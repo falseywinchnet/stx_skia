@@ -89,6 +89,74 @@ bool chain(int width, int height, SkColorType format, Output& output) {
     return true;
 }
 
+bool rg16_average() {
+    for (int height = 1; height <= 17; ++height) {
+        for (int width = 1; width <= 17; ++width) {
+            if (width == 1 && height == 1) continue;
+            const int outputWidth = width > 1 ? width / 2 : 1;
+            const int outputHeight = height > 1 ? height / 2 : 1;
+            const size_t sourceStride = static_cast<size_t>(width + 2);
+            const size_t destinationStride = static_cast<size_t>(outputWidth + 2);
+            std::vector<uint32_t> input(sourceStride * (height - 1) + width, 0xbaadbaadU);
+            std::vector<uint32_t> output(destinationStride * (outputHeight - 1) + outputWidth,
+                                         0xbaadbaadU);
+            for (int y = 0; y < height; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    const uint32_t red = static_cast<uint32_t>((x * 7919 + y * 3571) & 65535);
+                    const uint32_t green = static_cast<uint32_t>((x * 2131 + y * 4421 + 12345) & 65535);
+                    input[static_cast<size_t>(y) * sourceStride + x] = red | (green << 16);
+                }
+            }
+            const SkImageInfo info = SkImageInfo::Make(width, height, kR16G16_unorm_SkColorType,
+                                                       kOpaque_SkAlphaType);
+            const SkPixmap source(info, input.data(), sourceStride * sizeof(uint32_t));
+            const SkImageInfo destinationInfo = info.makeWH(outputWidth, outputHeight);
+            const SkPixmap destination(destinationInfo, output.data(),
+                                        destinationStride * sizeof(uint32_t));
+            std::unique_ptr<SkMipmapDownSampler> sampler = SkMipmap::MakeDownSampler(source);
+            if (!sampler) return false;
+            (*sampler).buildLevel(destination, source);
+            const int columns = width == 1 ? 1 : 2 + (width & 1);
+            const int rows = height == 1 ? 1 : 2 + (height & 1);
+            const unsigned divisor = (columns == 3 ? 4U : columns) * (rows == 3 ? 4U : rows);
+            for (int y = 0; y < outputHeight; ++y) {
+                for (int x = 0; x < outputWidth; ++x) {
+                    uint32_t redSum = 0;
+                    uint32_t greenSum = 0;
+                    for (int row = 0; row < rows; ++row) {
+                        for (int column = 0; column < columns; ++column) {
+                            const unsigned wx = columns == 3 && column == 1 ? 2U : 1U;
+                            const unsigned wy = rows == 3 && row == 1 ? 2U : 1U;
+                            const size_t index = static_cast<size_t>(2 * y + row) * sourceStride +
+                                                 2 * x + column;
+                            const uint32_t pixel = input[index];
+                            redSum += (pixel & 65535U) * wx * wy;
+                            greenSum += (pixel >> 16) * wx * wy;
+                        }
+                    }
+                    const uint32_t red = redSum / divisor;
+#ifdef STX_SKIA_REFERENCE
+                    // The pinned implementation narrows away the green channel.
+                    const uint32_t green = 0;
+#else
+                    const uint32_t green = greenSum / divisor;
+#endif
+                    const uint32_t expected = red | (green << 16);
+                    if (output[static_cast<size_t>(y) * destinationStride + x] != expected) return false;
+                }
+                if (y + 1 < outputHeight) {
+                    for (size_t x = static_cast<size_t>(outputWidth); x < destinationStride; ++x) {
+                        if (output[static_cast<size_t>(y) * destinationStride + x] != 0xbaadbaadU) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+
 bool independent_average() {
     alignas(8) std::array<uint8_t, 64> storage{};
     const SkImageInfo info = SkImageInfo::Make(4, 4, kRGBA_8888_SkColorType, kPremul_SkAlphaType);
@@ -274,6 +342,7 @@ bool invalid_inputs() {
 }
 
 int main(int argc, char** argv) {
+    if (!rg16_average()) return 7;
     if (!independent_average()) return 1;
     if (!builder()) return 2;
     if (!discardable(false) || !discardable(true)) return 3;

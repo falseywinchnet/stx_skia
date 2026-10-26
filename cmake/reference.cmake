@@ -307,3 +307,6 @@ foreach(unit IN ITEMS SkMipmap SkMipmapBuilder)
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkMipmapHQDownSampler.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkMipmapHQDownSampler.cpp)

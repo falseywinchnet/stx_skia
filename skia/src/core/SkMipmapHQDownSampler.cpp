@@ -96,10 +96,14 @@ struct ColorTypeFilter_88 {
 struct ColorTypeFilter_1616 {
     typedef uint32_t Type;
     static uint64_t Expand(uint32_t x) {
-        return (x & 0xFFFF) | ((x & ~0xFFFF) << 16);
+        const uint64_t wide = x;
+        const uint64_t expanded = (wide & 0xFFFFULL) | ((wide & 0xFFFF0000ULL) << 16);
+        return expanded;
     }
-    static uint16_t Compact(uint64_t x) {
-        return (x & 0xFFFF) | ((x >> 16) & ~0xFFFF);
+    static uint32_t Compact(uint64_t x) {
+        const uint64_t packed = (x & 0xFFFFULL) | ((x >> 16) & 0xFFFF0000ULL);
+        const uint32_t result = static_cast<uint32_t>(packed);
+        return result;
     }
 };
 
