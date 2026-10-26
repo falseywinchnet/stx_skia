@@ -23,12 +23,16 @@ public:
     }
 
     void setNewSize(int w, int h) {
-        fRootBounds.setXYWH(0, 0, w, h);
-
-        SkASSERT(fStack.count() == 1);
+        SkASSERT_RELEASE(w >= 0 && h >= 0);
+        SkASSERT_RELEASE(fStack.count() == 1);
         Rec& rec = fStack.back();
-        SkASSERT(rec.fDeferredCount == 0);
-        rec.fRC.setRect(fRootBounds);
+        SkASSERT_RELEASE(rec.fDeferredCount == 0);
+
+        const SkIRect newBounds = SkIRect::MakeWH(w, h);
+        const bool disableAA = SkScan::PathRequiresTiling(newBounds);
+        fRootBounds = newBounds;
+        fDisableAA = disableAA;
+        rec.fRC.setRect(newBounds);
     }
 
     const SkRasterClip& rc() const { return fStack.back().fRC; }

@@ -949,6 +949,15 @@ The block allocator's resize path now poisons the complete released suffix,
 including its first byte. A focused ASan shadow-boundary check verifies the
 retained/released boundary. See ../results/2026-10-26/BLOCK_RESIZE.md.
 
+## Raster clip resize state
+
+SkRasterClipStack now recalculates its scan-converter antialiasing policy when
+the root extent changes. It validates the required unsaved root state and
+dimensions before updating bounds. A fractional-rectangle fixture crosses the
+scanner's tiling limit in both directions. The original header remains the
+reference build's version; see ../results/2026-10-26/RASTER_CLIP_RESIZE.md.
+The broader clipping and scan-conversion implementations remain unconverted.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
