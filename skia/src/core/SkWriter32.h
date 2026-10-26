@@ -28,6 +28,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <type_traits>
 #include <cstring>
 
@@ -35,7 +36,7 @@ class SkMatrix;
 struct SkSamplingOptions;
 
 // Owns internal storage and borrows optional caller-owned initial storage. The
-// caller keeps external storage alive and disjoint from this owner's allocation.
+// caller keeps external storage alive and disjoint from this object and its allocation.
 // Reset discards live bytes but retains the internal allocation until reuse or
 // destruction. Growing copies external live bytes once and then uses internal storage.
 // Extent/offset violations and allocation failure terminate; writes have no error state.
@@ -66,12 +67,17 @@ public:
     // reset or destruction; fill it before snapshot/flatten/read operations.
     uint32_t* reserve(size_t size) {
         SkASSERT_RELEASE(SkIsAlign4(size));
-        SkASSERT_RELEASE(size <= MaximumExtent - fUsed);
+        SkASSERT_RELEASE(size <= MaximumExtent);
         const size_t offset = fUsed;
+        // Each addend fits ptrdiff_t, so their sum fits size_t. Only growth can
+        // exceed the admitted extent; fitting writes keep the original fast path.
         const size_t required = offset + size;
-        if (required > fCapacity) growToAtLeast(required);
+        if (required > fCapacity) {
+            SkASSERT_RELEASE(required <= MaximumExtent);
+            growToAtLeast(required);
+        }
         fUsed = required;
-        if (fData == nullptr) return nullptr;
+        if (size == 0 && fData == nullptr) return nullptr;
         uint32_t* storage = reinterpret_cast<uint32_t*>(fData + offset);
         return storage;
     }
@@ -107,13 +113,14 @@ public:
         const int32_t low = value & 0xffff;
         write32(low);
     }
+    // Begin the scalar record lifetime while retaining its type for alias analysis.
     void write32(int32_t value) {
-        void* destination = reserve(sizeof(value));
-        std::memcpy(destination, &value, sizeof(value));
+        int32_t* destination = reinterpret_cast<int32_t*>(reserve(sizeof(value)));
+        std::construct_at(destination, value);
     }
     void writeScalar(SkScalar value) {
-        void* destination = reserve(sizeof(value));
-        std::memcpy(destination, &value, sizeof(value));
+        SkScalar* destination = reinterpret_cast<SkScalar*>(reserve(sizeof(value)));
+        std::construct_at(destination, value);
     }
     void writePoint(const SkPoint& point) { write(&point, sizeof(point)); }
     void writePoint3(const SkPoint3& point) { write(&point, sizeof(point)); }
@@ -147,7 +154,7 @@ public:
         std::memcpy(destination, values, size);
     }
 
-    // Only alignment padding is initialized. The caller fills the claimed payload.
+    // When padding is needed, zero the final word. The caller fills the full payload.
     uint32_t* reservePad(size_t size) {
         SkASSERT_RELEASE(size <= MaximumExtent - 3);
         const size_t aligned = SkAlign4(size);
@@ -210,6 +217,7 @@ public:
 
 private:
     static constexpr size_t MaximumExtent = static_cast<size_t>(std::numeric_limits<ptrdiff_t>::max());
+    static_assert(MaximumExtent <= std::numeric_limits<size_t>::max() / 2);
     void growToAtLeast(size_t size);
 
     uint8_t* fData = nullptr;  // Borrows either fInternal or external storage.

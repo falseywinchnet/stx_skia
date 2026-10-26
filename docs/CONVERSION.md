@@ -705,6 +705,23 @@ callbacks now round-trip the base and two mip levels. No speed gain is claimed.
 See ../results/2026-10-26/WRITE_BUFFER.md. SkWriter32's underlying storage and growth
 implementation remains a separate required conversion.
 
+## Storage writer and inline capacity
+
+SkWriter32.h/.cpp are converted with bounded reservation/growth, checked string
+sizes, defined empty behavior and value-returning record reads. Scalar records
+begin lifetime through typed construction; inline capacity uses an aligned byte
+array. The five-field owner remains 40 bytes, and SkSWriter32<24> remains 64 bytes.
+No new lifetime metadata is added. Unused stream input is removed.
+
+The first correct conversion regressed about threefold in the word loop. Moving
+the remaining extent check to growth and restoring typed scalar stores recovers
+the original fitting path; final paired medians are within about 1%, with overlapping
+ranges. Earlier regressions, including an 8% result for full supplied capacity,
+remain recorded. Both 34-test profiles, independent byte expectations across
+fourteen capacities, render/serialization comparisons, instrumented suites,
+relocated consumer and GUI.Forms gates pass. See ../results/2026-10-26/WRITER32.md
+and its raw measurements/native probe. This is not a rendering-speed claim.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
