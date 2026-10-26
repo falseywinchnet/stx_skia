@@ -737,6 +737,21 @@ cover release, move, self-move, moved-from reuse and 120 inline/heap transitions
 No speed gain is claimed. See ../results/2026-10-26/AUTO_MALLOC.md. The typed allocation
 templates and other remaining memory/raster implementation still require conversion.
 
+## Typed heap allocation owner
+
+AutoTMalloc is extracted into its own header and converted, retaining its single
+owning pointer and eight-byte M4 layout. Reallocation checks element-count
+multiplication before releasing ownership. Reset/reallocation policies remain;
+compile-time borrow and type constraints replace implicit assumptions without
+adding tracking fields. The original mixed template header is preserved for the
+reference. Other classes in that header still require conversion.
+
+Both 36-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass.
+New fixtures exercise 864
+resize transitions plus ownership transfer and reset. No speed gain is claimed.
+See ../results/2026-10-26/AUTO_TMALLOC.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

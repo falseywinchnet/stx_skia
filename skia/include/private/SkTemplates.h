@@ -9,6 +9,7 @@
 #define SkTemplates_DEFINED
 
 #include "include/private/SkAlign.h"
+#include "include/private/SkAutoTMalloc.h"
 #include "include/private/SkAssert.h"
 #include "include/private/SkMalloc.h"
 #include "include/private/SkTLogic.h"
@@ -304,61 +305,6 @@ private:
     T* fArray;
     alignas(T) std::byte fStorage[kCount * sizeof(T)];
     int fCount;
-};
-
-/** Manages an array of T elements, freeing the array in the destructor.
- *  Does NOT call any constructors/destructors on T (T must be POD).
- */
-template <typename T,
-          typename = std::enable_if_t<std::is_trivially_default_constructible<T>::value &&
-                                      std::is_trivially_destructible<T>::value>>
-class AutoTMalloc  {
-public:
-    /** Takes ownership of the ptr. The ptr must be a value which can be passed to sk_free. */
-    explicit AutoTMalloc(T* ptr = nullptr) : fPtr(ptr) {}
-
-    /** Allocates space for 'count' Ts. */
-    explicit AutoTMalloc(size_t count)
-        : fPtr(count ? (T*)sk_malloc_throw(count, sizeof(T)) : nullptr) {}
-
-    AutoTMalloc(AutoTMalloc&&) = default;
-    AutoTMalloc& operator=(AutoTMalloc&&) = default;
-
-    /** Resize the memory area pointed to by the current ptr preserving contents. */
-    void realloc(size_t count) {
-        fPtr.reset(count ? (T*)sk_realloc_throw(fPtr.release(), count * sizeof(T)) : nullptr);
-    }
-
-    /** Resize the memory area pointed to by the current ptr without preserving contents. */
-    [[clang::reinitializes]]
-    T* reset(size_t count = 0) {
-        fPtr.reset(count ? (T*)sk_malloc_throw(count, sizeof(T)) : nullptr);
-        return this->get();
-    }
-
-    T* get() const { return fPtr.get(); }
-
-    operator T*() { return fPtr.get(); }
-
-    operator const T*() const { return fPtr.get(); }
-
-    T& operator[](int index) { return fPtr.get()[index]; }
-
-    const T& operator[](int index) const { return fPtr.get()[index]; }
-
-    /** Aliases matching other types, like std::vector. */
-    const T* data() const { return fPtr.get(); }
-    T* data() { return fPtr.get(); }
-
-    /**
-     *  Transfer ownership of the ptr to the caller, setting the internal
-     *  pointer to NULL. Note that this differs from get(), which also returns
-     *  the pointer, but it does not transfer ownership.
-     */
-    T* release() { return fPtr.release(); }
-
-private:
-    std::unique_ptr<T, SkOverloadedFunctionObject<void(void*), sk_free>> fPtr;
 };
 
 template <size_t kCountRequested,
