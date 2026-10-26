@@ -30,9 +30,23 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <utility>
 
 namespace {
+
+// The input may borrow this builder's points. Preserve it before an append can
+// move the array; disjoint callers keep the direct copy path.
+bool points_overlap(SkSpan<const SkPoint> source, SkSpan<const SkPoint> stored) {
+    if (source.empty() || stored.empty()) {
+        return false;
+    }
+    std::less<const SkPoint*> less;
+    const SkPoint* sourceEnd = source.data() + source.size();
+    const SkPoint* storedEnd = stored.data() + stored.size();
+    const bool overlaps = less(source.data(), storedEnd) && less(stored.data(), sourceEnd);
+    return overlaps;
+}
 
 void subdivide_cubic_to(SkPathBuilder* path, const SkPoint pts[4], int level = 2) {
     if (--level >= 0) {
@@ -794,6 +808,12 @@ SkPathBuilder& SkPathBuilder::addPolygon(SkSpan<const SkPoint> pts, bool isClose
         return *this;
     }
 
+    PointsArray stablePoints;
+    if (points_overlap(pts, fPts)) {
+        stablePoints = PointsArray(pts);
+        pts = stablePoints;
+    }
+
     this->moveTo(pts[0]);
     this->polylineTo(pts.last(pts.size() - 1));
     if (isClosed) {
@@ -804,6 +824,12 @@ SkPathBuilder& SkPathBuilder::addPolygon(SkSpan<const SkPoint> pts, bool isClose
 
 SkPathBuilder& SkPathBuilder::polylineTo(SkSpan<const SkPoint> pts) {
     if (!pts.empty()) {
+        PointsArray stablePoints;
+        if (points_overlap(pts, fPts)) {
+            stablePoints = PointsArray(pts);
+            pts = stablePoints;
+        }
+
         this->ensureMove();
 
         const auto count = pts.size();

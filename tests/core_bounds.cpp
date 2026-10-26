@@ -1,4 +1,5 @@
 #include "include/core/SkStream.h"
+#include "include/core/SkPathBuilder.h"
 #include "src/core/SkBase64.h"
 
 #include <array>
@@ -95,6 +96,53 @@ bool stream_counts() {
     }
     return true;
 }
+
+bool file_stream_failure_states() {
+    std::array<uint8_t, 1> output = {0x5a};
+    SkFILEStream reader;
+    if (reader.isValid() || reader.read(output.data(), output.size()) != 0) return false;
+    if (output[0] != 0x5a) return false;
+    reader.close();
+    if (reader.read(output.data(), output.size()) != 0) return false;
+
+    SkFILEWStream writer(nullptr);
+    if (writer.isValid() || writer.bytesWritten() != 0) return false;
+    if (writer.write(output.data(), output.size())) return false;
+    return writer.bytesWritten() == 0;
+}
+
+bool aliased_path_points() {
+    SkPathBuilder polygon;
+    polygon.moveTo(0, 0);
+    for (int index = 1; index < 32; ++index) {
+        polygon.lineTo(static_cast<float>(index), static_cast<float>(index + 1));
+    }
+    const SkSpan<const SkPoint> polygonInput = polygon.points();
+    polygon.addPolygon(polygonInput, false);
+    const SkSpan<const SkPoint> polygonOutput = polygon.points();
+    if (polygonOutput.size() != 64) return false;
+    for (int index = 0; index < 32; ++index) {
+        const SkPoint expected = polygonOutput[index];
+        const SkPoint actual = polygonOutput[index + 32];
+        if (actual.fX != expected.fX || actual.fY != expected.fY) return false;
+    }
+
+    SkPathBuilder polyline;
+    polyline.moveTo(0, 0);
+    for (int index = 1; index < 32; ++index) {
+        polyline.lineTo(static_cast<float>(index), static_cast<float>(index + 1));
+    }
+    const SkSpan<const SkPoint> lineInput = polyline.points();
+    polyline.polylineTo(lineInput);
+    const SkSpan<const SkPoint> lineOutput = polyline.points();
+    if (lineOutput.size() != 64) return false;
+    for (int index = 0; index < 32; ++index) {
+        const SkPoint expected = lineOutput[index];
+        const SkPoint actual = lineOutput[index + 32];
+        if (actual.fX != expected.fX || actual.fY != expected.fY) return false;
+    }
+    return true;
+}
 }
 
 int main() {
@@ -105,6 +153,14 @@ int main() {
     if (!stream_counts()) {
         std::fprintf(stderr, "stream copy count contract failed\n");
         return 2;
+    }
+    if (!file_stream_failure_states()) {
+        std::fprintf(stderr, "file stream failure contract failed\n");
+        return 3;
+    }
+    if (!aliased_path_points()) {
+        std::fprintf(stderr, "aliased path point contract failed\n");
+        return 4;
     }
     return 0;
 }

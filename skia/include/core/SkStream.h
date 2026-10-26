@@ -457,6 +457,7 @@ public:
     bool write(const void* buffer, size_t size) override;
     void flush() override;
     void fsync();
+    /** Returns zero when the file is no longer valid. */
     size_t bytesWritten() const override;
 
 private:

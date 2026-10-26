@@ -213,6 +213,9 @@ size_t SkFILEStream::read(void* buffer, size_t size) {
     if (size > fEnd - fCurrent) {
         size = fEnd - fCurrent;
     }
+    if (size == 0 || fFILE == nullptr) {
+        return 0;
+    }
     size_t bytesRead = size;
     if (buffer) {
         bytesRead = sk_qread(fFILE.get(), buffer, size, fCurrent);
@@ -439,7 +442,7 @@ const void* SkMemoryStream::getAtPos() {
 
 SkFILEWStream::SkFILEWStream(const char path[])
 {
-    fFILE = sk_fopen(path, kWrite_SkFILE_Flag);
+    fFILE = path != nullptr ? sk_fopen(path, kWrite_SkFILE_Flag) : nullptr;
 }
 
 SkFILEWStream::~SkFILEWStream()
@@ -450,6 +453,9 @@ SkFILEWStream::~SkFILEWStream()
 }
 
 size_t SkFILEWStream::bytesWritten() const {
+    if (fFILE == nullptr) {
+        return 0;
+    }
     return sk_ftell(fFILE);
 }
 
