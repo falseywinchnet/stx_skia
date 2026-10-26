@@ -14,299 +14,356 @@
 #include "src/core/SkMipmap.h"
 #include "src/core/SkVx.h"
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+
 namespace {
 
+// Integer channels have enough spare bits for the largest sum (16 weighted
+// samples). Half-float channels expand to binary32 lanes; arithmetic order and
+// narrowing retain the original filter's rounding. No platform intrinsics.
 struct ColorTypeFilter_8888 {
-    typedef uint32_t Type;
-    static skvx::Vec<4, uint16_t> Expand(uint32_t x) {
-        return skvx::cast<uint16_t>(skvx::byte4::Load(&x));
+    using Type = uint32_t;
+    using Expanded = skvx::Vec<4, uint16_t>;
+    static Expanded Expand(Type pixel) {
+        const skvx::byte4 bytes = skvx::byte4::Load(&pixel);
+        const Expanded channels = skvx::cast<uint16_t>(bytes);
+        return channels;
     }
-    static uint32_t Compact(const skvx::Vec<4, uint16_t>& x) {
-        uint32_t r;
-        skvx::cast<uint8_t>(x).store(&r);
-        return r;
+    static Type Compact(const Expanded& channels) {
+        Type packed = 0;
+        const skvx::byte4 bytes = skvx::cast<uint8_t>(channels);
+        bytes.store(&packed);
+        return packed;
     }
 };
 
 struct ColorTypeFilter_565 {
-    typedef uint16_t Type;
-    static uint32_t Expand(uint16_t x) {
-        return (x & ~SK_G16_MASK_IN_PLACE) | ((x & SK_G16_MASK_IN_PLACE) << 16);
+    using Type = uint16_t;
+    using Expanded = uint32_t;
+    static Expanded Expand(Type pixel) {
+        const Expanded channels = (pixel & ~SK_G16_MASK_IN_PLACE) |
+                                  ((pixel & SK_G16_MASK_IN_PLACE) << 16);
+        return channels;
     }
-    static uint16_t Compact(uint32_t x) {
-        return ((x & ~SK_G16_MASK_IN_PLACE) & 0xFFFF) | ((x >> 16) & SK_G16_MASK_IN_PLACE);
+    static Type Compact(Expanded channels) {
+        const Expanded packed = ((channels & ~SK_G16_MASK_IN_PLACE) & 0xFFFF) |
+                                ((channels >> 16) & SK_G16_MASK_IN_PLACE);
+        const Type result = static_cast<Type>(packed);
+        return result;
     }
 };
 
 struct ColorTypeFilter_4444 {
-    typedef uint16_t Type;
-    static uint32_t Expand(uint16_t x) {
-        return (x & 0xF0F) | ((x & ~0xF0F) << 12);
+    using Type = uint16_t;
+    using Expanded = uint32_t;
+    static Expanded Expand(Type pixel) {
+        const Expanded channels = (pixel & 0xF0F) | ((pixel & ~0xF0F) << 12);
+        return channels;
     }
-    static uint16_t Compact(uint32_t x) {
-        return (x & 0xF0F) | ((x >> 12) & ~0xF0F);
+    static Type Compact(Expanded channels) {
+        const Expanded packed = (channels & 0xF0F) | ((channels >> 12) & ~0xF0F);
+        const Type result = static_cast<Type>(packed);
+        return result;
     }
 };
 
 struct ColorTypeFilter_8 {
-    typedef uint8_t Type;
-    static unsigned Expand(unsigned x) {
-        return x;
-    }
-    static uint8_t Compact(unsigned x) {
-        return (uint8_t)x;
+    using Type = uint8_t;
+    using Expanded = unsigned;
+    static Expanded Expand(unsigned pixel) { return pixel; }
+    static Type Compact(Expanded channels) {
+        const Type result = static_cast<Type>(channels);
+        return result;
     }
 };
 
 struct ColorTypeFilter_F16 {
-    typedef uint16_t Type;
-    static skvx::float4 Expand(uint16_t x) {
-        uint64_t x4 = (uint64_t)x; // add 0s out to four lanes (0,0,0,x)
-        return from_half(skvx::half4::Load(&x4));
+    using Type = uint16_t;
+    using Expanded = skvx::float4;
+    static Expanded Expand(Type pixel) {
+        const uint64_t packed = pixel; // Three unused half lanes are zero.
+        const skvx::half4 halves = skvx::half4::Load(&packed);
+        const Expanded channels = from_half(halves);
+        return channels;
     }
-    static uint16_t Compact(const skvx::float4& x) {
-        uint64_t r;
-        to_half(x).store(&r);
-        return r & 0xFFFF;  // but ignore the extra 3 here
+    static Type Compact(const Expanded& channels) {
+        uint64_t packed = 0;
+        const skvx::half4 halves = to_half(channels);
+        halves.store(&packed);
+        const Type result = static_cast<Type>(packed & 0xFFFFULL);
+        return result;
     }
 };
 
 struct ColorTypeFilter_RGBA_F16 {
-    typedef uint64_t Type; // SkHalf x4
-    static skvx::float4 Expand(uint64_t x) {
-        return from_half(skvx::half4::Load(&x));
+    using Type = uint64_t;
+    using Expanded = skvx::float4;
+    static Expanded Expand(Type pixel) {
+        const skvx::half4 halves = skvx::half4::Load(&pixel);
+        const Expanded channels = from_half(halves);
+        return channels;
     }
-    static uint64_t Compact(const skvx::float4& x) {
-        uint64_t r;
-        to_half(x).store(&r);
-        return r;
+    static Type Compact(const Expanded& channels) {
+        Type packed = 0;
+        const skvx::half4 halves = to_half(channels);
+        halves.store(&packed);
+        return packed;
     }
 };
 
 struct ColorTypeFilter_88 {
-    typedef uint16_t Type;
-    static uint32_t Expand(uint16_t x) {
-        return (x & 0xFF) | ((x & ~0xFF) << 8);
+    using Type = uint16_t;
+    using Expanded = uint32_t;
+    static Expanded Expand(Type pixel) {
+        const Expanded channels = (pixel & 0xFF) | ((pixel & ~0xFF) << 8);
+        return channels;
     }
-    static uint16_t Compact(uint32_t x) {
-        return (x & 0xFF) | ((x >> 8) & ~0xFF);
+    static Type Compact(Expanded channels) {
+        const Expanded packed = (channels & 0xFF) | ((channels >> 8) & ~0xFF);
+        const Type result = static_cast<Type>(packed);
+        return result;
     }
 };
 
 struct ColorTypeFilter_1616 {
-    typedef uint32_t Type;
-    static uint64_t Expand(uint32_t x) {
-        const uint64_t wide = x;
-        const uint64_t expanded = (wide & 0xFFFFULL) | ((wide & 0xFFFF0000ULL) << 16);
-        return expanded;
+    using Type = uint32_t;
+    using Expanded = uint64_t;
+    static Expanded Expand(Type pixel) {
+        const Expanded wide = pixel;
+        const Expanded channels = (wide & 0xFFFFULL) | ((wide & 0xFFFF0000ULL) << 16);
+        return channels;
     }
-    static uint32_t Compact(uint64_t x) {
-        const uint64_t packed = (x & 0xFFFFULL) | ((x >> 16) & 0xFFFF0000ULL);
-        const uint32_t result = static_cast<uint32_t>(packed);
+    static Type Compact(Expanded channels) {
+        const Expanded packed = (channels & 0xFFFFULL) | ((channels >> 16) & 0xFFFF0000ULL);
+        const Type result = static_cast<Type>(packed);
         return result;
     }
 };
 
 struct ColorTypeFilter_F16F16 {
-    typedef uint32_t Type;
-    static skvx::float4 Expand(uint32_t x) {
-        uint64_t x4 = (uint64_t)x; // // add 0s out to four lanes (0,0,x,x)
-        return from_half(skvx::half4::Load(&x4));
+    using Type = uint32_t;
+    using Expanded = skvx::float4;
+    static Expanded Expand(Type pixel) {
+        const uint64_t packed = pixel; // Two unused half lanes are zero.
+        const skvx::half4 halves = skvx::half4::Load(&packed);
+        const Expanded channels = from_half(halves);
+        return channels;
     }
-    static uint32_t Compact(const skvx::float4& x) {
-        uint64_t r;
-        to_half(x).store(&r);
-        return (uint32_t) (r & 0xFFFFFFFF);  // but ignore the extra 2 here
+    static Type Compact(const Expanded& channels) {
+        uint64_t packed = 0;
+        const skvx::half4 halves = to_half(channels);
+        halves.store(&packed);
+        const Type result = static_cast<Type>(packed & 0xFFFFFFFFULL);
+        return result;
     }
 };
 
 struct ColorTypeFilter_16161616 {
-    typedef uint64_t Type;
-    static skvx::Vec<4, uint32_t> Expand(uint64_t x) {
-        return skvx::cast<uint32_t>(skvx::Vec<4, uint16_t>::Load(&x));
+    using Type = uint64_t;
+    using Expanded = skvx::Vec<4, uint32_t>;
+    static Expanded Expand(Type pixel) {
+        const skvx::Vec<4, uint16_t> words = skvx::Vec<4, uint16_t>::Load(&pixel);
+        const Expanded channels = skvx::cast<uint32_t>(words);
+        return channels;
     }
-    static uint64_t Compact(const skvx::Vec<4, uint32_t>& x) {
-        uint64_t r;
-        skvx::cast<uint16_t>(x).store(&r);
-        return r;
+    static Type Compact(const Expanded& channels) {
+        Type packed = 0;
+        const skvx::Vec<4, uint16_t> words = skvx::cast<uint16_t>(channels);
+        words.store(&packed);
+        return packed;
     }
 };
 
 struct ColorTypeFilter_16 {
-    typedef uint16_t Type;
-    static uint32_t Expand(uint16_t x) {
-        return x;
-    }
-    static uint16_t Compact(uint32_t x) {
-        return (uint16_t) x;
+    using Type = uint16_t;
+    using Expanded = uint32_t;
+    static Expanded Expand(Type pixel) { return pixel; }
+    static Type Compact(Expanded channels) {
+        const Type result = static_cast<Type>(channels);
+        return result;
     }
 };
 
 struct ColorTypeFilter_1010102 {
-    typedef uint32_t Type;
-    static uint64_t Expand(uint64_t x) {
-        return (((x      ) & 0x3ff)      ) |
-        (((x >> 10) & 0x3ff) << 16) |
-        (((x >> 20) & 0x3ff) << 32) |
-        (((x >> 30) & 0x3  ) << 48);
+    using Type = uint32_t;
+    using Expanded = uint64_t;
+    static Expanded Expand(Expanded pixel) {
+        const Expanded channels = (pixel & 0x3ffULL) |
+                                  (((pixel >> 10) & 0x3ffULL) << 16) |
+                                  (((pixel >> 20) & 0x3ffULL) << 32) |
+                                  (((pixel >> 30) & 0x3ULL) << 48);
+        return channels;
     }
-    static uint32_t Compact(uint64_t x) {
-        return (((x      ) & 0x3ff)      ) |
-        (((x >> 16) & 0x3ff) << 10) |
-        (((x >> 32) & 0x3ff) << 20) |
-        (((x >> 48) & 0x3  ) << 30);
+    static Type Compact(Expanded channels) {
+        const Expanded packed = (channels & 0x3ffULL) |
+                                (((channels >> 16) & 0x3ffULL) << 10) |
+                                (((channels >> 32) & 0x3ffULL) << 20) |
+                                (((channels >> 48) & 0x3ULL) << 30);
+        const Type result = static_cast<Type>(packed);
+        return result;
     }
 };
 
 template <typename T> T add_121(const T& a, const T& b, const T& c) {
-    return a + b + b + c;
+    const T sum = a + b + b + c;
+    return sum;
 }
 
-template <typename T> T shift_right(const T& x, int bits) {
-    return x >> bits;
+template <typename T> T shift_right(const T& value, int bits) {
+    const T shifted = value >> bits;
+    return shifted;
 }
 
-skvx::float4 shift_right(const skvx::float4& x, int bits) {
-    return x * (1.0f / (1 << bits));
+skvx::float4 shift_right(const skvx::float4& value, int bits) {
+    const float scale = 1.0f / (1 << bits);
+    const skvx::float4 shifted = value * scale;
+    return shifted;
 }
 
-template <typename T> T shift_left(const T& x, int bits) {
-    return x << bits;
+template <typename T> T shift_left(const T& value, int bits) {
+    const T shifted = value << bits;
+    return shifted;
 }
 
-skvx::float4 shift_left(const skvx::float4& x, int bits) {
-    return x * (1 << bits);
+skvx::float4 shift_left(const skvx::float4& value, int bits) {
+    const float scale = static_cast<float>(1 << bits);
+    const skvx::float4 shifted = value * scale;
+    return shifted;
 }
 
-//
-//  To produce each mip level, we need to filter down by 1/2 (e.g. 100x100 -> 50,50)
-//  If the starting dimension is odd, we floor the size of the lower level (e.g. 101 -> 50)
-//  In those (odd) cases, we use a triangle filter, with 1-pixel overlap between samplings,
-//  else for even cases, we just use a 2x box filter.
-//
-//  This produces 4 possible isotropic filters: 2x2 2x3 3x2 3x3 where WxH indicates the number of
-//  src pixels we need to sample in each dimension to produce 1 dst pixel.
-//
-//  OpenGL expects a full mipmap stack to contain anisotropic space as well.
-//  This means a 100x1 image would continue down to a 50x1 image, 25x1 image...
-//  Because of this, we need 4 more anisotropic filters: 1x2, 1x3, 2x1, 3x1.
+// Each destination axis is max(1, floor(source/2)). Even axes use a two-sample
+// box; odd axes above one use overlapping [1,2,1] triangles. A singleton axis
+// uses one sample. The eight kernels implement all resulting footprints except
+// 1x1, which does not reduce. Inputs/outputs are disjoint, aligned and complete.
+// Three-column kernels carry the shared edge sum into the next output sample.
 
 template <typename F> void downsample_1_2(void* dst, const void* src, size_t srcRB, int count) {
     SkASSERT(count > 0);
-    auto p0 = static_cast<const typename F::Type*>(src);
-    auto p1 = (const typename F::Type*)((const char*)p0 + srcRB);
-    auto d = static_cast<typename F::Type*>(dst);
+    const typename F::Type* p0 = static_cast<const typename F::Type*>(src);
+    const uint8_t* sourceBytes = static_cast<const uint8_t*>(src);
+    const typename F::Type* p1 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB);
+    typename F::Type* d = static_cast<typename F::Type*>(dst);
 
     for (int i = 0; i < count; ++i) {
-        auto c00 = F::Expand(p0[0]);
-        auto c10 = F::Expand(p1[0]);
+        const size_t sourceIndex = static_cast<size_t>(i) * 2;
+        const typename F::Expanded c00 = F::Expand(p0[sourceIndex]);
+        const typename F::Expanded c10 = F::Expand(p1[sourceIndex]);
 
-        auto c = c00 + c10;
-        d[i] = F::Compact(shift_right(c, 1));
-        p0 += 2;
-        p1 += 2;
+        const typename F::Expanded c = c00 + c10;
+        const typename F::Expanded reduced = shift_right(c, 1);
+        d[i] = F::Compact(reduced);
     }
 }
 
 template <typename F> void downsample_1_3(void* dst, const void* src, size_t srcRB, int count) {
     SkASSERT(count > 0);
-    auto p0 = static_cast<const typename F::Type*>(src);
-    auto p1 = (const typename F::Type*)((const char*)p0 + srcRB);
-    auto p2 = (const typename F::Type*)((const char*)p1 + srcRB);
-    auto d = static_cast<typename F::Type*>(dst);
+    const typename F::Type* p0 = static_cast<const typename F::Type*>(src);
+    const uint8_t* sourceBytes = static_cast<const uint8_t*>(src);
+    const typename F::Type* p1 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB);
+    const typename F::Type* p2 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB * 2);
+    typename F::Type* d = static_cast<typename F::Type*>(dst);
 
     for (int i = 0; i < count; ++i) {
-        auto c00 = F::Expand(p0[0]);
-        auto c10 = F::Expand(p1[0]);
-        auto c20 = F::Expand(p2[0]);
+        const size_t sourceIndex = static_cast<size_t>(i) * 2;
+        const typename F::Expanded c00 = F::Expand(p0[sourceIndex]);
+        const typename F::Expanded c10 = F::Expand(p1[sourceIndex]);
+        const typename F::Expanded c20 = F::Expand(p2[sourceIndex]);
 
-        auto c = add_121(c00, c10, c20);
-        d[i] = F::Compact(shift_right(c, 2));
-        p0 += 2;
-        p1 += 2;
-        p2 += 2;
+        const typename F::Expanded c = add_121(c00, c10, c20);
+        const typename F::Expanded reduced = shift_right(c, 2);
+        d[i] = F::Compact(reduced);
     }
 }
 
 template <typename F> void downsample_2_1(void* dst, const void* src, size_t srcRB, int count) {
     SkASSERT(count > 0);
-    auto p0 = static_cast<const typename F::Type*>(src);
-    auto d = static_cast<typename F::Type*>(dst);
+    const typename F::Type* p0 = static_cast<const typename F::Type*>(src);
+    typename F::Type* d = static_cast<typename F::Type*>(dst);
 
     for (int i = 0; i < count; ++i) {
-        auto c00 = F::Expand(p0[0]);
-        auto c01 = F::Expand(p0[1]);
+        const size_t sourceIndex = static_cast<size_t>(i) * 2;
+        const typename F::Expanded c00 = F::Expand(p0[sourceIndex]);
+        const typename F::Expanded c01 = F::Expand(p0[sourceIndex + 1]);
 
-        auto c = c00 + c01;
-        d[i] = F::Compact(shift_right(c, 1));
-        p0 += 2;
+        const typename F::Expanded c = c00 + c01;
+        const typename F::Expanded reduced = shift_right(c, 1);
+        d[i] = F::Compact(reduced);
     }
 }
 
 template <typename F> void downsample_2_2(void* dst, const void* src, size_t srcRB, int count) {
     SkASSERT(count > 0);
-    auto p0 = static_cast<const typename F::Type*>(src);
-    auto p1 = (const typename F::Type*)((const char*)p0 + srcRB);
-    auto d = static_cast<typename F::Type*>(dst);
+    const typename F::Type* p0 = static_cast<const typename F::Type*>(src);
+    const uint8_t* sourceBytes = static_cast<const uint8_t*>(src);
+    const typename F::Type* p1 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB);
+    typename F::Type* d = static_cast<typename F::Type*>(dst);
 
     for (int i = 0; i < count; ++i) {
-        auto c00 = F::Expand(p0[0]);
-        auto c01 = F::Expand(p0[1]);
-        auto c10 = F::Expand(p1[0]);
-        auto c11 = F::Expand(p1[1]);
+        const size_t sourceIndex = static_cast<size_t>(i) * 2;
+        const typename F::Expanded c00 = F::Expand(p0[sourceIndex]);
+        const typename F::Expanded c01 = F::Expand(p0[sourceIndex + 1]);
+        const typename F::Expanded c10 = F::Expand(p1[sourceIndex]);
+        const typename F::Expanded c11 = F::Expand(p1[sourceIndex + 1]);
 
-        auto c = c00 + c10 + c01 + c11;
-        d[i] = F::Compact(shift_right(c, 2));
-        p0 += 2;
-        p1 += 2;
+        const typename F::Expanded c = c00 + c10 + c01 + c11;
+        const typename F::Expanded reduced = shift_right(c, 2);
+        d[i] = F::Compact(reduced);
     }
 }
 
 template <typename F> void downsample_2_3(void* dst, const void* src, size_t srcRB, int count) {
     SkASSERT(count > 0);
-    auto p0 = static_cast<const typename F::Type*>(src);
-    auto p1 = (const typename F::Type*)((const char*)p0 + srcRB);
-    auto p2 = (const typename F::Type*)((const char*)p1 + srcRB);
-    auto d = static_cast<typename F::Type*>(dst);
+    const typename F::Type* p0 = static_cast<const typename F::Type*>(src);
+    const uint8_t* sourceBytes = static_cast<const uint8_t*>(src);
+    const typename F::Type* p1 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB);
+    const typename F::Type* p2 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB * 2);
+    typename F::Type* d = static_cast<typename F::Type*>(dst);
 
     for (int i = 0; i < count; ++i) {
-        auto c00 = F::Expand(p0[0]);
-        auto c01 = F::Expand(p0[1]);
-        auto c10 = F::Expand(p1[0]);
-        auto c11 = F::Expand(p1[1]);
-        auto c20 = F::Expand(p2[0]);
-        auto c21 = F::Expand(p2[1]);
+        const size_t sourceIndex = static_cast<size_t>(i) * 2;
+        const typename F::Expanded c00 = F::Expand(p0[sourceIndex]);
+        const typename F::Expanded c01 = F::Expand(p0[sourceIndex + 1]);
+        const typename F::Expanded c10 = F::Expand(p1[sourceIndex]);
+        const typename F::Expanded c11 = F::Expand(p1[sourceIndex + 1]);
+        const typename F::Expanded c20 = F::Expand(p2[sourceIndex]);
+        const typename F::Expanded c21 = F::Expand(p2[sourceIndex + 1]);
 
-        auto c = add_121(c00, c10, c20) + add_121(c01, c11, c21);
-        d[i] = F::Compact(shift_right(c, 3));
-        p0 += 2;
-        p1 += 2;
-        p2 += 2;
+        const typename F::Expanded firstColumn = add_121(c00, c10, c20);
+        const typename F::Expanded secondColumn = add_121(c01, c11, c21);
+        const typename F::Expanded c = firstColumn + secondColumn;
+        const typename F::Expanded reduced = shift_right(c, 3);
+        d[i] = F::Compact(reduced);
     }
 }
 
 template <typename F> void downsample_3_1(void* dst, const void* src, size_t srcRB, int count) {
     SkASSERT(count > 0);
-    auto p0 = static_cast<const typename F::Type*>(src);
-    auto d = static_cast<typename F::Type*>(dst);
+    const typename F::Type* p0 = static_cast<const typename F::Type*>(src);
+    typename F::Type* d = static_cast<typename F::Type*>(dst);
 
-    auto c02 = F::Expand(p0[0]);
+    typename F::Expanded c02 = F::Expand(p0[0]);
     for (int i = 0; i < count; ++i) {
-        auto c00 = c02;
-        auto c01 = F::Expand(p0[1]);
-        c02 = F::Expand(p0[2]);
+        const size_t sourceIndex = static_cast<size_t>(i) * 2;
+        const typename F::Expanded c00 = c02;
+        const typename F::Expanded c01 = F::Expand(p0[sourceIndex + 1]);
+        c02 = F::Expand(p0[sourceIndex + 2]);
 
-        auto c = add_121(c00, c01, c02);
-        d[i] = F::Compact(shift_right(c, 2));
-        p0 += 2;
+        const typename F::Expanded c = add_121(c00, c01, c02);
+        const typename F::Expanded reduced = shift_right(c, 2);
+        d[i] = F::Compact(reduced);
     }
 }
 
 template <typename F> void downsample_3_2(void* dst, const void* src, size_t srcRB, int count) {
     SkASSERT(count > 0);
-    auto p0 = static_cast<const typename F::Type*>(src);
-    auto p1 = (const typename F::Type*)((const char*)p0 + srcRB);
-    auto d = static_cast<typename F::Type*>(dst);
+    const typename F::Type* p0 = static_cast<const typename F::Type*>(src);
+    const uint8_t* sourceBytes = static_cast<const uint8_t*>(src);
+    const typename F::Type* p1 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB);
+    typename F::Type* d = static_cast<typename F::Type*>(dst);
 
     // Given pixels:
     // a0 b0 c0 d0 e0 ...
@@ -316,33 +373,34 @@ template <typename F> void downsample_3_2(void* dst, const void* src, size_t src
     // (c0 + 2*d0 + e0 + c1 + 2*d1 + e1) / 8
     // ...
 
-    auto c0 = F::Expand(p0[0]);
-    auto c1 = F::Expand(p1[0]);
-    auto c = c0 + c1;
+    typename F::Expanded c0 = F::Expand(p0[0]);
+    typename F::Expanded c1 = F::Expand(p1[0]);
+    typename F::Expanded c = c0 + c1;
     for (int i = 0; i < count; ++i) {
-        auto a = c;
+        const size_t sourceIndex = static_cast<size_t>(i) * 2;
+        const typename F::Expanded a = c;
 
-        auto b0 = F::Expand(p0[1]);
-        auto b1 = F::Expand(p1[1]);
-        auto b = b0 + b0 + b1 + b1;
+        const typename F::Expanded b0 = F::Expand(p0[sourceIndex + 1]);
+        const typename F::Expanded b1 = F::Expand(p1[sourceIndex + 1]);
+        const typename F::Expanded b = b0 + b0 + b1 + b1;
 
-        c0 = F::Expand(p0[2]);
-        c1 = F::Expand(p1[2]);
+        c0 = F::Expand(p0[sourceIndex + 2]);
+        c1 = F::Expand(p1[sourceIndex + 2]);
         c = c0 + c1;
 
-        auto sum = a + b + c;
-        d[i] = F::Compact(shift_right(sum, 3));
-        p0 += 2;
-        p1 += 2;
+        const typename F::Expanded sum = a + b + c;
+        const typename F::Expanded reduced = shift_right(sum, 3);
+        d[i] = F::Compact(reduced);
     }
 }
 
 template <typename F> void downsample_3_3(void* dst, const void* src, size_t srcRB, int count) {
     SkASSERT(count > 0);
-    auto p0 = static_cast<const typename F::Type*>(src);
-    auto p1 = (const typename F::Type*)((const char*)p0 + srcRB);
-    auto p2 = (const typename F::Type*)((const char*)p1 + srcRB);
-    auto d = static_cast<typename F::Type*>(dst);
+    const typename F::Type* p0 = static_cast<const typename F::Type*>(src);
+    const uint8_t* sourceBytes = static_cast<const uint8_t*>(src);
+    const typename F::Type* p1 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB);
+    const typename F::Type* p2 = reinterpret_cast<const typename F::Type*>(sourceBytes + srcRB * 2);
+    typename F::Type* d = static_cast<typename F::Type*>(dst);
 
     // Given pixels:
     // a0 b0 c0 d0 e0 ...
@@ -353,258 +411,133 @@ template <typename F> void downsample_3_3(void* dst, const void* src, size_t src
     // (c0 + 2*d0 + e0 + 2*c1 + 4*d1 + 2*e1 + c2 + 2*d2 + e2) / 16
     // ...
 
-    auto c0 = F::Expand(p0[0]);
-    auto c1 = F::Expand(p1[0]);
-    auto c2 = F::Expand(p2[0]);
-    auto c = add_121(c0, c1, c2);
+    typename F::Expanded c0 = F::Expand(p0[0]);
+    typename F::Expanded c1 = F::Expand(p1[0]);
+    typename F::Expanded c2 = F::Expand(p2[0]);
+    typename F::Expanded c = add_121(c0, c1, c2);
     for (int i = 0; i < count; ++i) {
-        auto a = c;
+        const size_t sourceIndex = static_cast<size_t>(i) * 2;
+        const typename F::Expanded a = c;
 
-        auto b0 = F::Expand(p0[1]);
-        auto b1 = F::Expand(p1[1]);
-        auto b2 = F::Expand(p2[1]);
-        auto b = shift_left(add_121(b0, b1, b2), 1);
+        const typename F::Expanded b0 = F::Expand(p0[sourceIndex + 1]);
+        const typename F::Expanded b1 = F::Expand(p1[sourceIndex + 1]);
+        const typename F::Expanded b2 = F::Expand(p2[sourceIndex + 1]);
+        const typename F::Expanded middleColumn = add_121(b0, b1, b2);
+        const typename F::Expanded b = shift_left(middleColumn, 1);
 
-        c0 = F::Expand(p0[2]);
-        c1 = F::Expand(p1[2]);
-        c2 = F::Expand(p2[2]);
+        c0 = F::Expand(p0[sourceIndex + 2]);
+        c1 = F::Expand(p1[sourceIndex + 2]);
+        c2 = F::Expand(p2[sourceIndex + 2]);
         c = add_121(c0, c1, c2);
 
-        auto sum = a + b + c;
-        d[i] = F::Compact(shift_right(sum, 4));
-        p0 += 2;
-        p1 += 2;
-        p2 += 2;
+        const typename F::Expanded sum = a + b + c;
+        const typename F::Expanded reduced = shift_right(sum, 4);
+        d[i] = F::Compact(reduced);
     }
 }
 
 
-typedef void FilterProc(void*, const void* srcPtr, size_t srcRB, int count);
+using FilterProc = void(void* destination, const void* source, size_t sourceRowBytes, int count);
+// Row-major [source rows - 1][source columns - 1]. The 1x1 entry is unused.
+using FilterTable = std::array<FilterProc*, 9>;
 
-struct HQDownSampler : SkMipmapDownSampler {
-    FilterProc* proc_1_2 = nullptr;
-    FilterProc* proc_1_3 = nullptr;
-    FilterProc* proc_2_1 = nullptr;
-    FilterProc* proc_2_2 = nullptr;
-    FilterProc* proc_2_3 = nullptr;
-    FilterProc* proc_3_1 = nullptr;
-    FilterProc* proc_3_2 = nullptr;
-    FilterProc* proc_3_3 = nullptr;
-
-    void buildLevel(const SkPixmap& dst, const SkPixmap& src) override;
+class HQDownSampler final : public SkMipmapDownSampler {
+public:
+    explicit HQDownSampler(const FilterTable& filters) : fFilters(filters) {}
+    void buildLevel(const SkPixmap& destination, const SkPixmap& source) override;
+private:
+    // The per-format static table outlives every sampler.
+    const FilterTable& fFilters;
 };
 
-void HQDownSampler::buildLevel(const SkPixmap& dst, const SkPixmap& src) {
-    const int width = src.width();
-    const int height = src.height();
-
-    FilterProc* proc;
-    if (height & 1) {
-        if (height == 1) {        // src-height is 1
-            if (width & 1) {      // src-width is 3
-                proc = proc_3_1;
-            } else {              // src-width is 2
-                proc = proc_2_1;
-            }
-        } else {                  // src-height is 3
-            if (width & 1) {
-                if (width == 1) { // src-width is 1
-                    proc = proc_1_3;
-                } else {          // src-width is 3
-                    proc = proc_3_3;
-                }
-            } else {              // src-width is 2
-                proc = proc_2_3;
-            }
-        }
-    } else {                      // src-height is 2
-        if (width & 1) {
-            if (width == 1) {     // src-width is 1
-                proc = proc_1_2;
-            } else {              // src-width is 3
-                proc = proc_3_2;
-            }
-        } else {                  // src-width is 2
-            proc = proc_2_2;
-        }
+void HQDownSampler::buildLevel(const SkPixmap& destination, const SkPixmap& source) {
+    const int width = source.width();
+    const int height = source.height();
+    const int columns = width == 1 ? 1 : 2 + (width & 1);
+    const int rows = height == 1 ? 1 : 2 + (height & 1);
+    const size_t filterIndex = static_cast<size_t>((rows - 1) * 3 + columns - 1);
+    FilterProc* procedure = fFilters[filterIndex];
+    if (procedure == nullptr) {
+        return; // The singleton image has no reduced level.
     }
-
-    const void* srcBasePtr = src.addr();
-    const size_t srcRB = src.rowBytes();
-    void* dstBasePtr = dst.writable_addr();
-
-    for (int y = 0; y < dst.height(); y++) {
-        proc(dstBasePtr, srcBasePtr, srcRB, dst.width());
-        srcBasePtr = (const char*)srcBasePtr + srcRB * 2; // jump two rows
-        dstBasePtr = (      char*)dstBasePtr + dst.rowBytes();
+    const int outputWidth = destination.width();
+    const int outputHeight = destination.height();
+    SkASSERT(outputWidth == std::max(1, width / 2));
+    SkASSERT(outputHeight == std::max(1, height / 2));
+    const size_t sourceStride = source.rowBytes();
+    const size_t destinationStride = destination.rowBytes();
+    const uint8_t* input = static_cast<const uint8_t*>(source.addr());
+    uint8_t* output = static_cast<uint8_t*>(destination.writable_addr());
+    for (int y = 0; y < outputHeight; ++y) {
+        // Form live row addresses only, including one-row and exact-sized buffers.
+        const size_t sourceOffset = static_cast<size_t>(y) * 2 * sourceStride;
+        const size_t destinationOffset = static_cast<size_t>(y) * destinationStride;
+        procedure(output + destinationOffset, input + sourceOffset, sourceStride, outputWidth);
     }
+}
+
+template <typename F>
+std::unique_ptr<SkMipmapDownSampler> make_sampler() {
+    static constexpr FilterTable filters{
+        nullptr, downsample_2_1<F>, downsample_3_1<F>,
+        downsample_1_2<F>, downsample_2_2<F>, downsample_3_2<F>,
+        downsample_1_3<F>, downsample_2_3<F>, downsample_3_3<F>};
+    std::unique_ptr<SkMipmapDownSampler> sampler = std::make_unique<HQDownSampler>(filters);
+    return sampler;
 }
 
 } // namespace
 
 std::unique_ptr<SkMipmapDownSampler> SkMipmap::MakeDownSampler(const SkPixmap& root) {
-    FilterProc* proc_1_2 = nullptr;
-    FilterProc* proc_1_3 = nullptr;
-    FilterProc* proc_2_1 = nullptr;
-    FilterProc* proc_2_2 = nullptr;
-    FilterProc* proc_2_3 = nullptr;
-    FilterProc* proc_3_1 = nullptr;
-    FilterProc* proc_3_2 = nullptr;
-    FilterProc* proc_3_3 = nullptr;
-
+    std::unique_ptr<SkMipmapDownSampler> sampler{};
     switch (root.colorType()) {
         case kRGBA_8888_SkColorType:
         case kBGRA_8888_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_8888>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_8888>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_8888>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_8888>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_8888>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_8888>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_8888>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_8888>;
+            sampler = make_sampler<ColorTypeFilter_8888>();
             break;
         case kRGB_565_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_565>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_565>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_565>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_565>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_565>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_565>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_565>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_565>;
+            sampler = make_sampler<ColorTypeFilter_565>();
             break;
         case kARGB_4444_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_4444>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_4444>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_4444>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_4444>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_4444>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_4444>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_4444>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_4444>;
+            sampler = make_sampler<ColorTypeFilter_4444>();
             break;
         case kAlpha_8_SkColorType:
         case kGray_8_SkColorType:
         case kR8_unorm_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_8>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_8>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_8>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_8>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_8>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_8>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_8>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_8>;
+            sampler = make_sampler<ColorTypeFilter_8>();
             break;
         case kRGBA_F16Norm_SkColorType:
         case kRGBA_F16_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_RGBA_F16>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_RGBA_F16>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_RGBA_F16>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_RGBA_F16>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_RGBA_F16>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_RGBA_F16>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_RGBA_F16>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_RGBA_F16>;
+            sampler = make_sampler<ColorTypeFilter_RGBA_F16>();
             break;
         case kR8G8_unorm_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_88>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_88>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_88>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_88>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_88>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_88>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_88>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_88>;
+            sampler = make_sampler<ColorTypeFilter_88>();
             break;
         case kR16G16_unorm_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_1616>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_1616>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_1616>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_1616>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_1616>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_1616>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_1616>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_1616>;
+            sampler = make_sampler<ColorTypeFilter_1616>();
             break;
         case kA16_unorm_SkColorType:
         case kR16_unorm_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_16>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_16>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_16>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_16>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_16>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_16>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_16>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_16>;
+            sampler = make_sampler<ColorTypeFilter_16>();
             break;
         case kRGBA_1010102_SkColorType:
         case kBGRA_1010102_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_1010102>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_1010102>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_1010102>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_1010102>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_1010102>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_1010102>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_1010102>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_1010102>;
+            sampler = make_sampler<ColorTypeFilter_1010102>();
             break;
         case kA16_float_SkColorType:
         case kR16_float_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_F16>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_F16>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_F16>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_F16>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_F16>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_F16>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_F16>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_F16>;
+            sampler = make_sampler<ColorTypeFilter_F16>();
             break;
         case kR16G16_float_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_F16F16>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_F16F16>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_F16F16>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_F16F16>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_F16F16>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_F16F16>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_F16F16>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_F16F16>;
+            sampler = make_sampler<ColorTypeFilter_F16F16>();
             break;
         case kR16G16B16A16_unorm_SkColorType:
-            proc_1_2 = downsample_1_2<ColorTypeFilter_16161616>;
-            proc_1_3 = downsample_1_3<ColorTypeFilter_16161616>;
-            proc_2_1 = downsample_2_1<ColorTypeFilter_16161616>;
-            proc_2_2 = downsample_2_2<ColorTypeFilter_16161616>;
-            proc_2_3 = downsample_2_3<ColorTypeFilter_16161616>;
-            proc_3_1 = downsample_3_1<ColorTypeFilter_16161616>;
-            proc_3_2 = downsample_3_2<ColorTypeFilter_16161616>;
-            proc_3_3 = downsample_3_3<ColorTypeFilter_16161616>;
+            sampler = make_sampler<ColorTypeFilter_16161616>();
             break;
-
-        case kUnknown_SkColorType:
-        case kRGB_888x_SkColorType:     // TODO: use 8888?
-        case kRGB_101010x_SkColorType:  // TODO: use 1010102?
-        case kBGR_101010x_SkColorType:  // TODO: use 1010102?
-        case kBGR_101010x_XR_SkColorType:  // TODO: use 1010102?
-        case kRGB_F16F16F16x_SkColorType:  // TODO: use F16?
-        case kBGRA_10101010_XR_SkColorType:
-        case kRGBA_10x6_SkColorType:
-        case kRGBA_F32_SkColorType:
-            return nullptr;
-
-        case kSRGBA_8888_SkColorType:  // TODO: needs careful handling
-            return nullptr;
+        default:
+            // Formats without an admitted filter remain unsupported.
+            break;
     }
-
-    auto sampler = std::make_unique<HQDownSampler>();
-    sampler->proc_1_2 = proc_1_2;
-    sampler->proc_1_3 = proc_1_3;
-    sampler->proc_2_1 = proc_2_1;
-    sampler->proc_2_2 = proc_2_2;
-    sampler->proc_2_3 = proc_2_3;
-    sampler->proc_3_1 = proc_3_1;
-    sampler->proc_3_2 = proc_3_2;
-    sampler->proc_3_3 = proc_3_3;
     return sampler;
 }
 

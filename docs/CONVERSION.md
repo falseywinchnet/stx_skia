@@ -423,6 +423,21 @@ transitions. It adds an eighth byte-identical artifact. Downsampling kernels and
 bitmap cache implementation remain separate conversion work. See
 ../results/2026-10-26/MIPMAP_STORAGE.md.
 
+## HQ mipmap downsampling kernels
+
+SkMipmapHQDownSampler.cpp now uses explicit expanded pixel types, named arithmetic
+results, live row/index traversal and a shared immutable table per format. The
+eight box/triangle footprints retain their sum order and shared-edge reuse.
+The source buffers are never advanced past their live extent in C++.
+
+Two separately committed packed-format corrections preserve RG16's green channel
+and give RGB10A2 alpha enough accumulator headroom. Independent weighted-sum tests
+cover those intentional reference differences. The remaining 16 supported formats
+retain byte comparisons; all common mip/render artifacts match. The selected
+kernels compile to common-width native/SSE2 code, with M4 timing evidence and
+limits recorded in ../results/2026-10-26/MIPMAP_KERNELS.md. The optional drawing
+mipmap implementation remains separate conversion work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

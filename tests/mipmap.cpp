@@ -10,9 +10,11 @@
 #include "src/image/SkImage_Base.h"
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <vector>
 
@@ -86,6 +88,69 @@ bool chain(int width, int height, SkColorType format, Output& output) {
     if (unchanged.fPixmap.width() != 1 || unchanged.fPixmap.height() != 1) return false;
     if (storage != original) return false;
     ++output.chains;
+    return true;
+}
+
+// Fill packed source representations directly so less common two-channel and
+// integer formats do not depend on the separate SkPixmap erase conversion path.
+void fill_raw(const SkPixmap& pixels, bool halfFloat) {
+    const size_t rowBytes = pixels.info().minRowBytes();
+    for (int y = 0; y < pixels.height(); ++y) {
+        uint8_t* row = static_cast<uint8_t*>(pixels.writable_addr(0, y));
+        if (halfFloat) {
+            for (size_t word = 0; word < rowBytes / 2; ++word) {
+                const uint16_t value = static_cast<uint16_t>(0x2000 + ((word * 131 + y * 313) % 0x1c00));
+                std::memcpy(row + word * 2, &value, sizeof(value));
+            }
+        } else {
+            for (size_t byte = 0; byte < rowBytes; ++byte) {
+                row[byte] = static_cast<uint8_t>((byte * 107 + y * 197 + 43) & 255);
+            }
+        }
+    }
+}
+
+bool packed_chains(Output& output) {
+    struct Format {
+        SkColorType colorType;
+        bool halfFloat;
+    };
+    // RG16 and RGB10A2 have independent oracles for their corrected channels.
+    constexpr std::array<Format, 16> formats{{
+        {kRGBA_8888_SkColorType, false}, {kBGRA_8888_SkColorType, false},
+        {kRGB_565_SkColorType, false}, {kARGB_4444_SkColorType, false},
+        {kAlpha_8_SkColorType, false}, {kGray_8_SkColorType, false},
+        {kR8_unorm_SkColorType, false}, {kRGBA_F16Norm_SkColorType, true},
+        {kRGBA_F16_SkColorType, true}, {kR8G8_unorm_SkColorType, false},
+        {kA16_unorm_SkColorType, false}, {kR16_unorm_SkColorType, false},
+        {kA16_float_SkColorType, true}, {kR16_float_SkColorType, true},
+        {kR16G16_float_SkColorType, true}, {kR16G16B16A16_unorm_SkColorType, false},
+    }};
+    for (const Format& format : formats) {
+        for (int height = 1; height <= 9; ++height) {
+            for (int width = 1; width <= 9; ++width) {
+                if (width == 1 && height == 1) continue;
+                const SkImageInfo info = SkImageInfo::Make(width, height, format.colorType,
+                                                           kPremul_SkAlphaType);
+                const size_t stride = info.minRowBytes() + 16;
+                const size_t extent = stride * (height - 1) + info.minRowBytes();
+                std::vector<uint64_t> storage((extent + 7) / 8, 0);
+                const SkPixmap source(info, storage.data(), stride);
+                fill_raw(source, format.halfFloat);
+                const std::vector<uint64_t> original = storage;
+                sk_sp<SkMipmap> mips(SkMipmap::Build(source, nullptr));
+                if (!mips) return false;
+                const int count = (*mips).countLevels();
+                for (int index = 0; index < count; ++index) {
+                    SkMipmap::Level level{};
+                    if (!(*mips).getLevel(index, &level)) return false;
+                    if (!record_pixels(level.fPixmap, output)) return false;
+                }
+                if (storage != original) return false;
+                ++output.chains;
+            }
+        }
+    }
     return true;
 }
 
@@ -371,6 +436,46 @@ bool discardable(bool discard) {
     return correct;
 }
 
+int benchmark() {
+    struct Case { int width; int height; int iterations; };
+    constexpr std::array<Case, 5> cases{{
+        {8, 8, 100000}, {127, 129, 500}, {128, 128, 500},
+        {1023, 1025, 20}, {1024, 1024, 20},
+    }};
+    constexpr std::array<SkColorType, 2> formats{kRGBA_8888_SkColorType, kRGBA_F16_SkColorType};
+    for (const SkColorType format : formats) {
+        for (const Case& sample : cases) {
+            const SkImageInfo info = SkImageInfo::Make(sample.width, sample.height, format,
+                                                       kPremul_SkAlphaType);
+            const int outputWidth = sample.width / 2;
+            const int outputHeight = sample.height / 2;
+            const SkImageInfo reducedInfo = info.makeWH(outputWidth, outputHeight);
+            const size_t sourceStride = info.minRowBytes() + 16;
+            const size_t destinationStride = reducedInfo.minRowBytes() + 16;
+            std::vector<uint64_t> input((sourceStride * sample.height + 7) / 8, 0);
+            std::vector<uint64_t> output((destinationStride * outputHeight + 7) / 8, 0);
+            const SkPixmap source(info, input.data(), sourceStride);
+            const SkPixmap destination(reducedInfo, output.data(), destinationStride);
+            fill_raw(source, format == kRGBA_F16_SkColorType);
+            std::unique_ptr<SkMipmapDownSampler> sampler = SkMipmap::MakeDownSampler(source);
+            if (!sampler) return 9;
+            (*sampler).buildLevel(destination, source);
+            const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+            for (int iteration = 0; iteration < sample.iterations; ++iteration) {
+                (*sampler).buildLevel(destination, source);
+            }
+            const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            const std::chrono::duration<double> elapsed = end - start;
+            Output result{};
+            if (!record_pixels(destination, result)) return 10;
+            std::printf("%d,%d,%d,%d,%.9f,%llu\n", static_cast<int>(format), sample.width,
+                        sample.height, sample.iterations, elapsed.count(),
+                        static_cast<unsigned long long>(result.hash));
+        }
+    }
+    return 0;
+}
+
 bool invalid_inputs() {
     events = AllocationEvents{};
     events.failAllocation = true;
@@ -404,6 +509,10 @@ bool invalid_inputs() {
 }
 
 int main(int argc, char** argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--benchmark") == 0) {
+        const int result = benchmark();
+        return result;
+    }
     if (!rg16_average()) return 7;
     if (!rgba10_average()) return 8;
     if (!independent_average()) return 1;
@@ -425,6 +534,7 @@ int main(int argc, char** argv) {
             }
         }
     }
+    if (!packed_chains(output)) passed = false;
     if (output.file != nullptr && std::fclose(output.file) != 0) passed = false;
     if (!passed) return 6;
     std::printf("mipmap: %d chains, %zu bytes, hash=%llu PASS\n", output.chains,
