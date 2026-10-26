@@ -10,7 +10,7 @@
 extern bool gForceHighPrecisionRasterPipeline;
 
 namespace {
-constexpr size_t stride = 79;
+constexpr size_t stride = 211;
 constexpr size_t rows = 5;
 constexpr uint32_t sentinel = 0x3f7a9521U;
 using Pixels = std::array<uint32_t, stride * rows>;
@@ -93,7 +93,7 @@ int main() {
         gForceHighPrecisionRasterPipeline = highPrecision != 0;
         for (size_t width = 0; width <= 65; ++width) {
             for (size_t height = 0; height <= 3; ++height) {
-                for (size_t x = 1; x <= 3; ++x) {
+                for (const size_t x : std::array<size_t, 4>{1, 3, 67, 129}) {
                     for (int compiled = 0; compiled < 2; ++compiled) {
                         if (!row_case(width, height, x, compiled != 0)) return 1;
                         ++cases;

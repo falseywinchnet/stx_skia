@@ -799,6 +799,23 @@ transitions, trimming, reverse destruction, ownership moves and candidate failur
 cleanup. Three M4 layouts match the reference. No speed gain is claimed. See
 ../results/2026-10-26/AUTO_STARRAY.md. General template helpers remain unconverted.
 
+## Remaining template helpers and raster-tail addresses
+
+SkTemplates.h now contains the converted owner includes, scalar/offset helpers
+and a named free-memory deleter. Unused generic callable/cleanup/array-factory
+adapters and the typed-after helper are removed. SkBitSet is reference-only.
+The retained macOS Core Foundation owner uses a named deleter. Original headers
+remain preserved for the differential profile.
+
+Raster tail patch/restore and stage address calculation now use integer address
+bias/cancellation on the supported native CPU platforms, without adding context
+fields. Only these three functions in the large pipeline header are converted.
+Both 40-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass. The
+expanded pipeline fixture covers 4,224 cases and context restoration. No speed
+gain is claimed. See ../results/2026-10-26/TEMPLATE_HELPERS.md. Broader raster,
+geometry, canvas and utility conversion remains required.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

@@ -1692,42 +1692,46 @@ SI U16 to_half(F f) {
 #endif
 }
 
+// Native CPU contexts use flat addresses. A tail's temporary base is a biased
+// address token, not an array pointer: keep biasing and cancellation in uintptr_t
+// arithmetic, then form the actual scratch pointer only at the stage access.
 static void patch_memory_contexts(SkSpan<SkRasterPipelineContexts::MemoryCtxPatch> memoryCtxPatches,
-                                  const size_t dx,
-                                  const size_t dy,
-                                  size_t tail) {
+                                  const size_t dx, const size_t dy, size_t tail) {
     for (SkRasterPipelineContexts::MemoryCtxPatch& patch : memoryCtxPatches) {
-        SkRasterPipelineContexts::MemoryCtx* ctx = patch.info.context;
-
-        const ptrdiff_t offset = patch.info.bytesPerPixel * (dy * ctx->stride + dx);
+        SkRasterPipelineContexts::MemoryCtx& context = *patch.info.context;
+        const size_t pixelOffset = dy * context.stride + dx;
+        const uintptr_t byteOffset = patch.info.bytesPerPixel * pixelOffset;
         if (patch.info.load) {
-            void* ctxData = SkTAddOffset<void>(ctx->pixels, offset);
-            memcpy(patch.scratch, ctxData, patch.info.bytesPerPixel * tail);
+            const uintptr_t base = reinterpret_cast<uintptr_t>(context.pixels);
+            const uintptr_t address = base + byteOffset;
+            const void* pixels = reinterpret_cast<const void*>(address);
+            const size_t bytes = patch.info.bytesPerPixel * tail;
+            memcpy(patch.scratch, pixels, bytes);
         }
-
         SkASSERT(patch.backup == nullptr);
-        void* scratchFakeBase = SkTAddOffset<void>(patch.scratch, -offset);
-        patch.backup = ctx->pixels;
-        ctx->pixels = scratchFakeBase;
+        const uintptr_t scratchAddress = reinterpret_cast<uintptr_t>(patch.scratch);
+        const uintptr_t biasedAddress = scratchAddress - byteOffset;
+        patch.backup = context.pixels;
+        context.pixels = reinterpret_cast<void*>(biasedAddress);
     }
 }
 
 static void restore_memory_contexts(
         SkSpan<SkRasterPipelineContexts::MemoryCtxPatch> memoryCtxPatches,
-        const size_t dx,
-        const size_t dy,
-        size_t tail) {
+        const size_t dx, const size_t dy, size_t tail) {
     for (SkRasterPipelineContexts::MemoryCtxPatch& patch : memoryCtxPatches) {
-        SkRasterPipelineContexts::MemoryCtx* ctx = patch.info.context;
-
+        SkRasterPipelineContexts::MemoryCtx& context = *patch.info.context;
         SkASSERT(patch.backup != nullptr);
-        ctx->pixels = patch.backup;
+        context.pixels = patch.backup;
         patch.backup = nullptr;
-
-        const ptrdiff_t offset = patch.info.bytesPerPixel * (dy * ctx->stride + dx);
         if (patch.info.store) {
-            void* ctxData = SkTAddOffset<void>(ctx->pixels, offset);
-            memcpy(ctxData, patch.scratch, patch.info.bytesPerPixel * tail);
+            const size_t pixelOffset = dy * context.stride + dx;
+            const uintptr_t byteOffset = patch.info.bytesPerPixel * pixelOffset;
+            const uintptr_t base = reinterpret_cast<uintptr_t>(context.pixels);
+            const uintptr_t address = base + byteOffset;
+            void* pixels = reinterpret_cast<void*>(address);
+            const size_t bytes = patch.info.bytesPerPixel * tail;
+            memcpy(pixels, patch.scratch, bytes);
         }
     }
 }
@@ -1943,7 +1947,12 @@ SI void from_16161616(U64 _16161616, F* r, F* g, F* b, F* a) {
 // Used by load_ and store_ stages to get to the right (dx,dy) starting point of contiguous memory.
 template <typename T>
 SI T* ptr_at_xy(const SkRasterPipelineContexts::MemoryCtx* ctx, const size_t dx, const size_t dy) {
-    return (T*)ctx->pixels + dy*ctx->stride + dx;
+    const size_t elementOffset = dy * (*ctx).stride + dx;
+    const uintptr_t byteOffset = elementOffset * sizeof(T);
+    const uintptr_t base = reinterpret_cast<uintptr_t>((*ctx).pixels);
+    const uintptr_t address = base + byteOffset;
+    T* pixels = reinterpret_cast<T*>(address);
+    return pixels;
 }
 
 // clamp v to [0,limit).
