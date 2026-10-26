@@ -42,6 +42,23 @@ bool trivial_copy_without_constructor() {
     return true;
 }
 #ifndef STX_SKIA_REFERENCE
+struct EqualityOnly {
+    int value = 0;
+    bool operator==(const EqualityOnly& right) const { return value == right.value; }
+    bool operator!=(const EqualityOnly&) const = delete;
+};
+
+bool equality_only_contract() {
+    TArray<EqualityOnly> left;
+    TArray<EqualityOnly> right;
+    left.emplace_back().value = 7;
+    right.emplace_back().value = 7;
+    if (!(left == right) || left != right) return false;
+    right[0].value = 9;
+    if (left == right || !(left != right)) return false;
+    return true;
+}
+
 bool empty_end_contract() {
     TArray<uint32_t> empty;
     const TArray<uint32_t>& readOnly = empty;
@@ -604,6 +621,7 @@ int main(int argc, char** argv) {
     bool valid = trivial_copy_without_constructor();
 #ifndef STX_SKIA_REFERENCE
     valid = empty_end_contract() && valid;
+    valid = equality_only_contract() && valid;
 #endif
     valid = successful_construction<TArray<uint32_t>>(ordinary) && valid;
     valid = successful_construction<STArray<1, uint32_t>>(ordinary) && valid;

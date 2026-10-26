@@ -910,6 +910,12 @@ existing capacity, and rejects element alignment beyond the heap allocator's
 guarantee. See ../results/2026-10-26/TARRAY_ACCESS.md. These fixes do
 not imply that every retained renderer header has been converted.
 
+Array equality now requires only element equality. The preserved reference
+fails to compile when an element defines `==` but explicitly deletes `!=`;
+the candidate compares with `==` and passes the focused regression. See
+../results/2026-10-26/TARRAY_EQUALITY.md. Other container and renderer
+boundaries remain open.
+
 ## Arena allocation boundary
 
 The raster arena's heap-only and reset paths no longer do pointer arithmetic

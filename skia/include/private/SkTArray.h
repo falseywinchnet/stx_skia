@@ -601,12 +601,12 @@ public:
     const T& fromBack(int) const && = delete;
 
     bool operator==(const TArray<T, MEM_MOVE>& right) const {
-        int leftCount = this->size();
+        const int leftCount = this->size();
         if (leftCount != right.size()) {
             return false;
         }
         for (int index = 0; index < leftCount; ++index) {
-            if (fData[index] != right.fData[index]) {
+            if (!(fData[index] == right.fData[index])) {
                 return false;
             }
         }
