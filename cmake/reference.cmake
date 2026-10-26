@@ -279,3 +279,11 @@ list(APPEND stx_sources baseline/skia/src/sfnt/SkOTTable_name.cpp)
 
 list(REMOVE_ITEM stx_sources skia/src/image/SkTiledImageUtils.cpp)
 list(APPEND stx_sources baseline/skia/src/image/SkTiledImageUtils.cpp)
+
+# Original image ownership and raster implementation for differential checks.
+foreach(unit IN ITEMS SkImage_Base SkImage_Raster SkImage_Lazy)
+    list(REMOVE_ITEM stx_sources skia/src/image/${unit}.cpp)
+    list(APPEND stx_sources baseline/skia/src/image/${unit}.cpp)
+endforeach()
+
+list(APPEND stx_sources baseline/skia/src/core/SkCompressedDataUtils.cpp)

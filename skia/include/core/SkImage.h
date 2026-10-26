@@ -34,7 +34,6 @@ class SkRecorder;
 class SkShader;
 class SkSurfaceProps;
 enum SkColorType : int;
-enum class SkTextureCompressionType;
 enum class SkTileMode;
 
 struct SkIPoint;
@@ -64,22 +63,6 @@ using RasterReleaseProc = void(const void* pixels, ReleaseContext);
     @return        created SkImage, or nullptr
 */
 SK_API sk_sp<SkImage> RasterFromBitmap(const SkBitmap& bitmap);
-
-/** Creates a CPU-backed SkImage from compressed data.
-
-    This method will decompress the compressed data and create an image wrapping
-    it. Any mipmap levels present in the compressed data are discarded.
-
-    @param data     compressed data to store in SkImage
-    @param width    width of full SkImage
-    @param height   height of full SkImage
-    @param type     type of compression used
-    @return         created SkImage, or nullptr
-*/
-SK_API sk_sp<SkImage> RasterFromCompressedTextureData(sk_sp<SkData> data,
-                                                      int width,
-                                                      int height,
-                                                      SkTextureCompressionType type);
 
 /**
  *  Return a SkImage using the encoded data, but attempts to defer decoding until the

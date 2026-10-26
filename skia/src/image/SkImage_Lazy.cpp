@@ -103,7 +103,7 @@ private:
 ///////////////////////////////////////////////////////////////////////////////
 
 SkImage_Lazy::SkImage_Lazy(Validator* validator)
-    : SkImage_Base(validator->fInfo, validator->fUniqueID, /*backingStorage=*/nullptr)
+    : SkImage_Base(validator->fInfo, validator->fUniqueID)
     , fSharedGenerator(std::move(validator->fSharedGenerator))
 {
     SkASSERT(fSharedGenerator);

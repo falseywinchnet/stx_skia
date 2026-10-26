@@ -21,7 +21,7 @@ still awaits house-style conversion.
 - No compiled GPU backend, image decoder/encoder or platform font backend.
 
 The candidate removes generic codec scaffolding, Apple's encoded-image generator,
-unused effects and wider CPU-dispatch objects. Excluded GPU implementations,
+the compressed-texture decoder, unused effects and wider CPU-dispatch objects. Excluded GPU implementations,
 unused modules and upstream infrastructure have also been removed from the tree.
 All 17 general image-filter factory implementations and their public factory
 header are removed from the candidate. GUI.Forms owns CSS and backdrop effects.

@@ -79,7 +79,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkColorSpace.cpp
     skia/src/core/SkColorSpaceXformSteps.cpp
     skia/src/core/SkColorTable.cpp
-    skia/src/core/SkCompressedDataUtils.cpp
     skia/src/core/SkContainers.cpp
     skia/src/core/SkContourMeasure.cpp
     skia/src/core/SkConvertPixels.cpp

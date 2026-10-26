@@ -35,38 +35,44 @@
 class GrDirectContext;
 class SkSurfaceProps;
 
-// fixes skbug.com/40036261
-static bool is_not_subset(const SkBitmap& bm) {
-    SkASSERT(bm.pixelRef());
-    SkISize dim = SkISize::Make(bm.pixelRef()->width(), bm.pixelRef()->height());
-    SkASSERT(dim != bm.dimensions() || bm.pixelRefOrigin().isZero());
-    return dim == bm.dimensions();
+// A subset must not reuse the parent pixel-ref identity: caches describe the
+// image dimensions, while the shared pixel ref describes the full allocation.
+static uint32_t bitmap_image_id(const SkBitmap& bitmap) {
+    const SkPixelRef* pixels = bitmap.pixelRef();
+    SkASSERT(pixels);
+    const SkISize allocationSize = SkISize::Make((*pixels).width(), (*pixels).height());
+    const SkISize imageSize = bitmap.dimensions();
+    SkASSERT(allocationSize != imageSize || bitmap.pixelRefOrigin().isZero());
+    if (allocationSize == imageSize) {
+        const uint32_t id = bitmap.getGenerationID();
+        return id;
+    }
+    return kNeedNewImageUniqueID;
 }
 
-static void release_data(void* addr, void* context) {
-    SkData* data = static_cast<SkData*>(context);
-    data->unref();
+static void release_data(void*, void* context) {
+    SkData& data = *static_cast<SkData*>(context);
+    data.unref();
 }
 
-SkImage_Raster::SkImage_Raster(const SkImageInfo& info,
-                               sk_sp<SkData> data,
-                               size_t rowBytes,
-                               sk_sp<SkMipmap> mips,
-                               uint32_t id)
-        : SkImage_Base(info, id, /*backingStorage=*/nullptr), fMips(mips) {
-    void* addr = const_cast<void*>(data->data());
-
-    fBitmap.installPixels(info, addr, rowBytes, release_data, data.release());
+SkImage_Raster::SkImage_Raster(const SkImageInfo& info, sk_sp<SkData> data,
+                               size_t rowBytes, sk_sp<SkMipmap> mips, uint32_t id)
+        : SkImage_Base(info, id), fMips(std::move(mips)) {
+    // Validated factories transfer one data reference to the bitmap's release
+    // callback. The bitmap is the image's sole owner of this pixel reference.
+    void* address = const_cast<void*>((*data).data());
+    SkData* retainedData = data.release();
+    const bool installed = fBitmap.installPixels(info, address, rowBytes,
+                                                 release_data, retainedData);
+    SkASSERT(installed);
+    (void)installed;
     fBitmap.setImmutable();
-    fPixelStorages.push_back(sk_ref_sp(fBitmap.pixelRef()));
 }
 
-SkImage_Raster::SkImage_Raster(const SkBitmap& bm, sk_sp<SkMipmap> mips, bool bitmapMayBeMutable)
-        : SkImage_Base(bm.info(),
-                       is_not_subset(bm) ? bm.getGenerationID() : (uint32_t)kNeedNewImageUniqueID,
-                       sk_ref_sp(bm.pixelRef()))
-        , fBitmap(bm)
-        , fMips(mips) {
+SkImage_Raster::SkImage_Raster(const SkBitmap& bitmap, sk_sp<SkMipmap> mips,
+                               bool bitmapMayBeMutable)
+        : SkImage_Base(bitmap.info(), bitmap_image_id(bitmap)),
+          fBitmap(bitmap), fMips(std::move(mips)) {
     SkASSERT(bitmapMayBeMutable || fBitmap.isImmutable());
 }
 
@@ -79,12 +85,14 @@ bool SkImage_Raster::onReadPixels(GrDirectContext*,
                                   int srcX,
                                   int srcY,
                                   CachingHint) const {
-    SkBitmap shallowCopy(fBitmap);
-    return shallowCopy.readPixels(dstInfo, dstPixels, dstRowBytes, srcX, srcY);
+    // readPixels is const; retaining a second pixel-ref owner adds no protection.
+    const bool copied = fBitmap.readPixels(dstInfo, dstPixels, dstRowBytes, srcX, srcY);
+    return copied;
 }
 
 bool SkImage_Raster::onPeekPixels(SkPixmap* pm) const {
-    return fBitmap.peekPixels(pm);
+    const bool available = fBitmap.peekPixels(pm);
+    return available;
 }
 
 bool SkImage_Raster::getROPixels(GrDirectContext*, SkBitmap* dst, CachingHint) const {
@@ -95,26 +103,33 @@ bool SkImage_Raster::getROPixels(GrDirectContext*, SkBitmap* dst, CachingHint) c
 sk_sp<SkSurface> SkImage_Raster::onMakeSurface(SkRecorder* recorder,
                                                const SkImageInfo& info) const {
     if (!recorder) {
-        // TODO(kjlubick) remove this after old SkImage::makeScaled(image info, sampling) API gone
+        // Legacy scaling without an explicit recorder uses the shared CPU recorder.
         recorder = skcpu::Recorder::TODO();
     }
     const SkSurfaceProps* props = nullptr;
     constexpr size_t rowBytes = 0;
-    return recorder->cpuRecorder()->makeBitmapSurface(info, rowBytes, props);
+    skcpu::Recorder* cpu = (*recorder).cpuRecorder();
+    if (!cpu) {
+        return nullptr;
+    }
+    sk_sp<SkSurface> surface = (*cpu).makeBitmapSurface(info, rowBytes, props);
+    return surface;
 }
 
 static SkBitmap copy_bitmap_subset(const SkBitmap& orig, const SkIRect& subset) {
-    SkImageInfo info = orig.info().makeDimensions(subset.size());
+    const SkImageInfo originalInfo = orig.info();
+    const SkISize subsetSize = subset.size();
+    const SkImageInfo info = originalInfo.makeDimensions(subsetSize);
     SkBitmap bitmap;
     if (!bitmap.tryAllocPixels(info)) {
-        return {};
+        return SkBitmap{};
     }
 
     void* dst = bitmap.getPixels();
-    void* src = orig.getAddr(subset.x(), subset.y());
+    const void* src = orig.getAddr(subset.x(), subset.y());
     if (!dst || !src) {
         SkDEBUGFAIL("SkImage_Raster::onMakeSubset with nullptr src or dst");
-        return {};
+        return SkBitmap{};
     }
 
     SkRectMemcpy(dst, bitmap.rowBytes(), src, orig.rowBytes(), bitmap.rowBytes(),
@@ -129,32 +144,40 @@ static sk_sp<SkMipmap> copy_mipmaps(const SkBitmap& src, SkMipmap* srcMips) {
         return nullptr;
     }
 
-    sk_sp<SkMipmap> dst;
-    dst.reset(SkMipmap::Build(src.pixmap(),
-                              /* factoryProc= */ nullptr,
-                              /* computeContents= */ false));
-    if (!dst) {
+    const SkPixmap sourcePixels = src.pixmap();
+    sk_sp<SkMipmap> destination(SkMipmap::Build(sourcePixels, nullptr, false));
+    if (!destination) {
         return nullptr;
     }
-    for (int i = 0; i < dst->countLevels(); ++i) {
-        SkMipmap::Level srcLevel, dstLevel;
-        srcMips->getLevel(i, &srcLevel);
-        dst->getLevel(i, &dstLevel);
-        srcLevel.fPixmap.readPixels(dstLevel.fPixmap);
+    const int levelCount = (*destination).countLevels();
+    for (int i = 0; i < levelCount; ++i) {
+        SkMipmap::Level sourceLevel{};
+        SkMipmap::Level destinationLevel{};
+        if (!(*srcMips).getLevel(i, &sourceLevel) ||
+            !(*destination).getLevel(i, &destinationLevel)) {
+            return nullptr;
+        }
+        const bool copied = sourceLevel.fPixmap.readPixels(destinationLevel.fPixmap);
+        if (!copied) {
+            return nullptr;
+        }
     }
-
-    return dst;
+    return destination;
 }
 
 sk_sp<SkImage> SkImage_Raster::onMakeSubset(SkRecorder*,
                                             const SkIRect& subset,
                                             RequiredProperties requiredProperties) const {
-    sk_sp<SkImage> img;
+    sk_sp<SkImage> image = nullptr;
 
     if (requiredProperties.fMipmapped) {
-        bool fullCopy = subset == SkIRect::MakeSize(fBitmap.dimensions());
+        const SkIRect fullBounds = SkIRect::MakeSize(fBitmap.dimensions());
+        const bool fullCopy = subset == fullBounds;
 
-        sk_sp<SkMipmap> mips = fullCopy ? copy_mipmaps(fBitmap, fMips.get()) : nullptr;
+        sk_sp<SkMipmap> mips = nullptr;
+        if (fullCopy) {
+            mips = copy_mipmaps(fBitmap, fMips.get());
+        }
 
         // SkImage::withMipmaps will always make a copy for us so we can temporarily share
         // the pixel ref with fBitmap
@@ -167,16 +190,16 @@ sk_sp<SkImage> SkImage_Raster::onMakeSubset(SkRecorder*,
                 new SkImage_Raster(tmpSubset, /*mips=*/nullptr, /* bitmapMayBeMutable= */ true));
 
         // withMipmaps will auto generate the mipmaps if a nullptr is passed in
-        SkASSERT(!mips || mips->validForRootLevel(tmp->imageInfo()));
-        img = tmp->withMipmaps(std::move(mips));
+        SkASSERT(!mips || (*mips).validForRootLevel((*tmp).imageInfo()));
+        image = (*tmp).withMipmaps(std::move(mips));
     } else {
         SkBitmap copy = copy_bitmap_subset(fBitmap, subset);
         if (!copy.isNull()) {
-            img = SkImages::RasterFromBitmap(copy);
+            image = SkImages::RasterFromBitmap(copy);
         }
     }
 
-    return img;
+    return image;
 }
 
 sk_sp<SkImage_Raster> SkImage_Raster::MakeFromBitmap(const SkBitmap& bm,
@@ -192,18 +215,20 @@ sk_sp<SkImage_Raster> SkImage_Raster::MakeFromBitmap(const SkBitmap& bm,
 
     if (SkCopyPixelsMode::kAlways == cpm ||
         (!bm.isImmutable() && SkCopyPixelsMode::kNever != cpm)) {
-        size_t size = bm.computeByteSize();
+        const size_t size = bm.computeByteSize();
         if (SkImageInfo::ByteSizeOverflowed(size)) {
             return nullptr;
         }
 
         sk_sp<SkData> data(SkData::MakeWithCopy(bm.getPixels(), size));
 
-        return sk_sp<SkImage_Raster>(new SkImage_Raster(
-                bm.info(), std::move(data), bm.rowBytes(), std::move(mips), kNeedNewImageUniqueID));
+        sk_sp<SkImage_Raster> image(new SkImage_Raster(
+            bm.info(), std::move(data), bm.rowBytes(), std::move(mips), kNeedNewImageUniqueID));
+        return image;
     }
-    return sk_sp<SkImage_Raster>(
-            new SkImage_Raster(bm, std::move(mips), SkCopyPixelsMode::kNever == cpm));
+    const bool mayBeMutable = cpm == SkCopyPixelsMode::kNever;
+    sk_sp<SkImage_Raster> image(new SkImage_Raster(bm, std::move(mips), mayBeMutable));
+    return image;
 }
 
 bool SkImage_Raster::onAsLegacyBitmap(GrDirectContext*, SkBitmap* bitmap) const {
@@ -212,12 +237,14 @@ bool SkImage_Raster::onAsLegacyBitmap(GrDirectContext*, SkBitmap* bitmap) const 
     // pixelref since the caller might call setImmutable() themselves
     // (thus changing our state).
     if (fBitmap.isImmutable()) {
-        SkIPoint origin = fBitmap.pixelRefOrigin();
-        bitmap->setInfo(fBitmap.info(), fBitmap.rowBytes());
-        bitmap->setPixelRef(sk_ref_sp(fBitmap.pixelRef()), origin.x(), origin.y());
+        const SkIPoint origin = fBitmap.pixelRefOrigin();
+        (*bitmap).setInfo(fBitmap.info(), fBitmap.rowBytes());
+        sk_sp<SkPixelRef> pixels = sk_ref_sp(fBitmap.pixelRef());
+        (*bitmap).setPixelRef(std::move(pixels), origin.x(), origin.y());
         return true;
     }
-    return this->SkImage_Base::onAsLegacyBitmap(nullptr, bitmap);
+    const bool copied = SkImage_Base::onAsLegacyBitmap(nullptr, bitmap);
+    return copied;
 }
 
 sk_sp<SkShader> SkImage_Raster::makeShaderForPaint(const SkPaint& paint,
@@ -225,17 +252,19 @@ sk_sp<SkShader> SkImage_Raster::makeShaderForPaint(const SkPaint& paint,
                                                    SkTileMode tmy,
                                                    const SkSamplingOptions& sampling,
                                                    const SkMatrix* localMatrix) {
-    auto s = SkImageShader::Make(sk_ref_sp<SkImage>(this), tmx, tmy, sampling, localMatrix);
-    if (!s) {
+    sk_sp<SkImage> image = sk_ref_sp<SkImage>(this);
+    sk_sp<SkShader> shader = SkImageShader::Make(std::move(image), tmx, tmy, sampling, localMatrix);
+    if (!shader) {
         return nullptr;
     }
-    if (SkColorTypeIsAlphaOnly(this->colorType()) && paint.getShader()) {
+    if (SkColorTypeIsAlphaOnly(colorType()) && paint.getShader()) {
         // Compose the image shader with the paint's shader. Alpha images+shaders should output the
         // texture's alpha multiplied by the shader's color. DstIn (d*sa) will achieve this with
         // the source image and dst shader (MakeBlend takes dst first, src second).
-        s = SkShaders::Blend(SkBlendMode::kDstIn, paint.refShader(), std::move(s));
+        sk_sp<SkShader> colorShader = paint.refShader();
+        shader = SkShaders::Blend(SkBlendMode::kDstIn, std::move(colorShader), std::move(shader));
     }
-    return s;
+    return shader;
 }
 
 sk_sp<SkImage> SkImage_Raster::onMakeWithMipmaps(sk_sp<SkMipmap> mips) const {
@@ -245,27 +274,35 @@ sk_sp<SkImage> SkImage_Raster::onMakeWithMipmaps(sk_sp<SkMipmap> mips) const {
     // SkPixelRef can interact badly with SkSurface/SkImage copy-on-write. So we just always
     // make a copy with a new ID.
     if (!mips) {
-        mips.reset(SkMipmap::Build(fBitmap.pixmap(), nullptr));
+        const SkPixmap pixels = fBitmap.pixmap();
+        SkMipmap* created = SkMipmap::Build(pixels, nullptr);
+        mips.reset(created);
     }
-    return SkImage_Raster::MakeFromBitmap(fBitmap, SkCopyPixelsMode::kAlways, std::move(mips));
+    sk_sp<SkImage> image = MakeFromBitmap(fBitmap, SkCopyPixelsMode::kAlways, std::move(mips));
+    return image;
 }
 
 sk_sp<SkImage> SkImage_Raster::makeColorTypeAndColorSpace(SkRecorder*,
                                                           SkColorType targetColorType,
                                                           sk_sp<SkColorSpace> targetColorSpace,
                                                           RequiredProperties) const {
-    SkPixmap src;
-    SkAssertResult(fBitmap.peekPixels(&src));
-
-    SkBitmap dst;
-    if (!dst.tryAllocPixels(
-                fBitmap.info().makeColorType(targetColorType).makeColorSpace(targetColorSpace))) {
+    SkPixmap source;
+    if (!fBitmap.peekPixels(&source)) {
         return nullptr;
     }
-
-    SkAssertResult(dst.writePixels(src));
-    dst.setImmutable();
-    return SkImages::RasterFromBitmap(dst);
+    const SkImageInfo originalInfo = fBitmap.info();
+    const SkImageInfo typedInfo = originalInfo.makeColorType(targetColorType);
+    const SkImageInfo destinationInfo = typedInfo.makeColorSpace(std::move(targetColorSpace));
+    SkBitmap destination;
+    if (!destination.tryAllocPixels(destinationInfo)) {
+        return nullptr;
+    }
+    if (!destination.writePixels(source)) {
+        return nullptr;
+    }
+    destination.setImmutable();
+    sk_sp<SkImage> image = SkImages::RasterFromBitmap(destination);
+    return image;
 }
 
 sk_sp<SkImage> SkImage_Raster::onReinterpretColorSpace(sk_sp<SkColorSpace> newCS) const {
@@ -274,5 +311,6 @@ sk_sp<SkImage> SkImage_Raster::onReinterpretColorSpace(sk_sp<SkColorSpace> newCS
     // gen ID from the bitmap, which gets it from the pixelRef.
     SkPixmap pixmap = fBitmap.pixmap();
     pixmap.setColorSpace(std::move(newCS));
-    return SkImages::RasterFromPixmapCopy(pixmap);
+    sk_sp<SkImage> image = SkImages::RasterFromPixmapCopy(pixmap);
+    return image;
 }

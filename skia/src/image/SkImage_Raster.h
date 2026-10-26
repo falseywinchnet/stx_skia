@@ -14,7 +14,6 @@
 #include "include/core/SkRecorder.h"
 #include "include/core/SkRefCnt.h"
 #include "include/core/SkTypes.h"
-#include "include/private/SkTo.h"
 #include "src/core/SkMipmap.h"
 #include "src/image/SkImage_Base.h"
 
@@ -48,7 +47,7 @@ public:
         if (!recorder) {
             return false;
         }
-        if (!recorder->cpuRecorder()) {
+        if (!(*recorder).cpuRecorder()) {
             return false;
         }
         return true;
@@ -70,7 +69,10 @@ public:
 
     sk_sp<SkSurface> onMakeSurface(SkRecorder*, const SkImageInfo&) const final;
 
-    SkPixelRef* getPixelRef() const { return fBitmap.pixelRef(); }
+    SkPixelRef* getPixelRef() const {
+        SkPixelRef* pixels = fBitmap.pixelRef();
+        return pixels;
+    }
 
     bool onAsLegacyBitmap(GrDirectContext*, SkBitmap*) const override;
 
@@ -81,13 +83,20 @@ public:
         // lifetime of derived/cached resources to the image. In this case, we only want cached
         // data (eg mips) tied to the lifetime of the underlying pixelRef.
         SkASSERT(fBitmap.pixelRef());
-        fBitmap.pixelRef()->notifyAddedToCache();
+        SkPixelRef& pixels = *fBitmap.pixelRef();
+        pixels.notifyAddedToCache();
     }
 
-    bool onHasMipmaps() const override { return SkToBool(fMips); }
+    bool onHasMipmaps() const override {
+        const bool present = fMips != nullptr;
+        return present;
+    }
     bool onIsProtected() const override { return false; }
 
-    SkMipmap* onPeekMips() const override { return fMips.get(); }
+    SkMipmap* onPeekMips() const override {
+        SkMipmap* mips = fMips.get();
+        return mips;
+    }
 
     sk_sp<SkImage> onMakeWithMipmaps(sk_sp<SkMipmap>) const override;
 
@@ -124,8 +133,9 @@ protected:
     SkImage_Raster(const SkBitmap&, sk_sp<SkMipmap>, bool bitmapMayBeMutable);
 
 private:
+    // Bitmap retains the pixel ref. Mipmaps have independent owned storage.
     SkBitmap fBitmap;
-    sk_sp<SkMipmap> fMips;
+    sk_sp<SkMipmap> fMips = nullptr;
 };
 
 #endif // SkImage_Raster_DEFINED

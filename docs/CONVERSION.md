@@ -351,6 +351,22 @@ Release/Debug instrumented suites and a relocated consumer pass. See
 ../results/2026-10-26/SURFACE_FACADE.md. GPU-era compatibility declarations in
 other public headers remain separate work.
 
+## Raster image ownership and copies
+
+SkImage_Base.cpp/.h, SkImage_Raster.cpp/.h and SkImage_RasterFactories.cpp now
+use explicit owners, named results and checked copy/fallback paths. The obsolete
+capture pixel-storage array is removed; the raster bitmap owns its pixel ref.
+A const image read no longer creates a redundant bitmap owner. Mipmap/subset
+identity rules remain intact, and borrowing helpers reject temporary owners.
+
+The unused compressed-texture factory and CPU ETC/BC1 decoder are reference-only,
+closing a residual decoder path outside the earlier ordinary codec removal.
+Candidate compilation is 252 units on macOS arm64. Raster-image object size is
+104 bytes versus 136 in the original; no throughput gain is claimed. Eighteen
+tests and seven rendering artifacts retain reference results. Public SkImage and
+lazy-generator conversion remain separate work. See
+../results/2026-10-26/RASTER_IMAGE_OWNERSHIP.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
