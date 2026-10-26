@@ -27,6 +27,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Shader-mask filtering | `src/effects/SkShaderMaskFilterImpl.cpp/.h`, `include/effects/SkShaderMaskFilter.h` | 576 byte-exact shader masks, checked source metadata, scoped pixel ownership and failure preservation |
 | Blur-filter construction and cached masks | `src/core/SkBlurMaskFilterImpl.cpp/.h` | Explicit shape alternatives, cache/allocation handoff, checked raster extents and 288 reference scenes |
 | Standard blend shaders | `src/shaders/SkBlendShader.cpp/.h` | 696 reference scenes across all 29 standard modes, local/affine transforms, opacity combinations and colored vertices; invalid-mode rejection |
+| Mipmap selection, storage and builder | `src/core/SkMipmapAccessor.cpp/.h`, `src/core/SkMipmap.cpp/.h`, `src/core/SkMipmapBuilder.cpp/.h` | Attached/generated level selection, checked allocation layout, discard/relock, builder lifetime and 1,152 byte-exact mip chains; downsampling kernels remain separate |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -406,6 +407,21 @@ checks cover 26 attached/generated selection cases, eviction/lifetime, a
 one-pixel fallback and three unreadable-provider cases. Mipmap generation,
 bitmap caching and the image shader remain separate conversion work. See
 ../results/2026-10-26/MIPMAP_ACCESSOR.md.
+
+## Mipmap storage and builder
+
+SkMipmap.cpp/.h and SkMipmapBuilder.cpp/.h now expose checked allocation layout,
+client/cache lifetime, discardable descriptor ownership and writable-view rules.
+The layout walk halves dimensions directly; checked byte sums precede allocation.
+Metadata-only construction retains caller-filled levels. Invalid pixel extents
+and metadata are rejected before allocation, and null builder attachment returns
+null. Existing mip filters, rounding, compatibility and fallback behavior remain.
+
+A new deterministic suite compares 1,152 chains across four formats, checks an
+independent 2x2 average, builder outliving, allocator failure and discard/relock
+transitions. It adds an eighth byte-identical artifact. Downsampling kernels and
+bitmap cache implementation remain separate conversion work. See
+../results/2026-10-26/MIPMAP_STORAGE.md.
 
 ## Still required
 

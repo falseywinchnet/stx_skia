@@ -10,30 +10,35 @@
 #include "include/core/SkPixmap.h"
 #include "include/core/SkTypes.h"
 #include "src/core/SkMipmap.h"
-struct SkImageInfo;
-
 SkMipmapBuilder::SkMipmapBuilder(const SkImageInfo& info) {
-    fMM = sk_sp<SkMipmap>(SkMipmap::Build({info, nullptr, 0},
-                                          /* factoryProc= */ nullptr,
-                                          /* computeContents= */ false));
+    const SkPixmap metadata(info, nullptr, 0);
+    SkMipmap* levels = SkMipmap::Build(metadata, nullptr, false);
+    fMM.reset(levels);
 }
 
 SkMipmapBuilder::~SkMipmapBuilder() {}
 
 int SkMipmapBuilder::countLevels() const {
-    return fMM ? fMM->countLevels() : 0;
-}
-
-SkPixmap SkMipmapBuilder::level(int index) const {
-    SkPixmap pm;
-
-    SkMipmap::Level level;
-    if (fMM && fMM->getLevel(index, &level)) {
-        pm = level.fPixmap;
+    if (!fMM) {
+        return 0;
     }
-    return pm;
+    const int count = (*fMM).countLevels();
+    return count;
 }
 
-sk_sp<SkImage> SkMipmapBuilder::attachTo(const sk_sp<const SkImage>& src) {
-    return src->withMipmaps(fMM);
+SkPixmap SkMipmapBuilder::level(int index) const & {
+    SkPixmap pixels{};
+    SkMipmap::Level selected{};
+    if (fMM && (*fMM).getLevel(index, &selected)) {
+        pixels = selected.fPixmap;
+    }
+    return pixels;
+}
+
+sk_sp<SkImage> SkMipmapBuilder::attachTo(const sk_sp<const SkImage>& source) {
+    if (!source) {
+        return nullptr;
+    }
+    sk_sp<SkImage> image = (*source).withMipmaps(fMM);
+    return image;
 }

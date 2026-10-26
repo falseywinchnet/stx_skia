@@ -21,16 +21,20 @@ public:
     ~SkMipmapBuilder();
 
     int countLevels() const;
-    SkPixmap level(int index) const;
+    // Writable view borrowed until this builder and every attached image release
+    // the levels. Fill every level before attachment; do not mutate after sharing.
+    // Invalid indices or failed construction return an empty view.
+    SkPixmap level(int index) const &;
+    SkPixmap level(int index) const && = delete;
 
-    /**
-     *  If these levels are compatible with src, return a new Image that combines src's base level
-     *  with these levels as mip levels. If not compatible, this returns nullptr.
-     */
+    // Shares completed levels with a compatible image. Null input is rejected;
+    // neither input nor builder is consumed. Incompatible levels return the
+    // original image; an empty builder permits default mipmap generation, as
+    // withMipmaps does. Neither fallback is an attachment-success guarantee.
     sk_sp<SkImage> attachTo(const sk_sp<const SkImage>& src);
 
 private:
-    sk_sp<SkMipmap> fMM;
+    sk_sp<SkMipmap> fMM{};
 };
 
 #endif

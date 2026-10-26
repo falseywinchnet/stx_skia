@@ -9,97 +9,96 @@
 #define SkMipmap_DEFINED
 
 #include "include/core/SkPixmap.h"
-#include "include/core/SkScalar.h"
+#include "include/core/SkRefCnt.h"
 #include "include/core/SkSize.h"
 #include "src/core/SkCachedData.h"
-#include "src/core/SkImageInfoPriv.h"
-#include "src/shaders/SkShaderBase.h"
+
+#include <cstddef>
 #include <memory>
 
 class SkBitmap;
-class SkData;
+class SkColorSpace;
 class SkDiscardableMemory;
-class SkMipmapBuilder;
 
-typedef SkDiscardableMemory* (*SkDiscardableFactoryProc)(size_t bytes);
+// A synchronous allocator returns an owned, locked, suitably aligned block of
+// at least the requested size, or null. The callback must not throw. SkCachedData
+// releases/unlocks a successful allocation after the final client/cache release.
+using SkDiscardableFactoryProc = SkDiscardableMemory* (*)(size_t bytes);
 
 struct SkMipmapDownSampler {
     virtual ~SkMipmapDownSampler() {}
-
-    virtual void buildLevel(const SkPixmap& dst, const SkPixmap& src) = 0;
+    // Source and destination are disjoint; destination is the next halved level.
+    // Caller supplies complete, correctly aligned buffers with the same format.
+    virtual void buildLevel(const SkPixmap& destination, const SkPixmap& source) = 0;
 };
 
-/*
- * SkMipmap will generate mipmap levels when given a base mipmap level image.
- *
- * Any function which deals with mipmap levels indices will start with index 0
- * being the first mipmap level which was generated. Said another way, it does
- * not include the base level in its range.
- */
+// Owns a reduced image chain. Index zero is the first reduced level, not the
+// source. A client reference locks storage; a cache reference alone does not.
 class SkMipmap : public SkCachedData {
 public:
     ~SkMipmap() override;
-    // Allocate and fill-in a mipmap. If computeContents is false, we just allocated
-    // and compute the sizes/rowbytes, but leave the pixel-data uninitialized.
-    static SkMipmap* Build(const SkPixmap& src, SkDiscardableFactoryProc,
+
+    // Returns one owned client reference, or null for invalid/unsupported input
+    // or unavailable pixel allocation. Source is borrowed for this call only.
+    // With computeContents=true it must supply the full declared, aligned extent.
+    // With false only metadata is consumed; every returned level must be filled
+    // by the caller before sampling/publication. Pixel storage is uninitialized.
+    // Metadata and total storage sizes are validated before the allocator runs.
+    static SkMipmap* Build(const SkPixmap& source, SkDiscardableFactoryProc,
                            bool computeContents = true);
+    static SkMipmap* Build(const SkBitmap& source, SkDiscardableFactoryProc);
 
-    static SkMipmap* Build(const SkBitmap& src, SkDiscardableFactoryProc);
-
-    // Determines how many levels a SkMipmap will have without creating that mipmap.
-    // This does not include the base mipmap level that the user provided when
-    // creating the SkMipmap.
+    // Halve each axis with max(1, floor(axis/2)) until both reach one.
+    // Invalid dimensions and a 1x1 source have no reduced levels.
     static int ComputeLevelCount(int baseWidth, int baseHeight);
-    static int ComputeLevelCount(SkISize s) { return ComputeLevelCount(s.width(), s.height()); }
-
-    // Determines the size of a given mipmap level.
-    // |level| is an index into the generated mipmap levels. It does not include
-    // the base level. So index 0 represents mipmap level 1.
+    static int ComputeLevelCount(SkISize dimensions) {
+        const int count = ComputeLevelCount(dimensions.width(), dimensions.height());
+        return count;
+    }
     static SkISize ComputeLevelSize(int baseWidth, int baseHeight, int level);
-    static SkISize ComputeLevelSize(SkISize s, int level) {
-        return ComputeLevelSize(s.width(), s.height(), level);
+    static SkISize ComputeLevelSize(SkISize dimensions, int level) {
+        const SkISize size = ComputeLevelSize(dimensions.width(), dimensions.height(), level);
+        return size;
     }
 
-    // Computes the fractional level based on the scaling in X and Y.
-    static float ComputeLevel(SkSize scaleSize);
+    // Fractional level with the original half-level sharpening bias; -1 means
+    // no reduction. Unlike stored indices, zero denotes the source image.
+    static float ComputeLevel(SkSize scale);
 
-    // We use a block of (possibly discardable) memory to hold an array of Level structs, followed
-    // by the pixel data for each level. On 32-bit platforms, Level would naturally be 4 byte
-    // aligned, so the pixel data could end up with 4 byte alignment. If the pixel data is F16,
-    // it must be 8 byte aligned. To ensure this, keep the Level struct 8 byte aligned as well.
+    // Descriptors precede pixel storage in the same discardable allocation.
+    // Eight-byte alignment also aligns F16 pixel starts on 32-bit platforms.
     struct alignas(8) Level {
-        SkPixmap    fPixmap;
-        SkSize      fScale; // < 1.0
+        SkPixmap fPixmap{};
+        SkSize fScale{}; // level dimensions divided by source dimensions
     };
 
-    bool extractLevel(SkSize scale, Level*) const;
-
-    // countLevels returns the number of mipmap levels generated (which does not
-    // include the base mipmap level).
+    // Output pixel views borrow this object's locked storage; their copied color
+    // space is retained separately. Keep a client reference through every use.
+    // Null output queries availability only. Failure leaves output unchanged.
+    // extractLevel rounds and clamps to the last level; getLevel rejects indices
+    // outside the chain. Neither returns the original source image.
+    bool extractLevel(SkSize scale, Level* output) const;
+    bool getLevel(int index, Level* output) const;
     int countLevels() const;
-
-    // |index| is an index into the generated mipmap levels. It does not include
-    // the base level. So index 0 represents mipmap level 1.
-    bool getLevel(int index, Level*) const;
-
     bool validForRootLevel(const SkImageInfo&) const;
 
     static std::unique_ptr<SkMipmapDownSampler> MakeDownSampler(const SkPixmap&);
 
 protected:
-    void onDataChange(void* oldData, void* newData) const override {
-        fLevels = static_cast<Level*>(newData); // could be nullptr
+    void onDataChange(void*, void* newData) const override {
+        fLevels = static_cast<Level*>(newData);
     }
 
 private:
-    sk_sp<SkColorSpace> fCS;
-    mutable Level*      fLevels;    // managed by the baseclass, may be null due to onDataChanged.
-    int                 fCount;
+    // Descriptors inside discardable storage hold null color spaces: discarding
+    // the block must not strand owned references. Returned copies receive fCS.
+    sk_sp<SkColorSpace> fCS{};
+    mutable Level* fLevels = nullptr;
+    int fCount = 0;
 
-    SkMipmap(void* malloc, size_t size);
-    SkMipmap(size_t size, SkDiscardableMemory* dm);
-
-    static size_t AllocLevelsSize(int levelCount, size_t pixelSize);
+    SkMipmap(void* allocation, size_t size);
+    SkMipmap(size_t size, SkDiscardableMemory*);
+    static size_t AllocLevelsSize(int levelCount, size_t pixelBytes);
 };
 
 #endif
