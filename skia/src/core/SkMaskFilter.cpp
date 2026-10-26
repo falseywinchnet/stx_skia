@@ -18,7 +18,8 @@ void SkMaskFilter::RegisterFlattenables() {
 
 sk_sp<SkMaskFilter> SkMaskFilter::Deserialize(const void* data, size_t size,
                                               const SkDeserialProcs* procs) {
-    return sk_sp<SkMaskFilter>(static_cast<SkMaskFilter*>(
-                               SkFlattenable::Deserialize(
-                               kSkMaskFilter_Type, data, size, procs).release()));
+    sk_sp<SkFlattenable> decoded = SkFlattenable::Deserialize(kSkMaskFilter_Type, data, size, procs);
+    SkMaskFilter* filter = static_cast<SkMaskFilter*>(decoded.release());
+    sk_sp<SkMaskFilter> result(filter);
+    return result;
 }

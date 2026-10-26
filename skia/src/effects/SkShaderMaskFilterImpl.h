@@ -33,7 +33,7 @@ public:
 
     bool filterMask(SkMaskBuilder* dst, const SkMask& src, const SkMatrix&,
                     SkIPoint* margin) const override;
-    std::pair<sk_sp<SkImageFilter>, bool> asImageFilter(const SkMatrix&,
+    SkMaskFilterBase::ImageFilterResult asImageFilter(const SkMatrix&,
                                                         const SkPaint&) const override;
 
     void computeFastBounds(const SkRect& src, SkRect* dst) const override {

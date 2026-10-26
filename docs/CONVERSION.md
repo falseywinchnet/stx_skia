@@ -23,6 +23,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Mask descriptors and Gaussian blur | `src/core/SkMask.cpp/.h`, `src/core/SkMaskBlurFilter.cpp/.h` | Checked padded bounds, explicit borrowed storage, move-empty descriptors, exact last-row extents and 304 reference blur cases |
 | Blur style composition and analytic rectangles | `src/core/SkBlurMask.cpp/.h` | All four styles, exact analytic profiles, checked temporary extents, padded reference convolution, bounded 16-bit coverage arithmetic |
 | Cached pixel/mask storage | `src/core/SkCachedData.cpp/.h` | Cache/client reference distinction, discard/reacquire and failure states, callback ordering, final release after unlocking and concurrent reference sharing |
+| Mask-filter dispatch and nine-patch ownership | `src/core/SkMaskFilterBase.cpp/.h`, `src/core/SkMaskFilter.cpp`; existing public header reviewed | Adopted cache/allocation owners, failure cleanup, bounded clipped run storage, named image-filter result and 240 rendering comparisons |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -151,6 +152,22 @@ uses a const callback and a mutable borrowed level pointer. That header receives
 only this adapter change, not a full-conversion claim. Diagnostics require
 quiescent reference transitions; a cache-only reference cannot use pixel data.
 Details and coverage are in CACHED_DATA.md.
+
+## Mask-filter dispatch conversion notes
+
+NinePatch retains one adopted cache reference or one owned pixel allocation,
+declared before its borrowed descriptor. The generic path owns returned masks
+before testing success, including failed filters that already produced storage.
+Horizontal nine-patch run payload is allocated only when those clipped strips
+exist, and capped at 98,304 bytes by splitting lengths above 32,767. Side-only
+clips do not construct that scratch owner. Source offsets use size_t.
+
+ImageFilterResult names the image filter and shading effect. SkBlurMaskFilterImpl,
+SkShaderMaskFilterImpl and SkCanvasPriv receive only signature/consumer adaptations
+here; their remaining implementation is not marked converted. The unused legacy
+emboss factory bridge is removed from SkLightingImageFilter, while its retained
+lighting filters remain. These adapted files retain original baseline copies.
+See MASK_FILTER_DISPATCH.md for tests and remaining scope.
 
 ## Still required
 

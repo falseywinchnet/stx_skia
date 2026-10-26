@@ -137,3 +137,17 @@ cache ownership and callback publication order. SkMipmap.h has a matching const
 callback/mutable view adaptation only, with its original header retained for the
 reference build. tests/cached_data.cpp is original deterministic transition,
 callback and concurrent-reference coverage.
+
+
+## Mask-filter dispatch conversion
+
+SkMaskFilterBase.cpp/.h and SkMaskFilter.cpp retain original baseline copies; the
+already-conforming public SkMaskFilter.h is reviewed and also retained there.
+Nine-patch allocations/cache references have named owners, clipped run storage
+is bounded, and filter failure results are adopted before checking success.
+The named image-filter result requires small signature/consumer adaptations in
+SkBlurMaskFilterImpl, SkShaderMaskFilterImpl and SkCanvasPriv; those larger files
+are not claimed converted by this batch. The uncalled legacy emboss factory
+bridge is removed from SkLightingImageFilter, with its original retained for the
+baseline. tests/mask_filter.cpp is original deterministic rendering and ownership
+coverage, now included in native differential comparisons.

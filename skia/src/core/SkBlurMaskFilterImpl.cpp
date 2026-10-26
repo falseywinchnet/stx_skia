@@ -72,7 +72,7 @@ bool SkBlurMaskFilterImpl::asABlur(BlurRec* rec) const {
     return true;
 }
 
-std::pair<sk_sp<SkImageFilter>, bool> SkBlurMaskFilterImpl::asImageFilter(const SkMatrix& ctm,
+SkMaskFilterBase::ImageFilterResult SkBlurMaskFilterImpl::asImageFilter(const SkMatrix& ctm,
                                                                           const SkPaint&) const {
     // Mask filters apply a uniform blur in either local or device space. Depending on the scale
     // factors of the `ctm`, the actual blur radii can end up non-uniform.

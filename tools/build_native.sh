@@ -27,4 +27,5 @@ else
     "build/$profile/stx_skia_pixel_conversion_tests" "build/$profile/conversions.raw"
     "build/$profile/stx_skia_pixmap_tests" "build/$profile/pixmap.raw"
     "build/$profile/stx_skia_mask_tests" "build/$profile/mask.raw"
+    "build/$profile/stx_skia_mask_filter_tests" "build/$profile/mask-filter.raw"
 fi

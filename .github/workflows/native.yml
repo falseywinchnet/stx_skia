@@ -23,6 +23,7 @@ jobs:
           cmake -E compare_files build/baseline/conversions.raw build/candidate/conversions.raw
           cmake -E compare_files build/baseline/pixmap.raw build/candidate/pixmap.raw
           cmake -E compare_files build/baseline/mask.raw build/candidate/mask.raw
+          cmake -E compare_files build/baseline/mask-filter.raw build/candidate/mask-filter.raw
           sh tools/verify_installed.sh
       - name: Instrumented deterministic suite
         run: sh tools/build_native.sh candidate-sanitize
@@ -46,4 +47,5 @@ jobs:
           cmake -E compare_files build/baseline/conversions.raw build/candidate/conversions.raw
           cmake -E compare_files build/baseline/pixmap.raw build/candidate/pixmap.raw
           cmake -E compare_files build/baseline/mask.raw build/candidate/mask.raw
+          cmake -E compare_files build/baseline/mask-filter.raw build/candidate/mask-filter.raw
           sh tools/verify_installed.sh

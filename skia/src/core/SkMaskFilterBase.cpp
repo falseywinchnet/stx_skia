@@ -33,57 +33,57 @@ class SkPaint;
 class SkRRect;
 
 SkMaskFilterBase::NinePatch::~NinePatch() {
-    if (fCache) {
-        SkASSERT((const void*)fMask.fImage == fCache->data());
-        fCache->unref();
-    } else {
-        // fMask is about to be destroyed and "owns" its fImage.
-        SkMaskBuilder::FreeImage(const_cast<uint8_t*>(fMask.fImage));
-    }
+    if (fCache) SkASSERT(static_cast<const void*>(fMask.fImage) == (*fCache).data());
+    // Members release storage after the borrowed descriptor ends its lifetime.
 }
 
 bool SkMaskFilterBase::asABlur(BlurRec*) const {
     return false;
 }
 
-std::pair<sk_sp<SkImageFilter>, bool> SkMaskFilterBase::asImageFilter(const SkMatrix& ctm,
+SkMaskFilterBase::ImageFilterResult SkMaskFilterBase::asImageFilter(const SkMatrix& ctm,
                                                                       const SkPaint& paint) const {
-    return std::make_pair(nullptr, false);
+    const ImageFilterResult result{.filter = nullptr, .appliesShading = false};
+    return result;
 }
 
 static SkMask extract_mask_subset(const SkMask& src, SkIRect bounds, int32_t newX, int32_t newY) {
     SkASSERT(src.fBounds.contains(bounds));
 
-    const int dx = bounds.left() - src.fBounds.left();
-    const int dy = bounds.top() - src.fBounds.top();
+    const size_t dx = static_cast<size_t>(static_cast<int64_t>(bounds.left()) - src.fBounds.left());
+    const size_t dy = static_cast<size_t>(static_cast<int64_t>(bounds.top()) - src.fBounds.top());
     bounds.offsetTo(newX, newY);
-    return SkMask(src.fImage + dy * src.fRowBytes + dx,
-                  bounds,
-                  src.fRowBytes,
-                  src.fFormat);
+    const size_t offset = dy * src.fRowBytes + dx;
+    const SkMask subset(src.fImage + offset, bounds, src.fRowBytes, src.fFormat);
+    return subset;
 }
 
 static void blit_clipped_mask(SkBlitter* blitter, const SkMask& mask,
                             const SkIRect& bounds, const SkIRect& clipR) {
-    SkIRect r;
+    SkIRect r = SkIRect::MakeEmpty();
     if (r.intersect(bounds, clipR)) {
-        blitter->blitMask(mask, r);
+        (*blitter).blitMask(mask, r);
     }
 }
 
 static void blit_clipped_rect(SkBlitter* blitter, const SkIRect& rect, const SkIRect& clipR) {
-    SkIRect r;
+    SkIRect r = SkIRect::MakeEmpty();
     if (r.intersect(rect, clipR)) {
-        blitter->blitRect(r.left(), r.top(), r.width(), r.height());
+        (*blitter).blitRect(r.left(), r.top(), r.width(), r.height());
     }
 }
 
 static void draw_nine_clipped(const SkMask& mask, const SkIRect& outerR,
                               const SkIPoint& center, bool fillCenter,
                               const SkIRect& clipR, SkBlitter* blitter) {
+    SkASSERT(mask.fFormat == SkMask::kA8_Format);
+    SkASSERT(mask.fBounds.fLeft == 0 && mask.fBounds.fTop == 0);
+    SkASSERT(mask.fBounds.contains(center.x(), center.y()));
+    SkASSERT(outerR.width64() >= mask.fBounds.width64());
+    SkASSERT(outerR.height64() >= mask.fBounds.height64());
     const int cx = center.x();
     const int cy = center.y();
-    SkIRect bounds;
+    SkIRect bounds = SkIRect::MakeEmpty();
 
     // top-left
     bounds = mask.fBounds;
@@ -122,7 +122,7 @@ static void draw_nine_clipped(const SkMask& mask, const SkIRect& outerR,
         blit_clipped_mask(blitter, m, m.fBounds, clipR);
     }
 
-    SkIRect innerR;
+    SkIRect innerR = SkIRect::MakeEmpty();
     innerR.setLTRB(outerR.left() + cx - mask.fBounds.left(),
                    outerR.top() + cy - mask.fBounds.top(),
                    outerR.right() + (cx + 1 - mask.fBounds.right()),
@@ -131,39 +131,51 @@ static void draw_nine_clipped(const SkMask& mask, const SkIRect& outerR,
         blit_clipped_rect(blitter, innerR, clipR);
     }
 
-    const int innerW = innerR.width();
-    size_t storageSize = (innerW + 1) * (sizeof(int16_t) + sizeof(uint8_t));
-    SkAutoSMalloc<4*1024> storage(storageSize);
-    int16_t* runs = (int16_t*)storage.get();
-    uint8_t* alpha = (uint8_t*)(runs + innerW + 1);
-
-    SkIRect r;
-    // top
-    r.setLTRB(innerR.left(), outerR.top(), innerR.right(), innerR.top());
-    if (r.intersect(clipR)) {
-        const int startY = std::max(0, r.top() - outerR.top());
-        const int stopY = startY + r.height();
-        const int width = r.width();
-        runs[0] = width;
-        runs[width] = 0;
-        for (int y = startY; y < stopY; ++y) {
-            alpha[0] = *mask.getAddr8(cx, mask.fBounds.top() + y);
-            blitter->blitAntiH(r.left(), outerR.top() + y, alpha, runs);
+    // Only clipped horizontal strips need run storage. A run has a signed
+    // 16-bit length; split larger spans instead of narrowing their width.
+    SkIRect top = SkIRect::MakeLTRB(innerR.left(), outerR.top(), innerR.right(), innerR.top());
+    SkIRect bottom = SkIRect::MakeLTRB(innerR.left(), innerR.bottom(), innerR.right(), outerR.bottom());
+    const bool hasTop = top.intersect(clipR);
+    const bool hasBottom = bottom.intersect(clipR);
+    if (hasTop || hasBottom) {
+        const int topWidth = hasTop ? top.width() : 0;
+        const int bottomWidth = hasBottom ? bottom.width() : 0;
+        const int runWidth = std::min(32767, std::max(topWidth, bottomWidth));
+        const size_t slots = static_cast<size_t>(runWidth) + 1;
+        const size_t storageSize = slots * (sizeof(int16_t) + sizeof(uint8_t));
+        SkAutoSMalloc<4 * 1024> storage(storageSize);
+        int16_t* runs = static_cast<int16_t*>(storage.get());
+        uint8_t* alpha = reinterpret_cast<uint8_t*>(runs + slots);
+        if (hasTop) {
+            for (int y = top.top(); y < top.bottom(); ++y) {
+                const int maskY = mask.fBounds.top() + y - outerR.top();
+                alpha[0] = *mask.getAddr8(cx, maskY);
+                for (int x = top.left(); x < top.right();) {
+                    const int count = std::min(runWidth, top.right() - x);
+                    runs[0] = static_cast<int16_t>(count);
+                    runs[count] = 0;
+                    (*blitter).blitAntiH(x, y, alpha, runs);
+                    x += count;
+                }
+            }
+        }
+        if (hasBottom) {
+            // Preserve the original bottom-to-top publication order.
+            for (int y = bottom.bottom(); y > bottom.top();) {
+                --y;
+                const int maskY = mask.fBounds.bottom() - (outerR.bottom() - y);
+                alpha[0] = *mask.getAddr8(cx, maskY);
+                for (int x = bottom.left(); x < bottom.right();) {
+                    const int count = std::min(runWidth, bottom.right() - x);
+                    runs[0] = static_cast<int16_t>(count);
+                    runs[count] = 0;
+                    (*blitter).blitAntiH(x, y, alpha, runs);
+                    x += count;
+                }
+            }
         }
     }
-    // bottom
-    r.setLTRB(innerR.left(), innerR.bottom(), innerR.right(), outerR.bottom());
-    if (r.intersect(clipR)) {
-        const int startY = outerR.bottom() - r.bottom();
-        const int stopY = startY + r.height();
-        const int width = r.width();
-        runs[0] = width;
-        runs[width] = 0;
-        for (int y = startY; y < stopY; ++y) {
-            alpha[0] = *mask.getAddr8(cx, mask.fBounds.bottom() - y - 1);
-            blitter->blitAntiH(r.left(), outerR.bottom() - y - 1, alpha, runs);
-        }
-    }
+    SkIRect r = SkIRect::MakeEmpty();
     // left
     r.setLTRB(outerR.left(), innerR.top(), innerR.left(), innerR.bottom());
     if (r.intersect(clipR)) {
@@ -172,7 +184,7 @@ static void draw_nine_clipped(const SkMask& mask, const SkIRect& outerR,
                         r,
                         0,    // so we repeat the scanline for our height
                         SkMask::kA8_Format);
-        blitter->blitMask(leftMask, r);
+        (*blitter).blitMask(leftMask, r);
     }
     // right
     r.setLTRB(innerR.right(), innerR.top(), outerR.right(), innerR.bottom());
@@ -182,7 +194,7 @@ static void draw_nine_clipped(const SkMask& mask, const SkIRect& outerR,
                          r,
                          0,    // so we repeat the scanline for our height
                          SkMask::kA8_Format);
-        blitter->blitMask(rightMask, r);
+        (*blitter).blitMask(rightMask, r);
     }
 }
 
@@ -207,7 +219,8 @@ static int countNestedRects(const SkPathRaw& raw, SkRect rects[2]) {
     if (SkPathPriv::IsNestedFillRects(raw, rects)) {
         return 2;
     }
-    if (auto r = raw.isRect()) {
+    const std::optional<SkRect> r = raw.isRect();
+    if (r.has_value()) {
         rects[0] = *r;
         return 1;
     }
@@ -223,12 +236,12 @@ bool SkMaskFilterBase::filterRRect(const SkRRect& devRRect,
     // cannot be used, return false to allow our caller to recover and perform
     // the drawing another way.
     std::optional<NinePatch> patch =
-            this->filterRRectToNine(devRRect, matrix, clip.getBounds(), cache);
+            filterRRectToNine(devRRect, matrix, clip.getBounds(), cache);
 
     if (!patch.has_value()) {
         return false;
     }
-    draw_nine(patch->fMask, patch->fOuterRect, patch->fCenter, true, clip, blitter);
+    draw_nine((*patch).fMask, (*patch).fOuterRect, (*patch).fCenter, true, clip, blitter);
     return true;
 }
 
@@ -239,7 +252,7 @@ SkMaskFilterBase::FilterReturn SkMaskFilterBase::filterRects(SkSpan<const SkRect
                                                              SkResourceCache* cache) const {
     std::optional<NinePatch> patch;
 
-    FilterReturn filterReturn = this->filterRectsToNine(
+    FilterReturn filterReturn = filterRectsToNine(
         devRects, matrix, clip.getBounds(), &patch, cache);
     switch (filterReturn) {
         case FilterReturn::kFalse:
@@ -247,14 +260,16 @@ SkMaskFilterBase::FilterReturn SkMaskFilterBase::filterRects(SkSpan<const SkRect
             break;
 
         case FilterReturn::kTrue:
-            draw_nine(patch->fMask, patch->fOuterRect, patch->fCenter, 1 == devRects.size(), clip,
+            if (!patch.has_value()) return FilterReturn::kFalse;
+            draw_nine((*patch).fMask, (*patch).fOuterRect, (*patch).fCenter, 1 == devRects.size(), clip,
                       blitter);
             break;
 
         case FilterReturn::kUnimplemented:
             SkASSERT(!patch.has_value());
-            // fall out
             break;
+        default:
+            return FilterReturn::kFalse;
     }
     return filterReturn;
 }
@@ -265,44 +280,49 @@ bool SkMaskFilterBase::filterPath(const SkPathRaw& devRaw,
                                   SkBlitter* blitter,
                                   SkStrokeRec::InitStyle style,
                                   SkResourceCache* cache) const {
-    SkRect rects[2];
+    SkRect rects[2] = {};
     int rectCount = 0;
     if (SkStrokeRec::kFill_InitStyle == style) {
         rectCount = countNestedRects(devRaw, rects);
     }
     if (rectCount > 0) {
-        switch (this->filterRects(SkSpan(rects, rectCount), matrix, clip, blitter, cache)) {
+        const SkSpan<const SkRect> rectangles(rects, static_cast<size_t>(rectCount));
+        const FilterReturn result = filterRects(rectangles, matrix, clip, blitter, cache);
+        switch (result) {
             case FilterReturn::kFalse:
                 return false;
             case FilterReturn::kTrue:
                 return true;
             case FilterReturn::kUnimplemented:
                 break;
+            default:
+                return false;
         }
     }
 
-    SkMaskBuilder srcM, dstM;
+    SkAutoMaskFreeImage sourceOwner;
+    SkAutoMaskFreeImage destinationOwner;
+    SkMaskBuilder srcM;
+    SkMaskBuilder dstM;
 
 #if defined(SK_BUILD_FOR_FUZZER)
     if (devRaw.verbs().size() > 1000 || devRaw.points().size() > 1000) {
         return false;
     }
 #endif
-    if (!skcpu::DrawToMask(devRaw,
+    const bool drawn = skcpu::DrawToMask(devRaw,
                            clip.getBounds(),
                            this,
                            &matrix,
                            &srcM,
                            SkMaskBuilder::kComputeBoundsAndRenderImage_CreateMode,
-                           style)) {
-        return false;
-    }
-    SkAutoMaskFreeImage autoSrc(srcM.image());
+                           style);
+    sourceOwner.reset(srcM.image());
+    if (!drawn) return false;
 
-    if (!this->filterMask(&dstM, srcM, matrix, nullptr)) {
-        return false;
-    }
-    SkAutoMaskFreeImage autoDst(dstM.image());
+    const bool filtered = filterMask(&dstM, srcM, matrix, nullptr);
+    destinationOwner.reset(dstM.image());
+    if (!filtered) return false;
 
     // if we get here, we need to (possibly) resolve the clip and blitter
     SkAAClipBlitterWrapper wrapper(clip, blitter);
@@ -313,7 +333,7 @@ bool SkMaskFilterBase::filterPath(const SkPathRaw& devRaw,
     if (!clipper.done()) {
         const SkIRect& cr = clipper.rect();
         do {
-            blitter->blitMask(dstM, cr);
+            (*blitter).blitMask(dstM, cr);
             clipper.next();
         } while (!clipper.done());
     }
@@ -336,12 +356,15 @@ SkMaskFilterBase::FilterReturn SkMaskFilterBase::filterRectsToNine(SkSpan<const 
 
 void SkMaskFilterBase::computeFastBounds(const SkRect& src, SkRect* dst) const {
     SkMask srcM(nullptr, src.roundOut(), 0, SkMask::kA8_Format);
+    SkAutoMaskFreeImage destinationOwner;
     SkMaskBuilder dstM;
 
-    SkIPoint margin;    // ignored
-    if (this->filterMask(&dstM, srcM, SkMatrix::I(), &margin)) {
-        dst->set(dstM.fBounds);
+    SkIPoint margin = {0, 0};    // ignored
+    const bool filtered = filterMask(&dstM, srcM, SkMatrix::I(), &margin);
+    destinationOwner.reset(dstM.image());
+    if (filtered) {
+        (*dst).set(dstM.fBounds);
     } else {
-        dst->set(srcM.fBounds);
+        (*dst).set(srcM.fBounds);
     }
 }
