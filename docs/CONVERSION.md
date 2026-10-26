@@ -526,6 +526,22 @@ are near parity; the collision-heavy churn workload takes about 7% less time in
 the final M4 series. Earlier regressions are retained. See
 ../results/2026-10-26/HASH_STORAGE.md and its measurement files.
 
+## Intrusive list and unused hash/cache wrappers
+
+SkTInternalLList.h now states non-owning membership, node/iterator lifetime,
+exclusive mutation and constant-time reset semantics. It retains two endpoint
+pointers and a one-pointer iterator, with no allocation or new runtime state.
+Temporary-list iterator initialization is rejected; unsupported traversal-start
+values produce an empty iterator. Debug checks enforce existing detached-node and
+distinct-list requirements. Valid link operations and ordering remain unchanged.
+
+Compiler dependencies and retained-source inspection found no CPU consumers of
+SkLRUCache.h, SkTDynamicHash.h or SkTMultiMap.h. They are reference-only, with a
+candidate scope check against reintroduction. The active intrusive list remains
+used by polygon triangulation and the discardable-memory pool. Its new fixtures
+exercise both consumers as well as permutation, insertion, traversal and transfer
+contracts. See ../results/2026-10-26/INTRUSIVE_LIST.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

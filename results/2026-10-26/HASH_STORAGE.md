@@ -1,7 +1,9 @@
 # Hash storage and probe relocation — 2026-10-26
 
-The retained resource cache, dynamic-hash adapter, LRU utility and flattenable
-dictionaries use SkTHash.h. Its original source remains byte-for-byte in
+The retained resource cache and flattenable dictionaries use SkTHash.h.
+Subsequent dependency inspection found the generic LRU utility, dynamic-hash
+adapter and multimap are unused by the CPU closure; they are now reference-only
+(see INTRUSIVE_LIST.md). Its original source remains byte-for-byte in
 baseline/skia/src/core/SkTHash.h and is selected first by reference builds.
 This work retains descending linear probing and the ordinary three-quarter
 growth/one-quarter shrink thresholds. No retained caller supplies the optional
