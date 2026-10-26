@@ -118,6 +118,11 @@ bool ownership_and_streams() {
 }
 
 bool memory_stream_move() {
+    SkMemoryStream empty;
+    std::uint8_t untouched = 0x5a;
+    if (empty.read(&untouched, 1) != 0 || untouched != 0x5a || empty.getAtPos() != nullptr) {
+        return false;
+    }
     const std::array<std::uint8_t, 6> bytes = {1, 2, 3, 4, 5, 6};
     SkMemoryStream stream(bytes.data(), bytes.size(), false);
     if (!stream.seek(4) || !stream.move(-2) || stream.getPosition() != 2) return false;

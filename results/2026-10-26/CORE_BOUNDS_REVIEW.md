@@ -45,3 +45,7 @@ negative move could wrap to a large value and clamp at the end instead of
 moving backward. It now handles backward and forward movement separately,
 including the minimum `long` value and both stream boundaries. `data_contract`
 checks those cases for candidate and reference builds.
+
+An empty `SkMemoryStream` now returns zero from `read` before forming an
+address from its null byte pointer, and `getAtPos` returns null directly.
+`data_contract` checks the empty-stream result and unchanged output byte.

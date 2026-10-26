@@ -348,6 +348,7 @@ size_t SkMemoryStream::read(void* buffer, size_t size) {
     if (size > dataSize - fOffset) {
         size = dataSize - fOffset;
     }
+    if (size == 0) return 0;
     if (buffer) {
         sk_careful_memcpy(buffer, fData->bytes() + fOffset, size);
     }
@@ -428,7 +429,9 @@ const void* SkMemoryStream::getMemoryBase() {
 }
 
 const void* SkMemoryStream::getAtPos() {
-    return fData->bytes() + fOffset;
+    const uint8_t* base = (*fData).bytes();
+    if (base == nullptr) return nullptr;
+    return base + fOffset;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
