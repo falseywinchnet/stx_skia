@@ -45,10 +45,13 @@ public:
      *  Iff this shader is backed by a single SkImage, return its ptr (the caller must ref this
      *  if they want to keep it longer than the lifetime of the shader). If not, return nullptr.
      */
-    SkImage* isAImage(SkMatrix* localMatrix, SkTileMode xy[2]) const;
+    SkImage* isAImage(SkMatrix* localMatrix, SkTileMode xy[2]) const &;
+    SkImage* isAImage(SkMatrix*, SkTileMode[2]) const && = delete;
 
     bool isAImage() const {
-        return this->isAImage(nullptr, (SkTileMode*)nullptr) != nullptr;
+        SkImage* image = isAImage(nullptr, nullptr);
+        const bool backedByImage = image != nullptr;
+        return backedByImage;
     }
 
     //////////////////////////////////////////////////////////////////////////

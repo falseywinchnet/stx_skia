@@ -31,17 +31,22 @@ public:
     template <typename T, typename... Args>
     static std::enable_if_t<std::is_base_of_v<SkShader, T>, sk_sp<SkShader>>
     MakeWrapped(const SkMatrix* localMatrix, Args&&... args) {
-        auto t = sk_make_sp<T>(std::forward<Args>(args)...);
+        sk_sp<T> shader = sk_make_sp<T>(std::forward<Args>(args)...);
         if (localMatrix) {
-            return t->makeWithLocalMatrix(*localMatrix);
+            sk_sp<SkShader> wrapped = (*shader).makeWithLocalMatrix(*localMatrix);
+            return wrapped;
         }
-        return t;
+        sk_sp<SkShader> result = std::move(shader);
+        return result;
     }
 
     SkLocalMatrixShader(sk_sp<SkShader> wrapped, const SkMatrix& localMatrix)
             : fLocalMatrix(localMatrix), fWrappedShader(std::move(wrapped)) {}
 
-    bool isOpaque() const override { return as_SB(fWrappedShader)->isOpaque(); }
+    bool isOpaque() const override {
+        const bool opaque = (*fWrappedShader).isOpaque();
+        return opaque;
+    }
 
     bool isConstant(SkColor4f* color = nullptr) const override;
     GradientType asGradient(GradientInfo* info, SkMatrix* localMatrix) const override;
@@ -54,7 +59,8 @@ public:
         return fWrappedShader;
     }
 
-    const SkMatrix& localMatrix() const { return fLocalMatrix; }
+    const SkMatrix& localMatrix() const & { return fLocalMatrix; }
+    const SkMatrix& localMatrix() const && = delete;
     sk_sp<SkShader> wrappedShader() const { return fWrappedShader; }
 
 protected:
@@ -87,14 +93,18 @@ public:
     SkCTMShader(sk_sp<SkShader> proxy, const SkMatrix& ctm,
                 SkPoint deviceOffset = {0, 0});
 
-    bool isOpaque() const override { return fProxyShader->isOpaque(); }
+    bool isOpaque() const override {
+        const bool opaque = (*fProxyShader).isOpaque();
+        return opaque;
+    }
 
     bool isConstant(SkColor4f* color = nullptr) const override;
     GradientType asGradient(GradientInfo* info, SkMatrix* localMatrix) const override;
 
     ShaderType type() const override { return ShaderType::kCTM; }
 
-    const SkMatrix& ctm() const { return fCTM; }
+    const SkMatrix& ctm() const & { return fCTM; }
+    const SkMatrix& ctm() const && = delete;
     sk_sp<SkShader> proxyShader() const { return fProxyShader; }
 
 protected:

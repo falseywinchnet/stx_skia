@@ -21,12 +21,15 @@
 #include <optional>
 
 sk_sp<SkFlattenable> SkCoordClampShader::CreateProc(SkReadBuffer& buffer) {
-    sk_sp<SkShader> shader(buffer.readShader());
-    SkRect subset = buffer.readRect();
-    if (!buffer.validate(SkToBool(shader))) {
+    sk_sp<SkShader> shader = buffer.readShader();
+    const SkRect subset = buffer.readRect();
+    const bool shaderPresent = SkToBool(shader);
+    const bool valid = buffer.validate(shaderPresent);
+    if (!valid) {
         return nullptr;
     }
-    return SkShaders::CoordClamp(std::move(shader), subset);
+    sk_sp<SkFlattenable> result = SkShaders::CoordClamp(std::move(shader), subset);
+    return result;
 }
 
 void SkCoordClampShader::flatten(SkWriteBuffer& buffer) const {
@@ -43,10 +46,13 @@ bool SkCoordClampShader::appendStages(const SkStageRec& rec,
     // Strictly speaking, childMRec's total matrix is not valid. It is only valid inside the subset
     // rectangle. However, we don't mark it as such because we want the "total matrix is valid"
     // behavior in SkImageShader for filtering.
-    auto clampCtx = rec.fAlloc->make<SkRasterPipelineContexts::CoordClampCtx>();
+    SkRasterPipelineContexts::CoordClampCtx* clampCtx =
+            (*rec.fAlloc).make<SkRasterPipelineContexts::CoordClampCtx>();
     *clampCtx = {fSubset.fLeft, fSubset.fTop, fSubset.fRight, fSubset.fBottom};
-    rec.fPipeline->append(SkRasterPipelineOp::clamp_x_and_y, clampCtx);
-    return as_SB(fShader)->appendStages(rec, *childMRec);
+    (*rec.fPipeline).append(SkRasterPipelineOp::clamp_x_and_y, clampCtx);
+    const SkShaderBase& shader = *as_SB(fShader);
+    const bool appended = shader.appendStages(rec, *childMRec);
+    return appended;
 }
 
 
@@ -57,5 +63,6 @@ sk_sp<SkShader> SkShaders::CoordClamp(sk_sp<SkShader> shader, const SkRect& subs
     if (!subset.isSorted()) {
         return nullptr;
     }
-    return sk_make_sp<SkCoordClampShader>(std::move(shader), subset);
+    sk_sp<SkShader> result = sk_make_sp<SkCoordClampShader>(std::move(shader), subset);
+    return result;
 }

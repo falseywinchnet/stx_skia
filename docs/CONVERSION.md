@@ -1107,6 +1107,17 @@ match, and the full instrumented suite returns PASS.
 See ../results/2026-10-26/SHADER_WORKING_SPACE.md. Other shader classes and their
 shared base still remain in the conversion programme.
 
+## Shader facade and coordinate wrappers
+
+The public shader facade, local-matrix/CTM wrappers, coordinate clamp and empty
+shader now use explicit ownership and named processing stages. Borrowed image
+and matrix views reject temporary shader objects. Nested matrix multiplication,
+coordinate clamp and captured tile offsets retain their existing behavior.
+Candidate/reference suites pass 56/56 and 55/55, all thirteen common artifacts
+match, and the complete instrumented suite returns PASS. See
+../results/2026-10-26/SHADER_COORDINATE_CONVERSION.md for coverage and limitations.
+The shared shader base and remaining sampling classes are still separate work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

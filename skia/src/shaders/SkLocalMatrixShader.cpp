@@ -15,12 +15,15 @@ enum class SkTileMode;
 struct SkStageRec;
 
 bool SkLocalMatrixShader::isConstant(SkColor4f* color) const {
-    return as_SB(fWrappedShader)->isConstant(color);
+    const SkShaderBase& wrapped = *as_SB(fWrappedShader);
+    const bool constant = wrapped.isConstant(color);
+    return constant;
 }
 
 SkShaderBase::GradientType SkLocalMatrixShader::asGradient(GradientInfo* info,
                                                            SkMatrix* localMatrix) const {
-    GradientType type = as_SB(fWrappedShader)->asGradient(info, localMatrix);
+    const SkShaderBase& wrapped = *as_SB(fWrappedShader);
+    const GradientType type = wrapped.asGradient(info, localMatrix);
     if (type != SkShaderBase::GradientType::kNone && localMatrix) {
         *localMatrix = ConcatLocalMatrices(fLocalMatrix, *localMatrix);
     }
@@ -28,13 +31,14 @@ SkShaderBase::GradientType SkLocalMatrixShader::asGradient(GradientInfo* info,
 }
 
 sk_sp<SkFlattenable> SkLocalMatrixShader::CreateProc(SkReadBuffer& buffer) {
-    SkMatrix lm;
+    SkMatrix lm{};
     buffer.readMatrix(&lm);
-    auto baseShader(buffer.readShader());
+    sk_sp<SkShader> baseShader = buffer.readShader();
     if (!baseShader) {
         return nullptr;
     }
-    return baseShader->makeWithLocalMatrix(lm);
+    sk_sp<SkFlattenable> result = (*baseShader).makeWithLocalMatrix(lm);
+    return result;
 }
 
 void SkLocalMatrixShader::flatten(SkWriteBuffer& buffer) const {
@@ -45,13 +49,16 @@ void SkLocalMatrixShader::flatten(SkWriteBuffer& buffer) const {
 #ifdef SK_ENABLE_LEGACY_SHADERCONTEXT
 SkShaderBase::Context* SkLocalMatrixShader::onMakeContext(const ContextRec& rec,
                                                           SkArenaAlloc* alloc) const {
-    return as_SB(fWrappedShader)->makeContext(ContextRec::Concat(rec, fLocalMatrix), alloc);
+    const SkShaderBase& wrapped = *as_SB(fWrappedShader);
+    const ContextRec localRec = ContextRec::Concat(rec, fLocalMatrix);
+    Context* context = wrapped.makeContext(localRec, alloc);
+    return context;
 }
 #endif
 
 SkImage* SkLocalMatrixShader::onIsAImage(SkMatrix* outMatrix, SkTileMode* mode) const {
-    SkMatrix imageMatrix;
-    SkImage* image = fWrappedShader->isAImage(&imageMatrix, mode);
+    SkMatrix imageMatrix{};
+    SkImage* image = (*fWrappedShader).isAImage(&imageMatrix, mode);
     if (image && outMatrix) {
         *outMatrix = ConcatLocalMatrices(fLocalMatrix, imageMatrix);
     }
@@ -60,12 +67,17 @@ SkImage* SkLocalMatrixShader::onIsAImage(SkMatrix* outMatrix, SkTileMode* mode) 
 }
 
 bool SkLocalMatrixShader::onAsLuminanceColor(SkColor4f* color) const {
-    return as_SB(fWrappedShader)->asLuminanceColor(color);
+    const SkShaderBase& wrapped = *as_SB(fWrappedShader);
+    const bool hasLuminance = wrapped.asLuminanceColor(color);
+    return hasLuminance;
 }
 
 bool SkLocalMatrixShader::appendStages(const SkStageRec& rec,
                                        const SkShaders::MatrixRec& mRec) const {
-    return as_SB(fWrappedShader)->appendStages(rec, mRec.concat(fLocalMatrix));
+    const SkShaderBase& wrapped = *as_SB(fWrappedShader);
+    const SkShaders::MatrixRec localRec = mRec.concat(fLocalMatrix);
+    const bool appended = wrapped.appendStages(rec, localRec);
+    return appended;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -75,12 +87,16 @@ SkCTMShader::SkCTMShader(sk_sp<SkShader> proxy, const SkMatrix& ctm,
         : fProxyShader(std::move(proxy)), fCTM(ctm), fDeviceOffset(deviceOffset) {}
 
 bool SkCTMShader::isConstant(SkColor4f* color) const {
-    return as_SB(fProxyShader)->isConstant(color);
+    const SkShaderBase& proxy = *as_SB(fProxyShader);
+    const bool constant = proxy.isConstant(color);
+    return constant;
 }
 
 SkShaderBase::GradientType SkCTMShader::asGradient(GradientInfo* info,
                                                    SkMatrix* localMatrix) const {
-    return as_SB(fProxyShader)->asGradient(info, localMatrix);
+    const SkShaderBase& proxy = *as_SB(fProxyShader);
+    const GradientType type = proxy.asGradient(info, localMatrix);
+    return type;
 }
 
 bool SkCTMShader::appendStages(const SkStageRec& rec, const SkShaders::MatrixRec&) const {

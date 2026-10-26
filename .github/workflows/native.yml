@@ -20,6 +20,7 @@ jobs:
           set -eu
           sh tools/build_native.sh baseline
           sh tools/build_native.sh candidate
+          cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
           cmake -E compare_files build/baseline/shader-working-space.raw build/candidate/shader-working-space.raw
           cmake -E compare_files build/baseline/color-plans.raw build/candidate/color-plans.raw
           cmake -E compare_files build/baseline/color-adjustments.raw build/candidate/color-adjustments.raw
@@ -52,6 +53,7 @@ jobs:
           set -eu
           sh tools/build_native.sh baseline
           sh tools/build_native.sh candidate
+          cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
           cmake -E compare_files build/baseline/shader-working-space.raw build/candidate/shader-working-space.raw
           cmake -E compare_files build/baseline/color-plans.raw build/candidate/color-plans.raw
           cmake -E compare_files build/baseline/color-adjustments.raw build/candidate/color-adjustments.raw

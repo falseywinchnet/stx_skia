@@ -435,3 +435,7 @@ foreach(unit IN ITEMS src/core/SkColorSpaceXformSteps.cpp
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
+
+# Shader facade retains its pre-conversion ownership and matrix composition.
+list(REMOVE_ITEM stx_sources skia/src/shaders/SkShader.cpp)
+list(APPEND stx_sources baseline/skia/src/shaders/SkShader.cpp)

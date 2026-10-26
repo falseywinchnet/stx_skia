@@ -17,7 +17,7 @@ struct SkStageRec;
 
 /**
  *  \class SkEmptyShader
- *  A Shader that always draws nothing. Its createContext always returns nullptr.
+ *  A shader that contributes no raster stages and draws nothing.
  */
 class SkEmptyShader : public SkShaderBase {
 public:
@@ -25,9 +25,7 @@ public:
 
 protected:
     void flatten(SkWriteBuffer& buffer) const override {
-        // Do nothing.
-        // We just don't want to fall through to SkShader::flatten(),
-        // which will write data we don't care to serialize or decode.
+        // Empty shaders have no payload.
     }
 
     bool appendStages(const SkStageRec&, const SkShaders::MatrixRec&) const override {
