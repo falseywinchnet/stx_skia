@@ -133,3 +133,19 @@ Windows host would add it as a second `Painter` beside `DibPainter`, the
 way macOS keeps `CoreGraphicsRaster`, chosen when the program starts and
 reported as a capability. The DIB painter stays the native reference
 behaviour.
+
+
+## Owner clarification after intake — 2026-10-25
+
+The owner withdraws optional item 8 above. GUI.Forms performs all CSS image and
+backdrop filtering on its own raster. Skia's general SkImageFilters system is
+outside the retained contract and is to be removed. Keep these separate effects:
+SkMaskFilter::MakeBlur for painter shadows, SkColorFilters::Matrix and
+SkShaderMaskFilter. Layers for opacity remain required.
+
+All Skia text/font machinery is to be removed: GUI.Forms supplies finished glyph
+coverage masks. Composition of those masks remains required. Image codecs remain
+outside stx_skia, including PNG, already owned by stx_png. Remove SkSL/runtime
+image effects after resolving internal CPU dependencies. GPU, PDF, SVG, Skottie,
+tracing and tools stay excluded. This clarification supersedes the earlier
+optional backdrop requirement; it does not claim the pruning is already done.

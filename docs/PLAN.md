@@ -40,8 +40,9 @@ explicitly third-party-derived source awaiting conversion.
 
 Next: native Linux x64/arm64 and Windows CLANG64 gates; coordinator integration;
 then separate picture/text dependencies from canvas and device dispatch, with
-render comparisons at each removal. Retain general image filters/SkSL until the
-wanted backdrop capability has a measured alternative. Continue conversion into
+render comparisons at each removal. The owner has now removed Skia backdrop filtering from the contract: remove
+general image filters, then resolve their remaining SkSL/runtime dependencies.
+Retain blur masks, matrix color filters and shader masks. Continue conversion into
 pixel storage, masks and exercised kernels with per-change measurements.
 
 The independent Daybreak review and full GUI.Forms stage gate remain separate.

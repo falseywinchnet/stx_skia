@@ -104,8 +104,10 @@ is rejected at the retained compatibility entry point.
 
 The coordinator requires layers, full affine transforms, sweep gradients,
 additional blends, arbitrary paths, cubic/mipmap sampling and per-corner radii.
-These remain. Backdrop blur is retained as the optional future capability, so
-its general image-filter and SkSL dependencies are not cut speculatively.
+The first seven capabilities remain. The owner subsequently withdrew the
+optional Skia backdrop capability: general image filters are now a removal target,
+followed by their SkSL dependencies. First-party GUI.Forms effects own backdrop
+and CSS filtering; blur masks, matrix color filters and shader masks remain.
 
 The new ownership helper is used in an isolated consumer patch for decoded and
 remapped pixel vectors. Gradient buffers are reused by the raster instance;
