@@ -642,11 +642,16 @@ static SkSamplingOptions tweak_sampling(SkSamplingOptions sampling, const SkMatr
     SkFilterMode filter = sampling.filter;
 
     // When the matrix is just an integer translate, bilerp == nearest neighbor.
-    if (filter == SkFilterMode::kLinear &&
-            matrix.getType() <= SkMatrix::kTranslate_Mask &&
-            matrix.getTranslateX() == (int)matrix.getTranslateX() &&
-            matrix.getTranslateY() == (int)matrix.getTranslateY()) {
-        filter = SkFilterMode::kNearest;
+    if (filter == SkFilterMode::kLinear && matrix.getType() <= SkMatrix::kTranslate_Mask) {
+        const float x = matrix.getTranslateX();
+        const float y = matrix.getTranslateY();
+        // Large finite translations can be integral without fitting in int.
+        // Test integrality in the computation's own precision, without narrowing.
+        const bool integral = std::isfinite(x) && std::isfinite(y) &&
+                              x == std::trunc(x) && y == std::trunc(y);
+        if (integral) {
+            filter = SkFilterMode::kNearest;
+        }
     }
 
     const SkSamplingOptions adjusted(filter, sampling.mipmap);

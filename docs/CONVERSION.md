@@ -1142,8 +1142,10 @@ reference suites pass 57/57 and 56/56, fourteen common artifacts match, and the
 instrumented suite returns PASS. See
 ../results/2026-10-26/IMAGE_SAMPLING_CONVERSION.md and TRANSFORM_CHILD_FAILURE.md in
 that directory. Only the two required canvas result consumers were adapted.
-Strict-subset behavior and extreme-coordinate shortcuts need focused follow-up;
-this conversion does not claim those contracts fully verified.
+The integer-translation shortcut now avoids out-of-range float-to-int conversion;
+eight signed boundary cases verify correct clamp-edge pixels. See
+../results/2026-10-26/IMAGE_TRANSLATION_RANGE.md. Strict-subset behavior still needs
+focused follow-up; the common corpus does not establish that contract.
 
 ## Still required
 

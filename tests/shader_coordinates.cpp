@@ -1,6 +1,7 @@
 #include "include/core/SkCanvas.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkPaint.h"
+#include "include/core/SkPixmap.h"
 #include "include/core/SkShader.h"
 #include "include/core/SkSurface.h"
 #include "src/shaders/SkLocalMatrixShader.h"
@@ -13,6 +14,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -225,6 +227,38 @@ bool matrix_state() {
     return true;
 }
 
+#ifndef STX_SKIA_REFERENCE
+bool large_translations() {
+    const std::array<uint8_t, 12> colors{255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255};
+    const SkImageInfo info = SkImageInfo::Make(3, 1, kRGBA_8888_SkColorType, kOpaque_SkAlphaType);
+    const SkPixmap source(info, colors.data(), colors.size());
+    const sk_sp<SkImage> image = SkImages::RasterFromPixmapCopy(source);
+    if (!image) return false;
+    const std::array<float, 8> translations{
+        2147483520.0f, -2147483520.0f, 2147483648.0f, -2147483648.0f,
+        4294967296.0f, -4294967296.0f,
+        std::numeric_limits<float>::max(), -std::numeric_limits<float>::max()};
+    const SkSamplingOptions linear(SkFilterMode::kLinear);
+    const SkImageInfo outputInfo = SkImageInfo::MakeN32Premul(width, height);
+    for (const float translation : translations) {
+        const SkMatrix local = SkMatrix::Translate(translation, 0);
+        const sk_sp<SkShader> shader = (*image).makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
+                                                         linear, local);
+        if (!shader) return false;
+        Pixels pixels{};
+        if (!render(shader, SkMatrix::I(), pixels)) return false;
+        const SkPixmap output(outputInfo, pixels.data(), width * sizeof(uint32_t));
+        const SkColor expected = translation > 0 ? SK_ColorRED : SK_ColorBLUE;
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                if (output.getColor(x, y) != expected) return false;
+            }
+        }
+    }
+    return true;
+}
+#endif
+
 bool empty_and_singular() {
     const sk_sp<SkShader> empty = SkShaders::Empty();
     SkMatrix singular{};
@@ -253,6 +287,10 @@ int main(int argc, char** argv) {
     if (!matrix_state()) return 4;
     if (!transform_child_failure()) return 5;
     if (!transform_updates()) return 6;
+#ifndef STX_SKIA_REFERENCE
+    // The upstream integrality test narrows these values outside int range.
+    if (!large_translations()) return 7;
+#endif
     if (argc == 2) {
         FILE* file = std::fopen(argv[1], "wb");
         if (file == nullptr) return 3;
