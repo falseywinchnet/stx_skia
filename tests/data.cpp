@@ -116,10 +116,24 @@ bool ownership_and_streams() {
     subset = (*data).copySubset(0, 0);
     return subset && (*subset).size() == 0;
 }
+
+bool memory_stream_move() {
+    const std::array<std::uint8_t, 6> bytes = {1, 2, 3, 4, 5, 6};
+    SkMemoryStream stream(bytes.data(), bytes.size(), false);
+    if (!stream.seek(4) || !stream.move(-2) || stream.getPosition() != 2) return false;
+    if (!stream.move(-1) || stream.getPosition() != 1) return false;
+    if (!stream.move(-std::numeric_limits<long>::max()) || stream.getPosition() != 0) return false;
+    if (!stream.move(std::numeric_limits<long>::min()) || stream.getPosition() != 0) return false;
+    if (!stream.move(std::numeric_limits<long>::max()) ||
+        stream.getPosition() != bytes.size()) return false;
+    if (!stream.move(-1) || stream.getPosition() != bytes.size() - 1) return false;
+    if (!stream.move(1) || stream.getPosition() != bytes.size()) return false;
+    return true;
+}
 }
 
 int main() {
-    if (!subsets() || !ownership_and_streams()) return 1;
+    if (!subsets() || !ownership_and_streams() || !memory_stream_move()) return 1;
     std::puts("data subsets, ranges, ownership and streams: PASS");
     return 0;
 }

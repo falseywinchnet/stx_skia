@@ -390,7 +390,27 @@ bool SkMemoryStream::seek(size_t position) {
 }
 
 bool SkMemoryStream::move(long offset) {
-    return this->seek(fOffset + offset);
+    if (offset < 0) {
+        if (offset == std::numeric_limits<long>::min()) {
+            fOffset = 0;
+            return true;
+        }
+        const size_t backward = static_cast<size_t>(-offset);
+        if (backward >= fOffset) {
+            fOffset = 0;
+        } else {
+            fOffset -= backward;
+        }
+        return true;
+    }
+    const size_t forward = static_cast<size_t>(offset);
+    const size_t remaining = (*fData).size() - fOffset;
+    if (forward >= remaining) {
+        fOffset = (*fData).size();
+    } else {
+        fOffset += forward;
+    }
+    return true;
 }
 
 SkMemoryStream* SkMemoryStream::onFork() const {

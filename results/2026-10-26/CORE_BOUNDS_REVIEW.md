@@ -39,3 +39,9 @@ total length before subtracting the two quantities. `data_contract` covers a
 one-byte-at-a-time stream, early EOF, inconsistent position metadata and a
 null source. The candidate and reference release suites again passed 50/50
 and 49/49 respectively; the candidate sanitizer runner reported `PASS`.
+
+`SkMemoryStream::move` also added a signed offset to an unsigned cursor. A
+negative move could wrap to a large value and clamp at the end instead of
+moving backward. It now handles backward and forward movement separately,
+including the minimum `long` value and both stream boundaries. `data_contract`
+checks those cases for candidate and reference builds.
