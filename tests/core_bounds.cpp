@@ -1,6 +1,8 @@
 #include "include/core/SkStream.h"
 #include "include/core/SkPathBuilder.h"
+#include "src/core/SkAAClip.h"
 #include "src/core/SkBase64.h"
+#include "src/core/SkMask.h"
 
 #include <array>
 #include <cstddef>
@@ -143,6 +145,14 @@ bool aliased_path_points() {
     }
     return true;
 }
+
+bool oversized_clip_mask() {
+    SkAAClip clip;
+    if (!clip.setRect(SkIRect::MakeWH(50000, 50000))) return false;
+    SkMaskBuilder mask;
+    clip.copyToMask(&mask);
+    return mask.isEmpty() && mask.image() == nullptr && mask.rowBytes() == 0;
+}
 }
 
 int main() {
@@ -161,6 +171,10 @@ int main() {
     if (!aliased_path_points()) {
         std::fprintf(stderr, "aliased path point contract failed\n");
         return 4;
+    }
+    if (!oversized_clip_mask()) {
+        std::fprintf(stderr, "oversized clip mask contract failed\n");
+        return 5;
     }
     return 0;
 }

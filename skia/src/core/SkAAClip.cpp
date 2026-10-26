@@ -875,6 +875,13 @@ void SkAAClip::copyToMask(SkMaskBuilder* mask) const {
     mask->bounds() = fBounds;
     mask->rowBytes() = fBounds.width();
     size_t size = mask->computeImageSize();
+    if (size == 0) {
+        // A nonempty clip exceeded the mask's representable image extent.
+        mask->bounds().setEmpty();
+        mask->rowBytes() = 0;
+        mask->image() = nullptr;
+        return;
+    }
     mask->image() = SkMaskBuilder::AllocImage(size);
 
     Iter iter = RunHead::Iterate(*this);
@@ -1950,6 +1957,10 @@ void SkAAClipBlitter::blitMask(const SkMask& origMask, const SkIRect& clip) {
         grayMask.bounds() = origMask.fBounds;
         grayMask.rowBytes() = origMask.fBounds.width();
         size_t size = grayMask.computeImageSize();
+        if (size == 0) {
+            // The full A8 conversion cannot fit the mask extent.
+            return;
+        }
         grayMask.image() = reinterpret_cast<uint8_t*>(
             fGrayMaskScratch.reset(size, SkAutoMalloc::kReuse_OnShrink));
 
