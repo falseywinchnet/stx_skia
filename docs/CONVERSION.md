@@ -848,6 +848,22 @@ fingerprint 7262172567427146524. No speed gain is claimed. See
 ../results/2026-10-26/CONTAINER_CAPACITY.md. Element-container storage and relocation
 remain required work.
 
+## TArray construction and bitmap reference boundary
+
+TArray's copy/default construction and self-subrange reset now keep source
+elements live until copied and publish live counts after throwing construction
+has succeeded. Release count validation and empty-end arithmetic are tightened.
+The original stopped trial and its resolved cause remain recorded in
+../results/2026-10-26/TARRAY_CONSTRUCTION.md. Move, relocation and other append
+paths remain open, so the container is not yet fully converted.
+
+SkBitmap's pixel-reference origin now has a Release boundary matching its
+documented pinning behavior; impossible reference geometry detaches. The
+pre-fix AddressSanitizer write, fix and regression scope are in
+../results/2026-10-26/BITMAP_PIXEL_REF.md. Current native candidate/reference
+Release suites and candidate Release/Debug instrumented suites pass 44 tests;
+rendering and serialization artifacts remain byte-identical to reference.
+
 ## Fixed aligned element storage
 
 SkAlignedStorage is converted without runtime administration. It retains exactly

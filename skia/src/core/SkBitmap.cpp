@@ -31,7 +31,9 @@
 #include "src/image/SkImage_Raster.h"
 #include "src/shaders/SkImageShader.h"
 
+#include <algorithm>
 #include <cstring>
+#include <limits>
 #include <utility>
 class SkMaskFilter;
 
@@ -170,24 +172,54 @@ SkIPoint SkBitmap::pixelRefOrigin() const {
 }
 
 void SkBitmap::setPixelRef(sk_sp<SkPixelRef> pr, int dx, int dy) {
-#ifdef SK_DEBUG
-    if (pr) {
-        if (kUnknown_SkColorType != this->colorType()) {
-            SkASSERT(dx >= 0 && this->width() + dx <= pr->width());
-            SkASSERT(dy >= 0 && this->height() + dy <= pr->height());
+    const bool knownColor = kUnknown_SkColorType != colorType();
+    if (pr && knownColor) {
+        const int refWidth = (*pr).width();
+        const int refHeight = (*pr).height();
+        const int bitmapWidth = width();
+        const int bitmapHeight = height();
+        const size_t pixelBytes = static_cast<size_t>(bytesPerPixel());
+        const size_t refRowBytes = (*pr).rowBytes();
+        const bool invalidShape = refWidth < bitmapWidth || refHeight < bitmapHeight ||
+                                  refWidth < 0 || refHeight < 0;
+        const bool invalidStride = pixelBytes == 0 ||
+                                   !info().validRowBytes(refRowBytes) ||
+                                   (refWidth >= 0 &&
+                                    static_cast<size_t>(refWidth) > refRowBytes / pixelBytes);
+        const bool invalidExtent = refHeight > 0 &&
+                                   refRowBytes > std::numeric_limits<size_t>::max() /
+                                                         static_cast<size_t>(refHeight);
+        if (invalidShape || invalidStride || invalidExtent) {
+            // No origin can make this reference a valid bitmap view.
+            pr.reset();
+        } else if (refHeight == 0) {
+            // A reference with no rows has no addressable origin beyond its base.
+            dx = 0;
+            dy = 0;
+        } else {
+            const int maxX = refWidth - bitmapWidth;
+            const int maxY = refHeight - bitmapHeight;
+            SkASSERT(dx >= 0 && dx <= maxX);
+            SkASSERT(dy >= 0 && dy <= maxY);
+            dx = std::clamp(dx, 0, maxX);
+            dy = std::clamp(dy, 0, maxY);
+            if (bitmapHeight == 0 && dy == refHeight) {
+                // Keep a zero-height view within the final row's storage.
+                dy = refHeight - 1;
+            }
         }
     }
-#endif
-    fPixelRef = kUnknown_SkColorType != this->colorType() ? std::move(pr) : nullptr;
+    fPixelRef = knownColor ? std::move(pr) : nullptr;
     void* p = nullptr;
     size_t rowBytes = this->rowBytes();
-    // ignore dx,dy if there is no pixelref
     if (fPixelRef) {
-        rowBytes = fPixelRef->rowBytes();
-        // TODO(reed):  Enforce that PixelRefs must have non-null pixels.
-        p = fPixelRef->pixels();
+        rowBytes = (*fPixelRef).rowBytes();
+        p = (*fPixelRef).pixels();
         if (p) {
-            p = (char*)p + dy * rowBytes + dx * this->bytesPerPixel();
+            const size_t rowOffset = static_cast<size_t>(dy) * rowBytes;
+            const size_t columnOffset = static_cast<size_t>(dx) * bytesPerPixel();
+            const size_t offset = rowOffset + columnOffset;
+            p = static_cast<char*>(p) + offset;
         }
     }
     fPixmap.reset(fPixmap.info(), p, rowBytes);

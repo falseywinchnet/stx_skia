@@ -1,3 +1,4 @@
+#include "include/core/SkBitmap.h"
 #include "include/core/SkData.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkMallocPixelRef.h"
@@ -8,7 +9,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <thread>
+#include <utility>
 
 namespace {
 struct Events {
@@ -150,10 +153,76 @@ bool shared_identity() {
     if ((*other).getGenerationID() == generation) return false;
     return true;
 }
+
+bool bitmap_origin_contract() {
+    const SkImageInfo info = SkImageInfo::Make(1, 1, kRGBA_8888_SkColorType,
+                                               kPremul_SkAlphaType);
+    std::array<uint32_t, 1> pixels{};
+    sk_sp<SkPixelRef> owner = SkMakePixelRefWithProc(1, 1, sizeof(uint32_t),
+                                                    pixels.data(), nullptr, nullptr);
+    SkBitmap bitmap;
+    if (!bitmap.setInfo(info, sizeof(uint32_t))) return false;
+    bitmap.setPixelRef(owner, 0, 0);
+    bitmap.eraseColor(SK_ColorWHITE);
+    if (pixels[0] == 0) return false;
+
+    std::array<uint32_t, 4> edgePixels{};
+    sk_sp<SkPixelRef> edgeOwner = SkMakePixelRefWithProc(2, 2, 2 * sizeof(uint32_t),
+                                                        edgePixels.data(), nullptr, nullptr);
+    const SkImageInfo zeroWidthInfo = SkImageInfo::Make(0, 1, kRGBA_8888_SkColorType,
+                                                       kPremul_SkAlphaType);
+    SkBitmap zeroWidth;
+    if (!zeroWidth.setInfo(zeroWidthInfo, 0)) return false;
+    zeroWidth.setPixelRef(edgeOwner, 1, 1);
+    const SkIPoint zeroWidthOrigin = zeroWidth.pixelRefOrigin();
+    if (zeroWidthOrigin.x() != 1 || zeroWidthOrigin.y() != 1) return false;
+
+#if !defined(SK_DEBUG) && !defined(STX_SKIA_REFERENCE)
+    pixels[0] = 0;
+    bitmap.setPixelRef(owner, 1, 0);
+    bitmap.eraseColor(SK_ColorWHITE);
+    if (pixels[0] == 0) return false;
+
+    pixels[0] = 0;
+    bitmap.setPixelRef(owner, -1, -1);
+    bitmap.eraseColor(SK_ColorWHITE);
+    if (pixels[0] == 0) return false;
+
+    std::array<uint32_t, 4> grid{};
+    sk_sp<SkPixelRef> larger = SkMakePixelRefWithProc(2, 2, 2 * sizeof(uint32_t),
+                                                     grid.data(), nullptr, nullptr);
+    bitmap.setPixelRef(larger, 9, 9);
+    bitmap.eraseColor(SK_ColorWHITE);
+    if (grid[0] != 0 || grid[1] != 0 || grid[2] != 0 || grid[3] == 0) return false;
+    grid[3] = 0;
+    bitmap.setPixelRef(larger, 1, 0);
+    bitmap.eraseColor(SK_ColorWHITE);
+    if (grid[0] != 0 || grid[1] == 0 || grid[2] != 0 || grid[3] != 0) return false;
+    grid[1] = 0;
+    bitmap.setPixelRef(larger, std::numeric_limits<int>::max(),
+                       std::numeric_limits<int>::min());
+    bitmap.eraseColor(SK_ColorWHITE);
+    if (grid[0] != 0 || grid[1] == 0 || grid[2] != 0 || grid[3] != 0) return false;
+
+    SkBitmap impossible;
+    const SkImageInfo largerInfo = SkImageInfo::Make(2, 1, kRGBA_8888_SkColorType,
+                                                    kPremul_SkAlphaType);
+    if (!impossible.setInfo(largerInfo, 2 * sizeof(uint32_t))) return false;
+    impossible.setPixelRef(owner, 0, 0);
+    if (impossible.pixelRef() != nullptr || impossible.getPixels() != nullptr) return false;
+
+    sk_sp<SkPixelRef> shortStride = SkMakePixelRefWithProc(2, 2, sizeof(uint32_t),
+                                                          grid.data(), nullptr, nullptr);
+    bitmap.setPixelRef(std::move(shortStride), 0, 0);
+    if (bitmap.pixelRef() != nullptr || bitmap.getPixels() != nullptr) return false;
+#endif
+    return true;
+}
 }
 
 int main() {
-    if (!allocations() || !invalidation() || !listener_lifetimes() || !shared_identity()) return 1;
+    if (!allocations() || !invalidation() || !listener_lifetimes() || !shared_identity() ||
+        !bitmap_origin_contract()) return 1;
     std::puts("pixel allocation, ownership, invalidation and shared identity: PASS");
     return 0;
 }

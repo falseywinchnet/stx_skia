@@ -734,6 +734,10 @@ public:
         Asserts in debug builds if dx or dy are out of range. Pins dx and dy
         to legal range in release builds.
 
+        If the SkPixelRef dimensions or row bytes cannot contain SkBitmap,
+        clears the pixel reference and leaves SkBitmap dimensions unchanged.
+        A zero-height view at the end of the reference uses its final row.
+
         The caller is responsible for ensuring that the pixels match the
         SkColorType and SkAlphaType in SkImageInfo.
 
