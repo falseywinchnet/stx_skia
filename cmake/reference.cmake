@@ -5,6 +5,9 @@ foreach(unit IN ITEMS SkPixelRef SkMallocPixelRef SkPixelStorage SkIDChangeListe
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
 
+list(REMOVE_ITEM stx_sources skia/src/core/SkArenaAlloc.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkArenaAlloc.cpp)
+
 list(REMOVE_ITEM stx_sources skia/src/effects/SkShaderMaskFilterImpl.cpp)
 list(APPEND stx_sources baseline/skia/src/effects/SkShaderMaskFilterImpl.cpp)
 

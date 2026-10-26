@@ -129,6 +129,7 @@ public:
             fCursor = objStart + size;
             sk_asan_unpoison_memory_region(objStart, size);
         } else {
+            AssertRelease(size <= std::numeric_limits<uint32_t>::max() - sizeof(Footer));
             objStart = this->allocObjectWithFooter(size + sizeof(Footer), alignment);
             // Can never be UB because max value is alignof(T).
             uint32_t padding = SkToU32(objStart - fCursor);
@@ -213,7 +214,9 @@ public:
     // Only use makeBytesAlignedTo if none of the typed variants are practical to use.
     void* makeBytesAlignedTo(size_t size, size_t align) {
         AssertRelease(SkTFitsIn<uint32_t>(size));
-        auto objStart = this->allocObject(SkToU32(size), SkToU32(align));
+        AssertRelease(SkTFitsIn<uint32_t>(align));
+        AssertRelease(align != 0 && (align & (align - 1)) == 0);
+        char* objStart = allocObject(SkToU32(size), SkToU32(align));
         fCursor = objStart + size;
         sk_asan_unpoison_memory_region(objStart, size);
         return objStart;
@@ -231,6 +234,11 @@ protected:
 
 private:
     static void AssertRelease(bool cond) { if (!cond) { ::abort(); } }
+    static uint32_t CheckedArenaSize(size_t size) {
+        AssertRelease(SkTFitsIn<uint32_t>(size));
+        const uint32_t checked = static_cast<uint32_t>(size);
+        return checked;
+    }
 
     static char* SkipPod(char* footerEnd);
     static void RunDtorsOnBlock(char* footerEnd);
@@ -247,6 +255,7 @@ private:
     void ensureSpace(uint32_t size, uint32_t alignment);
 
     char* allocObject(uint32_t size, uint32_t alignment) {
+        if (fCursor == nullptr) ensureSpace(size, alignment);
         uintptr_t mask = alignment - 1;
         uintptr_t alignedOffset = (~reinterpret_cast<uintptr_t>(fCursor) + 1) & mask;
         uintptr_t totalSize = size + alignedOffset;

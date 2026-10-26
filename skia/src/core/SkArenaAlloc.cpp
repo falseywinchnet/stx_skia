@@ -18,11 +18,14 @@ static char* end_chain(char*) { return nullptr; }
 SkArenaAlloc::SkArenaAlloc(char* block, size_t size, size_t firstHeapAllocation)
     : fDtorCursor {block}
     , fCursor     {block}
-    , fEnd        {block + SkToU32(size)}
-    , fFibonacciProgression{SkToU32(size), SkToU32(firstHeapAllocation)}
+    , fEnd        {block}
+    , fFibonacciProgression{CheckedArenaSize(size), CheckedArenaSize(firstHeapAllocation)}
 {
+    SkASSERT_RELEASE(block != nullptr || size == 0);
     if (size < sizeof(Footer)) {
         fEnd = fCursor = fDtorCursor = nullptr;
+    } else {
+        fEnd = block + size;
     }
 
     if (fCursor != nullptr) {
@@ -115,6 +118,7 @@ restart:
     if (needsSkipFooter) {
         skipOverhead = sizeof(Footer) + sizeof(uint32_t);
     }
+    AssertRelease(sizeIncludingFooter <= std::numeric_limits<uint32_t>::max() - skipOverhead);
     const uint32_t totalSize = sizeIncludingFooter + skipOverhead;
 
     // Math on null fCursor/fEnd is undefined behavior, so explicitly check for first alloc.
@@ -125,13 +129,20 @@ restart:
 
     assert(fEnd);
     // This test alone would be enough nullptr were defined to be 0, but it's not.
-    char* objStart = (char*)((uintptr_t)(fCursor + skipOverhead + mask) & ~mask);
-    if ((ptrdiff_t)totalSize > fEnd - objStart) {
+    const uintptr_t cursorAddress = reinterpret_cast<uintptr_t>(fCursor);
+    const uintptr_t unalignedAddress = cursorAddress + skipOverhead;
+    AssertRelease(unalignedAddress >= cursorAddress);
+    const uintptr_t roundedAddress = unalignedAddress + mask;
+    AssertRelease(roundedAddress >= unalignedAddress);
+    const uintptr_t alignedAddress = roundedAddress & ~mask;
+    const uintptr_t alignedOffset = alignedAddress - cursorAddress;
+    const size_t availableBytes = static_cast<size_t>(fEnd - fCursor);
+    if (alignedOffset > availableBytes || totalSize > availableBytes - alignedOffset) {
         this->ensureSpace(totalSize, alignment);
         goto restart;
     }
 
-    AssertRelease((ptrdiff_t)totalSize <= fEnd - objStart);
+    char* objStart = fCursor + alignedOffset;
 
     // Install a skip footer if needed, thus terminating a run of POD data. The calling code is
     // responsible for installing the footer after the object.
@@ -160,8 +171,9 @@ void SkArenaAllocWithReset::reset() {
 }
 
 bool SkArenaAllocWithReset::isEmpty() {
-    return this->cursor() == nullptr ||
-           this->cursor() == fFirstBlock + sizeof(Footer);
+    if (cursor() == nullptr) return true;
+    if (fFirstBlock == nullptr) return false;
+    return cursor() == fFirstBlock + sizeof(Footer);
 }
 
 // SkFibonacci47 is the first 47 Fibonacci numbers. Fib(47) is the largest value less than 2 ^ 32.

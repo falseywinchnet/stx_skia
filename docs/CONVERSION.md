@@ -910,6 +910,16 @@ existing capacity, and rejects element alignment beyond the heap allocator's
 guarantee. See ../results/2026-10-26/TARRAY_ACCESS.md. These fixes do
 not imply that every retained renderer header has been converted.
 
+## Arena allocation boundary
+
+The raster arena's heap-only and reset paths no longer do pointer arithmetic
+on null storage. Initial extents, raw alignment and footer additions are
+checked before narrowing or pointer formation. The original source is retained
+for differential builds and the focused fixture covers valid heap/inline/reset
+behavior and invalid Release inputs. See
+../results/2026-10-26/ARENA_BOUNDARY.md. Constructor-throw cleanup and full
+house-style conversion of this arena remain open.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
