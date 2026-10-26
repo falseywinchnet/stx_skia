@@ -783,6 +783,22 @@ moves and independent source reuse. Four M4 layouts match the reference. No spee
 gain is claimed. See ../results/2026-10-26/AUTO_STMALLOC.md. The constructed inline
 array owner remains unconverted.
 
+## Constructed inline arrays
+
+AutoSTArray is extracted and converted, retaining pointer/inline storage/live
+count and the original capacity rounding. Destruction releases heap storage even
+with no live elements after trimming. Reset-to-zero empties storage; equal
+positive counts still reuse it. Inline moves now empty the source; heap moves
+transfer storage. A local pending owner handles failed construction in
+exception-enabled consumers without adding persistent state.
+
+Both 39-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass.
+The fixture covers 576 reset
+transitions, trimming, reverse destruction, ownership moves and candidate failure
+cleanup. Three M4 layouts match the reference. No speed gain is claimed. See
+../results/2026-10-26/AUTO_STARRAY.md. General template helpers remain unconverted.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
