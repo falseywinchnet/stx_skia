@@ -608,6 +608,21 @@ polygons, with small ascending regressions retained. See
 ../results/2026-10-26/PRIORITY_QUEUE.md and its timing/assembly evidence. This does
 not claim full polygon utility conversion or a universal rendering speedup.
 
+## Geometry and raster sorting
+
+SkTSort.h now uses named comparators, explicit count/depth conversions and
+bounded heap traversal. Empty heap/insertion/null ranges are corrected separately.
+The original introsort threshold, pivot, fallback and tie choices remain; sorting
+operates in caller storage without retained state or an auxiliary array. Its new
+fixture independently checks ordering, identity/guards, stability where promised,
+owning values and the original comparator/output traces across 53,553 cases.
+
+Both Release profiles pass 31 tests; nine artifacts match and instrumented,
+installed-consumer and GUI.Forms gates pass. Large-case gains and small-case
+regressions are preserved in ../results/2026-10-26/SORT.md and its raw measurements.
+This converts the utility, not its path/scan-conversion callers, and does not
+claim a universal speed improvement.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

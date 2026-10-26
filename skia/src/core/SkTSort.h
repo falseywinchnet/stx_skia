@@ -8,211 +8,184 @@
 #ifndef SkTSort_DEFINED
 #define SkTSort_DEFINED
 
-#include "include/private/SkTo.h"
+#include "include/private/SkAssert.h"
 #include "src/core/SkMathPriv.h"
 
+#include <climits>
 #include <cstddef>
 #include <utility>
 
-///////////////////////////////////////////////////////////////////////////////
+// In-place sorting of caller-owned live elements. Comparators must provide a
+// strict weak ordering, observe operands only, and neither throw nor reenter the
+// same storage. Element copy/move/swap must not throw. Sorting retains no borrows
+// and allocates no scratch buffer. Equal-key order is unspecified except for
+// insertion sort, which is stable. Pointer ranges belong to one array; [null,null)
+// is an admitted empty range. Counts describe live elements, not capacity.
+namespace skia_sort_detail {
+template <typename T> struct ValueLess {
+    bool operator()(const T& a, const T& b) const {
+        const bool result = a < b;
+        return result;
+    }
+};
+template <typename T> struct PointeeLess {
+    bool operator()(const T* a, const T* b) const {
+        const bool result = *a < *b;
+        return result;
+    }
+};
+}
 
-/*  Sifts a broken heap. The input array is a heap from root to bottom
- *  except that the root entry may be out of place.
- *
- *  Sinks a hole from array[root] to leaf and then sifts the original array[root] element
- *  from the leaf level up.
- *
- *  This version does extra work, in that it copies child to parent on the way down,
- *  then copies parent to child on the way back up. When copies are inexpensive,
- *  this is an optimization as this sift variant should only be used when
- *  the potentially out of place root entry value is expected to be small.
- *
- *  @param root the one based index into array of the out-of-place root of the heap.
- *  @param bottom the one based index in the array of the last entry in the heap.
- */
+// Heap helpers use one-based indices. All entries except the root already form
+// a max-heap. Descent to a leaf followed by upward repair is used during draining,
+// when the replacement root is expected to be small. This preserves the original
+// comparator and tie schedule while using one held value and a moving hole.
 template <typename T, typename C>
 void SkTHeapSort_SiftUp(T array[], size_t root, size_t bottom, const C& lessThan) {
-    T x = array[root-1];
-    size_t start = root;
-    size_t j = root << 1;
-    while (j <= bottom) {
-        if (j < bottom && lessThan(array[j-1], array[j])) {
-            ++j;
-        }
-        array[root-1] = array[j-1];
-        root = j;
-        j = root << 1;
+    SkASSERT(root >= 1 && root <= bottom);
+    const T value = array[root - 1];
+    const size_t start = root;
+    const size_t lastParent = bottom / 2;
+    while (root <= lastParent) {
+        size_t child = root * 2;
+        if (child < bottom && lessThan(array[child - 1], array[child])) ++child;
+        array[root - 1] = array[child - 1];
+        root = child;
     }
-    j = root >> 1;
-    while (j >= start) {
-        if (lessThan(array[j-1], x)) {
-            array[root-1] = array[j-1];
-            root = j;
-            j = root >> 1;
-        } else {
-            break;
-        }
+    size_t parent = root / 2;
+    while (parent >= start) {
+        if (!lessThan(array[parent - 1], value)) break;
+        array[root - 1] = array[parent - 1];
+        root = parent;
+        parent = root / 2;
     }
-    array[root-1] = x;
+    array[root - 1] = value;
 }
 
-/*  Sifts a broken heap. The input array is a heap from root to bottom
- *  except that the root entry may be out of place.
- *
- *  Sifts the array[root] element from the root down.
- *
- *  @param root the one based index into array of the out-of-place root of the heap.
- *  @param bottom the one based index in the array of the last entry in the heap.
- */
+// Root and bottom are one-based. Check that a child exists before doubling its
+// parent's index, so arithmetic cannot wrap even at the size_t count limit.
 template <typename T, typename C>
 void SkTHeapSort_SiftDown(T array[], size_t root, size_t bottom, const C& lessThan) {
-    T x = array[root-1];
-    size_t child = root << 1;
-    while (child <= bottom) {
-        if (child < bottom && lessThan(array[child-1], array[child])) {
-            ++child;
-        }
-        if (lessThan(x, array[child-1])) {
-            array[root-1] = array[child-1];
-            root = child;
-            child = root << 1;
-        } else {
-            break;
-        }
+    SkASSERT(root >= 1 && root <= bottom);
+    const T value = array[root - 1];
+    const size_t lastParent = bottom / 2;
+    while (root <= lastParent) {
+        size_t child = root * 2;
+        if (child < bottom && lessThan(array[child - 1], array[child])) ++child;
+        if (!lessThan(value, array[child - 1])) break;
+        array[root - 1] = array[child - 1];
+        root = child;
     }
-    array[root-1] = x;
+    array[root - 1] = value;
 }
 
-/** Sorts the array of size count using comparator lessThan using a Heap Sort algorithm. Be sure to
- *  specialize swap if T has an efficient swap operation.
- *
- *  @param array the array to be sorted.
- *  @param count the number of elements in the array.
- *  @param lessThan a functor with bool operator()(T a, T b) which returns true if a comes before b.
- */
-template <typename T, typename C> void SkTHeapSort(T array[], size_t count, const C& lessThan) {
+template <typename T, typename C>
+void SkTHeapSort(T array[], size_t count, const C& lessThan) {
     if (count < 2) return;
-    for (size_t i = count >> 1; i > 0; --i) {
-        SkTHeapSort_SiftDown(array, i, count, lessThan);
+    SkASSERT_RELEASE(array != nullptr);
+    for (size_t root = count / 2; root > 0; --root) {
+        SkTHeapSort_SiftDown(array, root, count, lessThan);
     }
-
-    for (size_t i = count - 1; i > 0; --i) {
+    for (size_t last = count - 1; last > 0; --last) {
         using std::swap;
-        swap(array[0], array[i]);
-        SkTHeapSort_SiftUp(array, 1, i, lessThan);
+        swap(array[0], array[last]);
+        SkTHeapSort_SiftUp(array, 1, last, lessThan);
     }
 }
 
-/** Sorts the array of size count using comparator '<' using a Heap Sort algorithm. */
 template <typename T> void SkTHeapSort(T array[], size_t count) {
-    SkTHeapSort(array, count, [](const T& a, const T& b) { return a < b; });
+    const skia_sort_detail::ValueLess<T> less{};
+    SkTHeapSort(array, count, less);
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-/** Sorts the array of size count using comparator lessThan using an Insertion Sort algorithm. */
 template <typename T, typename C>
 void SkTInsertionSort(T* left, int count, const C& lessThan) {
     SkASSERT_RELEASE(count >= 0);
     if (count < 2) return;
-    T* right = left + count - 1;
-    for (T* next = left + 1; next <= right; ++next) {
-        if (!lessThan(*next, *(next - 1))) {
-            continue;
-        }
-        T insert = std::move(*next);
+    SkASSERT_RELEASE(left != nullptr);
+    T* end = left + count;
+    for (T* next = left + 1; next < end; ++next) {
+        if (!lessThan(*next, *(next - 1))) continue;
+        T value = std::move(*next);
         T* hole = next;
         do {
             *hole = std::move(*(hole - 1));
             --hole;
-        } while (left < hole && lessThan(insert, *(hole - 1)));
-        *hole = std::move(insert);
+        } while (left < hole && lessThan(value, *(hole - 1)));
+        *hole = std::move(value);
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
+// Partition a nonempty live range around one of its elements. The returned
+// address borrows that range. Caller-provided swaps may specialize element moves.
 template <typename T, typename C>
 T* SkTQSort_Partition(T* left, int count, T* pivot, const C& lessThan) {
+    SkASSERT(count > 0);
     T* right = left + count - 1;
+    SkASSERT(left <= pivot && pivot <= right);
+    const T pivotValue = *pivot;
     using std::swap;
-    T pivotValue = *pivot;
     swap(*pivot, *right);
     T* newPivot = left;
     while (left < right) {
         if (lessThan(*left, pivotValue)) {
             swap(*left, *newPivot);
-            newPivot += 1;
+            ++newPivot;
         }
-        left += 1;
+        ++left;
     }
     swap(*newPivot, *right);
     return newPivot;
 }
 
-/*  Introsort is a modified Quicksort.
- *  When the region to be sorted is a small constant size, it uses Insertion Sort.
- *  When depth becomes zero, it switches over to Heap Sort.
- *  This implementation recurses on the left region after pivoting and loops on the right,
- *    we already limit the stack depth by switching to heap sort,
- *    and cache locality on the data appears more important than saving a few stack frames.
- *
- *  @param depth at this recursion depth, switch to Heap Sort.
- *  @param left points to the beginning of the region to be sorted
- *  @param count number of items to be sorted
- *  @param lessThan  a functor/lambda which returns true if a comes before b.
- */
+// Middle-pivot introsort: insertion sort at 32 elements, heap sort at the depth
+// limit. Recurse left and iterate right to retain the original ordering decisions.
+// The depth limit bounds recursion; no auxiliary sorting buffer is allocated.
 template <typename T, typename C>
 void SkTIntroSort(int depth, T* left, int count, const C& lessThan) {
+    SkASSERT(depth >= 0 && count >= 0);
     for (;;) {
         if (count <= 32) {
             SkTInsertionSort(left, count, lessThan);
             return;
         }
-
         if (depth == 0) {
-            SkTHeapSort<T>(left, count, lessThan);
+            const size_t heapCount = static_cast<size_t>(count);
+            SkTHeapSort(left, heapCount, lessThan);
             return;
         }
         --depth;
-
-        T* middle = left + ((count - 1) >> 1);
+        T* middle = left + ((count - 1) / 2);
         T* pivot = SkTQSort_Partition(left, count, middle, lessThan);
-        int pivotCount = pivot - left;
-
+        const int pivotCount = static_cast<int>(pivot - left);
         SkTIntroSort(depth, left, pivotCount, lessThan);
         left += pivotCount + 1;
         count -= pivotCount + 1;
     }
 }
 
-/** Sorts the region from left to right using comparator lessThan using Introsort.
- *  Be sure to specialize `swap` if T has an efficient swap operation.
- *
- *  @param begin points to the beginning of the region to be sorted
- *  @param end points past the end of the region to be sorted
- *  @param lessThan a functor/lambda which returns true if a comes before b.
- */
 template <typename T, typename C>
 void SkTQSort(T* begin, T* end, const C& lessThan) {
     if (begin == end) return;
-    int n = SkToInt(end - begin);
-    if (n <= 1) {
-        return;
-    }
-    // Limit Introsort recursion depth to no more than 2 * ceil(log2(n-1)).
-    int depth = 2 * SkNextLog2(n - 1);
-    SkTIntroSort(depth, begin, n, lessThan);
+    SkASSERT_RELEASE(begin != nullptr && end != nullptr);
+    const std::ptrdiff_t distance = end - begin;
+    SkASSERT_RELEASE(distance >= 0 && distance <= INT_MAX);
+    const int count = static_cast<int>(distance);
+    if (count < 2) return;
+    // At most twice ceil(log2(count - 1)) recursive partitions.
+    const int depth = 2 * SkNextLog2(count - 1);
+    SkTIntroSort(depth, begin, count, lessThan);
 }
 
-/** Sorts the region from left to right using comparator 'a < b' using Introsort. */
 template <typename T> void SkTQSort(T* begin, T* end) {
-    SkTQSort(begin, end, [](const T& a, const T& b) { return a < b; });
+    const skia_sort_detail::ValueLess<T> less{};
+    SkTQSort(begin, end, less);
 }
 
-/** Sorts the region from left to right using comparator '*a < *b' using Introsort. */
+// Pointer elements must all point to live comparable objects for the whole call.
 template <typename T> void SkTQSort(T** begin, T** end) {
-    SkTQSort(begin, end, [](const T* a, const T* b) { return *a < *b; });
+    const skia_sort_detail::PointeeLess<T> less{};
+    SkTQSort(begin, end, less);
 }
 
 #endif
