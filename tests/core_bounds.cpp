@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <vector>
 #if !defined(_WIN32)
 #include <sys/mman.h>
@@ -142,6 +143,12 @@ bool file_stream_failure_states() {
     if (output[0] != 0x5a) return false;
     reader.close();
     if (reader.read(output.data(), output.size()) != 0) return false;
+
+    SkFILEStream sizedReader(static_cast<FILE*>(nullptr), 8);
+    if (sizedReader.isValid() || !sizedReader.isAtEnd() || sizedReader.getLength() != 0 ||
+        sizedReader.read(output.data(), output.size()) != 0 || output[0] != 0x5a) return false;
+    std::unique_ptr<SkStreamAsset> duplicate = sizedReader.duplicate();
+    if (!(*duplicate).isAtEnd() || (*duplicate).getLength() != 0) return false;
 
     SkFILEWStream writer(nullptr);
     if (writer.isValid() || writer.bytesWritten() != 0) return false;

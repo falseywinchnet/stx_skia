@@ -168,7 +168,7 @@ bool SkWStream::writeStream(SkStream* stream, size_t length) {
 
 SkFILEStream::SkFILEStream(std::shared_ptr<FILE> file, size_t end, size_t start, size_t current)
     : fFILE(std::move(file))
-    , fEnd(end)
+    , fEnd(fFILE != nullptr ? end : 0)
     , fStart(std::min(start, fEnd))
     , fCurrent(SkTPin(current, fStart, fEnd))
 {

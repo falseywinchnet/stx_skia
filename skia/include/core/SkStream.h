@@ -317,6 +317,7 @@ public:
      *  The current position of the C FILE stream will be considered the
      *  beginning of the SkFILEStream and size bytes later will be the end.
      *  The C FILE stream will be closed in the destructor.
+     *  A null file produces an invalid, empty stream regardless of size.
      */
     explicit SkFILEStream(FILE* file, size_t size);
 
