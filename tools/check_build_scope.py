@@ -17,7 +17,7 @@ def main():
                        "SkImageGeneratorCG.cpp", "SkFontMgr_mac", "SkTypeface_mac",
                        "SkTypeface_FreeType", "SkOpts_ml3", "SkOpts_ml4",
                        "skcms_TransformHsw", "skcms_TransformSkx",
-                       "SkExecutor.cpp", "SkTaskGroup.cpp"]
+                       "SkExecutor.cpp", "SkTaskGroup.cpp", "SkSharedMutex.cpp"]
     for command in commands:
         name = command["file"]
         for pattern in forbidden_paths:
@@ -27,7 +27,7 @@ def main():
                                       str(directory / "libstx_skia.a")], text=True)
     for pattern in ["SkCodec::", "SkImageGeneratorCG::", "SkPngCodec::",
                     "SkFontMgr_New_CoreText", "SkTypeface_FreeType::",
-                    "SkExecutor::", "SkTaskGroup::", "SkThreadPool<"]:
+                    "SkExecutor::", "SkTaskGroup::", "SkThreadPool<", "SkSharedMutex::"]:
         if pattern in symbols:
             rejected.append(pattern)
     if rejected:

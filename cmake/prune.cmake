@@ -1,4 +1,5 @@
 # Codec ownership belongs to stx_png/stx_cng, never the raster library.
+list(REMOVE_ITEM stx_sources skia/src/core/SkSharedMutex.cpp)
 list(FILTER stx_sources EXCLUDE REGEX "skia/src/(codec|encode|android)/")
 list(FILTER stx_sources EXCLUDE REGEX "skia/src/ports/SkImageGeneratorCG\\.cpp$")
 list(APPEND stx_sources src/encoded_image.cpp)
