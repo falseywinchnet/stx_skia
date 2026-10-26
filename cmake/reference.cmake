@@ -393,3 +393,7 @@ endforeach()
 # Preserve original container capacity and allocation-span behavior.
 list(REMOVE_ITEM stx_sources skia/src/core/SkContainers.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkContainers.cpp)
+
+# Original block deque retained for differential verification.
+list(REMOVE_ITEM stx_sources skia/src/core/SkDeque.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkDeque.cpp)
