@@ -91,6 +91,7 @@ void SkTHeapSort_SiftDown(T array[], size_t root, size_t bottom, const C& lessTh
  *  @param lessThan a functor with bool operator()(T a, T b) which returns true if a comes before b.
  */
 template <typename T, typename C> void SkTHeapSort(T array[], size_t count, const C& lessThan) {
+    if (count < 2) return;
     for (size_t i = count >> 1; i > 0; --i) {
         SkTHeapSort_SiftDown(array, i, count, lessThan);
     }
@@ -112,6 +113,8 @@ template <typename T> void SkTHeapSort(T array[], size_t count) {
 /** Sorts the array of size count using comparator lessThan using an Insertion Sort algorithm. */
 template <typename T, typename C>
 void SkTInsertionSort(T* left, int count, const C& lessThan) {
+    SkASSERT_RELEASE(count >= 0);
+    if (count < 2) return;
     T* right = left + count - 1;
     for (T* next = left + 1; next <= right; ++next) {
         if (!lessThan(*next, *(next - 1))) {
@@ -192,6 +195,7 @@ void SkTIntroSort(int depth, T* left, int count, const C& lessThan) {
  */
 template <typename T, typename C>
 void SkTQSort(T* begin, T* end, const C& lessThan) {
+    if (begin == end) return;
     int n = SkToInt(end - begin);
     if (n <= 1) {
         return;
