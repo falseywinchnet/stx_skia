@@ -8,145 +8,83 @@
 #ifndef SkMalloc_DEFINED
 #define SkMalloc_DEFINED
 
-#include <cstring>
-
 #include "include/private/SkAPI.h"
 
-/*
-    memory wrappers to be implemented by the porting layer (platform)
-*/
+#include <cstddef>
+#include <cstring>
 
+// Allocations belong to the caller and must be released with sk_free. Null is
+// accepted by free. Zero-byte allocation follows libc and may return null or a
+// freeable allocation; it never grants access to any bytes.
+SK_API void sk_free(void* storage);
+[[noreturn]] SK_API void sk_out_of_memory();
 
-/** Free memory returned by sk_malloc(). It is safe to pass null. */
-SK_API extern void sk_free(void*);
-
-/**
- *  Called internally if we run out of memory. The platform implementation must
- *  not return, but should either throw an exception or otherwise exit.
- */
-SK_API extern void sk_out_of_memory(void);
-
-enum {
-    /**
-     *  If this bit is set, the returned buffer must be zero-initialized. If this bit is not set
-     *  the buffer can be uninitialized.
-     */
-    SK_MALLOC_ZERO_INITIALIZE   = 1 << 0,
-
-    /**
-     *  If this bit is set, the implementation must throw/crash/quit if the request cannot
-     *  be fulfilled. If this bit is not set, then it should return nullptr on failure.
-     */
-    SK_MALLOC_THROW             = 1 << 1,
+enum SkMallocFlags : unsigned {
+    SK_MALLOC_ZERO_INITIALIZE = 1 << 0,
+    SK_MALLOC_THROW = 1 << 1
 };
-/**
- *  Return a block of memory (at least 4-byte aligned) of at least the specified size.
- *  If the requested memory cannot be returned, either return nullptr or throw/exit, depending
- *  on the SK_MALLOC_THROW bit. If the allocation succeeds, the memory will be zero-initialized
- *  if the SK_MALLOC_ZERO_INITIALIZE bit was set.
- *
- *  To free the memory, call sk_free()
- */
-SK_API extern void* sk_malloc_flags(size_t size, unsigned flags);
 
-/** Same as standard realloc(), but this one never returns null on failure. It will throw
- *  if it fails.
- *  If size is 0, it will call sk_free on buffer and return null. (This behavior is implementation-
- *  defined for normal realloc. We follow what glibc does.)
- */
-SK_API extern void* sk_realloc_throw(void* buffer, size_t size);
+// The supported native ports use malloc/calloc, including their fundamental
+// alignment. These two flags select zero initialization and fatal failure.
+// Other flag bits are ignored, as before. THROW is a historical name: failure
+// of a nonzero allocation terminates; this port does not throw C++ exceptions.
+SK_API void* sk_malloc_flags(size_t size, unsigned flags);
 
-/**
- *  Return the size of the block of memory allocated in reality for a given pointer. The pointer
- *  passed must have been allocated using the sk_malloc_* or sk_realloc_* functions. The "size"
- *  parameter indicates the size originally requested when the memory block was allocated, and
- *  the value returned by this function must be bigger or equal to it.
- */
-SK_API extern size_t sk_malloc_size(void* addr, size_t size);
+// Preserve min(old size, new size) bytes; growth is uninitialized. A zero size
+// releases the old block and returns null. Nonzero allocation failure terminates.
+SK_API void* sk_realloc_throw(void* storage, size_t size);
+
+// Query a live allocator-owned block. requested is its known requested extent.
+// The platform query returns at least requested; callers must not pass borrows
+// into a block, freed storage or unrelated allocations.
+SK_API size_t sk_malloc_size(void* storage, size_t requested);
 
 static inline void* sk_malloc_throw(size_t size) {
-    return sk_malloc_flags(size, SK_MALLOC_THROW);
+    void* storage = sk_malloc_flags(size, SK_MALLOC_THROW);
+    return storage;
 }
-
 static inline void* sk_calloc_throw(size_t size) {
-    return sk_malloc_flags(size, SK_MALLOC_THROW | SK_MALLOC_ZERO_INITIALIZE);
+    void* storage = sk_malloc_flags(size, SK_MALLOC_THROW | SK_MALLOC_ZERO_INITIALIZE);
+    return storage;
 }
-
 static inline void* sk_calloc_canfail(size_t size) {
-#if defined(SK_BUILD_FOR_FUZZER)
-    // To reduce the chance of OOM, pretend we can't allocate more than 200kb.
-    if (size > 200000) {
-        return nullptr;
-    }
-#endif
-    return sk_malloc_flags(size, SK_MALLOC_ZERO_INITIALIZE);
+    void* storage = sk_malloc_flags(size, SK_MALLOC_ZERO_INITIALIZE);
+    return storage;
 }
-
-// Performs a safe multiply count * elemSize, checking for overflow
-SK_API extern void* sk_calloc_throw(size_t count, size_t elemSize);
-SK_API extern void* sk_malloc_throw(size_t count, size_t elemSize);
-SK_API extern void* sk_realloc_throw(void* buffer, size_t count, size_t elemSize);
-
-/**
- *  These variants return nullptr on failure
- */
 static inline void* sk_malloc_canfail(size_t size) {
-#if defined(SK_BUILD_FOR_FUZZER)
-    // To reduce the chance of OOM, pretend we can't allocate more than 200kb.
-    if (size > 200000) {
-        return nullptr;
-    }
+    void* storage = sk_malloc_flags(size, 0);
+    return storage;
+}
+
+// Count products are checked before contacting the allocator. Overflow terminates
+// in fatal operations and returns null in the fallible operation.
+SK_API void* sk_calloc_throw(size_t count, size_t elementSize);
+SK_API void* sk_malloc_throw(size_t count, size_t elementSize);
+SK_API void* sk_realloc_throw(void* storage, size_t count, size_t elementSize);
+SK_API void* sk_malloc_canfail(size_t count, size_t elementSize);
+
+// The byte operations borrow their ranges only for this call. Null is admitted
+// for zero-length ranges. Nonempty ranges must be valid for the requested access.
+static inline void sk_bzero(void* storage, size_t size) {
+    if (size != 0) std::memset(storage, 0, size);
+}
+
+// Source and destination must not overlap for a nonempty copy.
+static inline void* sk_careful_memcpy(void* destination, const void* source, size_t size) {
+    if (size != 0) std::memcpy(destination, source, size);
+    return destination;
+}
+
+// Overlap is permitted; the result is as if the source bytes were preserved.
+static inline void* sk_careful_memmove(void* destination, const void* source, size_t size) {
+    if (size != 0) std::memmove(destination, source, size);
+    return destination;
+}
+
+static inline int sk_careful_memcmp(const void* first, const void* second, size_t size) {
+    if (size == 0) return 0;
+    const int comparison = std::memcmp(first, second, size);
+    return comparison;
+}
+
 #endif
-    return sk_malloc_flags(size, 0);
-}
-SK_API extern void* sk_malloc_canfail(size_t count, size_t elemSize);
-
-// bzero is safer than memset, but we can't rely on it, so... sk_bzero()
-static inline void sk_bzero(void* buffer, size_t size) {
-    // Please c.f. sk_careful_memcpy.  It's undefined behavior to call memset(null, 0, 0).
-    if (size) {
-        memset(buffer, 0, size);
-    }
-}
-
-/**
- *  sk_careful_memcpy() is just like memcpy(), but guards against undefined behavior.
- *
- * It is undefined behavior to call memcpy() with null dst or src, even if len is 0.
- * If an optimizer is "smart" enough, it can exploit this to do unexpected things.
- *     memcpy(dst, src, 0);
- *     if (src) {
- *         printf("%x\n", *src);
- *     }
- * In this code the compiler can assume src is not null and omit the if (src) {...} check,
- * unconditionally running the printf, crashing the program if src really is null.
- * Of the compilers we pay attention to only GCC performs this optimization in practice.
- */
-static inline void* sk_careful_memcpy(void* dst, const void* src, size_t len) {
-    // When we pass >0 len we had better already be passing valid pointers.
-    // So we just need to skip calling memcpy when len == 0.
-    if (len) {
-        memcpy(dst,src,len);
-    }
-    return dst;
-}
-
-static inline void* sk_careful_memmove(void* dst, const void* src, size_t len) {
-    // When we pass >0 len we had better already be passing valid pointers.
-    // So we just need to skip calling memcpy when len == 0.
-    if (len) {
-        memmove(dst,src,len);
-    }
-    return dst;
-}
-
-static inline int sk_careful_memcmp(const void* a, const void* b, size_t len) {
-    // When we pass >0 len we had better already be passing valid pointers.
-    // So we just need to skip calling memcmp when len == 0.
-    if (len == 0) {
-        return 0;   // we treat zero-length buffers as "equal"
-    }
-    return memcmp(a, b, len);
-}
-
-#endif  // SkMalloc_DEFINED

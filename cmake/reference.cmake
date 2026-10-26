@@ -383,3 +383,9 @@ endforeach()
 # Preserve the original storage writer with the original serialization profile.
 list(REMOVE_ITEM stx_sources skia/src/core/SkWriter32.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkWriter32.cpp)
+
+# Original allocator policy and product wrappers remain differential references.
+foreach(unit IN ITEMS src/core/SkMalloc.cpp src/ports/SkMemory_malloc.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()

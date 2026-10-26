@@ -816,6 +816,22 @@ expanded pipeline fixture covers 4,224 cases and context restoration. No speed
 gain is claimed. See ../results/2026-10-26/TEMPLATE_HELPERS.md. Broader raster,
 geometry, canvas and utility conversion remains required.
 
+## Allocation and byte primitives
+
+SkMalloc.h/.cpp and the native allocator port are converted, preserving libc
+allocation, null-free behavior, zero-size policy and platform size queries.
+Count-product overflow now returns null directly for fallible allocation or
+terminates directly for fatal operations, without submitting SIZE_MAX to the
+allocator. No allocation metadata, registry or locking is added. Unsupported
+Android controls and special review-build overrides remain reference-only.
+
+Both 41-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass.
+Fixtures cover 209 allocation/
+reallocation cases, three fallible overflow cases and 5,577 byte-operation cases.
+No speed gain is claimed. See ../results/2026-10-26/ALLOCATION_PRIMITIVES.md.
+Alignment helpers and remaining container/raster work are still required.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
