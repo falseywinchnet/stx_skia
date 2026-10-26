@@ -21,6 +21,7 @@
 #include "src/shaders/SkShaderBase.h"
 
 #include <cstdint>
+#include <optional>
 #include <utility>
 
 class SkArenaAlloc;
@@ -29,11 +30,11 @@ enum class SkTileMode;
 
 static SkMatrix pts_to_unit_matrix(const SkPoint pts[2]) {
     SkVector    vec = pts[1] - pts[0];
-    SkScalar    mag = vec.length();
-    SkScalar    inv = mag ? SkScalarInvert(mag) : 0;
+    const SkScalar mag = vec.length();
+    const SkScalar inv = mag ? SkScalarInvert(mag) : 0;
 
     vec.scale(inv);
-    SkMatrix matrix;
+    SkMatrix matrix{};
     matrix.setSinCos(-vec.fY, vec.fX, pts[0].fX, pts[0].fY);
     matrix.postTranslate(-pts[0].fX, -pts[0].fY);
     matrix.postScale(inv, inv);
@@ -46,23 +47,25 @@ SkLinearGradient::SkLinearGradient(const SkPoint pts[2], const SkGradient& desc)
         : SkGradientBaseShader(desc, pts_to_unit_matrix(pts)), fStart(pts[0]), fEnd(pts[1]) {}
 
 sk_sp<SkFlattenable> SkLinearGradient::CreateProc(SkReadBuffer& buffer) {
-    SkGradientScope scope;
-    SkMatrix legacyLocalMatrix, *lmPtr = nullptr;
-    auto grad = scope.unflatten(buffer, &legacyLocalMatrix);
+    SkGradientScope scope{};
+    SkMatrix legacyLocalMatrix{};
+    const SkMatrix* lmPtr = nullptr;
+    const std::optional<SkGradient> grad = scope.unflatten(buffer, &legacyLocalMatrix);
     if (!grad) {
         return nullptr;
     }
     if (!legacyLocalMatrix.isIdentity()) {
         lmPtr = &legacyLocalMatrix;
     }
-    SkPoint pts[2];
+    SkPoint pts[2]{};
     pts[0] = buffer.readPoint();
     pts[1] = buffer.readPoint();
-    return SkShaders::LinearGradient(pts, *grad, lmPtr);
+    sk_sp<SkFlattenable> shader = SkShaders::LinearGradient(pts, *grad, lmPtr);
+    return shader;
 }
 
 void SkLinearGradient::flatten(SkWriteBuffer& buffer) const {
-    this->INHERITED::flatten(buffer);
+    SkGradientBaseShader::flatten(buffer);
     buffer.writePoint(fStart);
     buffer.writePoint(fEnd);
 }
@@ -76,8 +79,8 @@ SkShaderBase::GradientType SkLinearGradient::asGradient(GradientInfo* info,
                                                         SkMatrix* localMatrix) const {
     if (info) {
         commonAsAGradient(info);
-        info->fPoint[0] = fStart;
-        info->fPoint[1] = fEnd;
+        (*info).fPoint[0] = fStart;
+        (*info).fPoint[1] = fEnd;
     }
     if (localMatrix) {
         *localMatrix = SkMatrix::I();
@@ -91,7 +94,19 @@ sk_sp<SkShader> SkShaders::LinearGradient(const SkPoint pts[2], const SkGradient
         return nullptr;
     }
 
-    GRADIENT_FACTORY_EARLY_EXIT(grad, lm);
+    const SkGradient::Colors& colors = grad.colors();
+    const SkGradient::Interpolation& interp = grad.interpolation();
+    const SkSpan<const SkColor4f> stops = colors.colors();
+    if (!SkGradientBaseShader::ValidGradient(stops, colors.tileMode(), interp)) {
+        return nullptr;
+    }
+    if (stops.size() == 1) {
+        sk_sp<SkShader> solid = SkShaders::Color(stops.front(), colors.colorSpace());
+        return solid;
+    }
+    if (lm && !(*lm).invert(nullptr)) {
+        return nullptr;
+    }
 
     if (SkScalarNearlyZero((pts[1] - pts[0]).length(),
                            SkGradientBaseShader::kDegenerateThreshold)) {
@@ -99,9 +114,12 @@ sk_sp<SkShader> SkShaders::LinearGradient(const SkPoint pts[2], const SkGradient
         // the gradient approaches two half planes of solid color (first and last). However, they
         // are divided by the line perpendicular to the start and end point, which becomes undefined
         // once start and end are exactly the same, so just use the end color for a stable solution.
-        return SkGradientBaseShader::MakeDegenerateGradient(grad.colors());
+        sk_sp<SkShader> degenerate = SkGradientBaseShader::MakeDegenerateGradient(colors);
+        return degenerate;
     }
 
     sk_sp<SkShader> s = sk_make_sp<SkLinearGradient>(pts, grad);
-    return s->makeWithLocalMatrix(lm ? *lm : SkMatrix::I());
+    const SkMatrix matrix = lm ? *lm : SkMatrix::I();
+    sk_sp<SkShader> wrapped = (*s).makeWithLocalMatrix(matrix);
+    return wrapped;
 }

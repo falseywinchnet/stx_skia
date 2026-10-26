@@ -180,19 +180,5 @@ struct SkColor4fXformer {
     } while (0)
 
 
-#define GRADIENT_FACTORY_EARLY_EXIT(grad, lm) \
-    do {                                                                                        \
-        const auto& colors = grad.colors();                                                     \
-        const auto& interp = grad.interpolation();                                              \
-        if (!SkGradientBaseShader::ValidGradient(colors.colors(), colors.tileMode(), interp)) { \
-            return nullptr;                                                                     \
-        }                                                                                       \
-        if (colors.colors().size() == 1) {                                                      \
-            return SkShaders::Color(colors.colors().front(), colors.colorSpace());              \
-        }                                                                                       \
-        if (lm && !lm->invert(nullptr)) {                                                       \
-            return nullptr;                                                                     \
-        }                                                                                       \
-    } while (0)
 
 #endif

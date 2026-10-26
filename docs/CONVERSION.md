@@ -1170,6 +1170,18 @@ the full instrumented suite returns PASS. See
 ../results/2026-10-26/SPECIAL_IMAGE_CONVERSION.md. The surrounding canvas/device
 and lower-level sampling implementation remain separate conversion work.
 
+## Gradient geometry and factories
+
+Linear, radial, sweep and two-point conical gradient classes are converted.
+Factory early returns are explicit; sweep angles have named fields; focal setup
+state starts initialized and metadata borrows reject temporary objects. A new
+5,472-render corpus covers degenerate geometry, hard stops, tile modes,
+interpolation spaces, alpha conventions and local transforms. Candidate/reference
+suites pass 59/59 and 58/58, all sixteen common artifacts match, and the full
+instrumented suite returns PASS. See
+../results/2026-10-26/GRADIENT_GEOMETRY_CONVERSION.md. The shared gradient base,
+color-stop storage, interpolation builder and raster kernels remain unconverted.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

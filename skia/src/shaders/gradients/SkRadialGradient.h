@@ -24,10 +24,10 @@ public:
 
     GradientType asGradient(GradientInfo* info, SkMatrix* matrix) const override;
 
-    const SkPoint& center() const { return fCenter; }
+    const SkPoint& center() const & { return fCenter; }
+    const SkPoint& center() const && = delete;
     SkScalar radius() const { return fRadius; }
 protected:
-    SkRadialGradient(SkReadBuffer& buffer);
     void flatten(SkWriteBuffer& buffer) const override;
 
     void appendGradientStages(SkArenaAlloc* alloc,
