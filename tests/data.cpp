@@ -8,6 +8,45 @@
 #include <limits>
 
 namespace {
+#ifndef STX_SKIA_REFERENCE
+class ChunkedStream final : public SkStream {
+public:
+    ChunkedStream(const std::uint8_t* bytes, std::size_t length, std::size_t chunk,
+                  bool knownLength = true, bool invalidPosition = false)
+        : fBytes(bytes), fLength(length), fChunk(chunk), fKnownLength(knownLength),
+          fInvalidPosition(invalidPosition) {}
+
+    std::size_t read(void* buffer, std::size_t size) override {
+        std::size_t count = size;
+        if (count > fChunk) count = fChunk;
+        const std::size_t remaining = fLength - fPosition;
+        if (count > remaining) count = remaining;
+        if (buffer != nullptr && count != 0) {
+            std::memcpy(buffer, fBytes + fPosition, count);
+        }
+        fPosition += count;
+        return count;
+    }
+
+    bool isAtEnd() const override { return fPosition == fLength; }
+    bool hasLength() const override { return fKnownLength; }
+    std::size_t getLength() const override { return fLength; }
+    bool hasPosition() const override { return fKnownLength; }
+    std::size_t getPosition() const override {
+        if (fInvalidPosition) return fLength + 1;
+        return fPosition;
+    }
+
+private:
+    const std::uint8_t* fBytes;
+    std::size_t fLength;
+    std::size_t fChunk;
+    bool fKnownLength;
+    bool fInvalidPosition;
+    std::size_t fPosition = 0;
+};
+#endif
+
 void count_release(const void*, void* context) {
     unsigned int& count = *static_cast<unsigned int*>(context);
     ++count;
@@ -57,6 +96,16 @@ bool ownership_and_streams() {
     data = SkData::MakeFromStream(&stream, input.size());
     if (!data || std::memcmp((*data).data(), input.data(), input.size()) != 0) return false;
     if (SkData::MakeFromStream(&stream, 1)) return false;
+#ifndef STX_SKIA_REFERENCE
+    ChunkedStream chunked(input.data(), input.size(), 1);
+    data = SkData::MakeFromStream(&chunked, input.size());
+    if (!data || std::memcmp((*data).data(), input.data(), input.size()) != 0) return false;
+    ChunkedStream shortInput(input.data(), 3, 1, false);
+    if (SkData::MakeFromStream(&shortInput, input.size())) return false;
+    ChunkedStream invalidPosition(input.data(), input.size(), 1, true, true);
+    if (SkData::MakeFromStream(&invalidPosition, 1)) return false;
+    if (SkData::MakeFromStream(nullptr, 0)) return false;
+#endif
     data = SkData::MakeZeroInitialized(31);
     for (std::size_t i = 0; i < (*data).size(); ++i) {
         if ((*data).bytes()[i] != 0) return false;

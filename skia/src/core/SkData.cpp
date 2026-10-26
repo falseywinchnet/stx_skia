@@ -184,9 +184,16 @@ sk_sp<SkData> SkData::MakeWithCString(const char text[]) {
 }
 
 sk_sp<SkData> SkData::MakeFromStream(SkStream* stream, std::size_t size) {
+    if (stream == nullptr) return nullptr;
     if (SkStreamPriv::RemainingLengthIsBelow(stream, size)) return nullptr;
     sk_sp<SkData> result = MakeUninitialized(size);
-    const std::size_t read = (*stream).read((*result).writable_data(), size);
-    if (read != size) return nullptr;
+    uint8_t* output = static_cast<uint8_t*>((*result).writable_data());
+    std::size_t copied = 0;
+    while (copied < size) {
+        const std::size_t remaining = size - copied;
+        const std::size_t count = (*stream).read(output + copied, remaining);
+        if (count == 0 || count > remaining) return nullptr;
+        copied += count;
+    }
     return result;
 }

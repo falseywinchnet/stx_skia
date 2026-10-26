@@ -27,3 +27,15 @@ The review also raised an extreme-coordinate clip translation question.
 Rechecking the branch inequalities showed the suspected narrowing and
 subtraction values stay within signed `int` whenever those branches execute.
 No change to clip translation is justified by that candidate.
+
+## Follow-up stream contract repair
+
+`SkData::MakeFromStream` previously rejected a positive short read even though
+`SkStream::read` returns an actual count rather than promising to fill the
+request. It now accumulates exactly the requested number of bytes, accepts
+successive positive short reads, and returns null on early EOF. The preflight
+for a length-reporting stream also rejects a reported position beyond its
+total length before subtracting the two quantities. `data_contract` covers a
+one-byte-at-a-time stream, early EOF, inconsistent position metadata and a
+null source. The candidate and reference release suites again passed 50/50
+and 49/49 respectively; the candidate sanitizer runner reported `PASS`.
