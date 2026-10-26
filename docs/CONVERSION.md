@@ -1048,6 +1048,17 @@ reference builds. The focused fixture, matching render output and timing limit
 are recorded in ../results/2026-10-26/AA_CLIP_SCRATCH.md. This is a bounded
 repair, not a full conversion of clipping or scan conversion.
 
+## Bitmap ownership and metadata
+
+The complete bitmap implementation and public header now follow house spelling
+and explicit ownership/failure sequencing. Filtered alpha extraction releases
+its temporary owners before an unfiltered fallback; metadata borrows reject
+temporary bitmaps. Copy/move/reset, shared subsets, pixel transfers, release
+callbacks and alpha extraction have a dedicated contract fixture. The original
+pre-conversion source and header remain in the reference build. See
+../results/2026-10-26/BITMAP_CONVERSION.md. This completes the bitmap facade,
+while its device drawing, sampling and canvas callers remain in the programme.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

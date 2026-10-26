@@ -410,3 +410,7 @@ list(APPEND stx_sources baseline/skia/src/core/SkContainers.cpp)
 # Original block deque retained for differential verification.
 list(REMOVE_ITEM stx_sources skia/src/core/SkDeque.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkDeque.cpp)
+
+# Bitmap ownership and facade conversion has an independent pre-conversion reference.
+list(REMOVE_ITEM stx_sources skia/src/core/SkBitmap.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkBitmap.cpp)
