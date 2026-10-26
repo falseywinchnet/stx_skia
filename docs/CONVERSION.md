@@ -926,6 +926,18 @@ construction can therefore be cleaned up without destroying unconstructed
 storage. See ../results/2026-10-26/ARENA_CONSTRUCTION.md. Full source-style
 conversion and broader renderer verification remain open.
 
+## Block-list construction and concatenation
+
+SkTBlockList now publishes a new element only after its constructor succeeds.
+An interrupted append releases the unpublished slot and its empty heap block.
+Concatenation keeps nontrivial source objects alive until all head items have
+moved, and records each completed trivial segment before another allocation
+can fail. The one-item path accepts a move-only element. Invalid block sizes,
+negative reservations, empty front access and count overflow are rejected in
+Release. The original header is retained for differential builds. See
+../results/2026-10-26/TBLOCK_LIST.md. This is a targeted correctness pass;
+the retained header and block allocator still need full source-style review.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
