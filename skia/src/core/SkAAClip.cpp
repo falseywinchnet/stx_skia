@@ -1940,6 +1940,27 @@ static void upscaleBW2A8(SkMask* dstMask, const SkMask& srcMask) {
     }
 }
 
+// When the full A8 image exceeds SkMask's extent, expand only the visible
+// rectangle. Source bit alignment is relative to the original mask bounds.
+static void upscaleBWClipToA8(SkMask* dstMask, const SkMask& srcMask) {
+    const SkIRect& bounds = dstMask->fBounds;
+    const int width = bounds.width();
+    const int height = bounds.height();
+    const size_t firstBit = static_cast<size_t>(
+        static_cast<int64_t>(bounds.fLeft) - srcMask.fBounds.fLeft) & 7U;
+    for (int y = 0; y < height; ++y) {
+        const uint8_t* source = srcMask.getAddr1(bounds.fLeft, bounds.fTop + y);
+        uint8_t* destination = const_cast<uint8_t*>(dstMask->fImage) +
+                               static_cast<size_t>(y) * dstMask->fRowBytes;
+        for (int x = 0; x < width; ++x) {
+            const size_t bit = firstBit + static_cast<size_t>(x);
+            const uint8_t value = source[bit >> 3];
+            const uint8_t mask = static_cast<uint8_t>(0x80U >> (bit & 7U));
+            destination[x] = (value & mask) != 0 ? 0xFF : 0;
+        }
+    }
+}
+
 void SkAAClipBlitter::blitMask(const SkMask& origMask, const SkIRect& clip) {
     SkASSERT(fAAClip->getBounds().contains(clip));
 
@@ -1957,14 +1978,24 @@ void SkAAClipBlitter::blitMask(const SkMask& origMask, const SkIRect& clip) {
         grayMask.bounds() = origMask.fBounds;
         grayMask.rowBytes() = origMask.fBounds.width();
         size_t size = grayMask.computeImageSize();
+        bool clippedConversion = false;
         if (size == 0) {
-            // The full A8 conversion cannot fit the mask extent.
-            return;
+            grayMask.bounds() = clip;
+            grayMask.rowBytes() = clip.width();
+            size = grayMask.computeImageSize();
+            if (size == 0) {
+                return;
+            }
+            clippedConversion = true;
         }
         grayMask.image() = reinterpret_cast<uint8_t*>(
             fGrayMaskScratch.reset(size, SkAutoMalloc::kReuse_OnShrink));
 
-        upscaleBW2A8(&grayMask, origMask);
+        if (clippedConversion) {
+            upscaleBWClipToA8(&grayMask, origMask);
+        } else {
+            upscaleBW2A8(&grayMask, origMask);
+        }
         mask = &grayMask;
     }
 

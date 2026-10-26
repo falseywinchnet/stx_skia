@@ -1,11 +1,13 @@
 #include "include/core/SkStream.h"
 #include "include/core/SkPathBuilder.h"
+#include "include/core/SkPath.h"
 #include "include/core/SkBitmap.h"
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPaint.h"
 #include "src/core/SkAAClip.h"
 #include "src/core/SkBase64.h"
+#include "src/core/SkBlitter.h"
 #include "src/core/SkMask.h"
 #include "src/core/SkPathRaw.h"
 
@@ -15,6 +17,9 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#if !defined(_WIN32)
+#include <sys/mman.h>
+#endif
 
 namespace {
 class ShortStream final : public SkStream {
@@ -36,6 +41,32 @@ private:
     const uint8_t* fBytes;
     size_t fLength;
     size_t fPosition = 0;
+};
+
+class MaskCapture final : public SkBlitter {
+public:
+    void blitH(int, int, int) override { fValid = false; }
+    void blitAntiH(int, int, const SkAlpha[], const int16_t[]) override { fValid = false; }
+    void blitMask(const SkMask& mask, const SkIRect& clip) override {
+        if (mask.fFormat != SkMask::kA8_Format || clip.width() != 8 ||
+            clip.height() != 1 || clip.fLeft != 0 || clip.fTop < 0 || clip.fTop >= 8) {
+            fValid = false;
+            return;
+        }
+        const uint8_t* row = mask.getAddr8(clip.fLeft, clip.fTop);
+        for (int x = 0; x < 8; ++x) {
+            fPixels[static_cast<size_t>(clip.fTop) * 8 + x] = row[x];
+        }
+        ++fRows;
+    }
+
+    bool valid() const { return fValid && fRows == 8; }
+    const std::array<uint8_t, 64>& pixels() const { return fPixels; }
+
+private:
+    std::array<uint8_t, 64> fPixels{};
+    int fRows = 0;
+    bool fValid = true;
 };
 
 bool decode_expected(const char* source, size_t sourceLength,
@@ -186,6 +217,52 @@ bool oversized_filtered_alpha() {
     if (source.extractAlpha(&output, &paint, nullptr)) return false;
     return output.isNull();
 }
+
+#if !defined(_WIN32)
+bool clipped_large_bw_mask() {
+    constexpr size_t rowBytes = 6250;
+    constexpr size_t rows = 50000;
+    constexpr size_t byteCount = rowBytes * rows;
+    void* storage = mmap(nullptr, byteCount, PROT_READ | PROT_WRITE,
+                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (storage == MAP_FAILED) return false;
+
+    std::array<uint8_t, 8> compact{};
+    uint8_t* largeBytes = static_cast<uint8_t*>(storage);
+    for (int y = 0; y < 8; ++y) {
+        compact[y] = static_cast<uint8_t>(0xA5U ^ static_cast<unsigned int>(y * 17));
+        for (int x = 0; x < 8; ++x) {
+            if ((compact[y] & (0x80U >> x)) != 0) {
+                const int bit = x + 3;
+                largeBytes[static_cast<size_t>(y) * rowBytes + (bit >> 3)] |=
+                    static_cast<uint8_t>(0x80U >> (bit & 7));
+            }
+        }
+    }
+
+    const SkMask small(compact.data(), SkIRect::MakeWH(8, 8), 1, SkMask::kBW_Format);
+    const SkMask large(largeBytes, SkIRect::MakeLTRB(-3, 0, 49997, 50000),
+                       rowBytes, SkMask::kBW_Format);
+    SkAAClip aaClip;
+    const SkIRect visible = SkIRect::MakeWH(8, 8);
+    bool valid = aaClip.setPath(SkPath::Oval(SkRect::MakeWH(8, 8)), visible, true);
+    valid = valid && aaClip.getBounds() == visible && !aaClip.quickContains(visible);
+    if (valid) {
+        MaskCapture smallOutput;
+        MaskCapture largeOutput;
+        SkAAClipBlitter smallBlitter;
+        SkAAClipBlitter largeBlitter;
+        smallBlitter.init(&smallOutput, &aaClip);
+        largeBlitter.init(&largeOutput, &aaClip);
+        smallBlitter.blitMask(small, visible);
+        largeBlitter.blitMask(large, visible);
+        valid = smallOutput.valid() && largeOutput.valid() &&
+                smallOutput.pixels() == largeOutput.pixels();
+    }
+    munmap(storage, byteCount);
+    return valid;
+}
+#endif
 }
 
 int main() {
@@ -213,5 +290,11 @@ int main() {
         std::fprintf(stderr, "oversized filtered alpha contract failed\n");
         return 6;
     }
+#if !defined(_WIN32)
+    if (!clipped_large_bw_mask()) {
+        std::fprintf(stderr, "clipped large BW mask contract failed\n");
+        return 7;
+    }
+#endif
     return 0;
 }
