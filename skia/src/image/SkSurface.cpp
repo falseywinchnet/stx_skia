@@ -9,7 +9,6 @@
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkCanvas.h"
-#include "include/core/SkCapabilities.h" // IWYU pragma: keep
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
@@ -81,10 +80,6 @@ void SkSurface::notifyContentWillChange(ContentChangeMode mode) {
 
 SkCanvas* SkSurface::getCanvas() {
     return asSB(this)->getCachedCanvas();
-}
-
-sk_sp<const SkCapabilities> SkSurface::capabilities() {
-    return asSB(this)->onCapabilities();
 }
 
 sk_sp<SkImage> SkSurface::makeImageSnapshot() {

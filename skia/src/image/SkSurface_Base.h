@@ -26,7 +26,6 @@
 class GrBackendSemaphore;
 class GrBackendTexture;
 class GrRecordingContext;
-class SkCapabilities;
 class SkColorSpace;
 class SkPaint;
 class SkPixmap;
@@ -166,7 +165,6 @@ public:
     virtual bool onCharacterize(GrSurfaceCharacterization*) const { return false; }
     virtual bool onIsCompatible(const GrSurfaceCharacterization&) const { return false; }
 
-    virtual sk_sp<const SkCapabilities> onCapabilities() = 0;
 
     sk_sp<SkPixelStorage> getPixelStorage() const { return fPixelStorage; }
 

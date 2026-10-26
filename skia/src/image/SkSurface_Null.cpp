@@ -5,7 +5,6 @@
  * found in the LICENSE file.
  */
 
-#include "include/core/SkCapabilities.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkRefCnt.h"
@@ -38,10 +37,6 @@ protected:
     void onWritePixels(const SkPixmap&, int x, int y) override {}
     void onDraw(SkCanvas*, SkScalar, SkScalar, const SkSamplingOptions&, const SkPaint*) override {}
     bool onCopyOnWrite(ContentChangeMode) override { return true; }
-    sk_sp<const SkCapabilities> onCapabilities() override {
-        // Not really, but we have to return *something*
-        return SkCapabilities::RasterBackend();
-    }
     SkImageInfo imageInfo() const override {
         return SkImageInfo::MakeUnknown(this->width(), this->height());
     }

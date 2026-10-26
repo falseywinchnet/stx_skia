@@ -359,7 +359,6 @@ public:
      *  makeRawShader functions like makeShader, but for images that contain non-color data.
      *  This includes images encoding things like normals, material properties (eg, roughness),
      *  heightmaps, or any other purely mathematical data that happens to be stored in an image.
-     *  These types of images are useful with some programmable shaders (see: SkRuntimeEffect).
      *
      *  Raw image shaders work like regular image shaders (including filtering and tiling), with
      *  a few major differences:

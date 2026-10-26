@@ -13,7 +13,6 @@
 #include "include/core/SkColor.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkMatrix.h"
-#include "include/core/SkMesh.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPoint.h"
 #include "include/core/SkRRect.h"
@@ -157,7 +156,6 @@ DRAW(DrawAtlas, drawAtlas(r.atlas.get(),
                           {r.colors.data(), r.colors ? r.count : 0},
                           r.mode, r.sampling, r.cull, r.paint))
 DRAW(DrawVertices, drawVertices(r.vertices, r.bmode, r.paint))
-DRAW(DrawMesh, drawMesh(r.mesh, r.blender, r.paint))
 DRAW(DrawShadowRec, private_draw_shadow_rec(r.path, r.rec))
 DRAW(DrawAnnotation, drawAnnotation(r.rect, r.key.c_str(), r.value.get()))
 
@@ -456,9 +454,6 @@ private:
     }
     Bounds bounds(const DrawVertices& op) const {
         return this->adjustAndMap(op.vertices->bounds(), &op.paint);
-    }
-    Bounds bounds(const DrawMesh& op) const {
-        return this->adjustAndMap(op.mesh.bounds(), &op.paint);
     }
     Bounds bounds(const DrawAtlas& op) const {
         if (op.cull) {

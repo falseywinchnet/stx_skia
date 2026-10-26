@@ -17,7 +17,6 @@
 struct GrFPArgs;
 class GrFragmentProcessor;
 class SkColorInfo;
-class SkRuntimeEffect;
 struct SkStageRec;
 
 namespace skgpu::graphite {
@@ -52,7 +51,6 @@ public:
 
     [[nodiscard]] virtual bool onAppendStages(const SkStageRec& rec) const = 0;
 
-    virtual SkRuntimeEffect* asRuntimeEffect() const { return nullptr; }
 
     static SkFlattenable::Type GetFlattenableType() { return kSkBlender_Type; }
     SkFlattenable::Type getFlattenableType() const override { return GetFlattenableType(); }

@@ -181,8 +181,6 @@ public:
     void setDeserialProcs(const SkDeserialProcs& procs);
     const SkDeserialProcs& getDeserialProcs() const { return fProcs; }
 
-    bool allowSkSL() const { return fAllowSkSL; }
-    void setAllowSkSL(bool allow) { fAllowSkSL = allow; }
 
     bool allowTags(SkFourByteTag tag) const {
         if (!fProcs.fAllowTagsProc) {
@@ -278,7 +276,6 @@ private:
 
     int fRecursionLimit = 100;
 
-    bool fAllowSkSL = true;
     bool fError = false;
 };
 

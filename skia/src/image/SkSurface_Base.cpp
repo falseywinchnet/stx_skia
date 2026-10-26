@@ -9,7 +9,6 @@
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkCanvas.h"
-#include "include/core/SkCapabilities.h"
 #include "include/core/SkColorSpace.h" // IWYU pragma: keep
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
@@ -134,10 +133,6 @@ uint32_t SkSurface_Base::newGenerationID() {
     SkASSERT(!fCachedCanvas || fCachedCanvas->getSurfaceBase() == this);
     static std::atomic<uint32_t> nextID{1};
     return nextID.fetch_add(1, std::memory_order_relaxed);
-}
-
-sk_sp<const SkCapabilities> SkSurface_Base::onCapabilities() {
-    return SkCapabilities::RasterBackend();
 }
 
 void SkSurface_Base::createCaptureBreakpoint() {

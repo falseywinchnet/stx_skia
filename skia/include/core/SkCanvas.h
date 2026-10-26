@@ -57,7 +57,6 @@ class SkDevice;
 class SkDrawable;
 class SkFont;
 class SkImage;
-class SkMesh;
 class SkPaintFilterCanvas;
 class SkPath;
 class SkPicture;
@@ -1959,28 +1958,6 @@ public:
     */
     void drawVertices(const sk_sp<SkVertices>& vertices, SkBlendMode mode, const SkPaint& paint);
 
-    /**
-        Experimental, under active development, and subject to change without notice.
-
-        Draws a mesh using a user-defined specification (see SkMeshSpecification). Requires
-        a GPU backend or SkSL to be compiled in.
-
-        SkBlender is ignored if SkMesh's specification does not output fragment shader color.
-        Otherwise, it combines
-            - the SkShader if SkPaint contains SkShader
-            - or the opaque SkPaint color if SkPaint does not contain SkShader
-        as the src of the blend and the mesh's fragment color as the dst.
-
-        SkMaskFilter, SkPathEffect, and antialiasing on SkPaint are ignored.
-
-        @param mesh      the mesh vertices and compatible specification.
-        @param blender   combines vertices colors with SkShader if present or SkPaint opaque color
-                         if not. Ignored if the custom mesh does not output color. Defaults to
-                         SkBlendMode::kModulate if nullptr.
-        @param paint     specifies the SkShader, used as SkVertices texture, may be nullptr
-    */
-    void drawMesh(const SkMesh& mesh, sk_sp<SkBlender> blender, const SkPaint& paint);
-
     /** Draws a Coons patch: the interpolation of four cubics with shared corners,
         associating a color, and optionally a texture SkPoint, with each corner.
 
@@ -2234,7 +2211,6 @@ protected:
 
     virtual void onDrawVerticesObject(const SkVertices* vertices, SkBlendMode mode,
                                       const SkPaint& paint);
-    virtual void onDrawMesh(const SkMesh&, sk_sp<SkBlender>, const SkPaint&);
     virtual void onDrawAnnotation(const SkRect& rect, const char key[], SkData* value);
     virtual void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&);
 

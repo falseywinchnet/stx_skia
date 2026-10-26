@@ -19,7 +19,6 @@
 #include <cstring>
 
 class SkCanvas;
-class SkCapabilities;
 class SkImage;
 class SkPaint;
 class SkPixelRef;
@@ -62,7 +61,6 @@ public:
     void onDraw(SkCanvas*, SkScalar, SkScalar, const SkSamplingOptions&, const SkPaint*) override;
     bool onCopyOnWrite(ContentChangeMode) override;
     void onRestoreBackingMutability() override;
-    sk_sp<const SkCapabilities> onCapabilities() override;
     SkRecorder* onGetBaseRecorder() const override;
 
 private:

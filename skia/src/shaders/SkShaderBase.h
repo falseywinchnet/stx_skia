@@ -27,7 +27,6 @@
 class SkArenaAlloc;
 class SkColorSpace;
 class SkImage;
-class SkRuntimeEffect;
 class SkWriteBuffer;
 enum SkColorType : int;
 enum class SkTileMode;
@@ -362,7 +361,6 @@ public:
         return nullptr;
     }
 
-    virtual SkRuntimeEffect* asRuntimeEffect() const { return nullptr; }
 
     static Type GetFlattenableType() { return kSkShader_Type; }
     Type getFlattenableType() const override { return GetFlattenableType(); }

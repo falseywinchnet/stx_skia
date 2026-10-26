@@ -23,7 +23,6 @@
 class SkBlender;
 class SkImage;
 class SkMatrix;
-class SkMesh;
 class SkMipmap;
 class SkPaint;
 class SkPath;
@@ -83,8 +82,6 @@ public:
                        SkCanvas::SrcRectConstraint) override;
 
     void drawVertices(const SkVertices*, sk_sp<SkBlender>, const SkPaint&, bool) override;
-    // Implemented in src/sksl/SkBitmapDevice_mesh.cpp
-    void drawMesh(const SkMesh&, sk_sp<SkBlender>, const SkPaint&) override;
 
     void drawAtlas(SkSpan<const SkRSXform>, SkSpan<const SkRect>, SkSpan<const SkColor>,
                    sk_sp<SkBlender>, const SkPaint&) override;

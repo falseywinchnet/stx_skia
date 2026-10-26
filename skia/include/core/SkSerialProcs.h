@@ -114,11 +114,6 @@ struct SK_API SkDeserialProcs {
     SkDeserialTypefaceStreamProc fTypefaceStreamProc = nullptr;
     void*                        fTypefaceCtx = nullptr;
 
-    // This looks like a flag, but it could be considered a proc as well (one that takes no
-    // parameters and returns a bool). Given that there are only two valid implementations of that
-    // proc, we just insert the bool directly.
-    bool                         fAllowSkSL = true;
-
     // Can be used to restrict the tags that will be deserialized from SkPictures.
     SkDeserialAllowTagsProc      fAllowTagsProc = nullptr;
     void*                        fAllowTagsCtx = nullptr;

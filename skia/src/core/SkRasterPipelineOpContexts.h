@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace SkSL { class TraceHook; }
 // state shared by stack_checkpoint and stack_rewind
 struct SkRasterPipelineStage;
 enum class SkPerlinNoiseShaderType;
@@ -282,33 +281,6 @@ struct BranchIfEqualCtx : public BranchCtx {
 struct CaseOpCtx {
     int expectedValue;
     SkRPOffset offset;  // points to a pair of adjacent I32s: {I32 actualValue, I32 defaultMask}
-};
-
-struct TraceFuncCtx {
-    const int* traceMask;
-    SkSL::TraceHook* traceHook;
-    int funcIdx;
-};
-
-struct TraceScopeCtx {
-    const int* traceMask;
-    SkSL::TraceHook* traceHook;
-    int delta;
-};
-
-struct TraceLineCtx {
-    const int* traceMask;
-    SkSL::TraceHook* traceHook;
-    int lineNumber;
-};
-
-struct TraceVarCtx {
-    const int* traceMask;
-    SkSL::TraceHook* traceHook;
-    int slotIdx, numSlots;
-    const int* data;
-    const uint32_t *indirectOffset;  // can be null; if set, an offset applied to `data`
-    uint32_t indirectLimit;          // the indirect offset is clamped to this upper bound
 };
 
 }  // namespace SkRasterPipelineContexts

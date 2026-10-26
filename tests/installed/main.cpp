@@ -9,6 +9,12 @@
 template <typename T>
 concept HasImageFiltering = requires(T& paint) { paint.getImageFilter(); };
 static_assert(!HasImageFiltering<SkPaint>);
+template <typename T>
+concept HasProgrammableMesh = requires { &T::drawMesh; };
+static_assert(!HasProgrammableMesh<SkCanvas>);
+#if __has_include("include/effects/SkRuntimeEffect.h")
+#error Runtime compiler headers must not be installed.
+#endif
 
 namespace {
 struct ConsumerBase {

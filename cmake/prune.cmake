@@ -15,3 +15,16 @@ list(FILTER stx_sources EXCLUDE REGEX "skia/src/effects/imagefilters/")
 
 # CSS/backdrop image evaluation belongs to the first-party GUI.Forms engine.
 list(FILTER stx_sources EXCLUDE REGEX "skia/src/core/(SkBlurEngine|SkImageFilter|SkImageFilterCache|SkImageFilterTypes|SkLocalMatrixImageFilter)\\.cpp$")
+
+# Runtime shader compilation and programmable meshes are outside the CPU contract.
+list(FILTER stx_sources EXCLUDE REGEX "skia/src/sksl/")
+list(REMOVE_ITEM stx_sources skia/src/core/SkKnownRuntimeEffects.cpp)
+list(REMOVE_ITEM stx_sources skia/src/core/SkRuntimeEffect.cpp)
+list(REMOVE_ITEM stx_sources skia/src/core/SkRuntimeBlender.cpp)
+list(REMOVE_ITEM stx_sources skia/src/core/SkMesh.cpp)
+list(REMOVE_ITEM stx_sources skia/src/core/SkCapabilities.cpp)
+list(REMOVE_ITEM stx_sources skia/src/shaders/SkGainmapShader.cpp)
+list(REMOVE_ITEM stx_sources skia/src/shaders/SkRuntimeShader.cpp)
+list(REMOVE_ITEM stx_sources skia/src/effects/SkBlenders.cpp)
+list(REMOVE_ITEM stx_sources skia/src/effects/colorfilters/SkRuntimeColorFilter.cpp)
+list(REMOVE_ITEM stx_sources skia/src/utils/SkShaderUtils.cpp)

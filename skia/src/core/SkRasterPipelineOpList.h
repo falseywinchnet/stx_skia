@@ -154,8 +154,7 @@
     M(cmpne_imm_float)                                                                          \
         M(cmpne_n_floats) M(cmpne_float)  M(cmpne_2_floats) M(cmpne_3_floats) M(cmpne_4_floats) \
     M(cmpne_imm_int)                                                                            \
-        M(cmpne_n_ints)   M(cmpne_int)    M(cmpne_2_ints)   M(cmpne_3_ints)   M(cmpne_4_ints)   \
-    M(trace_line)         M(trace_var)    M(trace_enter)    M(trace_exit)     M(trace_scope)
+        M(cmpne_n_ints)   M(cmpne_int)    M(cmpne_2_ints)   M(cmpne_3_ints)   M(cmpne_4_ints)
 
 // `SK_RASTER_PIPELINE_OPS_HIGHP_ONLY` defines ops that are only available in highp; this subset
 // includes all of SkSL.

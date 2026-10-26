@@ -17,7 +17,6 @@
 #include "src/core/SkRasterPipelineContextUtils.h"
 #include "src/core/SkUtils.h"  // unaligned_{load,store}
 #include "src/shaders/SkPerlinNoiseShaderType.h"
-#include "src/sksl/tracing/SkSLTraceHook.h"
 
 #include <cstdint>
 #include <type_traits>
@@ -4358,63 +4357,6 @@ HIGHP_BRANCH_STAGE(branch_if_no_active_lanes_eq, SkRasterPipelineContexts::Branc
     match &= execution_mask();
     // If any lanes matched, don't take the branch.
     return any(match) ? 1 : ctx->offset;
-}
-
-HIGHP_TAIL_STAGE(trace_line, SkRasterPipelineContexts::TraceLineCtx* ctx) {
-    const I32* traceMask = (const I32*)ctx->traceMask;
-    if (any(execution_mask() & *traceMask)) {
-        ctx->traceHook->line(ctx->lineNumber);
-    }
-}
-
-HIGHP_TAIL_STAGE(trace_enter, SkRasterPipelineContexts::TraceFuncCtx* ctx) {
-    const I32* traceMask = (const I32*)ctx->traceMask;
-    if (any(execution_mask() & *traceMask)) {
-        ctx->traceHook->enter(ctx->funcIdx);
-    }
-}
-
-HIGHP_TAIL_STAGE(trace_exit, SkRasterPipelineContexts::TraceFuncCtx* ctx) {
-    const I32* traceMask = (const I32*)ctx->traceMask;
-    if (any(execution_mask() & *traceMask)) {
-        ctx->traceHook->exit(ctx->funcIdx);
-    }
-}
-
-HIGHP_TAIL_STAGE(trace_scope, SkRasterPipelineContexts::TraceScopeCtx* ctx) {
-    // Note that trace_scope intentionally does not incorporate the execution mask. Otherwise, the
-    // scopes would become unbalanced if the execution mask changed in the middle of a block. The
-    // caller is responsible for providing a combined trace- and execution-mask.
-    const I32* traceMask = (const I32*)ctx->traceMask;
-    if (any(*traceMask)) {
-        ctx->traceHook->scope(ctx->delta);
-    }
-}
-
-HIGHP_TAIL_STAGE(trace_var, SkRasterPipelineContexts::TraceVarCtx* ctx) {
-    const I32* traceMask = (const I32*)ctx->traceMask;
-    I32 mask = execution_mask() & *traceMask;
-    if (any(mask)) {
-        for (size_t lane = 0; lane < N; ++lane) {
-            if (select_lane(mask, lane)) {
-                const I32* data = (const I32*)ctx->data;
-                int slotIdx = ctx->slotIdx, numSlots = ctx->numSlots;
-                if (ctx->indirectOffset) {
-                    // If this was an indirect store, apply the indirect-offset to the data pointer.
-                    uint32_t indirectOffset = select_lane(*(const U32*)ctx->indirectOffset, lane);
-                    indirectOffset = std::min<uint32_t>(indirectOffset, ctx->indirectLimit);
-                    data += indirectOffset;
-                    slotIdx += indirectOffset;
-                }
-                while (numSlots--) {
-                    ctx->traceHook->var(slotIdx, select_lane(*data, lane));
-                    ++slotIdx;
-                    ++data;
-                }
-                break;
-            }
-        }
-    }
 }
 
 HIGHP_TAIL_STAGE(copy_uniform, SkRasterPipelineContexts::UniformCtx* ctx) {

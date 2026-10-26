@@ -9,7 +9,6 @@
 #include "include/core/SkBitmap.h"
 #include "include/core/SkCPURecorder.h"
 #include "include/core/SkCanvas.h"
-#include "include/core/SkCapabilities.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkMallocPixelRef.h"
 #include "include/core/SkPixelRef.h"
@@ -176,10 +175,6 @@ bool SkSurface_Raster::onCopyOnWrite(ContentChangeMode mode) {
         bmDev->replaceBitmapBackendForRasterSurface(fBitmap);
     }
     return true;
-}
-
-sk_sp<const SkCapabilities> SkSurface_Raster::onCapabilities() {
-    return SkCapabilities::RasterBackend();
 }
 
 SkRecorder* SkSurface_Raster::onGetBaseRecorder() const {

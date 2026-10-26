@@ -45,10 +45,8 @@ SkPictureBackedGlyphDrawable::MakeFromBuffer(SkReadBuffer& buffer) {
         return nullptr;
     }
 
-    // Glyphs have a limited set of what they can be. We explicitly disable sksl for security
-    // purposes (see b/40064011, b/40064341)
+    // Glyph pictures admit only the following bounded set of record tags.
     SkDeserialProcs procs;
-    procs.fAllowSkSL = false;
     procs.fAllowTagsProc = [](SkFourByteTag tag, void*) -> bool {
         return tag == SK_PICT_BUFFER_SIZE_TAG ||
                tag == SK_PICT_FACTORY_TAG ||

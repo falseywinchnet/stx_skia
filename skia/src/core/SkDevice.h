@@ -35,7 +35,6 @@
 
 struct SkArc;
 class SkColorSpace;
-class SkMesh;
 struct SkDrawShadowRec;
 class SkRasterHandleAllocator;
 class SkSpecialImage;
@@ -371,7 +370,6 @@ public:
                               sk_sp<SkBlender>,
                               const SkPaint&,
                               bool skipColorXform = false) = 0;
-    virtual void drawMesh(const SkMesh& mesh, sk_sp<SkBlender>, const SkPaint&) = 0;
     virtual void drawShadow(SkCanvas*, const SkPath&, const SkDrawShadowRec&);
 
     // default implementation calls drawVertices
@@ -574,7 +572,6 @@ protected:
     void drawPath(const SkPath&, const SkPaint&) override {}
     void drawDevice(SkDevice*, const SkSamplingOptions&, const SkPaint&) override {}
     void drawVertices(const SkVertices*, sk_sp<SkBlender>, const SkPaint&, bool) override {}
-    void drawMesh(const SkMesh&, sk_sp<SkBlender>, const SkPaint&) override {}
 
     void drawSlug(SkCanvas*, const sktext::gpu::Slug*, const SkPaint&) override {}
     void onDrawGlyphRunList(SkCanvas*, const sktext::GlyphRunList&, const SkPaint&) override {}

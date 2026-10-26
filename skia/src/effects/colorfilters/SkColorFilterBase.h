@@ -17,7 +17,6 @@
 #include <cstddef>
 
 class SkColorSpace;
-class SkRuntimeEffect;
 enum class SkBlendMode;
 struct SkDeserialProcs;
 struct SkStageRec;
@@ -56,7 +55,6 @@ public:
                SkColors::kTransparent;
     }
 
-    virtual SkRuntimeEffect* asRuntimeEffect() const { return nullptr; }
 
     static SkFlattenable::Type GetFlattenableType() {
         return kSkColorFilter_Type;

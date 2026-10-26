@@ -27,7 +27,6 @@ class GrRecordingContext;
 class GrSurfaceCharacterization;
 class SkBitmap;
 class SkCanvas;
-class SkCapabilities;
 class SkColorSpace;
 class SkPaint;
 class SkRecorder;
@@ -287,12 +286,6 @@ public:
         example: https://fiddle.skia.org/c/@Surface_getCanvas
     */
     SkCanvas* getCanvas();
-
-    /** Returns SkCapabilities that describes the capabilities of the SkSurface's device.
-
-        @return  SkCapabilities of SkSurface's device.
-    */
-    sk_sp<const SkCapabilities> capabilities();
 
     /** Returns a compatible SkSurface, or nullptr. Returned SkSurface contains
         the same raster, GPU, or null properties as the original. Returned SkSurface

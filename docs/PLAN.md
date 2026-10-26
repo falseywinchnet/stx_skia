@@ -40,8 +40,8 @@ explicitly third-party-derived source awaiting conversion.
 
 Next: native Linux x64/arm64 and Windows CLANG64 gates; coordinator integration;
 then separate picture/text dependencies from canvas and device dispatch, with
-render comparisons at each removal. The owner has now removed Skia backdrop filtering from the contract: remove
-general image filters, then resolve their remaining SkSL/runtime dependencies.
+render comparisons at each removal. General image filters and their SkSL/runtime
+dependencies are now removed under the clarified owner contract.
 Retain blur masks, matrix color filters and shader masks. Continue conversion into
 pixel storage, masks and exercised kernels with per-change measurements.
 

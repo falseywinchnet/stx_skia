@@ -18,3 +18,140 @@ foreach(unit IN ITEMS src/utils/SkPaintFilterCanvas.cpp src/image/SkImage_Raster
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
+
+# Original runtime/compiler and adapted CPU entry points.
+foreach(unit IN ITEMS
+    src/core/SkBitmapDevice.cpp
+    src/core/SkCanvas.cpp
+    src/core/SkCapabilities.cpp
+    src/core/SkKnownRuntimeEffects.cpp
+    src/core/SkMesh.cpp
+    src/core/SkRecordCanvas.cpp
+    src/core/SkRecordDraw.cpp
+    src/core/SkRuntimeBlender.cpp
+    src/core/SkRuntimeEffect.cpp
+    src/effects/SkBlenders.cpp
+    src/effects/colorfilters/SkRuntimeColorFilter.cpp
+    src/image/SkSurface.cpp
+    src/image/SkSurface_Base.cpp
+    src/image/SkSurface_Null.cpp
+    src/image/SkSurface_Raster.cpp
+    src/ports/SkGlobalInitialization_default.cpp
+    src/shaders/SkBlendShader.cpp
+    src/shaders/SkGainmapShader.cpp
+    src/shaders/SkRuntimeShader.cpp
+    src/sksl/SkSLAnalysis.cpp
+    src/sksl/SkSLBuiltinTypes.cpp
+    src/sksl/SkSLCompiler.cpp
+    src/sksl/SkSLConstantFolder.cpp
+    src/sksl/SkSLContext.cpp
+    src/sksl/SkSLErrorReporter.cpp
+    src/sksl/SkSLInliner.cpp
+    src/sksl/SkSLIntrinsicList.cpp
+    src/sksl/SkSLLexer.cpp
+    src/sksl/SkSLMangler.cpp
+    src/sksl/SkSLModule.cpp
+    src/sksl/SkSLModuleDataDefault.cpp
+    src/sksl/SkSLModuleLoader.cpp
+    src/sksl/SkSLOperator.cpp
+    src/sksl/SkSLOutputStream.cpp
+    src/sksl/SkSLParser.cpp
+    src/sksl/SkSLPool.cpp
+    src/sksl/SkSLPosition.cpp
+    src/sksl/SkSLSampleUsage.cpp
+    src/sksl/SkSLString.cpp
+    src/sksl/SkSLUtil.cpp
+    src/sksl/analysis/SkSLCanExitWithoutReturningValue.cpp
+    src/sksl/analysis/SkSLCheckProgramStructure.cpp
+    src/sksl/analysis/SkSLCheckSymbolTableCorrectness.cpp
+    src/sksl/analysis/SkSLFinalizationChecks.cpp
+    src/sksl/analysis/SkSLGetLoopControlFlowInfo.cpp
+    src/sksl/analysis/SkSLGetLoopUnrollInfo.cpp
+    src/sksl/analysis/SkSLGetReturnComplexity.cpp
+    src/sksl/analysis/SkSLHasSideEffects.cpp
+    src/sksl/analysis/SkSLIsConstantExpression.cpp
+    src/sksl/analysis/SkSLIsDynamicallyUniformExpression.cpp
+    src/sksl/analysis/SkSLIsSameExpressionTree.cpp
+    src/sksl/analysis/SkSLIsTrivialExpression.cpp
+    src/sksl/analysis/SkSLProgramUsage.cpp
+    src/sksl/analysis/SkSLReturnsInputAlpha.cpp
+    src/sksl/analysis/SkSLSpecialization.cpp
+    src/sksl/analysis/SkSLSwitchCaseContainsExit.cpp
+    src/sksl/analysis/SkSLSymbolTableStackBuilder.cpp
+    src/sksl/codegen/SkSLRasterPipelineBuilder.cpp
+    src/sksl/codegen/SkSLRasterPipelineCodeGenerator.cpp
+    src/sksl/ir/SkSLBinaryExpression.cpp
+    src/sksl/ir/SkSLBlock.cpp
+    src/sksl/ir/SkSLChildCall.cpp
+    src/sksl/ir/SkSLConstructor.cpp
+    src/sksl/ir/SkSLConstructorArray.cpp
+    src/sksl/ir/SkSLConstructorArrayCast.cpp
+    src/sksl/ir/SkSLConstructorCompound.cpp
+    src/sksl/ir/SkSLConstructorCompoundCast.cpp
+    src/sksl/ir/SkSLConstructorDiagonalMatrix.cpp
+    src/sksl/ir/SkSLConstructorMatrixResize.cpp
+    src/sksl/ir/SkSLConstructorScalarCast.cpp
+    src/sksl/ir/SkSLConstructorSplat.cpp
+    src/sksl/ir/SkSLConstructorStruct.cpp
+    src/sksl/ir/SkSLDiscardStatement.cpp
+    src/sksl/ir/SkSLDoStatement.cpp
+    src/sksl/ir/SkSLExpression.cpp
+    src/sksl/ir/SkSLExpressionStatement.cpp
+    src/sksl/ir/SkSLExtension.cpp
+    src/sksl/ir/SkSLFieldAccess.cpp
+    src/sksl/ir/SkSLForStatement.cpp
+    src/sksl/ir/SkSLFunctionCall.cpp
+    src/sksl/ir/SkSLFunctionDeclaration.cpp
+    src/sksl/ir/SkSLFunctionDefinition.cpp
+    src/sksl/ir/SkSLIfStatement.cpp
+    src/sksl/ir/SkSLIndexExpression.cpp
+    src/sksl/ir/SkSLInterfaceBlock.cpp
+    src/sksl/ir/SkSLLayout.cpp
+    src/sksl/ir/SkSLLiteral.cpp
+    src/sksl/ir/SkSLModifierFlags.cpp
+    src/sksl/ir/SkSLModifiersDeclaration.cpp
+    src/sksl/ir/SkSLPostfixExpression.cpp
+    src/sksl/ir/SkSLPrefixExpression.cpp
+    src/sksl/ir/SkSLProgram.cpp
+    src/sksl/ir/SkSLSetting.cpp
+    src/sksl/ir/SkSLStructDefinition.cpp
+    src/sksl/ir/SkSLSwitchCase.cpp
+    src/sksl/ir/SkSLSwitchStatement.cpp
+    src/sksl/ir/SkSLSwizzle.cpp
+    src/sksl/ir/SkSLSymbol.cpp
+    src/sksl/ir/SkSLSymbolTable.cpp
+    src/sksl/ir/SkSLTernaryExpression.cpp
+    src/sksl/ir/SkSLType.cpp
+    src/sksl/ir/SkSLTypeReference.cpp
+    src/sksl/ir/SkSLVarDeclarations.cpp
+    src/sksl/ir/SkSLVariable.cpp
+    src/sksl/ir/SkSLVariableReference.cpp
+    src/sksl/tracing/SkSLDebugTracePlayer.cpp
+    src/sksl/tracing/SkSLDebugTracePriv.cpp
+    src/sksl/tracing/SkSLTraceHook.cpp
+    src/sksl/transform/SkSLAddConstToVarModifiers.cpp
+    src/sksl/transform/SkSLEliminateDeadFunctions.cpp
+    src/sksl/transform/SkSLEliminateDeadGlobalVariables.cpp
+    src/sksl/transform/SkSLEliminateDeadLocalVariables.cpp
+    src/sksl/transform/SkSLEliminateEmptyStatements.cpp
+    src/sksl/transform/SkSLEliminateUnnecessaryBraces.cpp
+    src/sksl/transform/SkSLEliminateUnreachableCode.cpp
+    src/sksl/transform/SkSLFindAndDeclareBuiltinFunctions.cpp
+    src/sksl/transform/SkSLFindAndDeclareBuiltinStructs.cpp
+    src/sksl/transform/SkSLFindAndDeclareBuiltinVariables.cpp
+    src/sksl/transform/SkSLHoistSwitchVarDeclarationsAtTopLevel.cpp
+    src/sksl/transform/SkSLRenamePrivateSymbols.cpp
+    src/sksl/transform/SkSLReplaceConstVarsWithLiterals.cpp
+    src/sksl/transform/SkSLReplaceSplatCastsWithSwizzles.cpp
+    src/sksl/transform/SkSLRewriteIndexedSwizzle.cpp
+    src/sksl/transform/SkSLTransform.cpp
+    src/utils/SkShaderUtils.cpp
+)
+    list(REMOVE_ITEM stx_sources skia/${unit} baseline/skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()
+
+foreach(unit IN ITEMS src/core/SkReadBuffer.cpp src/core/SkGlyph.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()

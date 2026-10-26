@@ -207,3 +207,29 @@ owner/API, device/image filter entry points and cache purges. Historical paint
 records retain a zero slot and reject unsupported image-filter entries.
 New tests/paint.cpp checks this contract; the installed-consumer test verifies
 API absence. These edits do not claim full conversion of the adapted files.
+
+
+## Runtime/compiler removal and blend-shader conversion
+
+The SkSL source/header trees and runtime effect, shader, color-filter and blender
+implementations now live in baseline/skia, preserving notices and the original
+reference build. Gainmap shaders, arithmetic-blender factories, programmable
+meshes and shader-language capabilities move there as well. Adapted canvas,
+device, surface, recording, serialization and raster-pipeline files retain
+original baseline copies; those edits are not full-conversion claims.
+
+SkBlendShader.cpp/.h receive a separate house-style conversion within the runtime
+removal: named opacity computation, explicit child ownership and pipeline scratch
+lifetimes. Original copies preserve the differential oracle. New original
+shader_blend tests cover standard blend modes and vertex drawing, and compile-time
+checks verify that withdrawn APIs/headers are absent. Compiler trace stages are
+removed without replacing them with successful no-op implementations.
+
+
+## Span constructor participation correction
+
+The converted SkSpan lvalue-container constructor now participates only for
+compatible contiguous containers. Original baseline headers are unchanged.
+New compile-time checks in ownership_views.cpp cover the libstdc++ variant
+failure from db44f01 and incompatible/const element views. This correction
+preserves the original conversion's temporary-owner rejection.

@@ -100,6 +100,7 @@ SK_API sk_sp<SkShader> Empty();
 SK_API sk_sp<SkShader> Color(SkColor);
 SK_API sk_sp<SkShader> Color(const SkColor4f&, sk_sp<SkColorSpace>);
 SK_API sk_sp<SkShader> Blend(SkBlendMode mode, sk_sp<SkShader> dst, sk_sp<SkShader> src);
+// Accepts standard blend-mode blenders only; a custom blender returns nullptr.
 SK_API sk_sp<SkShader> Blend(sk_sp<SkBlender>, sk_sp<SkShader> dst, sk_sp<SkShader> src);
 SK_API sk_sp<SkShader> CoordClamp(sk_sp<SkShader>, const SkRect& subset);
 

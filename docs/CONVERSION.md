@@ -26,6 +26,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Mask-filter dispatch and nine-patch ownership | `src/core/SkMaskFilterBase.cpp/.h`, `src/core/SkMaskFilter.cpp`; existing public header reviewed | Adopted cache/allocation owners, failure cleanup, bounded clipped run storage and reference rendering comparisons |
 | Shader-mask filtering | `src/effects/SkShaderMaskFilterImpl.cpp/.h`, `include/effects/SkShaderMaskFilter.h` | 576 byte-exact shader masks, checked source metadata, scoped pixel ownership and failure preservation |
 | Blur-filter construction and cached masks | `src/core/SkBlurMaskFilterImpl.cpp/.h` | Explicit shape alternatives, cache/allocation handoff, checked raster extents and 288 reference scenes |
+| Standard blend shaders | `src/shaders/SkBlendShader.cpp/.h` | 696 reference scenes across all 29 standard modes, local/affine transforms, opacity combinations and colored vertices; invalid-mode rejection |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -68,6 +69,13 @@ The spelling checker reports four compatibility declarations in these headers:
 arrow expressions or trailing-return function definitions. The operator remains
 needed by unconverted source; its removal and explicit template spelling at
 remaining callers are tracked as outstanding, without suppressing the checker.
+
+The lvalue-container constructor now constrains participation through a private
+trait requiring data, an integral count and compatible element-pointer access.
+This corrects libstdc++ variant probing of non-container alternatives. Compile-time
+regressions cover non-containers, incompatible and const elements, vector<bool>,
+valid const views and variant selection. Temporary-owner rejection remains.
+See the cross-platform evidence in results/2026-10-26/RUNTIME_REMOVAL.md.
 
 ## Pixel extent conversion notes
 
@@ -209,8 +217,8 @@ contract. No output/timing comparison across the two different scene definitions
 is claimed.
 
 That first removal left core SkImageFilter/FilterTypes/layer machinery compiled.
-The subsequent CPU-layer and core-removal batches below remove it. SkSL and
-Skia's text/font internals remain explicit next work.
+The subsequent CPU-layer and core-removal batches below remove it. The runtime
+removal below also removes SkSL. Skia's text/font internals remain next work.
 SkCanvas and SkCanvasPriv receive narrow dependency edits, not full house-style
 conversion. See IMAGE_FILTER_PRUNING.md for the exact scope.
 
@@ -240,6 +248,26 @@ Original copies isolate the baseline from these changes. The paint contract test
 checks API absence, ordinary serialization and unsupported-record rejection;
 existing rendering comparisons cover retained effects. See IMAGE_FILTER_CORE.md.
 
+## Runtime/compiler removal and blend-shader conversion
+
+SkSL source and headers, runtime shaders/color filters/blenders, known effects,
+gainmap shaders, arithmetic-blender factories and programmable mesh specifications
+are reference-only. Canvas/device/record mesh dispatch is removed; ordinary
+SkVertices drawing remains. Shader-language capabilities and deserialization
+flags are removed instead of advertising a language the candidate cannot execute.
+The raster pipeline no longer exposes compiler tracing callbacks.
+
+Standard blend shaders now use named opacity tests, explicit child ownership and
+arena-backed coordinate/result storage with stated initialization and failure
+contracts. Their arithmetic and local-matrix ordering remain unchanged. The
+SkBlender overload accepts standard modes; custom runtime blending returns null.
+Invalid enum values also return null before constructing a shader.
+
+This converts SkBlendShader.cpp/.h, not the other adapted canvas, surface, record
+or raster-pipeline files. Compiler-oriented arithmetic stages remain in the
+raster pipeline pending separate dependency proof and pruning. Text/font and
+serialization internals still need removal. See ../results/2026-10-26/RUNTIME_REMOVAL.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
@@ -249,8 +277,9 @@ existing rendering comparisons cover retained effects. See IMAGE_FILTER_CORE.md.
 - Remove unused picture/text/serialization paths through actual dependency
   work. Preserve external glyph coverage and all admitted drawing behavior.
 - Convert remaining retained filter, shader, color and skcms implementation;
-  remove runtime/SkSL effects under the clarified owner contract, retaining blur
-  masks, matrix color filters and shader masks. General image filters are removed.
+  retain blur masks, matrix color filters and shader masks. General image filters
+  and runtime/SkSL effects are removed. Prune unused compiler-oriented arithmetic
+  stages from the raster pipeline through a separate dependency check.
 - Audit every retained production header and build/source list, including
   templates, generated runtime support and platform ports. Syntax-checker success
   alone is not semantic conversion evidence.

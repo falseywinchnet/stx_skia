@@ -1233,14 +1233,6 @@ void SkCanvas::drawVertices(const SkVertices* vertices, SkBlendMode mode, const 
     this->onDrawVerticesObject(vertices, mode, paint);
 }
 
-void SkCanvas::drawMesh(const SkMesh& mesh, sk_sp<SkBlender> blender, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    if (!blender) {
-        blender = SkBlender::Mode(SkBlendMode::kModulate);
-    }
-    this->onDrawMesh(mesh, std::move(blender), paint);
-}
-
 void SkCanvas::drawPath(const SkPath& path, const SkPaint& paint) {
     TRACE_EVENT0("skia", TRACE_FUNC);
     this->onDrawPath(path, paint);
@@ -2020,14 +2012,6 @@ void SkCanvas::onDrawVerticesObject(const SkVertices* vertices, SkBlendMode bmod
     auto layer = this->aboutToDraw(simplePaint, &bounds);
     if (layer) {
         this->topDevice()->drawVertices(vertices, SkBlender::Mode(bmode), layer->paint);
-    }
-}
-
-void SkCanvas::onDrawMesh(const SkMesh& mesh, sk_sp<SkBlender> blender, const SkPaint& paint) {
-    SkPaint simplePaint = clean_paint_for_drawVertices(paint);
-    auto layer = this->aboutToDraw(simplePaint, nullptr);
-    if (layer) {
-        this->topDevice()->drawMesh(mesh, std::move(blender), paint);
     }
 }
 
