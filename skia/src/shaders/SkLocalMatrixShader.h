@@ -84,7 +84,8 @@ private:
  */
 class SkCTMShader final : public SkShaderBase {
 public:
-    SkCTMShader(sk_sp<SkShader> proxy, const SkMatrix& ctm);
+    SkCTMShader(sk_sp<SkShader> proxy, const SkMatrix& ctm,
+                SkPoint deviceOffset = {0, 0});
 
     bool isOpaque() const override { return fProxyShader->isOpaque(); }
 
@@ -106,6 +107,7 @@ private:
 
     sk_sp<SkShader> fProxyShader;
     SkMatrix fCTM;
+    SkPoint fDeviceOffset;
 };
 
 #endif

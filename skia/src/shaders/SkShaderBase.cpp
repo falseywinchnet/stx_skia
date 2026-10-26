@@ -34,6 +34,13 @@ std::optional<MatrixRec> MatrixRec::apply(const SkStageRec& rec, const SkMatrix&
         return {};
     }
     if (!fCTMApplied) {
+        // A tiled clip evaluates at tile coordinates; restore the original
+        // device position before applying the captured shader CTM inverse.
+        if (rec.fDeviceOffset.fX != 0 || rec.fDeviceOffset.fY != 0) {
+            const SkMatrix offset = SkMatrix::Translate(rec.fDeviceOffset.fX,
+                                                         rec.fDeviceOffset.fY);
+            total = SkMatrix::Concat(total, offset);
+        }
         rec.fPipeline->append(SkRasterPipelineOp::seed_shader);
     }
     // appendMatrix is a no-op if total worked out to identity.

@@ -14,6 +14,9 @@
 #include "include/core/SkScalar.h"
 #include "include/private/SkDebug.h"
 #include "src/core/SkRegionPriv.h"
+#include "src/shaders/SkLocalMatrixShader.h"
+
+#include <utility>
 
 class SkBlitter;
 
@@ -249,12 +252,22 @@ void SkRasterClip::translate(int dx, int dy, SkRasterClip* dst) const {
 
     AUTO_RASTERCLIP_VALIDATE(*this);
 
-    if (this->isEmpty()) {
-        dst->setEmpty();
-        return;
-    }
     if (0 == (dx | dy)) {
         *dst = *this;
+        return;
+    }
+
+    // The geometric clip moves into tile coordinates, while the shader keeps
+    // the device CTM captured when clipShader was called.
+    if (fShader) {
+        const SkPoint offset = {-static_cast<float>(dx), -static_cast<float>(dy)};
+        sk_sp<SkShader> translated(new SkCTMShader(fShader, SkMatrix::I(), offset));
+        (*dst).fShader = std::move(translated);
+    } else {
+        (*dst).fShader.reset();
+    }
+    if (this->isEmpty()) {
+        dst->setEmpty();
         return;
     }
 

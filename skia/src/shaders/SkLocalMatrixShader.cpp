@@ -6,6 +6,7 @@
  */
 #include "src/shaders/SkLocalMatrixShader.h"
 
+#include "src/core/SkEffectPriv.h"
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkWriteBuffer.h"
 
@@ -69,8 +70,9 @@ bool SkLocalMatrixShader::appendStages(const SkStageRec& rec,
 
 ////////////////////////////////////////////////////////////////////
 
-SkCTMShader::SkCTMShader(sk_sp<SkShader> proxy, const SkMatrix& ctm)
-        : fProxyShader(std::move(proxy)), fCTM(ctm) {}
+SkCTMShader::SkCTMShader(sk_sp<SkShader> proxy, const SkMatrix& ctm,
+                         SkPoint deviceOffset)
+        : fProxyShader(std::move(proxy)), fCTM(ctm), fDeviceOffset(deviceOffset) {}
 
 bool SkCTMShader::isConstant(SkColor4f* color) const {
     return as_SB(fProxyShader)->isConstant(color);
@@ -82,7 +84,12 @@ SkShaderBase::GradientType SkCTMShader::asGradient(GradientInfo* info,
 }
 
 bool SkCTMShader::appendStages(const SkStageRec& rec, const SkShaders::MatrixRec&) const {
-    return as_SB(fProxyShader)->appendRootStages(rec, fCTM);
+    SkStageRec translated = rec;
+    translated.fDeviceOffset.fX += fDeviceOffset.fX;
+    translated.fDeviceOffset.fY += fDeviceOffset.fY;
+    const SkShaderBase& proxy = *as_SB(fProxyShader);
+    const bool appended = proxy.appendRootStages(translated, fCTM);
+    return appended;
 }
 
 sk_sp<SkFlattenable> SkCTMShader::CreateProc(SkReadBuffer& buffer) {

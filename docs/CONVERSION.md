@@ -958,6 +958,16 @@ scanner's tiling limit in both directions. The original header remains the
 reference build's version; see ../results/2026-10-26/RASTER_CLIP_RESIZE.md.
 The broader clipping and scan-conversion implementations remain unconverted.
 
+## Tiled clip shader coordinates
+
+Translating a raster clip into a later CPU tile now carries its shader and
+restores the original device coordinates when that shader's saved CTM is
+inverted. The first tile can begin at a nonzero origin, so preserving only
+the shader pointer would still sample spatial shaders at the wrong place.
+The regression includes a narrow draw in a later tile and a composited
+gradient clip. See ../results/2026-10-26/TILED_CLIP_SHADER.md. The wider
+shader and tiler implementations remain in the conversion programme.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
