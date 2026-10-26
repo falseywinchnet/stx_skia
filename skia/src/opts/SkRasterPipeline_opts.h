@@ -14,7 +14,6 @@
 #include "include/private/SkTemplates.h"
 #include "modules/skcms/skcms.h"
 #include "src/core/SkRasterPipeline.h"
-#include "src/core/SkRasterPipelineContextUtils.h"
 #include "src/core/SkUtils.h"  // unaligned_{load,store}
 #include "src/shaders/SkPerlinNoiseShaderType.h"
 
@@ -1774,90 +1773,73 @@ static constexpr size_t N = sizeof(F) / sizeof(float);
 #if SKRP_NARROW_STAGES
     struct Params {
         size_t dx, dy;
-        std::byte* base;
         F dr,dg,db,da;
     };
     using Stage = void(ABI*)(Params*, SkRasterPipelineStage* program, F r, F g, F b, F a);
 #else
     using Stage = void(ABI*)(SkRasterPipelineStage* program, const size_t dx, const size_t dy,
-                             std::byte* base, F,F,F,F, F,F,F,F);
+                             F,F,F,F, F,F,F,F);
 #endif
 
 static void start_pipeline(size_t dx, size_t dy,
                            size_t xlimit, size_t ylimit,
                            SkRasterPipelineStage* program,
-                           SkSpan<SkRasterPipelineContexts::MemoryCtxPatch> memoryCtxPatches,
-                           uint8_t* tailPointer) {
-    uint8_t unreferencedTail;
-    if (!tailPointer) {
-        tailPointer = &unreferencedTail;
-    }
+                           SkSpan<SkRasterPipelineContexts::MemoryCtxPatch> memoryCtxPatches) {
     auto start = (Stage)program->fn;
     const size_t x0 = dx;
-    std::byte* const base = nullptr;
     for (; dy < ylimit; dy++) {
     #if SKRP_NARROW_STAGES
-        Params params = { x0,dy,base, F0,F0,F0,F0 };
+        Params params = { x0,dy, F0,F0,F0,F0 };
         while (params.dx + N <= xlimit) {
             start(&params,program, F0,F0,F0,F0);
             params.dx += N;
         }
         if (size_t tail = xlimit - params.dx) {
-            *tailPointer = tail;
             patch_memory_contexts(memoryCtxPatches, params.dx, dy, tail);
             start(&params,program, F0,F0,F0,F0);
             restore_memory_contexts(memoryCtxPatches, params.dx, dy, tail);
-            *tailPointer = 0xFF;
         }
     #else
         dx = x0;
         while (dx + N <= xlimit) {
-            start(program,dx,dy,base, F0,F0,F0,F0, F0,F0,F0,F0);
+            start(program,dx,dy, F0,F0,F0,F0, F0,F0,F0,F0);
             dx += N;
         }
         if (size_t tail = xlimit - dx) {
-            *tailPointer = tail;
             patch_memory_contexts(memoryCtxPatches, dx, dy, tail);
-            start(program,dx,dy,base, F0,F0,F0,F0, F0,F0,F0,F0);
+            start(program,dx,dy, F0,F0,F0,F0, F0,F0,F0,F0);
             restore_memory_contexts(memoryCtxPatches, dx, dy, tail);
-            *tailPointer = 0xFF;
         }
     #endif
     }
 }
 
-#if SK_HAS_MUSTTAIL
-    #define SKRP_MUSTTAIL [[clang::musttail]]
-#else
-    #define SKRP_MUSTTAIL
-#endif
-
 #if SKRP_NARROW_STAGES
     #define DECLARE_HIGHP_STAGE(name, ARG, STAGE_RET, INC, OFFSET, MUSTTAIL)               \
-        SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy, std::byte*& base,     \
+        SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy,      \
                               F& r, F& g, F& b, F& a, F& dr, F& dg, F& db, F& da);         \
         static void ABI name(Params* params, SkRasterPipelineStage* program,               \
                              F r, F g, F b, F a) {                                         \
-            OFFSET name##_k(Ctx{program}, params->dx,params->dy,params->base,              \
+            OFFSET name##_k(Ctx{program}, params->dx,params->dy,              \
                             r,g,b,a, params->dr, params->dg, params->db, params->da);      \
             INC;                                                                           \
             auto fn = (Stage)program->fn;                                                  \
             MUSTTAIL return fn(params, program, r,g,b,a);                                  \
         }                                                                                  \
-        SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy, std::byte*& base,     \
+        SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy,      \
                               F& r, F& g, F& b, F& a, F& dr, F& dg, F& db, F& da)
 #else
     #define DECLARE_HIGHP_STAGE(name, ARG, STAGE_RET, INC, OFFSET, MUSTTAIL)                     \
-        SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy, std::byte*& base,           \
+        SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy,            \
                               F& r, F& g, F& b, F& a, F& dr, F& dg, F& db, F& da);               \
         static void ABI name(SkRasterPipelineStage* program, const size_t dx, const size_t dy,   \
-                             std::byte* base, F r, F g, F b, F a, F dr, F dg, F db, F da) {      \
-            OFFSET name##_k(Ctx{program}, dx,dy,base, r,g,b,a, dr,dg,db,da);                     \
+                             F r, F g, F b, F a, F dr, F dg, F db, F da) {      \
+            OFFSET name##_k(Ctx{program}, dx,dy, r,g,b,a, dr,dg,db,da);                     \
             INC;                                                                                 \
             auto fn = (Stage)program->fn;                                                        \
-            MUSTTAIL return fn(program, dx,dy,base, r,g,b,a, dr,dg,db,da);                       \
+            MUSTTAIL return fn(program, dx,dy, r,g,b,a, dr,dg,db,da);                       \
         }                                                                                        \
-        SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy, std::byte*& base,           \
+        SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy,            \
                               F& r, F& g, F& b, F& a, F& dr, F& dg, F& db, F& da)
 #endif
 
@@ -1866,130 +1848,14 @@ static void start_pipeline(size_t dx, size_t dy,
 #define HIGHP_STAGE(name, arg) \
     DECLARE_HIGHP_STAGE(name, arg, void, ++program, /*no offset*/, /*no musttail*/)
 
-// A tail stage returns void, always increments the program counter by 1, and uses tail-calling.
-// Tail-calling is necessary in SkSL-generated programs, which can be thousands of ops long, and
-// could overflow the stack (particularly in debug).
-#define HIGHP_TAIL_STAGE(name, arg) \
-    DECLARE_HIGHP_STAGE(name, arg, void, ++program, /*no offset*/, SKRP_MUSTTAIL)
-
-// A branch stage returns an integer, which is added directly to the program counter, and tailcalls.
-#define HIGHP_BRANCH_STAGE(name, arg) \
-    DECLARE_HIGHP_STAGE(name, arg, int, /*no increment*/, program +=, SKRP_MUSTTAIL)
-
 // just_return() is a simple no-op stage that only exists to end the chain,
 // returning back up to start_pipeline(), and from there to the caller.
 #if SKRP_NARROW_STAGES
     static void ABI just_return(Params*, SkRasterPipelineStage*, F,F,F,F) {}
 #else
-    static void ABI just_return(SkRasterPipelineStage*, size_t,size_t, std::byte*,
+    static void ABI just_return(SkRasterPipelineStage*, size_t,size_t,
                                 F,F,F,F, F,F,F,F) {}
 #endif
-
-// Note that in release builds, most stages consume no stack (thanks to tail call optimization).
-// However: certain builds (especially with non-clang compilers) may fail to optimize tail
-// calls, resulting in actual stack frames being generated.
-//
-// stack_checkpoint() and stack_rewind() are special stages that can be used to manage stack growth.
-// If a pipeline contains a stack_checkpoint, followed by any number of stack_rewind (at any point),
-// the C++ stack will be reset to the state it was at when the stack_checkpoint was initially hit.
-//
-// All instances of stack_rewind (as well as the one instance of stack_checkpoint near the start of
-// a pipeline) share a single context (of type SkRasterPipelineContexts::RewindCtx). That context holds the
-// full state of the mutable registers that are normally passed to the next stage in the program.
-//
-// stack_rewind is the only stage other than just_return that actually returns (rather than jumping
-// to the next stage in the program). Before it does so, it stashes all of the registers in the
-// context. This includes the updated `program` pointer. Unlike stages that tail call exactly once,
-// stack_checkpoint calls the next stage in the program repeatedly, as long as the `program` in the
-// context is overwritten (i.e., as long as a stack_rewind was the reason the pipeline returned,
-// rather than a just_return).
-//
-// Normally, just_return is the only stage that returns, and no other stage does anything after a
-// subsequent (called) stage returns, so the stack just unwinds all the way to start_pipeline.
-// With stack_checkpoint on the stack, any stack_rewind stages will return all the way up to the
-// stack_checkpoint. That grabs the values that would have been passed to the next stage (from the
-// context), and continues the linear execution of stages, but has reclaimed all of the stack frames
-// pushed before the stack_rewind before doing so.
-#if SKRP_NARROW_STAGES
-    static void ABI stack_checkpoint(Params* params, SkRasterPipelineStage* program,
-                                     F r, F g, F b, F a) {
-        SkRasterPipelineContexts::RewindCtx* ctx = Ctx{program};
-        while (program) {
-            auto next = (Stage)(++program)->fn;
-
-            ctx->stage = nullptr;
-            next(params, program, r, g, b, a);
-            program = ctx->stage;
-
-            if (program) {
-                r            = sk_unaligned_load<F>(ctx->r );
-                g            = sk_unaligned_load<F>(ctx->g );
-                b            = sk_unaligned_load<F>(ctx->b );
-                a            = sk_unaligned_load<F>(ctx->a );
-                params->dr   = sk_unaligned_load<F>(ctx->dr);
-                params->dg   = sk_unaligned_load<F>(ctx->dg);
-                params->db   = sk_unaligned_load<F>(ctx->db);
-                params->da   = sk_unaligned_load<F>(ctx->da);
-                params->base = ctx->base;
-            }
-        }
-    }
-    static void ABI stack_rewind(Params* params, SkRasterPipelineStage* program,
-                                 F r, F g, F b, F a) {
-        SkRasterPipelineContexts::RewindCtx* ctx = Ctx{program};
-        sk_unaligned_store(ctx->r , r );
-        sk_unaligned_store(ctx->g , g );
-        sk_unaligned_store(ctx->b , b );
-        sk_unaligned_store(ctx->a , a );
-        sk_unaligned_store(ctx->dr, params->dr);
-        sk_unaligned_store(ctx->dg, params->dg);
-        sk_unaligned_store(ctx->db, params->db);
-        sk_unaligned_store(ctx->da, params->da);
-        ctx->base  = params->base;
-        ctx->stage = program;
-    }
-#else
-    static void ABI stack_checkpoint(SkRasterPipelineStage* program,
-                                     const size_t dx, const size_t dy, std::byte* base,
-                                     F r, F g, F b, F a, F dr, F dg, F db, F da) {
-        SkRasterPipelineContexts::RewindCtx* ctx = Ctx{program};
-        while (program) {
-            auto next = (Stage)(++program)->fn;
-
-            ctx->stage = nullptr;
-            next(program, dx, dy, base, r, g, b, a, dr, dg, db, da);
-            program = ctx->stage;
-
-            if (program) {
-                r    = sk_unaligned_load<F>(ctx->r );
-                g    = sk_unaligned_load<F>(ctx->g );
-                b    = sk_unaligned_load<F>(ctx->b );
-                a    = sk_unaligned_load<F>(ctx->a );
-                dr   = sk_unaligned_load<F>(ctx->dr);
-                dg   = sk_unaligned_load<F>(ctx->dg);
-                db   = sk_unaligned_load<F>(ctx->db);
-                da   = sk_unaligned_load<F>(ctx->da);
-                base = ctx->base;
-            }
-        }
-    }
-    static void ABI stack_rewind(SkRasterPipelineStage* program,
-                                 const size_t dx, const size_t dy, std::byte* base,
-                                 F r, F g, F b, F a, F dr, F dg, F db, F da) {
-        SkRasterPipelineContexts::RewindCtx* ctx = Ctx{program};
-        sk_unaligned_store(ctx->r , r );
-        sk_unaligned_store(ctx->g , g );
-        sk_unaligned_store(ctx->b , b );
-        sk_unaligned_store(ctx->a , a );
-        sk_unaligned_store(ctx->dr, dr);
-        sk_unaligned_store(ctx->dg, dg);
-        sk_unaligned_store(ctx->db, db);
-        sk_unaligned_store(ctx->da, da);
-        ctx->base  = base;
-        ctx->stage = program;
-    }
-#endif
-
 
 // We could start defining normal Stages now.  But first, some helper functions.
 
@@ -4190,1081 +4056,6 @@ HIGHP_STAGE(callback, SkRasterPipelineContexts::CallbackCtx* c) {
     load4(c->read_from, &r,&g,&b,&a);
 }
 
-HIGHP_TAIL_STAGE(set_base_pointer, std::byte* p) {
-    base = p;
-}
-
-// All control flow stages used by SkSL maintain some state in the common registers:
-//   r: condition mask
-//   g: loop mask
-//   b: return mask
-//   a: execution mask (intersection of all three masks)
-// After updating r/g/b, you must invoke update_execution_mask().
-#define execution_mask()        sk_bit_cast<I32>(a)
-#define update_execution_mask() a = sk_bit_cast<F>(sk_bit_cast<I32>(r) & \
-                                                   sk_bit_cast<I32>(g) & \
-                                                   sk_bit_cast<I32>(b))
-
-HIGHP_TAIL_STAGE(init_lane_masks, SkRasterPipelineContexts::InitLaneMasksCtx* ctx) {
-    uint32_t iota[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-    static_assert(std::size(iota) >= SkRasterPipelineContexts::kMaxStride_highp);
-
-    I32 mask = cond_to_mask(sk_unaligned_load<U32>(iota) < *ctx->tail);
-    r = g = b = a = sk_bit_cast<F>(mask);
-}
-
-HIGHP_TAIL_STAGE(store_device_xy01, F* dst) {
-    // This is very similar to `seed_shader + store_src`, but b/a are backwards.
-    // (sk_FragCoord actually puts w=1 in the w slot.)
-    static constexpr float iota[] = {
-        0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 6.5f, 7.5f,
-        8.5f, 9.5f,10.5f,11.5f,12.5f,13.5f,14.5f,15.5f,
-    };
-    static_assert(std::size(iota) >= SkRasterPipelineContexts::kMaxStride_highp);
-
-    dst[0] = cast(U32_(dx)) + sk_unaligned_load<F>(iota);
-    dst[1] = cast(U32_(dy)) + 0.5f;
-    dst[2] = F0;
-    dst[3] = F1;
-}
-
-HIGHP_TAIL_STAGE(exchange_src, F* rgba) {
-    // Swaps r,g,b,a registers with the values at `rgba`.
-    F temp[4] = {r, g, b, a};
-    r = rgba[0];
-    rgba[0] = temp[0];
-    g = rgba[1];
-    rgba[1] = temp[1];
-    b = rgba[2];
-    rgba[2] = temp[2];
-    a = rgba[3];
-    rgba[3] = temp[3];
-}
-
-HIGHP_TAIL_STAGE(load_condition_mask, F* ctx) {
-    r = sk_unaligned_load<F>(ctx);
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(store_condition_mask, F* ctx) {
-    sk_unaligned_store(ctx, r);
-}
-
-HIGHP_TAIL_STAGE(merge_condition_mask, I32* ptr) {
-    // Set the condition-mask to the intersection of two adjacent masks at the pointer.
-    r = sk_bit_cast<F>(ptr[0] & ptr[1]);
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(merge_inv_condition_mask, I32* ptr) {
-    // Set the condition-mask to the intersection of the first mask and the inverse of the second.
-    r = sk_bit_cast<F>(ptr[0] & ~ptr[1]);
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(load_loop_mask, F* ctx) {
-    g = sk_unaligned_load<F>(ctx);
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(store_loop_mask, F* ctx) {
-    sk_unaligned_store(ctx, g);
-}
-
-HIGHP_TAIL_STAGE(mask_off_loop_mask, NoCtx) {
-    // We encountered a break statement. If a lane was active, it should be masked off now, and stay
-    // masked-off until the termination of the loop.
-    g = sk_bit_cast<F>(sk_bit_cast<I32>(g) & ~execution_mask());
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(reenable_loop_mask, I32* ptr) {
-    // Set the loop-mask to the union of the current loop-mask with the mask at the pointer.
-    g = sk_bit_cast<F>(sk_bit_cast<I32>(g) | ptr[0]);
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(merge_loop_mask, I32* ptr) {
-    // Set the loop-mask to the intersection of the current loop-mask with the mask at the pointer.
-    // (Note: this behavior subtly differs from merge_condition_mask!)
-    g = sk_bit_cast<F>(sk_bit_cast<I32>(g) & ptr[0]);
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(continue_op, I32* continueMask) {
-    // Set any currently-executing lanes in the continue-mask to true.
-    *continueMask |= execution_mask();
-
-    // Disable any currently-executing lanes from the loop mask. (Just like `mask_off_loop_mask`.)
-    g = sk_bit_cast<F>(sk_bit_cast<I32>(g) & ~execution_mask());
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(case_op, SkRasterPipelineContexts::CaseOpCtx* packed) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-
-    // Check each lane to see if the case value matches the expectation.
-    I32* actualValue = (I32*)(base + ctx.offset);
-    I32 caseMatches = cond_to_mask(*actualValue == ctx.expectedValue);
-
-    // In lanes where we found a match, enable the loop mask...
-    g = sk_bit_cast<F>(sk_bit_cast<I32>(g) | caseMatches);
-    update_execution_mask();
-
-    // ... and clear the default-case mask.
-    I32* defaultMask = actualValue + 1;
-    *defaultMask &= ~caseMatches;
-}
-
-HIGHP_TAIL_STAGE(load_return_mask, F* ctx) {
-    b = sk_unaligned_load<F>(ctx);
-    update_execution_mask();
-}
-
-HIGHP_TAIL_STAGE(store_return_mask, F* ctx) {
-    sk_unaligned_store(ctx, b);
-}
-
-HIGHP_TAIL_STAGE(mask_off_return_mask, NoCtx) {
-    // We encountered a return statement. If a lane was active, it should be masked off now, and
-    // stay masked-off until the end of the function.
-    b = sk_bit_cast<F>(sk_bit_cast<I32>(b) & ~execution_mask());
-    update_execution_mask();
-}
-
-HIGHP_BRANCH_STAGE(branch_if_all_lanes_active, SkRasterPipelineContexts::BranchIfAllLanesActiveCtx* ctx) {
-    uint32_t iota[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-    static_assert(std::size(iota) >= SkRasterPipelineContexts::kMaxStride_highp);
-
-    I32 tailLanes = cond_to_mask(*ctx->tail <= sk_unaligned_load<U32>(iota));
-    return all(execution_mask() | tailLanes) ? ctx->offset : 1;
-}
-
-HIGHP_BRANCH_STAGE(branch_if_any_lanes_active, SkRasterPipelineContexts::BranchCtx* ctx) {
-    return any(execution_mask()) ? ctx->offset : 1;
-}
-
-HIGHP_BRANCH_STAGE(branch_if_no_lanes_active, SkRasterPipelineContexts::BranchCtx* ctx) {
-    return any(execution_mask()) ? 1 : ctx->offset;
-}
-
-HIGHP_BRANCH_STAGE(jump, SkRasterPipelineContexts::BranchCtx* ctx) { return ctx->offset; }
-
-HIGHP_BRANCH_STAGE(branch_if_no_active_lanes_eq, SkRasterPipelineContexts::BranchIfEqualCtx* ctx) {
-    // Compare each lane against the expected value...
-    I32 match = cond_to_mask(*(const I32*)ctx->ptr == ctx->value);
-    // ... but mask off lanes that aren't executing.
-    match &= execution_mask();
-    // If any lanes matched, don't take the branch.
-    return any(match) ? 1 : ctx->offset;
-}
-
-HIGHP_TAIL_STAGE(copy_uniform, SkRasterPipelineContexts::UniformCtx* ctx) {
-    const int* src = ctx->src;
-    I32* dst = (I32*)ctx->dst;
-    dst[0] = I32_(src[0]);
-}
-HIGHP_TAIL_STAGE(copy_2_uniforms, SkRasterPipelineContexts::UniformCtx* ctx) {
-    const int* src = ctx->src;
-    I32* dst = (I32*)ctx->dst;
-    dst[0] = I32_(src[0]);
-    dst[1] = I32_(src[1]);
-}
-HIGHP_TAIL_STAGE(copy_3_uniforms, SkRasterPipelineContexts::UniformCtx* ctx) {
-    const int* src = ctx->src;
-    I32* dst = (I32*)ctx->dst;
-    dst[0] = I32_(src[0]);
-    dst[1] = I32_(src[1]);
-    dst[2] = I32_(src[2]);
-}
-HIGHP_TAIL_STAGE(copy_4_uniforms, SkRasterPipelineContexts::UniformCtx* ctx) {
-    const int* src = ctx->src;
-    I32* dst = (I32*)ctx->dst;
-    dst[0] = I32_(src[0]);
-    dst[1] = I32_(src[1]);
-    dst[2] = I32_(src[2]);
-    dst[3] = I32_(src[3]);
-}
-
-HIGHP_TAIL_STAGE(copy_constant, SkRasterPipelineContexts::ConstantCtx* packed) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    I32* dst = (I32*)(base + ctx.dst);
-    I32 value = I32_(ctx.value);
-    dst[0] = value;
-}
-HIGHP_TAIL_STAGE(splat_2_constants, SkRasterPipelineContexts::ConstantCtx* packed) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    I32* dst = (I32*)(base + ctx.dst);
-    I32 value = I32_(ctx.value);
-    dst[0] = dst[1] = value;
-}
-HIGHP_TAIL_STAGE(splat_3_constants, SkRasterPipelineContexts::ConstantCtx* packed) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    I32* dst = (I32*)(base + ctx.dst);
-    I32 value = I32_(ctx.value);
-    dst[0] = dst[1] = dst[2] = value;
-}
-HIGHP_TAIL_STAGE(splat_4_constants, SkRasterPipelineContexts::ConstantCtx* packed) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    I32* dst = (I32*)(base + ctx.dst);
-    I32 value = I32_(ctx.value);
-    dst[0] = dst[1] = dst[2] = dst[3] = value;
-}
-
-template <int NumSlots>
-SI void copy_n_slots_unmasked_fn(SkRasterPipelineContexts::BinaryOpCtx* packed, std::byte* base) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    F* dst = (F*)(base + ctx.dst);
-    F* src = (F*)(base + ctx.src);
-    memcpy(dst, src, sizeof(F) * NumSlots);
-}
-
-HIGHP_TAIL_STAGE(copy_slot_unmasked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_slots_unmasked_fn<1>(packed, base);
-}
-HIGHP_TAIL_STAGE(copy_2_slots_unmasked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_slots_unmasked_fn<2>(packed, base);
-}
-HIGHP_TAIL_STAGE(copy_3_slots_unmasked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_slots_unmasked_fn<3>(packed, base);
-}
-HIGHP_TAIL_STAGE(copy_4_slots_unmasked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_slots_unmasked_fn<4>(packed, base);
-}
-
-template <int NumSlots>
-SI void copy_n_immutable_unmasked_fn(SkRasterPipelineContexts::BinaryOpCtx* packed,
-                                     std::byte* base) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-
-    // Load the scalar values.
-    float* src = (float*)(base + ctx.src);
-    float values[NumSlots];
-    SK_UNROLL for (int index = 0; index < NumSlots; ++index) {
-        values[index] = src[index];
-    }
-    // Broadcast the scalars into the destination.
-    F* dst = (F*)(base + ctx.dst);
-    SK_UNROLL for (int index = 0; index < NumSlots; ++index) {
-        dst[index] = F_(values[index]);
-    }
-}
-
-HIGHP_TAIL_STAGE(copy_immutable_unmasked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_immutable_unmasked_fn<1>(packed, base);
-}
-HIGHP_TAIL_STAGE(copy_2_immutables_unmasked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_immutable_unmasked_fn<2>(packed, base);
-}
-HIGHP_TAIL_STAGE(copy_3_immutables_unmasked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_immutable_unmasked_fn<3>(packed, base);
-}
-HIGHP_TAIL_STAGE(copy_4_immutables_unmasked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_immutable_unmasked_fn<4>(packed, base);
-}
-
-template <int NumSlots>
-SI void copy_n_slots_masked_fn(SkRasterPipelineContexts::BinaryOpCtx* packed,
-                               std::byte* base,
-                               I32 mask) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    I32* dst = (I32*)(base + ctx.dst);
-    I32* src = (I32*)(base + ctx.src);
-    SK_UNROLL for (int count = 0; count < NumSlots; ++count) {
-        *dst = if_then_else(mask, *src, *dst);
-        dst += 1;
-        src += 1;
-    }
-}
-
-HIGHP_TAIL_STAGE(copy_slot_masked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_slots_masked_fn<1>(packed, base, execution_mask());
-}
-HIGHP_TAIL_STAGE(copy_2_slots_masked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_slots_masked_fn<2>(packed, base, execution_mask());
-}
-HIGHP_TAIL_STAGE(copy_3_slots_masked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_slots_masked_fn<3>(packed, base, execution_mask());
-}
-HIGHP_TAIL_STAGE(copy_4_slots_masked, SkRasterPipelineContexts::BinaryOpCtx* packed) {
-    copy_n_slots_masked_fn<4>(packed, base, execution_mask());
-}
-
-template <int LoopCount, typename OffsetType>
-SI void shuffle_fn(std::byte* ptr, OffsetType* offsets, int numSlots) {
-    F scratch[16];
-    SK_UNROLL for (int count = 0; count < LoopCount; ++count) {
-        scratch[count] = *(F*)(ptr + offsets[count]);
-    }
-    // Surprisingly, this switch generates significantly better code than a memcpy (on x86-64) when
-    // the number of slots is unknown at compile time, and generates roughly identical code when the
-    // number of slots is hardcoded. Using a switch allows `scratch` to live in ymm0-ymm15 instead
-    // of being written out to the stack and then read back in. Also, the intrinsic memcpy assumes
-    // that `numSlots` could be arbitrarily large, and so it emits more code than we need.
-    F* dst = (F*)ptr;
-    switch (numSlots) {
-        case 16: dst[15] = scratch[15]; [[fallthrough]];
-        case 15: dst[14] = scratch[14]; [[fallthrough]];
-        case 14: dst[13] = scratch[13]; [[fallthrough]];
-        case 13: dst[12] = scratch[12]; [[fallthrough]];
-        case 12: dst[11] = scratch[11]; [[fallthrough]];
-        case 11: dst[10] = scratch[10]; [[fallthrough]];
-        case 10: dst[ 9] = scratch[ 9]; [[fallthrough]];
-        case  9: dst[ 8] = scratch[ 8]; [[fallthrough]];
-        case  8: dst[ 7] = scratch[ 7]; [[fallthrough]];
-        case  7: dst[ 6] = scratch[ 6]; [[fallthrough]];
-        case  6: dst[ 5] = scratch[ 5]; [[fallthrough]];
-        case  5: dst[ 4] = scratch[ 4]; [[fallthrough]];
-        case  4: dst[ 3] = scratch[ 3]; [[fallthrough]];
-        case  3: dst[ 2] = scratch[ 2]; [[fallthrough]];
-        case  2: dst[ 1] = scratch[ 1]; [[fallthrough]];
-        case  1: dst[ 0] = scratch[ 0];
-    }
-}
-
-template <int N>
-SI void small_swizzle_fn(SkRasterPipelineContexts::SwizzleCtx* packed, std::byte* base) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    shuffle_fn<N>(base + ctx.dst, ctx.offsets, N);
-}
-
-HIGHP_TAIL_STAGE(swizzle_1, SkRasterPipelineContexts::SwizzleCtx* packed) {
-    small_swizzle_fn<1>(packed, base);
-}
-HIGHP_TAIL_STAGE(swizzle_2, SkRasterPipelineContexts::SwizzleCtx* packed) {
-    small_swizzle_fn<2>(packed, base);
-}
-HIGHP_TAIL_STAGE(swizzle_3, SkRasterPipelineContexts::SwizzleCtx* packed) {
-    small_swizzle_fn<3>(packed, base);
-}
-HIGHP_TAIL_STAGE(swizzle_4, SkRasterPipelineContexts::SwizzleCtx* packed) {
-    small_swizzle_fn<4>(packed, base);
-}
-HIGHP_TAIL_STAGE(shuffle, SkRasterPipelineContexts::ShuffleCtx* ctx) {
-    shuffle_fn<16>((std::byte*)ctx->ptr, ctx->offsets, ctx->count);
-}
-
-template <int NumSlots>
-SI void swizzle_copy_masked_fn(I32* dst, const I32* src, uint16_t* offsets, I32 mask) {
-    std::byte* dstB = (std::byte*)dst;
-    SK_UNROLL for (int count = 0; count < NumSlots; ++count) {
-        I32* dstS = (I32*)(dstB + *offsets);
-        *dstS = if_then_else(mask, *src, *dstS);
-        offsets += 1;
-        src     += 1;
-    }
-}
-
-HIGHP_TAIL_STAGE(swizzle_copy_slot_masked, SkRasterPipelineContexts::SwizzleCopyCtx* ctx) {
-    swizzle_copy_masked_fn<1>((I32*)ctx->dst, (const I32*)ctx->src, ctx->offsets, execution_mask());
-}
-HIGHP_TAIL_STAGE(swizzle_copy_2_slots_masked, SkRasterPipelineContexts::SwizzleCopyCtx* ctx) {
-    swizzle_copy_masked_fn<2>((I32*)ctx->dst, (const I32*)ctx->src, ctx->offsets, execution_mask());
-}
-HIGHP_TAIL_STAGE(swizzle_copy_3_slots_masked, SkRasterPipelineContexts::SwizzleCopyCtx* ctx) {
-    swizzle_copy_masked_fn<3>((I32*)ctx->dst, (const I32*)ctx->src, ctx->offsets, execution_mask());
-}
-HIGHP_TAIL_STAGE(swizzle_copy_4_slots_masked, SkRasterPipelineContexts::SwizzleCopyCtx* ctx) {
-    swizzle_copy_masked_fn<4>((I32*)ctx->dst, (const I32*)ctx->src, ctx->offsets, execution_mask());
-}
-
-HIGHP_TAIL_STAGE(copy_from_indirect_unmasked, SkRasterPipelineContexts::CopyIndirectCtx* ctx) {
-    // Clamp the indirect offsets to stay within the limit.
-    U32 offsets = *(const U32*)ctx->indirectOffset;
-    offsets = min(offsets, U32_(ctx->indirectLimit));
-
-    // Scale up the offsets to account for the N lanes per value.
-    offsets *= N;
-
-    // Adjust the offsets forward so that they fetch from the correct lane.
-    static constexpr uint32_t iota[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-    static_assert(std::size(iota) >= SkRasterPipelineContexts::kMaxStride_highp);
-    offsets += sk_unaligned_load<U32>(iota);
-
-    // Use gather to perform indirect lookups; write the results into `dst`.
-    const int* src = ctx->src;
-    I32*       dst = (I32*)ctx->dst;
-    I32*       end = dst + ctx->slots;
-    do {
-        *dst = gather(src, offsets);
-        dst += 1;
-        src += N;
-    } while (dst != end);
-}
-
-HIGHP_TAIL_STAGE(copy_from_indirect_uniform_unmasked,
-                 SkRasterPipelineContexts::CopyIndirectCtx* ctx) {
-    // Clamp the indirect offsets to stay within the limit.
-    U32 offsets = *(const U32*)ctx->indirectOffset;
-    offsets = min(offsets, U32_(ctx->indirectLimit));
-
-    // Use gather to perform indirect lookups; write the results into `dst`.
-    const int* src = ctx->src;
-    I32*       dst = (I32*)ctx->dst;
-    I32*       end = dst + ctx->slots;
-    do {
-        *dst = gather(src, offsets);
-        dst += 1;
-        src += 1;
-    } while (dst != end);
-}
-
-HIGHP_TAIL_STAGE(copy_to_indirect_masked, SkRasterPipelineContexts::CopyIndirectCtx* ctx) {
-    // Clamp the indirect offsets to stay within the limit.
-    U32 offsets = *(const U32*)ctx->indirectOffset;
-    offsets = min(offsets, U32_(ctx->indirectLimit));
-
-    // Scale up the offsets to account for the N lanes per value.
-    offsets *= N;
-
-    // Adjust the offsets forward so that they store into the correct lane.
-    static constexpr uint32_t iota[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-    static_assert(std::size(iota) >= SkRasterPipelineContexts::kMaxStride_highp);
-    offsets += sk_unaligned_load<U32>(iota);
-
-    // Perform indirect, masked writes into `dst`.
-    const I32* src = (const I32*)ctx->src;
-    const I32* end = src + ctx->slots;
-    int*       dst = ctx->dst;
-    I32        mask = execution_mask();
-    do {
-        scatter_masked(*src, dst, offsets, mask);
-        dst += N;
-        src += 1;
-    } while (src != end);
-}
-
-HIGHP_TAIL_STAGE(swizzle_copy_to_indirect_masked,
-                 SkRasterPipelineContexts::SwizzleCopyIndirectCtx* ctx) {
-    // Clamp the indirect offsets to stay within the limit.
-    U32 offsets = *(const U32*)ctx->indirectOffset;
-    offsets = min(offsets, U32_(ctx->indirectLimit));
-
-    // Scale up the offsets to account for the N lanes per value.
-    offsets *= N;
-
-    // Adjust the offsets forward so that they store into the correct lane.
-    static constexpr uint32_t iota[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-    static_assert(std::size(iota) >= SkRasterPipelineContexts::kMaxStride_highp);
-    offsets += sk_unaligned_load<U32>(iota);
-
-    // Perform indirect, masked, swizzled writes into `dst`.
-    const I32*      src   = (const I32*)ctx->src;
-    const I32*      end   = src + ctx->slots;
-    std::byte*      dstB    = (std::byte*)ctx->dst;
-    const uint16_t* swizzle = ctx->offsets;
-    I32             mask    = execution_mask();
-    do {
-        int* dst = (int*)(dstB + *swizzle);
-        scatter_masked(*src, dst, offsets, mask);
-        swizzle += 1;
-        src     += 1;
-    } while (src != end);
-}
-
-// Unary operations take a single input, and overwrite it with their output.
-// Unlike binary or ternary operations, we provide variations of 1-4 slots, but don't provide
-// an arbitrary-width "n-slot" variation; the Builder can chain together longer sequences manually.
-template <typename T, void (*ApplyFn)(T*)>
-SI void apply_adjacent_unary(T* dst, T* end) {
-    do {
-        ApplyFn(dst);
-        dst += 1;
-    } while (dst != end);
-}
-
-#if defined(SKRP_CPU_SCALAR)
-template <typename T>
-SI void cast_to_float_from_fn(T* dst) {
-    *dst = sk_bit_cast<T>((F)*dst);
-}
-SI void cast_to_int_from_fn(F* dst) {
-    *dst = sk_bit_cast<F>((I32)*dst);
-}
-SI void cast_to_uint_from_fn(F* dst) {
-    *dst = sk_bit_cast<F>((U32)*dst);
-}
-#else
-template <typename T>
-SI void cast_to_float_from_fn(T* dst) {
-    *dst = sk_bit_cast<T>(__builtin_convertvector(*dst, F));
-}
-SI void cast_to_int_from_fn(F* dst) {
-    *dst = sk_bit_cast<F>(__builtin_convertvector(*dst, I32));
-}
-SI void cast_to_uint_from_fn(F* dst) {
-    *dst = sk_bit_cast<F>(__builtin_convertvector(*dst, U32));
-}
-#endif
-
-SI void abs_fn(I32* dst) {
-    *dst = abs_(*dst);
-}
-
-SI void floor_fn(F* dst) {
-    *dst = floor_(*dst);
-}
-
-SI void ceil_fn(F* dst) {
-    *dst = ceil_(*dst);
-}
-
-SI void invsqrt_fn(F* dst) {
-    *dst = rsqrt(*dst);
-}
-
-#define DECLARE_UNARY_FLOAT(name)                                                              \
-    HIGHP_TAIL_STAGE(name##_float, F* dst) { apply_adjacent_unary<F, &name##_fn>(dst, dst + 1); }    \
-    HIGHP_TAIL_STAGE(name##_2_floats, F* dst) { apply_adjacent_unary<F, &name##_fn>(dst, dst + 2); } \
-    HIGHP_TAIL_STAGE(name##_3_floats, F* dst) { apply_adjacent_unary<F, &name##_fn>(dst, dst + 3); } \
-    HIGHP_TAIL_STAGE(name##_4_floats, F* dst) { apply_adjacent_unary<F, &name##_fn>(dst, dst + 4); }
-
-#define DECLARE_UNARY_INT(name)                                                                  \
-    HIGHP_TAIL_STAGE(name##_int, I32* dst) { apply_adjacent_unary<I32, &name##_fn>(dst, dst + 1); }    \
-    HIGHP_TAIL_STAGE(name##_2_ints, I32* dst) { apply_adjacent_unary<I32, &name##_fn>(dst, dst + 2); } \
-    HIGHP_TAIL_STAGE(name##_3_ints, I32* dst) { apply_adjacent_unary<I32, &name##_fn>(dst, dst + 3); } \
-    HIGHP_TAIL_STAGE(name##_4_ints, I32* dst) { apply_adjacent_unary<I32, &name##_fn>(dst, dst + 4); }
-
-#define DECLARE_UNARY_UINT(name)                                                                  \
-    HIGHP_TAIL_STAGE(name##_uint, U32* dst) { apply_adjacent_unary<U32, &name##_fn>(dst, dst + 1); }    \
-    HIGHP_TAIL_STAGE(name##_2_uints, U32* dst) { apply_adjacent_unary<U32, &name##_fn>(dst, dst + 2); } \
-    HIGHP_TAIL_STAGE(name##_3_uints, U32* dst) { apply_adjacent_unary<U32, &name##_fn>(dst, dst + 3); } \
-    HIGHP_TAIL_STAGE(name##_4_uints, U32* dst) { apply_adjacent_unary<U32, &name##_fn>(dst, dst + 4); }
-
-DECLARE_UNARY_INT(cast_to_float_from) DECLARE_UNARY_UINT(cast_to_float_from)
-DECLARE_UNARY_FLOAT(cast_to_int_from)
-DECLARE_UNARY_FLOAT(cast_to_uint_from)
-DECLARE_UNARY_FLOAT(floor)
-DECLARE_UNARY_FLOAT(ceil)
-DECLARE_UNARY_FLOAT(invsqrt)
-DECLARE_UNARY_INT(abs)
-
-#undef DECLARE_UNARY_FLOAT
-#undef DECLARE_UNARY_INT
-#undef DECLARE_UNARY_UINT
-
-// For complex unary ops, we only provide a 1-slot version to reduce code bloat.
-HIGHP_TAIL_STAGE(sin_float, F* dst)  { *dst = sin_(*dst); }
-HIGHP_TAIL_STAGE(cos_float, F* dst)  { *dst = cos_(*dst); }
-HIGHP_TAIL_STAGE(tan_float, F* dst)  { *dst = tan_(*dst); }
-HIGHP_TAIL_STAGE(asin_float, F* dst) { *dst = asin_(*dst); }
-HIGHP_TAIL_STAGE(acos_float, F* dst) { *dst = acos_(*dst); }
-HIGHP_TAIL_STAGE(atan_float, F* dst) { *dst = atan_(*dst); }
-HIGHP_TAIL_STAGE(sqrt_float, F* dst) { *dst = sqrt_(*dst); }
-HIGHP_TAIL_STAGE(exp_float, F* dst)  { *dst = approx_exp(*dst); }
-HIGHP_TAIL_STAGE(exp2_float, F* dst) { *dst = approx_pow2(*dst); }
-HIGHP_TAIL_STAGE(log_float, F* dst)  { *dst = approx_log(*dst); }
-HIGHP_TAIL_STAGE(log2_float, F* dst) { *dst = approx_log2(*dst); }
-
-HIGHP_TAIL_STAGE(inverse_mat2, F* dst) {
-    F a00 = dst[0], a01 = dst[1],
-      a10 = dst[2], a11 = dst[3];
-    F det = nmad(a01, a10, a00 * a11),
-      invdet = rcp_precise(det);
-    dst[0] =  invdet * a11;
-    dst[1] = -invdet * a01;
-    dst[2] = -invdet * a10;
-    dst[3] =  invdet * a00;
-}
-
-HIGHP_TAIL_STAGE(inverse_mat3, F* dst) {
-    F a00 = dst[0], a01 = dst[1], a02 = dst[2],
-      a10 = dst[3], a11 = dst[4], a12 = dst[5],
-      a20 = dst[6], a21 = dst[7], a22 = dst[8];
-    F b01 = nmad(a12, a21, a22 * a11),
-      b11 = nmad(a22, a10, a12 * a20),
-      b21 = nmad(a11, a20, a21 * a10);
-    F det = mad(a00, b01, mad(a01, b11, a02 * b21)),
-      invdet = rcp_precise(det);
-    dst[0] = invdet * b01;
-    dst[1] = invdet * nmad(a22, a01, a02 * a21);
-    dst[2] = invdet * nmad(a02, a11, a12 * a01);
-    dst[3] = invdet * b11;
-    dst[4] = invdet * nmad(a02, a20, a22 * a00);
-    dst[5] = invdet * nmad(a12, a00, a02 * a10);
-    dst[6] = invdet * b21;
-    dst[7] = invdet * nmad(a21, a00, a01 * a20);
-    dst[8] = invdet * nmad(a01, a10, a11 * a00);
-}
-
-HIGHP_TAIL_STAGE(inverse_mat4, F* dst) {
-    F a00 = dst[0],  a01 = dst[1],  a02 = dst[2],  a03 = dst[3],
-      a10 = dst[4],  a11 = dst[5],  a12 = dst[6],  a13 = dst[7],
-      a20 = dst[8],  a21 = dst[9],  a22 = dst[10], a23 = dst[11],
-      a30 = dst[12], a31 = dst[13], a32 = dst[14], a33 = dst[15];
-    F b00 = nmad(a01, a10, a00 * a11),
-      b01 = nmad(a02, a10, a00 * a12),
-      b02 = nmad(a03, a10, a00 * a13),
-      b03 = nmad(a02, a11, a01 * a12),
-      b04 = nmad(a03, a11, a01 * a13),
-      b05 = nmad(a03, a12, a02 * a13),
-      b06 = nmad(a21, a30, a20 * a31),
-      b07 = nmad(a22, a30, a20 * a32),
-      b08 = nmad(a23, a30, a20 * a33),
-      b09 = nmad(a22, a31, a21 * a32),
-      b10 = nmad(a23, a31, a21 * a33),
-      b11 = nmad(a23, a32, a22 * a33),
-      det = mad(b00, b11, b05 * b06) + mad(b02, b09, b03 * b08) - mad(b01, b10, b04 * b07),
-      invdet = rcp_precise(det);
-    b00 *= invdet;
-    b01 *= invdet;
-    b02 *= invdet;
-    b03 *= invdet;
-    b04 *= invdet;
-    b05 *= invdet;
-    b06 *= invdet;
-    b07 *= invdet;
-    b08 *= invdet;
-    b09 *= invdet;
-    b10 *= invdet;
-    b11 *= invdet;
-    dst[0]  =  mad(a13, b09, nmad(a12, b10, a11*b11));
-    dst[1]  = nmad(a03, b09, nmad(a01, b11, a02*b10));
-    dst[2]  =  mad(a33, b03, nmad(a32, b04, a31*b05));
-    dst[3]  = nmad(a23, b03, nmad(a21, b05, a22*b04));
-    dst[4]  = nmad(a13, b07, nmad(a10, b11, a12*b08));
-    dst[5]  =  mad(a03, b07, nmad(a02, b08, a00*b11));
-    dst[6]  = nmad(a33, b01, nmad(a30, b05, a32*b02));
-    dst[7]  =  mad(a23, b01, nmad(a22, b02, a20*b05));
-    dst[8]  =  mad(a13, b06, nmad(a11, b08, a10*b10));
-    dst[9]  = nmad(a03, b06, nmad(a00, b10, a01*b08));
-    dst[10] =  mad(a33, b00, nmad(a31, b02, a30*b04));
-    dst[11] = nmad(a23, b00, nmad(a20, b04, a21*b02));
-    dst[12] = nmad(a12, b06, nmad(a10, b09, a11*b07));
-    dst[13] =  mad(a02, b06, nmad(a01, b07, a00*b09));
-    dst[14] = nmad(a32, b00, nmad(a30, b03, a31*b01));
-    dst[15] =  mad(a22, b00, nmad(a21, b01, a20*b03));
-}
-
-// Binary operations take two adjacent inputs, and write their output in the first position.
-template <typename T, void (*ApplyFn)(T*, T*)>
-SI void apply_adjacent_binary(T* dst, T* src) {
-    T* end = src;
-    do {
-        ApplyFn(dst, src);
-        dst += 1;
-        src += 1;
-    } while (dst != end);
-}
-
-template <typename T, void (*ApplyFn)(T*, T*)>
-SI void apply_adjacent_binary_packed(SkRasterPipelineContexts::BinaryOpCtx* packed,
-                                     std::byte* base) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    std::byte* dst = base + ctx.dst;
-    std::byte* src = base + ctx.src;
-    apply_adjacent_binary<T, ApplyFn>((T*)dst, (T*)src);
-}
-
-template <int N, typename V, typename S, void (*ApplyFn)(V*, V*)>
-SI void apply_binary_immediate(SkRasterPipelineContexts::ConstantCtx* packed, std::byte* base) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    V* dst = (V*)(base + ctx.dst);         // get a pointer to the destination
-    S scalar = sk_bit_cast<S>(ctx.value);  // bit-pun the constant value as desired
-    V src = scalar - V();                  // broadcast the constant value into a vector
-    SK_UNROLL for (int index = 0; index < N; ++index) {
-        ApplyFn(dst, &src);                // perform the operation
-        dst += 1;
-    }
-}
-
-template <typename T>
-SI void add_fn(T* dst, T* src) {
-    *dst += *src;
-}
-
-template <typename T>
-SI void sub_fn(T* dst, T* src) {
-    *dst -= *src;
-}
-
-template <typename T>
-SI void mul_fn(T* dst, T* src) {
-    *dst *= *src;
-}
-
-SI void div_fn(F* dst, F* src) {
-    *dst /= *src;
-}
-
-// For some architectures, we are able to write code that vectorizes better for bulk integer
-// divisions. If we didn't define that above, use a general-purpose version.
-#ifndef SKRP_SUPPORTS_OPTIMIZED_DIV_INT
-SI void div_fn(I32* dst, I32* src) {
-    I32 divisor = *src;
-    // Integer division crashes when we divide by 0, but we can divide by -1 to not crash (the
-    // result will be non-sensical). The mask will be 0xFFFFFFF if true, which happens to be -1.
-    divisor |= ((I32)cond_to_mask(divisor == 0));
-    // Dividing by -1 works for all numerators *except* INT_MIN, so we can add -1 once more if
-    // we are in that case.
-    divisor += ((I32)cond_to_mask(divisor == -1 && *dst == std::numeric_limits<int32_t>::lowest()));
-    *dst /= divisor;
-}
-#endif
-
-#ifndef SKRP_SUPPORTS_OPTIMIZED_DIV_UINT
-SI void div_fn(U32* dst, U32* src) {
-    U32 divisor = *src;
-    // Integer division crashes when we divide by 0, but we can divide by something else to not
-    // crash (the result will be non-sensical). The mask will be 0xFFFFFFF if true.
-    divisor |= ((U32)cond_to_mask(divisor == 0));
-    *dst /= divisor;
-}
-#endif
-#undef SKRP_SUPPORTS_OPTIMIZED_DIV_INT
-#undef SKRP_SUPPORTS_OPTIMIZED_DIV_UINT
-
-SI void bitwise_and_fn(I32* dst, I32* src) {
-    *dst &= *src;
-}
-
-SI void bitwise_or_fn(I32* dst, I32* src) {
-    *dst |= *src;
-}
-
-SI void bitwise_xor_fn(I32* dst, I32* src) {
-    *dst ^= *src;
-}
-
-template <typename T>
-SI void max_fn(T* dst, T* src) {
-    *dst = max(*dst, *src);
-}
-
-template <typename T>
-SI void min_fn(T* dst, T* src) {
-    *dst = min(*dst, *src);
-}
-
-template <typename T>
-SI void cmplt_fn(T* dst, T* src) {
-    static_assert(sizeof(T) == sizeof(I32));
-    I32 result = cond_to_mask(*dst < *src);
-    memcpy(dst, &result, sizeof(I32));
-}
-
-template <typename T>
-SI void cmple_fn(T* dst, T* src) {
-    static_assert(sizeof(T) == sizeof(I32));
-    I32 result = cond_to_mask(*dst <= *src);
-    memcpy(dst, &result, sizeof(I32));
-}
-
-template <typename T>
-SI void cmpeq_fn(T* dst, T* src) {
-    static_assert(sizeof(T) == sizeof(I32));
-    I32 result = cond_to_mask(*dst == *src);
-    memcpy(dst, &result, sizeof(I32));
-}
-
-template <typename T>
-SI void cmpne_fn(T* dst, T* src) {
-    static_assert(sizeof(T) == sizeof(I32));
-    I32 result = cond_to_mask(*dst != *src);
-    memcpy(dst, &result, sizeof(I32));
-}
-
-SI void atan2_fn(F* dst, F* src) {
-    *dst = atan2_(*dst, *src);
-}
-
-SI void pow_fn(F* dst, F* src) {
-    *dst = approx_powf(*dst, *src);
-}
-
-SI void mod_fn(F* dst, F* src) {
-    *dst = nmad(*src, floor_(*dst / *src), *dst);
-}
-
-#define DECLARE_N_WAY_BINARY_FLOAT(name)                                               \
-    HIGHP_TAIL_STAGE(name##_n_floats, SkRasterPipelineContexts::BinaryOpCtx* packed) { \
-        apply_adjacent_binary_packed<F, &name##_fn>(packed, base);                     \
-    }
-
-#define DECLARE_BINARY_FLOAT(name)                                                              \
-    HIGHP_TAIL_STAGE(name##_float, F* dst) { apply_adjacent_binary<F, &name##_fn>(dst, dst + 1); }    \
-    HIGHP_TAIL_STAGE(name##_2_floats, F* dst) { apply_adjacent_binary<F, &name##_fn>(dst, dst + 2); } \
-    HIGHP_TAIL_STAGE(name##_3_floats, F* dst) { apply_adjacent_binary<F, &name##_fn>(dst, dst + 3); } \
-    HIGHP_TAIL_STAGE(name##_4_floats, F* dst) { apply_adjacent_binary<F, &name##_fn>(dst, dst + 4); } \
-    DECLARE_N_WAY_BINARY_FLOAT(name)
-
-#define DECLARE_N_WAY_BINARY_INT(name)                                               \
-    HIGHP_TAIL_STAGE(name##_n_ints, SkRasterPipelineContexts::BinaryOpCtx* packed) { \
-        apply_adjacent_binary_packed<I32, &name##_fn>(packed, base);                 \
-    }
-
-#define DECLARE_BINARY_INT(name)                                                                  \
-    HIGHP_TAIL_STAGE(name##_int, I32* dst) { apply_adjacent_binary<I32, &name##_fn>(dst, dst + 1); }    \
-    HIGHP_TAIL_STAGE(name##_2_ints, I32* dst) { apply_adjacent_binary<I32, &name##_fn>(dst, dst + 2); } \
-    HIGHP_TAIL_STAGE(name##_3_ints, I32* dst) { apply_adjacent_binary<I32, &name##_fn>(dst, dst + 3); } \
-    HIGHP_TAIL_STAGE(name##_4_ints, I32* dst) { apply_adjacent_binary<I32, &name##_fn>(dst, dst + 4); } \
-    DECLARE_N_WAY_BINARY_INT(name)
-
-#define DECLARE_N_WAY_BINARY_UINT(name)                                               \
-    HIGHP_TAIL_STAGE(name##_n_uints, SkRasterPipelineContexts::BinaryOpCtx* packed) { \
-        apply_adjacent_binary_packed<U32, &name##_fn>(packed, base);                  \
-    }
-
-#define DECLARE_BINARY_UINT(name)                                                                  \
-    HIGHP_TAIL_STAGE(name##_uint, U32* dst) { apply_adjacent_binary<U32, &name##_fn>(dst, dst + 1); }    \
-    HIGHP_TAIL_STAGE(name##_2_uints, U32* dst) { apply_adjacent_binary<U32, &name##_fn>(dst, dst + 2); } \
-    HIGHP_TAIL_STAGE(name##_3_uints, U32* dst) { apply_adjacent_binary<U32, &name##_fn>(dst, dst + 3); } \
-    HIGHP_TAIL_STAGE(name##_4_uints, U32* dst) { apply_adjacent_binary<U32, &name##_fn>(dst, dst + 4); } \
-    DECLARE_N_WAY_BINARY_UINT(name)
-
-// Many ops reuse the int stages when performing uint arithmetic, since they're equivalent on a
-// two's-complement machine. (Even multiplication is equivalent in the lower 32 bits.)
-DECLARE_BINARY_FLOAT(add)    DECLARE_BINARY_INT(add)
-DECLARE_BINARY_FLOAT(sub)    DECLARE_BINARY_INT(sub)
-DECLARE_BINARY_FLOAT(mul)    DECLARE_BINARY_INT(mul)
-DECLARE_BINARY_FLOAT(div)    DECLARE_BINARY_INT(div)    DECLARE_BINARY_UINT(div)
-                             DECLARE_BINARY_INT(bitwise_and)
-                             DECLARE_BINARY_INT(bitwise_or)
-                             DECLARE_BINARY_INT(bitwise_xor)
-DECLARE_BINARY_FLOAT(mod)
-DECLARE_BINARY_FLOAT(min)    DECLARE_BINARY_INT(min)    DECLARE_BINARY_UINT(min)
-DECLARE_BINARY_FLOAT(max)    DECLARE_BINARY_INT(max)    DECLARE_BINARY_UINT(max)
-DECLARE_BINARY_FLOAT(cmplt)  DECLARE_BINARY_INT(cmplt)  DECLARE_BINARY_UINT(cmplt)
-DECLARE_BINARY_FLOAT(cmple)  DECLARE_BINARY_INT(cmple)  DECLARE_BINARY_UINT(cmple)
-DECLARE_BINARY_FLOAT(cmpeq)  DECLARE_BINARY_INT(cmpeq)
-DECLARE_BINARY_FLOAT(cmpne)  DECLARE_BINARY_INT(cmpne)
-
-// Sufficiently complex ops only provide an N-way version, to avoid code bloat from the dedicated
-// 1-4 slot versions.
-DECLARE_N_WAY_BINARY_FLOAT(atan2)
-DECLARE_N_WAY_BINARY_FLOAT(pow)
-
-// Some ops have an optimized version when the right-side is an immediate value.
-#define DECLARE_IMM_BINARY_FLOAT(name)                                                  \
-    HIGHP_TAIL_STAGE(name##_imm_float, SkRasterPipelineContexts::ConstantCtx* packed) { \
-        apply_binary_immediate<1, F, float, &name##_fn>(packed, base);                  \
-    }
-#define DECLARE_IMM_BINARY_INT(name)                                                  \
-    HIGHP_TAIL_STAGE(name##_imm_int, SkRasterPipelineContexts::ConstantCtx* packed) { \
-        apply_binary_immediate<1, I32, int32_t, &name##_fn>(packed, base);            \
-    }
-#define DECLARE_MULTI_IMM_BINARY_INT(name)                                               \
-    HIGHP_TAIL_STAGE(name##_imm_int, SkRasterPipelineContexts::ConstantCtx* packed) {    \
-        apply_binary_immediate<1, I32, int32_t, &name##_fn>(packed, base);               \
-    }                                                                                    \
-    HIGHP_TAIL_STAGE(name##_imm_2_ints, SkRasterPipelineContexts::ConstantCtx* packed) { \
-        apply_binary_immediate<2, I32, int32_t, &name##_fn>(packed, base);               \
-    }                                                                                    \
-    HIGHP_TAIL_STAGE(name##_imm_3_ints, SkRasterPipelineContexts::ConstantCtx* packed) { \
-        apply_binary_immediate<3, I32, int32_t, &name##_fn>(packed, base);               \
-    }                                                                                    \
-    HIGHP_TAIL_STAGE(name##_imm_4_ints, SkRasterPipelineContexts::ConstantCtx* packed) { \
-        apply_binary_immediate<4, I32, int32_t, &name##_fn>(packed, base);               \
-    }
-#define DECLARE_IMM_BINARY_UINT(name)                                                  \
-    HIGHP_TAIL_STAGE(name##_imm_uint, SkRasterPipelineContexts::ConstantCtx* packed) { \
-        apply_binary_immediate<1, U32, uint32_t, &name##_fn>(packed, base);            \
-    }
-
-DECLARE_IMM_BINARY_FLOAT(add)   DECLARE_IMM_BINARY_INT(add)
-DECLARE_IMM_BINARY_FLOAT(mul)   DECLARE_IMM_BINARY_INT(mul)
-                                DECLARE_MULTI_IMM_BINARY_INT(bitwise_and)
-                                DECLARE_IMM_BINARY_FLOAT(max)
-                                DECLARE_IMM_BINARY_FLOAT(min)
-                                DECLARE_IMM_BINARY_INT(bitwise_xor)
-DECLARE_IMM_BINARY_FLOAT(cmplt) DECLARE_IMM_BINARY_INT(cmplt) DECLARE_IMM_BINARY_UINT(cmplt)
-DECLARE_IMM_BINARY_FLOAT(cmple) DECLARE_IMM_BINARY_INT(cmple) DECLARE_IMM_BINARY_UINT(cmple)
-DECLARE_IMM_BINARY_FLOAT(cmpeq) DECLARE_IMM_BINARY_INT(cmpeq)
-DECLARE_IMM_BINARY_FLOAT(cmpne) DECLARE_IMM_BINARY_INT(cmpne)
-
-#undef DECLARE_MULTI_IMM_BINARY_INT
-#undef DECLARE_IMM_BINARY_FLOAT
-#undef DECLARE_IMM_BINARY_INT
-#undef DECLARE_IMM_BINARY_UINT
-#undef DECLARE_BINARY_FLOAT
-#undef DECLARE_BINARY_INT
-#undef DECLARE_BINARY_UINT
-#undef DECLARE_N_WAY_BINARY_FLOAT
-#undef DECLARE_N_WAY_BINARY_INT
-#undef DECLARE_N_WAY_BINARY_UINT
-
-// Dots can be represented with multiply and add ops, but they are so foundational that it's worth
-// having dedicated ops.
-HIGHP_TAIL_STAGE(dot_2_floats, F* dst) {
-    dst[0] = mad(dst[0],  dst[2],
-                 dst[1] * dst[3]);
-}
-
-HIGHP_TAIL_STAGE(dot_3_floats, F* dst) {
-    dst[0] = mad(dst[0],  dst[3],
-             mad(dst[1],  dst[4],
-                 dst[2] * dst[5]));
-}
-
-HIGHP_TAIL_STAGE(dot_4_floats, F* dst) {
-    dst[0] = mad(dst[0],  dst[4],
-             mad(dst[1],  dst[5],
-             mad(dst[2],  dst[6],
-                 dst[3] * dst[7])));
-}
-
-// MxM, VxM and MxV multiplication all use matrix_multiply. Vectors are treated like a matrix with a
-// single column or row.
-template <int N>
-SI void matrix_multiply(SkRasterPipelineContexts::MatrixMultiplyCtx* packed, std::byte* base) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-
-    int outColumns   = ctx.rightColumns,
-        outRows      = ctx.leftRows;
-
-    SkASSERT(outColumns >= 1);
-    SkASSERT(outRows    >= 1);
-    SkASSERT(outColumns <= 4);
-    SkASSERT(outRows    <= 4);
-
-    SkASSERT(ctx.leftColumns == ctx.rightRows);
-    SkASSERT(N == ctx.leftColumns);  // N should match the result width
-
-#if !defined(SKRP_CPU_SCALAR)
-    // This prevents Clang from generating early-out checks for zero-sized matrices.
-    SK_ASSUME(outColumns >= 1);
-    SK_ASSUME(outRows    >= 1);
-    SK_ASSUME(outColumns <= 4);
-    SK_ASSUME(outRows    <= 4);
-#endif
-
-    // Get pointers to the adjacent left- and right-matrices.
-    F* resultMtx  = (F*)(base + ctx.dst);
-    F* leftMtx    = &resultMtx[ctx.rightColumns * ctx.leftRows];
-    F* rightMtx   = &leftMtx[N * ctx.leftRows];
-
-    // Emit each matrix element.
-    for (int c = 0; c < outColumns; ++c) {
-        for (int r = 0; r < outRows; ++r) {
-            // Dot a vector from leftMtx[*][r] with rightMtx[c][*].
-            F* leftRow     = &leftMtx [r];
-            F* rightColumn = &rightMtx[c * N];
-
-            F element = *leftRow * *rightColumn;
-            for (int idx = 1; idx < N; ++idx) {
-                leftRow     += outRows;
-                rightColumn += 1;
-                element = mad(*leftRow, *rightColumn, element);
-            }
-
-            *resultMtx++ = element;
-        }
-    }
-}
-
-HIGHP_TAIL_STAGE(matrix_multiply_2, SkRasterPipelineContexts::MatrixMultiplyCtx* packed) {
-    matrix_multiply<2>(packed, base);
-}
-
-HIGHP_TAIL_STAGE(matrix_multiply_3, SkRasterPipelineContexts::MatrixMultiplyCtx* packed) {
-    matrix_multiply<3>(packed, base);
-}
-
-HIGHP_TAIL_STAGE(matrix_multiply_4, SkRasterPipelineContexts::MatrixMultiplyCtx* packed) {
-    matrix_multiply<4>(packed, base);
-}
-
-// Refract always operates on 4-wide incident and normal vectors; for narrower inputs, the code
-// generator fills in the input columns with zero, and discards the extra output columns.
-HIGHP_TAIL_STAGE(refract_4_floats, F* dst) {
-    // Algorithm adapted from https://registry.khronos.org/OpenGL-Refpages/gl4/html/refract.xhtml
-    F *incident = dst + 0;
-    F *normal = dst + 4;
-    F eta = dst[8];
-
-    F dotNI = mad(normal[0],  incident[0],
-              mad(normal[1],  incident[1],
-              mad(normal[2],  incident[2],
-                  normal[3] * incident[3])));
-
-    F k = 1.0 - eta * eta * (1.0 - dotNI * dotNI);
-    F sqrt_k = sqrt_(k);
-
-    for (int idx = 0; idx < 4; ++idx) {
-        dst[idx] = if_then_else(k >= 0,
-                                eta * incident[idx] - (eta * dotNI + sqrt_k) * normal[idx],
-                                0.0);
-    }
-}
-
-// Ternary operations work like binary ops (see immediately above) but take two source inputs.
-template <typename T, void (*ApplyFn)(T*, T*, T*)>
-SI void apply_adjacent_ternary(T* dst, T* src0, T* src1) {
-    int count = src0 - dst;
-#if !defined(SKRP_CPU_SCALAR)
-    SK_ASSUME(count >= 1);
-#endif
-
-    for (int index = 0; index < count; ++index) {
-        ApplyFn(dst, src0, src1);
-        dst += 1;
-        src0 += 1;
-        src1 += 1;
-    }
-}
-
-template <typename T, void (*ApplyFn)(T*, T*, T*)>
-SI void apply_adjacent_ternary_packed(SkRasterPipelineContexts::TernaryOpCtx* packed,
-                                      std::byte* base) {
-    auto ctx = SkRPCtxUtils::Unpack(packed);
-    std::byte* dst  = base + ctx.dst;
-    std::byte* src0 = dst  + ctx.delta;
-    std::byte* src1 = src0 + ctx.delta;
-    apply_adjacent_ternary<T, ApplyFn>((T*)dst, (T*)src0, (T*)src1);
-}
-
-SI void mix_fn(F* a, F* x, F* y) {
-    // We reorder the arguments here to match lerp's GLSL-style order (interpolation point last).
-    *a = lerp(*x, *y, *a);
-}
-
-SI void mix_fn(I32* a, I32* x, I32* y) {
-    // We reorder the arguments here to match if_then_else's expected order (y before x).
-    *a = if_then_else(*a, *y, *x);
-}
-
-SI void smoothstep_fn(F* edge0, F* edge1, F* x) {
-    F t = clamp_01_((*x - *edge0) / (*edge1 - *edge0));
-    *edge0 = t * t * (3.0 - 2.0 * t);
-}
-
-#define DECLARE_N_WAY_TERNARY_FLOAT(name)                                               \
-    HIGHP_TAIL_STAGE(name##_n_floats, SkRasterPipelineContexts::TernaryOpCtx* packed) { \
-        apply_adjacent_ternary_packed<F, &name##_fn>(packed, base);                     \
-    }
-
-#define DECLARE_TERNARY_FLOAT(name)                                                           \
-    HIGHP_TAIL_STAGE(name##_float, F* p) { apply_adjacent_ternary<F, &name##_fn>(p, p+1, p+2); }    \
-    HIGHP_TAIL_STAGE(name##_2_floats, F* p) { apply_adjacent_ternary<F, &name##_fn>(p, p+2, p+4); } \
-    HIGHP_TAIL_STAGE(name##_3_floats, F* p) { apply_adjacent_ternary<F, &name##_fn>(p, p+3, p+6); } \
-    HIGHP_TAIL_STAGE(name##_4_floats, F* p) { apply_adjacent_ternary<F, &name##_fn>(p, p+4, p+8); } \
-    DECLARE_N_WAY_TERNARY_FLOAT(name)
-
-#define DECLARE_TERNARY_INT(name)                                                     \
-    HIGHP_TAIL_STAGE(name##_int, I32* p) {                                            \
-        apply_adjacent_ternary<I32, &name##_fn>(p, p + 1, p + 2);                     \
-    }                                                                                 \
-    HIGHP_TAIL_STAGE(name##_2_ints, I32* p) {                                         \
-        apply_adjacent_ternary<I32, &name##_fn>(p, p + 2, p + 4);                     \
-    }                                                                                 \
-    HIGHP_TAIL_STAGE(name##_3_ints, I32* p) {                                         \
-        apply_adjacent_ternary<I32, &name##_fn>(p, p + 3, p + 6);                     \
-    }                                                                                 \
-    HIGHP_TAIL_STAGE(name##_4_ints, I32* p) {                                         \
-        apply_adjacent_ternary<I32, &name##_fn>(p, p + 4, p + 8);                     \
-    }                                                                                 \
-    HIGHP_TAIL_STAGE(name##_n_ints, SkRasterPipelineContexts::TernaryOpCtx* packed) { \
-        apply_adjacent_ternary_packed<I32, &name##_fn>(packed, base);                 \
-    }
-
-DECLARE_N_WAY_TERNARY_FLOAT(smoothstep)
-DECLARE_TERNARY_FLOAT(mix)
-DECLARE_TERNARY_INT(mix)
-
-#undef DECLARE_N_WAY_TERNARY_FLOAT
-#undef DECLARE_TERNARY_FLOAT
-#undef DECLARE_TERNARY_INT
-
 HIGHP_STAGE(gauss_a_to_rgba, NoCtx) {
     // x = 1 - x;
     // exp(-x * x * 4) - 0.018f;
@@ -5418,8 +4209,7 @@ namespace lowp {
     static void (*just_return)(void) = nullptr;
 
     static void start_pipeline(size_t,size_t,size_t,size_t, SkRasterPipelineStage*,
-                               SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>,
-                               uint8_t* tailPointer) {}
+                               SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>) {}
 
 #else  // We are compiling vector code with Clang... let's make some lowp stages!
 
@@ -5475,12 +4265,7 @@ static constexpr U16 U16_0   = U16_(0),
 static void start_pipeline(size_t x0,     size_t y0,
                            size_t xlimit, size_t ylimit,
                            SkRasterPipelineStage* program,
-                           SkSpan<SkRasterPipelineContexts::MemoryCtxPatch> memoryCtxPatches,
-                           uint8_t* tailPointer) {
-    uint8_t unreferencedTail;
-    if (!tailPointer) {
-        tailPointer = &unreferencedTail;
-    }
+                           SkSpan<SkRasterPipelineContexts::MemoryCtxPatch> memoryCtxPatches) {
     auto start = (Stage)program->fn;
     for (size_t dy = y0; dy < ylimit; dy++) {
     #if SKRP_NARROW_STAGES
@@ -5489,11 +4274,9 @@ static void start_pipeline(size_t x0,     size_t y0,
             start(&params, program, U16_0,U16_0,U16_0,U16_0);
         }
         if (size_t tail = xlimit - params.dx) {
-            *tailPointer = tail;
             patch_memory_contexts(memoryCtxPatches, params.dx, dy, tail);
             start(&params, program, U16_0,U16_0,U16_0,U16_0);
             restore_memory_contexts(memoryCtxPatches, params.dx, dy, tail);
-            *tailPointer = 0xFF;
         }
     #else
         size_t dx = x0;
@@ -5501,11 +4284,9 @@ static void start_pipeline(size_t x0,     size_t y0,
             start(program, dx,dy, U16_0,U16_0,U16_0,U16_0, U16_0,U16_0,U16_0,U16_0);
         }
         if (size_t tail = xlimit - dx) {
-            *tailPointer = tail;
             patch_memory_contexts(memoryCtxPatches, dx, dy, tail);
             start(program, dx,dy, U16_0,U16_0,U16_0,U16_0, U16_0,U16_0,U16_0,U16_0);
             restore_memory_contexts(memoryCtxPatches, dx, dy, tail);
-            *tailPointer = 0xFF;
         }
     #endif
     }

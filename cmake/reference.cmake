@@ -155,3 +155,9 @@ foreach(unit IN ITEMS src/core/SkReadBuffer.cpp src/core/SkGlyph.cpp)
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkRasterPipeline.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkRasterPipeline.cpp)
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkOpts.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkOpts.cpp)

@@ -233,3 +233,14 @@ compatible contiguous containers. Original baseline headers are unchanged.
 New compile-time checks in ownership_views.cpp cover the libstdc++ variant
 failure from db44f01 and incompatible/const element views. This correction
 preserves the original conversion's temporary-owner rejection.
+
+
+## Compiler-only raster stages
+
+SkRasterPipeline.cpp/.h and SkOpts.cpp/.h retain original reference copies;
+SkOpts.cpp is taken from the initial import before the candidate SIMD dispatch
+condition. Earlier original copies cover the operation list, contexts and vector
+implementation. The context packing utility moves to baseline/skia. The candidate
+removes compiler operations and their execution state while preserving ordinary
+raster arithmetic. New original tests/raster_pipeline.cpp verifies padded rows,
+precision selection, extension/reset and compiled callback execution.

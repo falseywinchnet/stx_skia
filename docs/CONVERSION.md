@@ -264,9 +264,22 @@ SkBlender overload accepts standard modes; custom runtime blending returns null.
 Invalid enum values also return null before constructing a shader.
 
 This converts SkBlendShader.cpp/.h, not the other adapted canvas, surface, record
-or raster-pipeline files. Compiler-oriented arithmetic stages remain in the
-raster pipeline pending separate dependency proof and pruning. Text/font and
+or raster-pipeline files. The subsequent raster-stage pruning below removes compiler-oriented arithmetic
+and execution support from the raster pipeline. Text/font and
 serialization internals still need removal. See ../results/2026-10-26/RUNTIME_REMOVAL.md.
+
+## Compiler-only raster-stage pruning
+
+The remaining 290 compiler-only operations, their contexts, stack rewind support
+and packing utility are removed. The candidate has 229 operations versus 524 in
+the original reference (five tracing operations were removed earlier). Pipeline
+stage calls no longer forward an unused compiler base pointer, and launch no
+longer carries a shared compiler-tail pointer. Partial-row memory patching remains.
+
+This is dependency pruning of imported pipeline code, not a conversion claim for
+the full pipeline or its vector kernels. The new direct test covers 3,168 padded
+row, precision, extension, reset and compiled-execution combinations with independent
+expected pixels. See ../results/2026-10-26/RASTER_STAGE_PRUNING.md.
 
 ## Still required
 
@@ -278,8 +291,8 @@ serialization internals still need removal. See ../results/2026-10-26/RUNTIME_RE
   work. Preserve external glyph coverage and all admitted drawing behavior.
 - Convert remaining retained filter, shader, color and skcms implementation;
   retain blur masks, matrix color filters and shader masks. General image filters
-  and runtime/SkSL effects are removed. Prune unused compiler-oriented arithmetic
-  stages from the raster pipeline through a separate dependency check.
+  and runtime/SkSL effects and their compiler-only raster stages are removed.
+  Convert the remaining raster stage construction, execution and kernels.
 - Audit every retained production header and build/source list, including
   templates, generated runtime support and platform ports. Syntax-checker success
   alone is not semantic conversion evidence.

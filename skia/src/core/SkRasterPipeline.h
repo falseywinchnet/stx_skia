@@ -63,7 +63,7 @@ struct SkRasterPipelineStage {
     // `ctx` holds data used by the stage function.
     // Most context structures are declared in SkRasterPipelineOpContexts.h, and have names ending
     // in Ctx (e.g. "SkRasterPipelineContexts::SamplerCtx"). Some Raster Pipeline stages pack
-    // non-pointer data into this field using `SkRPCtxUtils::Pack`.
+    // immediate values into this field through the uintptr_t append overload.
     void* ctx;
 };
 SK_END_REQUIRE_DENSE
@@ -134,7 +134,6 @@ public:
 
     void appendTransferFunction(const skcms_TransferFunction&);
 
-    void appendStackRewind();
 
     bool empty() const { return fStages == nullptr; }
 
@@ -144,8 +143,7 @@ private:
 
     using StartPipelineFn = void (*)(size_t, size_t, size_t, size_t,
                                      SkRasterPipelineStage* program,
-                                     SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>,
-                                     uint8_t*);
+                                     SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>);
     StartPipelineFn buildPipeline(SkRasterPipelineStage*) const;
 
     void uncheckedAppend(SkRasterPipelineOp, void*);
@@ -155,13 +153,10 @@ private:
                           int bytesPerPixel,
                           bool load,
                           bool store);
-    uint8_t* tailPointer();
 
     SkArenaAlloc*                        fAlloc;
-    SkRasterPipelineContexts::RewindCtx* fRewindCtx;
     // A linked list of stages. fStages and getStageList() return the latest stage.
     StageList*                  fStages;
-    uint8_t*                    fTailPointer;
     int                         fNumStages;
 
     // Only 1 in 2 million CPU-backend pipelines used more than two MemoryCtxs.
