@@ -379,3 +379,7 @@ foreach(unit IN ITEMS
     list(REMOVE_ITEM stx_sources skia/${unit} baseline/skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
+
+# Preserve the original storage writer with the original serialization profile.
+list(REMOVE_ITEM stx_sources skia/src/core/SkWriter32.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkWriter32.cpp)
