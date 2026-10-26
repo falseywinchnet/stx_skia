@@ -13,6 +13,13 @@ def main():
     for header in ("SkLRUCache.h", "SkTDynamicHash.h", "SkTMultiMap.h", "SkPtrRecorder.h", "SkTSearch.h"):
         if (source_root / "skia/src/core" / header).exists():
             rejected.append("Unused CPU helper: " + header)
+    if (source_root / "skia/src/utils/SkBitSet.h").exists():
+        rejected.append("Unused CPU helper: SkBitSet.h")
+    templates = (source_root / "skia/include/private/SkTemplates.h").read_text()
+    for name in ("SkFunctionObject", "SkOverloadedFunctionObject", "SkAutoTCallVProc",
+                 "SkMakeArray", "SkTAfter"):
+        if name in templates:
+            rejected.append("Unused generic adapter: " + name)
     forbidden_paths = ["/src/gpu/", "/src/codec/", "/src/encode/", "/src/android/",
                        "SkImageGeneratorCG.cpp", "SkFontMgr_mac", "SkTypeface_mac",
                        "SkTypeface_FreeType", "SkOpts_ml3", "SkOpts_ml4",

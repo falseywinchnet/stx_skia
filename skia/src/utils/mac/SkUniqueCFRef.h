@@ -11,14 +11,18 @@
 #include "include/core/SkTypes.h"
 #if defined(SK_BUILD_FOR_MAC) || defined(SK_BUILD_FOR_IOS)
 
-#include "include/private/SkTemplates.h"
-
 #include <CoreFoundation/CoreFoundation.h>
 #include <memory>
 #include <type_traits>
 
+// The unique owner holds one retained Core Foundation reference. Observers do
+// not retain it; release transfers that obligation to the caller.
+struct SkReleaseCFObject {
+    void operator()(CFTypeRef object) const { CFRelease(object); }
+};
+
 template <typename CFRef> using SkUniqueCFRef =
-    std::unique_ptr<std::remove_pointer_t<CFRef>, SkFunctionObject<CFRelease>>;
+    std::unique_ptr<std::remove_pointer_t<CFRef>, SkReleaseCFObject>;
 
 #endif
 #endif
