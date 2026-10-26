@@ -323,3 +323,8 @@ endforeach()
 list(APPEND stx_sources
     baseline/skia/src/core/SkExecutor.cpp
     baseline/skia/src/core/SkTaskGroup.cpp)
+
+foreach(unit IN ITEMS src/lazy/SkDiscardableMemoryPool.cpp src/ports/SkDiscardableMemory_none.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()

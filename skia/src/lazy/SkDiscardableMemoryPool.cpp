@@ -11,6 +11,7 @@
 #include "include/private/chromium/SkDiscardableMemory.h"
 #include "src/core/SkTInternalLList.h"
 #include "src/lazy/SkDiscardableMemoryPool.h"
+#include <limits>
 
 using namespace skia_private;
 
@@ -38,15 +39,25 @@ public:
 
     size_t getRAMUsed() override;
     void setRAMBudget(size_t budget) override;
-    size_t getRAMBudget() override { return fBudget; }
+    size_t getRAMBudget() override {
+        SkAutoMutexExclusive guard(fMutex);
+        return fBudget;
+    }
 
     /** purges all unlocked DMs */
     void dumpPool() override;
 
     #if SK_LAZY_CACHE_STATS  // Defined in SkDiscardableMemoryPool.h
-    int getCacheHits() override { return fCacheHits; }
-    int getCacheMisses() override { return fCacheMisses; }
+    int getCacheHits() override {
+        SkAutoMutexExclusive guard(fMutex);
+        return fCacheHits;
+    }
+    int getCacheMisses() override {
+        SkAutoMutexExclusive guard(fMutex);
+        return fCacheMisses;
+    }
     void resetCacheHitsAndMisses() override {
+        SkAutoMutexExclusive guard(fMutex);
         fCacheHits = fCacheMisses = 0;
     }
     int          fCacheHits;
@@ -165,6 +176,9 @@ void DiscardableMemoryPool::dumpDownTo(size_t budget) {
 }
 
 std::unique_ptr<SkDiscardableMemory> DiscardableMemoryPool::make(size_t bytes) {
+    if (bytes == 0) {
+        return nullptr;
+    }
     UniqueVoidPtr addr(sk_malloc_canfail(bytes));
     if (nullptr == addr) {
         return nullptr;
@@ -195,7 +209,9 @@ bool DiscardableMemoryPool::lock(PoolDiscardableMemory* dm) {
     if (nullptr == dm->fPointer) {
         // May have been purged while waiting for lock.
         #if SK_LAZY_CACHE_STATS
-        ++fCacheMisses;
+        if (fCacheMisses < std::numeric_limits<int>::max()) {
+            ++fCacheMisses;
+        }
         #endif  // SK_LAZY_CACHE_STATS
         return false;
     }
@@ -203,7 +219,9 @@ bool DiscardableMemoryPool::lock(PoolDiscardableMemory* dm) {
     fList.remove(dm);
     fList.addToHead(dm);
     #if SK_LAZY_CACHE_STATS
-    ++fCacheHits;
+    if (fCacheHits < std::numeric_limits<int>::max()) {
+        ++fCacheHits;
+    }
     #endif  // SK_LAZY_CACHE_STATS
     return true;
 }
@@ -216,6 +234,7 @@ void DiscardableMemoryPool::unlock(PoolDiscardableMemory* dm) {
 }
 
 size_t DiscardableMemoryPool::getRAMUsed() {
+    SkAutoMutexExclusive guard(fMutex);
     return fUsed;
 }
 void DiscardableMemoryPool::setRAMBudget(size_t budget) {
