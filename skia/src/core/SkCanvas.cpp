@@ -1741,13 +1741,13 @@ void SkCanvas::onDrawImageRect2(const SkImage* image, const SkRect& src, const S
     if (realPaint.getMaskFilter() && this->topDevice()->useDrawCoverageMaskForMaskFilters()) {
         // Route mask-filtered drawImages to drawRect() to use the auto-layer for mask filters,
         // which require all shading to be encoded in the paint.
-        auto [drawDstRect, shader] = SkImageShader::MakeForDrawRect(
+        SkImageShader::DrawRect imageDraw = SkImageShader::MakeForDrawRect(
                 image, realPaint, sampling, src, dst, constraint == kStrict_SrcRectConstraint);
-        if (drawDstRect.isEmpty() || !shader) {
+        if (imageDraw.destination.isEmpty() || !imageDraw.shader) {
             return;
         }
-        realPaint.setShader(std::move(shader));
-        this->drawRect(drawDstRect, realPaint);
+        realPaint.setShader(std::move(imageDraw.shader));
+        this->drawRect(imageDraw.destination, realPaint);
         return;
     }
 
@@ -1979,18 +1979,18 @@ void SkCanvas::onDrawEdgeAAImageSet2(const ImageSetEntry imageSet[], int count,
         int dstClipIndex = 0;
         for (int i = 0; i < count; ++i) {
             SkPaint imagePaint = realPaint;
-            auto [drawDstRect, shader] =
+            SkImageShader::DrawRect imageDraw =
                     SkImageShader::MakeForDrawRect(imageSet[i].fImage.get(),
                                                    imagePaint,
                                                    sampling,
                                                    imageSet[i].fSrcRect,
                                                    imageSet[i].fDstRect,
                                                    constraint == kStrict_SrcRectConstraint);
-            if (drawDstRect.isEmpty() || !shader) {
+            if (imageDraw.destination.isEmpty() || !imageDraw.shader) {
                 return;
             }
-            imagePaint.setShader(std::move(shader));
-            auto layer = this->aboutToDraw(imagePaint, &drawDstRect);
+            imagePaint.setShader(std::move(imageDraw.shader));
+            auto layer = this->aboutToDraw(imagePaint, &imageDraw.destination);
             if (layer) {
                 // Since we can't call mapRect to apply any preview matrix and drawEdgeAAQuad
                 // doesn't take an optional matrix, we can modify the local-to-device matrix
@@ -2003,7 +2003,7 @@ void SkCanvas::onDrawEdgeAAImageSet2(const ImageSetEntry imageSet[], int count,
 
                 // Call drawEdgeAAImageSet on each image one at a time, to correctly
                 // paint the image.
-                this->topDevice()->drawEdgeAAQuad(drawDstRect,
+                this->topDevice()->drawEdgeAAQuad(imageDraw.destination,
                                                   imageSet[i].fHasClip ? dstClips + dstClipIndex
                                                                         : nullptr,
                                                   (QuadAAFlags)imageSet[i].fAAFlags,

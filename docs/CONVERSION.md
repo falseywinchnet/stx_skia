@@ -1130,6 +1130,21 @@ consumer exercises the public shader interface. See
 ../results/2026-10-26/SHADER_BASE_CONVERSION.md for the matrix-state checks,
 conditional compilation coverage and remaining scope.
 
+## Image-shader sampling and mutable coordinate stages
+
+Image shader setup now has named sampling/gather/color procedures, explicit
+arena-backed contexts and a named draw-rectangle result. The mutable coordinate
+wrapper owns an initialized matrix array; child-stage failure is propagated in a
+separate fix. The expanded corpus covers 16,128 scenes and matches the pre-conversion
+candidate throughout. The 15,264 common scenes match upstream; previously corrected
+mipmap-format paths remain separately recorded and independently tested. Candidate/
+reference suites pass 57/57 and 56/56, fourteen common artifacts match, and the
+instrumented suite returns PASS. See
+../results/2026-10-26/IMAGE_SAMPLING_CONVERSION.md and TRANSFORM_CHILD_FAILURE.md in
+that directory. Only the two required canvas result consumers were adapted.
+Strict-subset behavior and extreme-coordinate shortcuts need focused follow-up;
+this conversion does not claim those contracts fully verified.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

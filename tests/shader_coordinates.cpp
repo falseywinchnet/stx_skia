@@ -154,6 +154,42 @@ bool transform_child_failure() {
 #endif
 }
 
+bool transform_updates() {
+    const sk_sp<SkImage> image = make_image();
+    if (!image) return false;
+    const SkSamplingOptions nearest{};
+    const sk_sp<SkShader> shader = (*image).makeShader(SkTileMode::kRepeat, SkTileMode::kRepeat, nearest);
+    if (!shader) return false;
+    const SkShaderBase& child = *as_SB(shader);
+    SkTransformShader transform(child, false);
+    Pixels pixels{};
+    SkRasterPipelineContexts::MemoryCtx destination{pixels.data(), width};
+    SkSTArenaAlloc<4096> arena{};
+    const SkSurfaceProps props{};
+    SkRasterPipeline pipeline(&arena);
+    const SkStageRec rec{&pipeline, &arena, kRGBA_8888_SkColorType, nullptr,
+                         SkColors::kWhite, props, SkRect::MakeEmpty()};
+    const SkShaders::MatrixRec identity{};
+    if (!transform.appendStages(rec, identity)) return false;
+    pipeline.append(SkRasterPipelineOp::store_8888, &destination);
+    pipeline.run(0, 0, width, height);
+    const Pixels original = pixels;
+    const SkMatrix shifted = SkMatrix::Translate(1, 2);
+    if (!transform.update(shifted)) return false;
+    pipeline.run(0, 0, width, height);
+    const Pixels moved = pixels;
+    if (moved == original) return false;
+    SkMatrix perspective{};
+    perspective.setPerspX(0.125f);
+    if (transform.update(perspective)) return false;
+    pipeline.run(0, 0, width, height);
+    if (pixels != moved) return false;
+    if (!transform.update(SkMatrix::I())) return false;
+    pipeline.run(0, 0, width, height);
+    const bool restored = pixels == original;
+    return restored;
+}
+
 bool matrix_state() {
     SkSTArenaAlloc<2048> arena{};
     const SkSurfaceProps props{};
@@ -216,6 +252,7 @@ int main(int argc, char** argv) {
     if (!empty_and_singular()) return 2;
     if (!matrix_state()) return 4;
     if (!transform_child_failure()) return 5;
+    if (!transform_updates()) return 6;
     if (argc == 2) {
         FILE* file = std::fopen(argv[1], "wb");
         if (file == nullptr) return 3;

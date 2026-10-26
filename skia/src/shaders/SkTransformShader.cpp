@@ -16,7 +16,8 @@
 
 SkTransformShader::SkTransformShader(const SkShaderBase& shader, bool allowPerspective)
         : fShader{shader}, fAllowPerspective{allowPerspective} {
-    SkMatrix::I().get9(fMatrixStorage);
+    const SkMatrix identity{};
+    identity.get9(fMatrixStorage.data());
 }
 
 bool SkTransformShader::update(const SkMatrix& matrix) {
@@ -24,7 +25,7 @@ bool SkTransformShader::update(const SkMatrix& matrix) {
         return false;
     }
 
-    matrix.get9(fMatrixStorage);
+    matrix.get9(fMatrixStorage.data());
     return true;
 }
 
@@ -44,11 +45,11 @@ bool SkTransformShader::appendStages(const SkStageRec& rec,
     // The matrix we're about to insert gets updated between uses of the pipeline so our children
     // can't know the total transform when they add their stages. We don't even incorporate this
     // matrix into the SkShaders::MatrixRec at all.
-    childMRec->markTotalMatrixInvalid();
+    (*childMRec).markTotalMatrixInvalid();
 
-    auto type = fAllowPerspective ? SkRasterPipelineOp::matrix_perspective
+    const SkRasterPipelineOp type = fAllowPerspective ? SkRasterPipelineOp::matrix_perspective
                                   : SkRasterPipelineOp::matrix_2x3;
-    rec.fPipeline->append(type, fMatrixStorage);
+    (*rec.fPipeline).append(type, fMatrixStorage.data());
 
     const bool appended = fShader.appendStages(rec, *childMRec);
     return appended;

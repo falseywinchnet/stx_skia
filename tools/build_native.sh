@@ -23,6 +23,7 @@ if [ "$sanitize" = ON ]; then
     fi
 else
     ctest --test-dir "build/$profile" --output-on-failure
+    "build/$profile/stx_skia_image_sampling_tests" "build/$profile/image-sampling.raw" "build/$profile/image-sampling-corrected.raw"
     "build/$profile/stx_skia_shader_coordinate_tests" "build/$profile/shader-coordinates.raw"
     "build/$profile/stx_skia_shader_working_space_tests" "build/$profile/shader-working-space.raw"
     "build/$profile/stx_skia_color_plan_tests" "build/$profile/color-plans.raw"

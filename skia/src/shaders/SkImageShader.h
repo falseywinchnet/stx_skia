@@ -20,6 +20,7 @@
 class SkArenaAlloc;
 class SkMatrix;
 class SkPaint;
+class SkPixmap;
 class SkReadBuffer;
 class SkShader;
 class SkWriteBuffer;
@@ -55,7 +56,11 @@ public:
     // possibly adjusted 'dst' SkRect and a shader to apply to the paint such that calling
     // SkCanvas::drawRect(newDst, *paint) produces
     // visually equivalent results to the original drawImageRect() call.
-    static std::pair<SkRect, sk_sp<SkShader>> MakeForDrawRect(const SkImage* image,
+    struct DrawRect {
+        SkRect destination{};
+        sk_sp<SkShader> shader{};
+    };
+    static DrawRect MakeForDrawRect(const SkImage* image,
                                                               const SkPaint& paint,
                                                               const SkSamplingOptions&,
                                                               SkRect src,
@@ -92,6 +97,7 @@ private:
     SkImage* onIsAImage(SkMatrix*, SkTileMode*) const override;
 
     bool appendStages(const SkStageRec&, const SkShaders::MatrixRec&) const override;
+    void appendColorStages(const SkStageRec&, const SkPixmap&, const SkSamplingOptions&) const;
 
     sk_sp<SkImage>          fImage;
     const SkSamplingOptions fSampling;
