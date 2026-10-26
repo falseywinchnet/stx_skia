@@ -974,6 +974,12 @@ The regression includes a narrow draw in a later tile and a composited
 gradient clip. See ../results/2026-10-26/TILED_CLIP_SHADER.md. The wider
 shader and tiler implementations remain in the conversion programme.
 
+Replacing a raster clip now clears any shader mask left by an earlier
+`clipShader`. Canvas clip reset, root resizing, and empty translation are
+covered by a focused regression. See
+../results/2026-10-26/RASTER_CLIP_REPLACEMENT.md. The broader clipping and
+scan-conversion implementation remains open.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

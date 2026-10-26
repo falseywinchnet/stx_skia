@@ -95,6 +95,7 @@ SkRasterClip::~SkRasterClip() {
 bool SkRasterClip::setEmpty() {
     AUTO_RASTERCLIP_VALIDATE(*this);
 
+    fShader.reset();
     fIsBW = true;
     fBW.setEmpty();
     fAA.setEmpty();
@@ -106,6 +107,7 @@ bool SkRasterClip::setEmpty() {
 bool SkRasterClip::setRect(const SkIRect& rect) {
     AUTO_RASTERCLIP_VALIDATE(*this);
 
+    fShader.reset();
     fIsBW = true;
     fAA.setEmpty();
     fIsRect = fBW.setRect(rect);
@@ -257,6 +259,11 @@ void SkRasterClip::translate(int dx, int dy, SkRasterClip* dst) const {
         return;
     }
 
+    if (this->isEmpty()) {
+        (*dst).setEmpty();
+        return;
+    }
+
     // The geometric clip moves into tile coordinates, while the shader keeps
     // the device CTM captured when clipShader was called.
     if (fShader) {
@@ -266,11 +273,6 @@ void SkRasterClip::translate(int dx, int dy, SkRasterClip* dst) const {
     } else {
         (*dst).fShader.reset();
     }
-    if (this->isEmpty()) {
-        dst->setEmpty();
-        return;
-    }
-
     dst->fIsBW = fIsBW;
     if (fIsBW) {
         fBW.translate(dx, dy, &dst->fBW);
