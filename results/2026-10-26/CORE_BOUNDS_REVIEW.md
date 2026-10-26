@@ -70,3 +70,11 @@ total stream-length overflow before writing into the existing tail or
 allocating a new block. `data_contract` checks that the rejected write leaves
 the stream unchanged. The candidate Release suite again passed 50/50, the
 sanitizer runner returned `PASS`, and the ten reference artifacts matched.
+
+A later public constructor case supplied a null `FILE*` with a nonzero size to
+`SkFILEStream`. Its invalid object claimed a nonempty range, so `isAtEnd()`
+could ask for the size of a null file handle. The shared constructor now gives
+any null handle an empty range. `core_bounds_contract` checks the invalid
+stream, its read, end/length results and duplicate. The candidate Release
+suite passed 50/50, the reference suite passed 49/49, the instrumented suite
+returned `PASS`, and the recorded rendering hashes remained identical.

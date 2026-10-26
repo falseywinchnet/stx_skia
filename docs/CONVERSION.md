@@ -1040,6 +1040,12 @@ The repaired paths and deterministic checks are recorded in
 ../results/2026-10-26/CORE_BOUNDS_REVIEW.md. That scan covered selected core
 files and does not clear the remaining retained implementation.
 
+AA clip scanline scratch now follows the active draw width, with checked size
+arithmetic and reusable ownership. The original private header is retained for
+reference builds. The focused fixture, matching render output and timing limit
+are recorded in ../results/2026-10-26/AA_CLIP_SCRATCH.md. This is a bounded
+repair, not a full conversion of clipping or scan conversion.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

@@ -91,7 +91,7 @@ private:
 
 class SkAAClipBlitter : public SkBlitter {
 public:
-    SkAAClipBlitter() : fScanlineScratch(nullptr) {}
+    SkAAClipBlitter() = default;
     ~SkAAClipBlitter() override;
 
     void init(SkBlitter* blitter, const SkAAClip* aaclip) {
@@ -108,21 +108,21 @@ public:
     void blitMask(const SkMask&, const SkIRect& clip) override;
 
 private:
-    SkBlitter*      fBlitter;
-    const SkAAClip* fAAClip;
-    SkIRect         fAAClipBounds;
+    SkBlitter*      fBlitter = nullptr;
+    const SkAAClip* fAAClip = nullptr;
+    SkIRect         fAAClipBounds{};
 
     // point into fScanlineScratch
-    int16_t*        fRuns;
-    SkAlpha*        fAA;
+    int16_t*        fRuns = nullptr;
+    SkAlpha*        fAA = nullptr;
 
     enum {
         kSize = 32 * 32
     };
     SkAutoSMalloc<kSize> fGrayMaskScratch;  // used for blitMask
-    void* fScanlineScratch;  // enough for a mask at 32bit, or runs+aa
+    SkAutoMalloc fScanlineScratch;  // enough for a mask at 32bit, or runs+aa
 
-    void ensureRunsAndAA();
+    void ensureScratch(int activeWidth);
 };
 
 #endif

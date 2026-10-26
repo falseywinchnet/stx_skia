@@ -5,6 +5,7 @@
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPaint.h"
+#include "include/core/SkRegion.h"
 #include "src/core/SkAAClip.h"
 #include "src/core/SkBase64.h"
 #include "src/core/SkBlitter.h"
@@ -67,6 +68,42 @@ public:
 private:
     std::array<uint8_t, 64> fPixels{};
     int fRows = 0;
+    bool fValid = true;
+};
+
+class AlphaCapture final : public SkBlitter {
+public:
+    void blitH(int, int, int) override { fValid = false; }
+    void blitAntiH(int x, int y, const SkAlpha alphas[], const int16_t runs[]) override {
+        if (x != 0 || y != 0 || fCalls != 0) {
+            fValid = false;
+            return;
+        }
+        ++fCalls;
+        int position = 0;
+        while (position < 4) {
+            const int length = runs[position];
+            if (length <= 0 || length > 4 - position) {
+                fValid = false;
+                return;
+            }
+            for (int index = 0; index < length; ++index) {
+                fPixels[position + index] = alphas[position];
+            }
+            position += length;
+        }
+        fValid = runs[4] == 0;
+    }
+
+    bool valid() const {
+        const std::array<uint8_t, 4> expected = {255, 0, 0, 255};
+        return fValid && fCalls == 1 && fPixels == expected;
+    }
+    bool untouched() const { return fValid && fCalls == 0; }
+
+private:
+    std::array<uint8_t, 4> fPixels{};
+    int fCalls = 0;
     bool fValid = true;
 };
 
@@ -154,6 +191,38 @@ bool file_stream_failure_states() {
     if (writer.isValid() || writer.bytesWritten() != 0) return false;
     if (writer.write(output.data(), output.size())) return false;
     return writer.bytesWritten() == 0;
+}
+
+bool narrow_draw_inside_wide_clip() {
+    const std::array<SkIRect, 2> rectangles = {
+        SkIRect::MakeLTRB(0, 0, 1, 1),
+        SkIRect::MakeLTRB(3, 0, 50000, 1),
+    };
+    SkRegion region;
+    if (!region.setRects(rectangles.data(), 2)) return false;
+    SkAAClip clip;
+    if (!clip.setRegion(region) || clip.getBounds().width() != 50000) return false;
+
+    AlphaCapture output;
+    SkAAClipBlitter blitter;
+    blitter.init(&output, &clip);
+    blitter.blitH(0, 0, 4);
+    if (!output.valid()) return false;
+
+    const std::array<SkAlpha, 5> alphas = {255, 0, 0, 0, 0};
+    const std::array<int16_t, 5> runs = {4, 0, 0, 0, 0};
+    AlphaCapture antiOutput;
+    SkAAClipBlitter antiBlitter;
+    antiBlitter.init(&antiOutput, &clip);
+    antiBlitter.blitAntiH(0, 0, alphas.data(), runs.data());
+    if (!antiOutput.valid()) return false;
+
+    const std::array<int16_t, 1> emptyRuns = {0};
+    AlphaCapture emptyOutput;
+    SkAAClipBlitter emptyBlitter;
+    emptyBlitter.init(&emptyOutput, &clip);
+    emptyBlitter.blitAntiH(0, 0, alphas.data(), emptyRuns.data());
+    return emptyOutput.untouched();
 }
 
 bool aliased_path_points() {
@@ -284,6 +353,10 @@ int main() {
     if (!file_stream_failure_states()) {
         std::fprintf(stderr, "file stream failure contract failed\n");
         return 3;
+    }
+    if (!narrow_draw_inside_wide_clip()) {
+        std::fprintf(stderr, "narrow draw in wide AA clip failed\n");
+        return 8;
     }
     if (!aliased_path_points()) {
         std::fprintf(stderr, "aliased path point contract failed\n");
