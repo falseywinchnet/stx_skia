@@ -21,19 +21,10 @@
 #include <cstdint>
 #include <memory>
 
-class GrBackendSemaphore;
-class GrBackendTexture;
-class GrRecordingContext;
-class SkColorSpace;
 class SkPaint;
 class SkPixmap;
-class GrSurfaceCharacterization;
 class SkSurfaceProps;
-enum GrSurfaceOrigin : int;
-enum SkYUVColorSpace : int;
-namespace skgpu { namespace graphite { class Recorder; } }
 struct SkIRect;
-struct SkISize;
 struct SkImageInfo;
 
 class SkSurface_Base : public SkSurface {
@@ -42,19 +33,8 @@ public:
     SkSurface_Base(const SkImageInfo&, const SkSurfaceProps*);
     ~SkSurface_Base() override;
 
-    // From SkSurface.h
-    bool replaceBackendTexture(const GrBackendTexture&,
-                               GrSurfaceOrigin,
-                               ContentChangeMode,
-                               TextureReleaseProc,
-                               ReleaseContext) override {
-        return false;
-    }
-
     enum class Type {
         kNull,     // intentionally associating 0 with a null canvas
-        kGanesh,
-        kGraphite,
         kRaster,
     };
 
@@ -65,19 +45,6 @@ public:
         const bool matches = type() == Type::kRaster;
         return matches;
     }
-    // True for surfaces instantiated by Ganesh in GPU memory
-    bool isGaneshBacked() const {
-        const bool matches = type() == Type::kGanesh;
-        return matches;
-    }
-    // True for surfaces instantiated by Graphite in GPU memory
-    bool isGraphiteBacked() const {
-        const bool matches = type() == Type::kGraphite;
-        return matches;
-    }
-
-    virtual GrRecordingContext* onGetRecordingContext() const;
-    virtual skgpu::graphite::Recorder* onGetRecorder() const;
     virtual SkRecorder* onGetBaseRecorder() const;
 
     // Returns a newly allocated canvas whose ownership transfers to this surface.
@@ -112,19 +79,6 @@ public:
                                              RescaleMode,
                                              ReadPixelsCallback,
                                              ReadPixelsContext);
-    /**
-     * The CPU fallback reports unsupported conversion with one null-result callback.
-     */
-    virtual void onAsyncRescaleAndReadPixelsYUV420(SkYUVColorSpace,
-                                                   bool readAlpha,
-                                                   sk_sp<SkColorSpace> dstColorSpace,
-                                                   SkIRect srcRect,
-                                                   SkISize dstSize,
-                                                   RescaleGamma,
-                                                   RescaleMode,
-                                                   ReadPixelsCallback,
-                                                   ReadPixelsContext);
-
     // Draw a temporary owned snapshot into the supplied canvas synchronously.
     virtual void onDraw(SkCanvas*, SkScalar x, SkScalar y, const SkSamplingOptions&,const SkPaint*);
 
@@ -148,19 +102,6 @@ public:
      *  Called only when we _didn't_ copy-on-write; we assume the copies start mutable.
      */
     virtual void onRestoreBackingMutability() {}
-
-    /**
-     * Caused the current backend 3D API to wait on the passed in semaphores before executing new
-     * commands on the gpu. Any previously submitting commands will not be blocked by these
-     * semaphores.
-     */
-    virtual bool onWait(int numSemaphores, const GrBackendSemaphore* waitSemaphores,
-                        bool deleteSemaphoresAfterWait) {
-        return false;
-    }
-
-    virtual bool onCharacterize(GrSurfaceCharacterization*) const { return false; }
-    virtual bool onIsCompatible(const GrSurfaceCharacterization&) const { return false; }
 
     inline SkCanvas* getCachedCanvas();
     inline sk_sp<SkImage> refCachedImage();

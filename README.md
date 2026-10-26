@@ -31,7 +31,9 @@ meshes and shader-language capability APIs are also removed. The canvas no longe
 exposes text drawing or owns glyph-run scratch; external A8 glyph-mask composition
 remains. Picture recording/playback/capture, picture-backed images and shaders,
 font parsing/rasterization, text blobs, typefaces and strike caches are removed.
-The retained CPU pipeline has no font engine dependency.
+The retained CPU pipeline has no font engine dependency. Surface APIs expose CPU
+pixel ownership, snapshots and reads; unsupported GPU texture/context/semaphore
+interfaces and CPU-unimplemented surface YUV reads are removed.
 
 On the initial recorded M4/macOS build, the candidate passed seven selected GUI.Forms
 renderer tests and produced byte-identical output across 24 baseline comparison

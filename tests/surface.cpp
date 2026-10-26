@@ -1,3 +1,4 @@
+#include "include/core/SkBitmap.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkPaint.h"
@@ -12,6 +13,30 @@
 #include <cstdio>
 #include <memory>
 #include <utility>
+
+template <typename T>
+concept HasGpuSurfaceContext = requires(T& surface) { surface.recordingContext(); };
+template <typename T>
+concept HasGpuSurfaceRecorder = requires(T& surface) { surface.recorder(); };
+template <typename T>
+concept HasGpuSurfaceWait = requires(T& surface) { surface.wait(0, nullptr); };
+template <typename T>
+concept HasGpuSurfaceCharacterization = requires(T& surface) { surface.characterize(nullptr); };
+template <typename T>
+concept HasYuvSurfaceRead = requires { &T::asyncRescaleAndReadPixelsYUV420; };
+#ifdef STX_SKIA_REFERENCE
+static_assert(HasGpuSurfaceContext<SkSurface>);
+static_assert(HasGpuSurfaceRecorder<SkSurface>);
+static_assert(HasGpuSurfaceWait<SkSurface>);
+static_assert(HasGpuSurfaceCharacterization<SkSurface>);
+static_assert(HasYuvSurfaceRead<SkSurface>);
+#else
+static_assert(!HasGpuSurfaceContext<SkSurface>);
+static_assert(!HasGpuSurfaceRecorder<SkSurface>);
+static_assert(!HasGpuSurfaceWait<SkSurface>);
+static_assert(!HasGpuSurfaceCharacterization<SkSurface>);
+static_assert(!HasYuvSurfaceRead<SkSurface>);
+#endif
 
 namespace {
 constexpr int width = 9;
@@ -210,6 +235,131 @@ bool invalid_and_null() {
     if ((*surface).peekPixels(&pixels)) return false;
     return (*surface).getCanvas() == &canvas;
 }
+
+// Exercise facade copies with disjoint, padded buffers. The expected image is
+// specified by coordinates rather than reconstructed through another copy API.
+bool pixel_copies(bool wrapped) {
+    std::array<uint8_t, stride * height> backing{};
+    backing.fill(0xa5);
+    const SkImageInfo info = image_info();
+    sk_sp<SkSurface> surface;
+    if (wrapped) {
+        surface = SkSurfaces::WrapPixels(info, backing.data(), stride);
+    } else {
+        surface = SkSurfaces::Raster(info, stride, nullptr);
+    }
+    if (!surface) return false;
+    SkCanvas& canvas = *(*surface).getCanvas();
+    canvas.clear(SK_ColorRED);
+    sk_sp<SkImage> oldImage = (*surface).makeImageSnapshot();
+    if (!oldImage) return false;
+
+    constexpr std::size_t sourceStride = 28;
+    std::array<uint8_t, sourceStride * 4> source{};
+    source.fill(0xb6);
+    for (int y = 0; y < 4; ++y) {
+        for (int x = 0; x < 5; ++x) {
+            const std::size_t offset = static_cast<std::size_t>(y) * sourceStride + x * 4U;
+            source[offset] = static_cast<uint8_t>(x * 30);
+            source[offset + 1] = static_cast<uint8_t>(y * 40);
+            source[offset + 2] = 90;
+            source[offset + 3] = 255;
+        }
+    }
+    const SkPixmap input(info.makeWH(5, 4), source.data(), sourceStride);
+    const uint32_t before = (*surface).generationID();
+    (*surface).writePixels(input, width + 1, height + 1);
+    if ((*surface).generationID() != before) return false;
+    // Pixel writes ignore drawing transforms and clips.
+    canvas.save();
+    canvas.translate(20.0f, 30.0f);
+    canvas.clipRect(SkRect::MakeEmpty());
+    (*surface).writePixels(input, -2, 2);
+    canvas.restore();
+    if ((*surface).generationID() == before) return false;
+    if (!verify_image(*oldImage, false)) return false;
+
+    constexpr std::size_t outputStride = 60;
+    const SkImageInfo outputInfo = info.makeWH(width + 2, height + 2);
+    std::array<uint8_t, outputStride * (height + 2)> output{};
+    output.fill(0xc7);
+    if (!(*surface).readPixels(outputInfo, output.data(), outputStride, -1, -1)) return false;
+    for (int y = 0; y < height + 2; ++y) {
+        for (std::size_t byte = 0; byte < outputStride; ++byte) {
+            uint8_t expected = 0xc7;
+            const int x = static_cast<int>(byte / 4);
+            const int component = static_cast<int>(byte % 4);
+            if (y >= 1 && y <= height && x >= 1 && x <= width) {
+                const int sx = x - 1;
+                const int sy = y - 1;
+                expected = (component == 0 || component == 3) ? 255 : 0;
+                if (sx < 3 && sy >= 2 && sy < 6) {
+                    const std::size_t sourceOffset =
+                        static_cast<std::size_t>(sy - 2) * sourceStride + (sx + 2) * 4U;
+                    expected = source[sourceOffset + component];
+                }
+            }
+            const std::size_t offset = static_cast<std::size_t>(y) * outputStride + byte;
+            if (output[offset] != expected) return false;
+        }
+    }
+    const std::array<uint8_t, outputStride * (height + 2)> saved = output;
+    const SkPixmap destination(outputInfo, output.data(), outputStride);
+    if ((*surface).readPixels(destination, width, height)) return false;
+    if (output != saved) return false;
+    if (wrapped) {
+        for (int y = 0; y < height; ++y) {
+            for (std::size_t byte = width * 4; byte < stride; ++byte) {
+                if (backing[static_cast<std::size_t>(y) * stride + byte] != 0xa5) return false;
+            }
+        }
+    }
+
+    // Full bitmap writes take the discard path, retaining the old snapshot.
+    sk_sp<SkImage> partialImage = (*surface).makeImageSnapshot();
+    if (!partialImage) return false;
+    SkBitmap replacement;
+    if (!replacement.tryAllocPixels(info)) return false;
+    replacement.eraseColor(SK_ColorBLUE);
+    (*surface).writePixels(replacement, 0, 0);
+    SkBitmap readback;
+    if (!readback.tryAllocPixels(info)) return false;
+    if (!(*surface).readPixels(readback, 0, 0)) return false;
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            if (readback.getColor(x, y) != SK_ColorBLUE) return false;
+        }
+    }
+    SkPixmap partial;
+    if (!(*partialImage).peekPixels(&partial)) return false;
+    if (partial.getColor(width - 1, height - 1) != SK_ColorRED) return false;
+    if (partial.getColor(0, 2) != SkColorSetARGB(255, 60, 0, 90)) return false;
+    return true;
+}
+
+bool related_surfaces() {
+    const SkImageInfo info = image_info();
+    sk_sp<SkSurface> source = SkSurfaces::Raster(info);
+    if (!source || !(*source).baseRecorder()) return false;
+    SkCanvas& sourceCanvas = *(*source).getCanvas();
+    sourceCanvas.clear(SK_ColorGREEN);
+    sk_sp<SkSurface> target = (*source).makeSurface(width + 2, height + 2);
+    if (!target || (*target).width() != width + 2 || (*target).height() != height + 2) return false;
+    if ((*source).makeSurface(0, height)) return false;
+    SkCanvas& targetCanvas = *(*target).getCanvas();
+    targetCanvas.clear(SK_ColorRED);
+    (*source).draw(&targetCanvas, 1.0f, 1.0f);
+    SkPixmap targetPixels;
+    if (!(*target).peekPixels(&targetPixels)) return false;
+    for (int y = 0; y < height + 2; ++y) {
+        for (int x = 0; x < width + 2; ++x) {
+            const bool inside = x >= 1 && x <= width && y >= 1 && y <= height;
+            const SkColor expected = inside ? SK_ColorGREEN : SK_ColorRED;
+            if (targetPixels.getColor(x, y) != expected) return false;
+        }
+    }
+    return true;
+}
 }
 
 int main() {
@@ -222,7 +372,9 @@ int main() {
     if (!restore_mutability()) return 3;
     if (!invalid_and_null()) return 4;
     if (!callback_reads()) return 5;
-    std::printf("surface ownership, snapshots, retain/discard, release and null behavior; base %zu bytes; PASS\n",
+    if (!pixel_copies(false) || !pixel_copies(true)) return 6;
+    if (!related_surfaces()) return 7;
+    std::printf("surface ownership, snapshots, clipped copies, padded rows, callbacks and null behavior; base %zu bytes; PASS\n",
                 sizeof(SkSurface_Base));
     return 0;
 }

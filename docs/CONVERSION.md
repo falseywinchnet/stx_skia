@@ -336,6 +336,21 @@ null surfaces and callback results. On arm64 the base object is 56 bytes versus
 and GPU compatibility query stubs remain separate work. See
 ../results/2026-10-26/SURFACE_OWNERSHIP.md.
 
+## CPU surface facade
+
+SkSurface.cpp/.h are converted to named implementation references, explicit
+results and CPU ownership/callback documentation. Unsupported GPU context,
+texture, semaphore and characterization interfaces, their base virtual stubs,
+and CPU-unimplemented surface YUV reads are removed. Surface kinds now contain
+only null and raster. The retained CPU recorder and pixel APIs are unchanged.
+
+The surface test checks API removal, padded and clipped copies, drawing-state
+independence, full-write snapshot preservation and compatible surfaces.
+Seventeen tests and seven rendering artifacts retain reference results;
+Release/Debug instrumented suites and a relocated consumer pass. See
+../results/2026-10-26/SURFACE_FACADE.md. GPU-era compatibility declarations in
+other public headers remain separate work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

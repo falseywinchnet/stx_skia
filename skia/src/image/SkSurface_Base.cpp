@@ -9,7 +9,6 @@
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkCanvas.h"
-#include "include/core/SkColorSpace.h" // IWYU pragma: keep
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkPixmap.h"
@@ -23,10 +22,8 @@
 #include <atomic>
 #include <cstdint>
 
-class GrRecordingContext;
 class SkPaint;
 class SkSurfaceProps;
-namespace skgpu { namespace graphite { class Recorder; } }
 
 SkSurface_Base::SkSurface_Base(int width, int height, const SkSurfaceProps* props)
         : SkSurface(width, height, props) {}
@@ -42,9 +39,7 @@ SkSurface_Base::~SkSurface_Base() {
     }
 }
 
-GrRecordingContext* SkSurface_Base::onGetRecordingContext() const { return nullptr; }
 
-skgpu::graphite::Recorder* SkSurface_Base::onGetRecorder() const { return nullptr; }
 SkRecorder* SkSurface_Base::onGetBaseRecorder() const { return nullptr; }
 
 void SkSurface_Base::onDraw(SkCanvas* canvas, SkScalar x, SkScalar y,
@@ -84,14 +79,6 @@ void SkSurface_Base::onAsyncRescaleAndReadPixels(const SkImageInfo& info,
     }
     SkRescaleAndReadPixels(source, info, sourceRect, rescaleGamma, rescaleMode,
                           callback, context);
-}
-
-void SkSurface_Base::onAsyncRescaleAndReadPixelsYUV420(
-        SkYUVColorSpace yuvColorSpace, bool readAlpha, sk_sp<SkColorSpace> dstColorSpace,
-        SkIRect srcRect, SkISize dstSize, RescaleGamma rescaleGamma, RescaleMode,
-        ReadPixelsCallback callback, ReadPixelsContext context) {
-    // This CPU implementation does not provide YUV conversion.
-    callback(context, nullptr);
 }
 
 bool SkSurface_Base::outstandingImageSnapshot() const {
