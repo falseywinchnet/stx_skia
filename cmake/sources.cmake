@@ -181,7 +181,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkPixmapDraw.cpp
     skia/src/core/SkPoint.cpp
     skia/src/core/SkPoint3.cpp
-    skia/src/core/SkPtrRecorder.cpp
     skia/src/core/SkQuadClipper.cpp
     skia/src/core/SkQuads.cpp
     skia/src/core/SkRRect.cpp
@@ -236,7 +235,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkSwizzler_opts_ssse3.cpp
     skia/src/core/SkSynchronizedResourceCache.cpp
     skia/src/core/SkTDArray.cpp
-    skia/src/core/SkTSearch.cpp
     skia/src/core/SkTextBlob.cpp
     skia/src/core/SkThreadID.cpp
     skia/src/core/SkTime.cpp

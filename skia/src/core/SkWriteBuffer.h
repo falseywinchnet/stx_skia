@@ -22,14 +22,12 @@
 #include <cstdint>
 #include <string_view>
 
-class SkFactorySet;
 class SkFlattenable;
 class SkImage;
 class SkM44;
 class SkMatrix;
 class SkPaint;
 class SkPath;
-class SkRefCntSet;
 class SkRegion;
 class SkStream;
 class SkWStream;
@@ -148,14 +146,10 @@ public:
     void writeToMemory(void* dst) const { fWriter.flatten(dst); }
     sk_sp<SkData> snapshotAsData() const { return fWriter.snapshotAsData(); }
 
-    void setFactoryRecorder(sk_sp<SkFactorySet>);
-
 private:
-    sk_sp<SkFactorySet> fFactorySet;
-
     SkWriter32 fWriter;
 
-    // Only used if we do not have an fFactorySet
+    // Inline type names are shared within this stream.
     skia_private::THashMap<const char*, uint32_t> fFlattenableDict;
 };
 

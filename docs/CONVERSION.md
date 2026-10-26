@@ -623,6 +623,22 @@ regressions are preserved in ../results/2026-10-26/SORT.md and its raw measureme
 This converts the utility, not its path/scan-conversion callers, and does not
 claim a universal speed improvement.
 
+## Unused picture factory recording and search
+
+The picture-only factory recorder, pointer/reference-counted ID sets, and their
+otherwise-unused generic/string search helpers are reference-only. Two compiled
+implementation units and their private headers are removed, along with the
+writer's unused recorder setter, owner field and branch. Ordinary inline-name
+and repeated-name dictionary serialization remains; effect deserialization stays
+disabled. The remaining writer/flattenable implementation is not yet converted.
+
+Both 32-test Release profiles pass; a new 24-case effect-stream fixture produces
+3,344 identical bytes. It covers supplied/growing/owned writer forms, repeated
+names and retained effect types. The release runner and native CI compare that
+artifact. Nine rendering artifacts, instrumented suites, installed consumer and
+GUI.Forms fixture also pass. See ../results/2026-10-26/RECORDER_PRUNE.md for scope
+and the distinction between source removal and measured runtime improvement.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

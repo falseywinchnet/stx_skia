@@ -10,14 +10,15 @@ def main():
     commands = json.loads((directory / "compile_commands.json").read_text())
     rejected = []
     source_root = Path(__file__).resolve().parents[1]
-    for header in ("SkLRUCache.h", "SkTDynamicHash.h", "SkTMultiMap.h"):
+    for header in ("SkLRUCache.h", "SkTDynamicHash.h", "SkTMultiMap.h", "SkPtrRecorder.h", "SkTSearch.h"):
         if (source_root / "skia/src/core" / header).exists():
-            rejected.append("Unused CPU hash/cache wrapper: " + header)
+            rejected.append("Unused CPU helper: " + header)
     forbidden_paths = ["/src/gpu/", "/src/codec/", "/src/encode/", "/src/android/",
                        "SkImageGeneratorCG.cpp", "SkFontMgr_mac", "SkTypeface_mac",
                        "SkTypeface_FreeType", "SkOpts_ml3", "SkOpts_ml4",
                        "skcms_TransformHsw", "skcms_TransformSkx",
-                       "SkExecutor.cpp", "SkTaskGroup.cpp", "SkSharedMutex.cpp"]
+                       "SkExecutor.cpp", "SkTaskGroup.cpp", "SkSharedMutex.cpp",
+                       "SkPtrRecorder.cpp", "SkTSearch.cpp"]
     for command in commands:
         name = command["file"]
         for pattern in forbidden_paths:
@@ -27,7 +28,9 @@ def main():
                                       str(directory / "libstx_skia.a")], text=True)
     for pattern in ["SkCodec::", "SkImageGeneratorCG::", "SkPngCodec::",
                     "SkFontMgr_New_CoreText", "SkTypeface_FreeType::",
-                    "SkExecutor::", "SkTaskGroup::", "SkThreadPool<", "SkSharedMutex::"]:
+                    "SkExecutor::", "SkTaskGroup::", "SkThreadPool<", "SkSharedMutex::",
+                    "SkPtrSet::", "SkRefCntSet::", "SkNamedFactorySet::", "SkStrSearch(",
+                    "SkStrLCSearch(", "SkAutoAsciiToLC::", "SkBinaryWriteBuffer::setFactoryRecorder"]:
         if pattern in symbols:
             rejected.append(pattern)
     if rejected:

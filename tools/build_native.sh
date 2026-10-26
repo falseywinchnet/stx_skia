@@ -30,4 +30,5 @@ else
     "build/$profile/stx_skia_pixmap_tests" "build/$profile/pixmap.raw"
     "build/$profile/stx_skia_mask_tests" "build/$profile/mask.raw"
     "build/$profile/stx_skia_mask_filter_tests" "build/$profile/mask-filter.raw"
+    "build/$profile/stx_skia_flattenable_stream_tests" "build/$profile/flattenable.raw"
 fi

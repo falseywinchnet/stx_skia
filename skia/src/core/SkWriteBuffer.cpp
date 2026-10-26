@@ -20,7 +20,6 @@
 #include "src/core/SkMatrixPriv.h"
 #include "src/core/SkMipmap.h"
 #include "src/core/SkPaintPriv.h"
-#include "src/core/SkPtrRecorder.h"
 #include "src/image/SkImage_Base.h"
 
 #include <cstring>
@@ -33,10 +32,10 @@ class SkRegion;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 SkBinaryWriteBuffer::SkBinaryWriteBuffer(const SkSerialProcs& p)
-        : SkWriteBuffer(p), fFactorySet(nullptr) {}
+        : SkWriteBuffer(p) {}
 
 SkBinaryWriteBuffer::SkBinaryWriteBuffer(void* storage, size_t storageSize, const SkSerialProcs& p)
-        : SkWriteBuffer(p), fFactorySet(nullptr), fWriter(storage, storageSize) {}
+        : SkWriteBuffer(p), fWriter(storage, storageSize) {}
 
 SkBinaryWriteBuffer::~SkBinaryWriteBuffer() {}
 
@@ -228,50 +227,29 @@ void SkBinaryWriteBuffer::writePaint(const SkPaint& paint) {
     SkPaintPriv::Flatten(paint, *this);
 }
 
-void SkBinaryWriteBuffer::setFactoryRecorder(sk_sp<SkFactorySet> rec) {
-    fFactorySet = std::move(rec);
-}
-
-
-
 void SkBinaryWriteBuffer::writeFlattenable(const SkFlattenable* flattenable) {
     if (nullptr == flattenable) {
         this->write32(0);
         return;
     }
 
-    /*
-     *  We can write 1 of 2 versions of the flattenable:
-     *
-     *  1. index into fFactorySet: This assumes the writer will later resolve the function-ptrs
-     *     into strings for its reader. SkPicture does exactly this, by writing a table of names
-     *     (matching the indices) up front in its serialized form.
-     *
-     *  2. string name of the flattenable or index into fFlattenableDict:  We store the string to
-     *     allow the reader to specify its own factories after write time. In order to improve
-     *     compression, if we have already written the string, we write its index instead.
-     */
+    // Ordinary streams carry inline type names, then dictionary indices on reuse.
+    const char* name = flattenable->getTypeName();
+    SkASSERT(name);
+    SkASSERT(0 != strcmp("", name));
 
-    if (SkFlattenable::Factory factory = flattenable->getFactory(); factory && fFactorySet) {
-        this->write32(fFactorySet->add(factory));
+    if (uint32_t* indexPtr = fFlattenableDict.find(name)) {
+        // We will write the index as a 32-bit int.  We want the first byte
+        // that we send to be zero - this will act as a sentinel that we
+        // have an index (not a string).  This means that we will send the
+        // the index shifted left by 8.  The remaining 24-bits should be
+        // plenty to store the index.  Note that this strategy depends on
+        // being little endian, and type names being non-empty.
+        SkASSERT(0 == *indexPtr >> 24);
+        this->write32(*indexPtr << 8);
     } else {
-        const char* name = flattenable->getTypeName();
-        SkASSERT(name);
-        SkASSERT(0 != strcmp("", name));
-
-        if (uint32_t* indexPtr = fFlattenableDict.find(name)) {
-            // We will write the index as a 32-bit int.  We want the first byte
-            // that we send to be zero - this will act as a sentinel that we
-            // have an index (not a string).  This means that we will send the
-            // the index shifted left by 8.  The remaining 24-bits should be
-            // plenty to store the index.  Note that this strategy depends on
-            // being little endian, and type names being non-empty.
-            SkASSERT(0 == *indexPtr >> 24);
-            this->write32(*indexPtr << 8);
-        } else {
-            this->writeString(name);
-            fFlattenableDict.set(name, fFlattenableDict.count() + 1);
-        }
+        this->writeString(name);
+        fFlattenableDict.set(name, fFlattenableDict.count() + 1);
     }
 
     // make room for the size of the flattened object

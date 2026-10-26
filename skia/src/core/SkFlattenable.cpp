@@ -10,8 +10,6 @@
 #include "include/core/SkRefCnt.h"
 #include "include/core/SkSerialProcs.h"
 #include "include/core/SkTypes.h"
-#include "include/private/SkTDArray.h"
-#include "src/core/SkPtrRecorder.h"
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkWriteBuffer.h"
 
@@ -20,45 +18,6 @@
 #include <cstring>
 #include <iterator>
 #include <utility>
-
-SkNamedFactorySet::SkNamedFactorySet() : fNextAddedFactory(0) {}
-
-uint32_t SkNamedFactorySet::find(SkFlattenable::Factory factory) {
-    uint32_t index = fFactorySet.find(factory);
-    if (index > 0) {
-        return index;
-    }
-    const char* name = SkFlattenable::FactoryToName(factory);
-    if (nullptr == name) {
-        return 0;
-    }
-    *fNames.append() = name;
-    return fFactorySet.add(factory);
-}
-
-const char* SkNamedFactorySet::getNextAddedFactoryName() {
-    if (fNextAddedFactory < fNames.size()) {
-        return fNames[fNextAddedFactory++];
-    }
-    return nullptr;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-SkRefCntSet::~SkRefCntSet() {
-    // call this now, while our decPtr() is sill in scope
-    this->reset();
-}
-
-void SkRefCntSet::incPtr(void* ptr) {
-    ((SkRefCnt*)ptr)->ref();
-}
-
-void SkRefCntSet::decPtr(void* ptr) {
-    ((SkRefCnt*)ptr)->unref();
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 namespace {
 
