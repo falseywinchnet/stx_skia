@@ -28,6 +28,16 @@ static_assert(!HasProgrammableMesh<SkCanvas>);
 #if __has_include("include/effects/SkRuntimeEffect.h")
 #error Runtime compiler headers must not be installed.
 #endif
+#if __has_include("include/svg/SkSVGCanvas.h") || \
+    __has_include("include/codec/SkCodec.h") || \
+    __has_include("include/ports/SkImageGeneratorCG.h") || \
+    __has_include("include/android/SkImageAndroid.h") || \
+    __has_include("include/effects/Sk1DPathEffect.h") || \
+    __has_include("include/private/chromium/GrPromiseImageTexture.h") || \
+    __has_include("include/private/SkJpegGainmapEncoder.h") || \
+    __has_include("modules/skcms/src/skcms_internals.h")
+#error The installed package exposes a removed subsystem.
+#endif
 
 namespace {
 struct ConsumerBase {
@@ -52,5 +62,6 @@ int main() {
     if (!surface) return 3;
     SkCanvas& canvas = *(*surface).getCanvas();
     canvas.drawImage(image, 0, 0);
+    if (!(*surface).notifyContentWillChange(SkSurface::kRetain_ContentChangeMode)) return 5;
     return 0;
 }

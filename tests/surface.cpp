@@ -71,6 +71,16 @@ SkImageInfo image_info() {
     return info;
 }
 
+bool notify_change(SkSurface& surface, SkSurface::ContentChangeMode mode) {
+#ifdef STX_SKIA_REFERENCE
+    surface.notifyContentWillChange(mode);
+    return true;
+#else
+    const bool prepared = surface.notifyContentWillChange(mode);
+    return prepared;
+#endif
+}
+
 bool verify_image(const SkImage& image, bool greenCenter) {
     SkPixmap pixels;
     if (!image.peekPixels(&pixels)) return false;
@@ -111,7 +121,7 @@ bool snapshots(bool wrapped, bool discard) {
     if ((*surface).makeImageSnapshot(SkIRect::MakeXYWH(20, 20, 4, 4))) return false;
 
     if (discard) {
-        if (!(*surface).notifyContentWillChange(SkSurface::kDiscard_ContentChangeMode)) {
+        if (!notify_change(*surface, SkSurface::kDiscard_ContentChangeMode)) {
             return false;
         }
         canvas.clear(SK_ColorRED);
@@ -140,7 +150,7 @@ bool external_write_preserves_snapshot() {
     (*canvas).clear(SK_ColorRED);
     sk_sp<SkImage> snapshot = (*surface).makeImageSnapshot();
     if (!snapshot) return false;
-    if (!(*surface).notifyContentWillChange(SkSurface::kRetain_ContentChangeMode)) {
+    if (!notify_change(*surface, SkSurface::kRetain_ContentChangeMode)) {
         return false;
     }
     SkPixmap writable;

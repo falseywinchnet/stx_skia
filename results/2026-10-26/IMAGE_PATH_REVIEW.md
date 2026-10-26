@@ -31,3 +31,10 @@ Verification on the M4 Mini:
 
 This is a scoped review and repair. The remaining CPU library and GUI.Forms
 integration still require their own review and gates.
+
+The pinned reference still declares `notifyContentWillChange` as `void`. The
+shared surface test now calls the reference API without expecting a result and
+checks the candidate Boolean. Both release suites pass 49/49 tests; the
+candidate sanitizer runner reports `PASS`. `tools/measure.py` reports identical
+render artifacts and `PASS`. The fresh installed consumer compiles and runs
+against the candidate package.

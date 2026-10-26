@@ -1028,6 +1028,12 @@ The data-backed pixel-reference factory now validates its owner and aligned
 stride before constructing a reference. The boundary check and fixture are
 recorded in ../results/2026-10-26/BITMAP_PIXEL_REF.md.
 
+The installed package now omits headers for excluded subsystems and removed
+effects. A fresh installed consumer verifies representative exclusions and
+the surface notification result. See
+../results/2026-10-26/INSTALLED_HEADER_SCOPE.md for the measured header count
+and the remaining header-review limit.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

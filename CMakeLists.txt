@@ -346,9 +346,35 @@ endif()
 install(TARGETS stx_skia EXPORT stx_skiaTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(DIRECTORY skia/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/stx_skia/skia/include
-    FILES_MATCHING PATTERN "*.h" PATTERN "gpu" EXCLUDE PATTERN "third_party" EXCLUDE)
+    FILES_MATCHING PATTERN "*.h"
+    PATTERN "android" EXCLUDE
+    PATTERN "codec" EXCLUDE
+    PATTERN "docs" EXCLUDE
+    PATTERN "encode" EXCLUDE
+    PATTERN "gpu" EXCLUDE
+    PATTERN "ports" EXCLUDE
+    PATTERN "svg" EXCLUDE
+    PATTERN "third_party" EXCLUDE
+    PATTERN "chromium" EXCLUDE
+    PATTERN "mac" EXCLUDE
+    PATTERN "Sk1DPathEffect.h" EXCLUDE
+    PATTERN "Sk2DPathEffect.h" EXCLUDE
+    PATTERN "SkCornerPathEffect.h" EXCLUDE
+    PATTERN "SkDiscretePathEffect.h" EXCLUDE
+    PATTERN "SkHighContrastFilter.h" EXCLUDE
+    PATTERN "SkTableMaskFilter.h" EXCLUDE
+    PATTERN "SkTrimPathEffect.h" EXCLUDE
+    PATTERN "SkPerlinNoiseShader.h" EXCLUDE
+    PATTERN "SkEncodedInfo.h" EXCLUDE
+    PATTERN "SkExif.h" EXCLUDE
+    PATTERN "SkGainmapInfo.h" EXCLUDE
+    PATTERN "SkHdrMetadata.h" EXCLUDE
+    PATTERN "SkJpegGainmapEncoder.h" EXCLUDE
+    PATTERN "SkJpegMetadataDecoder.h" EXCLUDE
+    PATTERN "SkXmp.h" EXCLUDE)
 install(FILES skia/modules/skcms/skcms.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/stx_skia/skia/modules/skcms)
-install(DIRECTORY skia/modules/skcms/src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/stx_skia/skia/modules/skcms/src FILES_MATCHING PATTERN "*.h")
+install(FILES skia/modules/skcms/src/skcms_public.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/stx_skia/skia/modules/skcms/src)
 install(FILES LICENSE LICENSE-Skia DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/stx_skia)
 install(EXPORT stx_skiaTargets NAMESPACE stx_skia:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/stx_skia)
 configure_package_config_file(cmake/stx_skiaConfig.cmake.in
