@@ -224,6 +224,13 @@ bool blur_comparison(Record& record) {
                     owner.reset(dst.image());
                     if (!owner || dst.fFormat != SkMask::kA8_Format || border.x() < 0 || border.y() < 0) return false;
                     if (!record.mask(dst)) return false;
+                    for (const SkBlurStyle style : {kNormal_SkBlurStyle, kSolid_SkBlurStyle, kOuter_SkBlurStyle, kInner_SkBlurStyle}) {
+                        SkAutoMaskFreeImage styledOwner;
+                        SkMaskBuilder styled;
+                        const bool ok = SkBlurMask::BoxBlur(&styled, src, static_cast<SkScalar>(sigma), style);
+                        styledOwner.reset(styled.image());
+                        if (!ok || !styledOwner || !record.mask(styled)) return false;
+                    }
                 }
             }
         }
@@ -240,6 +247,82 @@ bool blur_comparison(Record& record) {
     }
     return true;
 }
+bool analytic_and_ground_truth(Record& record) {
+    for (const int width : {1, 7, 32}) {
+        for (const int height : {1, 5}) {
+            for (const float origin : {-2.0f, 0.25f}) {
+                const SkRect rectangle = SkRect::MakeXYWH(origin, origin, static_cast<float>(width), static_cast<float>(height));
+                for (const float sigma : {0.5f, 1.0f, 1.5f, 4.0f}) {
+                    for (const SkBlurStyle style : {kNormal_SkBlurStyle, kSolid_SkBlurStyle, kOuter_SkBlurStyle, kInner_SkBlurStyle}) {
+                        SkAutoMaskFreeImage owner;
+                        SkMaskBuilder mask;
+                        const bool ok = SkBlurMask::BlurRect(sigma, &mask, rectangle, style);
+                        owner.reset(mask.image());
+                        if (!ok || !owner || !record.mask(mask)) return false;
+                        SkMaskBuilder metadata;
+                        if (!SkBlurMask::BlurRect(sigma, &metadata, rectangle, style, nullptr, SkMaskBuilder::kJustComputeBounds_CreateMode)) return false;
+                        if (metadata.fBounds != mask.fBounds || metadata.fRowBytes != mask.fRowBytes || metadata.fImage != nullptr) return false;
+                    }
+                }
+            }
+        }
+    }
+    for (const int width : {1, 7, 13}) {
+        for (const int height : {1, 5}) {
+            const size_t extent = static_cast<size_t>(width) * height;
+            std::unique_ptr<uint8_t[]> input(new uint8_t[extent]);
+            for (size_t i = 0; i < extent; ++i) input[i] = static_cast<uint8_t>(i * 11 + 47);
+            const SkMask src(input.get(), SkIRect::MakeWH(width, height), width, SkMask::kA8_Format);
+            for (const float sigma : {0.5f, 1.5f, 3.0f}) {
+                for (const SkBlurStyle style : {kNormal_SkBlurStyle, kSolid_SkBlurStyle, kOuter_SkBlurStyle, kInner_SkBlurStyle}) {
+                    SkAutoMaskFreeImage owner;
+                    SkMaskBuilder mask;
+                    const bool ok = SkBlurMask::BlurGroundTruth(sigma, &mask, src, style);
+                    owner.reset(mask.image());
+                    if (!ok || !owner || !record.mask(mask)) return false;
+                }
+            }
+        }
+    }
+#ifndef STX_SKIA_REFERENCE
+    const uint8_t flatProfile = 91;
+    if (SkBlurMask::ProfileLookup(&flatProfile, 0, INT32_MAX, INT32_MAX) != 91 ||
+        SkBlurMask::ProfileLookup(&flatProfile, INT32_MAX - 1, INT32_MAX, INT32_MAX) != 91) return false;
+    SkMaskBuilder unchanged(nullptr, SkIRect::MakeWH(3, 2), 3, SkMask::kA8_Format);
+    const SkRect validRect = SkRect::MakeWH(4, 4);
+    if (SkBlurMask::BlurRect(0, &unchanged, validRect, kNormal_SkBlurStyle)) return false;
+    if (SkBlurMask::BlurRect(1, &unchanged, validRect, static_cast<SkBlurStyle>(255))) return false;
+    if (SkBlurMask::BlurRect(1, &unchanged, SkRect::MakeLTRB(0.2f, 0.2f, 1.7f, 1.7f), kInner_SkBlurStyle)) return false;
+    if (unchanged.fImage != nullptr || unchanged.fBounds != SkIRect::MakeWH(3, 2) || unchanged.fRowBytes != 3) return false;
+    const SkMask empty(nullptr, SkIRect::MakeEmpty(), 0, SkMask::kA8_Format);
+    if (SkBlurMask::BoxBlur(&unchanged, empty, 1, kNormal_SkBlurStyle)) return false;
+    if (SkBlurMask::BlurGroundTruth(1, &unchanged, empty, kNormal_SkBlurStyle)) return false;
+    // Reference convolution must honor padded source rows, independently of its
+    // retained tight-row reference implementation.
+    const std::array<uint8_t, 6> tight = {10, 30, 70, 90, 120, 180};
+    const std::array<uint8_t, 11> padded = {10, 30, 70, 255, 255, 255, 255, 255, 90, 120, 180};
+    const SkMask srcT(tight.data(), SkIRect::MakeWH(3, 2), 3, SkMask::kA8_Format);
+    const SkMask srcP(padded.data(), SkIRect::MakeWH(3, 2), 8, SkMask::kA8_Format);
+    for (const SkBlurStyle style : {kNormal_SkBlurStyle, kSolid_SkBlurStyle, kOuter_SkBlurStyle, kInner_SkBlurStyle}) {
+        SkAutoMaskFreeImage ownerT;
+        SkAutoMaskFreeImage ownerP;
+        SkMaskBuilder outputT;
+        SkMaskBuilder outputP;
+        const bool okT = SkBlurMask::BlurGroundTruth(1.5f, &outputT, srcT, style);
+        ownerT.reset(outputT.image());
+        const bool okP = SkBlurMask::BlurGroundTruth(1.5f, &outputP, srcP, style);
+        ownerP.reset(outputP.image());
+        if (!okT || !okP || outputT.fBounds != outputP.fBounds) return false;
+        for (int y = 0; y < outputT.fBounds.height(); ++y) {
+            const uint8_t* rowT = outputT.fImage + static_cast<size_t>(y) * outputT.fRowBytes;
+            const uint8_t* rowP = outputP.fImage + static_cast<size_t>(y) * outputP.fRowBytes;
+            if (std::memcmp(rowT, rowP, static_cast<size_t>(outputT.fBounds.width())) != 0) return false;
+        }
+    }
+#endif
+    return true;
+}
+
 }
 
 // Allocation and temporary storage are included; source preparation is excluded.
@@ -280,7 +363,40 @@ static int benchmark_blur() {
     return 0;
 }
 
+static int benchmark_rect() {
+    uint64_t checksum = 0;
+    for (const SkBlurStyle style : {kNormal_SkBlurStyle, kSolid_SkBlurStyle, kOuter_SkBlurStyle, kInner_SkBlurStyle}) {
+        for (const int width : {33, 257}) {
+            const int height = width == 33 ? 19 : 127;
+            const int repeats = width == 33 ? 2000 : 80;
+            const SkRect rectangle = SkRect::MakeWH(static_cast<float>(width), static_cast<float>(height));
+            for (const float sigma : {1.5f, 8.0f}) {
+                const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+                for (int i = 0; i < repeats; ++i) {
+                    SkAutoMaskFreeImage owner;
+                    SkMaskBuilder dst;
+                    const bool ok = SkBlurMask::BlurRect(sigma, &dst, rectangle, style);
+                    owner.reset(dst.image());
+                    if (!ok || !owner) return 1;
+                    const size_t bytes = dst.computeImageSize();
+                    checksum += owner.get()[static_cast<size_t>(i) % bytes];
+                }
+                const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+                const std::chrono::duration<double> elapsed = end - start;
+                const double seconds = elapsed.count();
+                std::printf("%d,%d,%d,%.1f,%d,%.9f\n", static_cast<int>(style), width, height, static_cast<double>(sigma), repeats, seconds);
+            }
+        }
+    }
+    std::printf("checksum=%llu\n", static_cast<unsigned long long>(checksum));
+    return 0;
+}
+
 int main(int argc, char** argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--benchmark-rect") == 0) {
+        const int result = benchmark_rect();
+        return result;
+    }
     if (argc == 2 && std::strcmp(argv[1], "--benchmark") == 0) {
         const int result = benchmark_blur();
         return result;
@@ -295,6 +411,7 @@ int main(int argc, char** argv) {
     if (!addresses_and_iterators()) { std::puts("address/iterator failed"); return 1; }
     if (!allocation_and_moves()) { std::puts("allocation/move failed"); return 1; }
     if (!blur_comparison(record)) { std::puts("blur failed"); return 1; }
+    if (!analytic_and_ground_truth(record)) { std::puts("analytic/ground-truth failed"); return 1; }
     if (file && std::fflush(file.get()) != 0) return 2;
     std::printf("mask: %zu bytes hash=%llu PASS\n", record.bytes, static_cast<unsigned long long>(record.hash));
     return 0;

@@ -1,4 +1,5 @@
 """Paired mask blur timing, including allocation and temporary storage."""
+import argparse
 import json
 from pathlib import Path
 import platform
@@ -7,6 +8,10 @@ import subprocess
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--rect", action="store_true")
+    args = parser.parse_args()
+    mode = "--benchmark-rect" if args.rect else "--benchmark"
     rows = {}
     checksums = set()
     for trial in range(9):
@@ -15,7 +20,7 @@ def main():
             profiles.reverse()
         for profile in profiles:
             result = subprocess.check_output(
-                [str(Path("build") / profile / "stx_skia_mask_tests"), "--benchmark"],
+                [str(Path("build") / profile / "stx_skia_mask_tests"), mode],
                 text=True)
             for line in result.splitlines():
                 if line.startswith("checksum="):
@@ -30,12 +35,13 @@ def main():
     report = {
         "platform": platform.platform(),
         "compiler": subprocess.check_output(["clang++", "--version"], text=True).splitlines()[0],
-        "key": "format,width,height,sigma,iterations",
+        "key": ("style" if args.rect else "format") + ",width,height,sigma,iterations",
         "seconds": rows,
         "checksum": sorted(checksums),
-        "scope": "Deterministic coverage pattern; padded rows; mask allocation, blur and destruction included; input preparation excluded. Nine alternating trials. Not whole GUI latency."
+        "mode": "analytic rectangle" if args.rect else "coverage mask",
+        "scope": "Allocation, blur and destruction included; input preparation excluded. Nine alternating trials. Not whole GUI latency. Coverage mode uses padded source rows; rectangle mode constructs analytic profiles."
     }
-    Path("build/mask-measurements.json").write_text(json.dumps(report, indent=2) + "\n")
+    Path("build/rect-measurements.json" if args.rect else "build/mask-measurements.json").write_text(json.dumps(report, indent=2) + "\n")
     for key, times in rows.items():
         baseline = statistics.median(times["baseline"])
         candidate = statistics.median(times["candidate"])

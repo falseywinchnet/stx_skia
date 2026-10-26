@@ -116,3 +116,14 @@ traversal, temporary coefficients and borrowed descriptor mutation explicit.
 Bounds/allocation rejection and moved-from states have candidate-only checks.
 tests/mask.cpp and tools/measure_masks.py are original deterministic coverage and
 measurement code; native CI compares complete mask output across both profiles.
+
+
+## Blur styles and analytic rectangles
+
+SkBlurMask.cpp/.h retain original reference copies. The derivative preserves
+common rendering arithmetic, removes unused scanline allocations and expresses
+coverage-product bounds in uint16_t. Direct Gaussian reference convolution now
+honors source row stride; failure and extent validation are explicit. The unused
+BlurRRect declaration had no implementation or source caller and was removed;
+rounded-rectangle rendering remains in the retained mask-filter implementation.
+Expanded deterministic cases and rectangle timing are original project tests.

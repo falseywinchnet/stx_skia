@@ -19,6 +19,8 @@
 #include "src/core/SkMaskBlurFilter.h"
 #include "src/core/SkMathPriv.h"
 
+#include <algorithm>
+#include <limits>
 #include <cmath>
 #include <cstring>
 #include <utility>
@@ -35,32 +37,32 @@ using namespace skia_private;
 static const SkScalar kBLUR_SIGMA_SCALE = 0.57735f;
 
 SkScalar SkBlurMask::ConvertRadiusToSigma(SkScalar radius) {
-    return radius > 0 ? kBLUR_SIGMA_SCALE * radius + 0.5f : 0.0f;
+    const SkScalar sigma = radius > 0 ? kBLUR_SIGMA_SCALE * radius + 0.5f : 0.0f;
+    return sigma;
 }
 
 SkScalar SkBlurMask::ConvertSigmaToRadius(SkScalar sigma) {
-    return sigma > 0.5f ? (sigma - 0.5f) / kBLUR_SIGMA_SCALE : 0.0f;
+    const SkScalar radius = sigma > 0.5f ? (sigma - 0.5f) / kBLUR_SIGMA_SCALE : 0.0f;
+    return radius;
 }
 
 
+// Caller-established live row extents; dst may equal blur for matching positions.
+// Source iterators advance only when another row remains in the input allocation.
 template <typename AlphaIter>
 static void merge_src_with_blur(uint8_t dst[], int dstRB,
                                 AlphaIter src, int srcRB,
                                 const uint8_t blur[], int blurRB,
                                 int sw, int sh) {
-    dstRB -= sw;
-    blurRB -= sw;
-    while (--sh >= 0) {
+    for (int y = 0; y < sh; ++y) {
+        uint8_t* output = dst + static_cast<size_t>(y) * dstRB;
+        const uint8_t* blurred = blur + static_cast<size_t>(y) * blurRB;
         AlphaIter rowSrc(src);
-        for (int x = sw - 1; x >= 0; --x) {
-            *dst = SkToU8(SkAlphaMul(*blur, SkAlpha255To256(*rowSrc)));
-            ++dst;
+        for (int x = 0; x < sw; ++x) {
+            output[x] = SkToU8(SkAlphaMul(blurred[x], SkAlpha255To256(*rowSrc)));
             ++rowSrc;
-            ++blur;
         }
-        dst += dstRB;
-        src >>= srcRB;
-        blur += blurRB;
+        if (y + 1 < sh) src >>= srcRB;
     }
 }
 
@@ -68,18 +70,16 @@ template <typename AlphaIter>
 static void clamp_solid_with_orig(uint8_t dst[], int dstRowBytes,
                                   AlphaIter src, int srcRowBytes,
                                   int sw, int sh) {
-    int x;
-    while (--sh >= 0) {
+    for (int y = 0; y < sh; ++y) {
+        uint8_t* output = dst + static_cast<size_t>(y) * dstRowBytes;
         AlphaIter rowSrc(src);
-        for (x = sw - 1; x >= 0; --x) {
-            int s = *rowSrc;
-            int d = *dst;
-            *dst = SkToU8(s + d - SkMulDiv255Round(s, d));
-            ++dst;
+        for (int x = 0; x < sw; ++x) {
+            const int s = *rowSrc;
+            const int d = output[x];
+            output[x] = SkToU8(s + d - SkMulDiv255Round(s, d));
             ++rowSrc;
         }
-        dst += dstRowBytes - sw;
-        src >>= srcRowBytes;
+        if (y + 1 < sh) src >>= srcRowBytes;
     }
 }
 
@@ -87,19 +87,29 @@ template <typename AlphaIter>
 static void clamp_outer_with_orig(uint8_t dst[], int dstRowBytes,
                                   AlphaIter src, int srcRowBytes,
                                   int sw, int sh) {
-    int x;
-    while (--sh >= 0) {
+    for (int y = 0; y < sh; ++y) {
+        uint8_t* output = dst + static_cast<size_t>(y) * dstRowBytes;
         AlphaIter rowSrc(src);
-        for (x = sw - 1; x >= 0; --x) {
-            int srcValue = *rowSrc;
-            if (srcValue) {
-                *dst = SkToU8(SkAlphaMul(*dst, SkAlpha255To256(255 - srcValue)));
+        for (int x = 0; x < sw; ++x) {
+            const int srcValue = *rowSrc;
+            if (srcValue != 0) {
+                output[x] = SkToU8(SkAlphaMul(output[x], SkAlpha255To256(255 - srcValue)));
             }
-            ++dst;
             ++rowSrc;
         }
-        dst += dstRowBytes - sw;
-        src >>= srcRowBytes;
+        if (y + 1 < sh) src >>= srcRowBytes;
+    }
+}
+
+static bool valid_style(SkBlurStyle style) {
+    switch (style) {
+        case kNormal_SkBlurStyle:
+        case kSolid_SkBlurStyle:
+        case kOuter_SkBlurStyle:
+        case kInner_SkBlurStyle:
+            return true;
+        default:
+            return false;
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -109,7 +119,10 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
                          SkScalar sigma,
                          SkBlurStyle style,
                          SkIVector* margin) {
-    SkASSERT(dst);
+    if (dst == nullptr || !valid_style(style) || !std::isfinite(sigma) || sigma < 0) return false;
+    const int64_t width = src.fBounds.width64();
+    const int64_t height = src.fBounds.height64();
+    if (width <= 0 || height <= 0 || width > INT32_MAX || height > INT32_MAX) return false;
     if (src.fFormat != SkMask::kBW_Format &&
         src.fFormat != SkMask::kA8_Format &&
         src.fFormat != SkMask::kARGB32_Format &&
@@ -123,10 +136,10 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
         // If there is no effective blur most styles will just produce the original mask.
         // However, kOuter_SkBlurStyle will produce an empty mask.
         if (style == kOuter_SkBlurStyle) {
-            dst->image() = nullptr;
-            dst->bounds() = SkIRect::MakeEmpty();
-            dst->rowBytes() = dst->fBounds.width();
-            dst->format() = SkMask::kA8_Format;
+            (*dst).image() = nullptr;
+            (*dst).bounds() = SkIRect::MakeEmpty();
+            (*dst).rowBytes() = (*dst).fBounds.width();
+            (*dst).format() = SkMask::kA8_Format;
             if (margin != nullptr) {
                 // This filter will disregard the src.fImage completely.
                 // The margin is actually {-(src.fBounds.width() / 2), -(src.fBounds.height() / 2)}
@@ -139,9 +152,9 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
     }
     const SkIVector border = blurFilter.blur(src, dst);
 
-    if (src.fImage != nullptr && dst->fImage == nullptr) {
+    if (src.fImage != nullptr && (*dst).fImage == nullptr) {
         // The call to blur() failed to set our destination image up (e.g. an overflow).
-        // Note that if src.fImage was null, dst->fImage will also be null and that's
+        // Note that if src.fImage was null, (*dst).fImage will also be null and that's
         // *not* an error case - the code should continue to calculate the border.
         return false;
     }
@@ -152,8 +165,8 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
 
     if (src.fImage == nullptr) {
         if (style == kInner_SkBlurStyle) {
-            dst->bounds() = src.fBounds; // restore trimmed bounds
-            dst->rowBytes() = dst->fBounds.width();
+            (*dst).bounds() = src.fBounds; // restore trimmed bounds
+            (*dst).rowBytes() = (*dst).fBounds.width();
         }
         return true;
     }
@@ -162,31 +175,32 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
         case kNormal_SkBlurStyle:
             break;
         case kSolid_SkBlurStyle: {
-            auto dstStart = &dst->image()[border.x() + border.y() * dst->fRowBytes];
+            const size_t offset = static_cast<size_t>(border.y()) * (*dst).fRowBytes + border.x();
+            uint8_t* dstStart = (*dst).image() + offset;
             switch (src.fFormat) {
                 case SkMask::kBW_Format:
                     clamp_solid_with_orig(
-                            dstStart, dst->fRowBytes,
+                            dstStart, (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kBW_Format>(src.fImage, 0), src.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                     break;
                 case SkMask::kA8_Format:
                     clamp_solid_with_orig(
-                            dstStart, dst->fRowBytes,
+                            dstStart, (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kA8_Format>(src.fImage), src.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                     break;
                 case SkMask::kARGB32_Format: {
                     const uint32_t* srcARGB = reinterpret_cast<const uint32_t*>(src.fImage);
                     clamp_solid_with_orig(
-                            dstStart, dst->fRowBytes,
+                            dstStart, (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kARGB32_Format>(srcARGB), src.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                 } break;
                 case SkMask::kLCD16_Format: {
                     const uint16_t* srcLCD = reinterpret_cast<const uint16_t*>(src.fImage);
                     clamp_solid_with_orig(
-                            dstStart, dst->fRowBytes,
+                            dstStart, (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kLCD16_Format>(srcLCD), src.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                 } break;
@@ -195,31 +209,32 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
             }
         } break;
         case kOuter_SkBlurStyle: {
-            auto dstStart = &dst->image()[border.x() + border.y() * dst->fRowBytes];
+            const size_t offset = static_cast<size_t>(border.y()) * (*dst).fRowBytes + border.x();
+            uint8_t* dstStart = (*dst).image() + offset;
             switch (src.fFormat) {
                 case SkMask::kBW_Format:
                     clamp_outer_with_orig(
-                            dstStart, dst->fRowBytes,
+                            dstStart, (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kBW_Format>(src.fImage, 0), src.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                     break;
                 case SkMask::kA8_Format:
                     clamp_outer_with_orig(
-                            dstStart, dst->fRowBytes,
+                            dstStart, (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kA8_Format>(src.fImage), src.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                     break;
                 case SkMask::kARGB32_Format: {
                     const uint32_t* srcARGB = reinterpret_cast<const uint32_t*>(src.fImage);
                     clamp_outer_with_orig(
-                            dstStart, dst->fRowBytes,
+                            dstStart, (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kARGB32_Format>(srcARGB), src.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                 } break;
                 case SkMask::kLCD16_Format: {
                     const uint16_t* srcLCD = reinterpret_cast<const uint16_t*>(src.fImage);
                     clamp_outer_with_orig(
-                            dstStart, dst->fRowBytes,
+                            dstStart, (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kLCD16_Format>(srcLCD), src.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                 } break;
@@ -229,28 +244,29 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
         } break;
         case kInner_SkBlurStyle: {
             // now we allocate the "real" dst, mirror the size of src
+            SkAutoMaskFreeImage blurOwner((*dst).image());
             SkMaskBuilder blur = std::move(*dst);
-            SkAutoMaskFreeImage autoFreeBlurMask(blur.image());
 
             *dst = SkMaskBuilder(nullptr, src.fBounds, src.fBounds.width(), blur.format());
-            size_t dstSize = dst->computeImageSize();
+            size_t dstSize = (*dst).computeImageSize();
             if (0 == dstSize) {
                 return false;   // too big to allocate, abort
             }
-            dst->image() = SkMaskBuilder::AllocImage(dstSize);
+            (*dst).image() = SkMaskBuilder::AllocImage(dstSize);
 
-            auto blurStart = &blur.image()[border.x() + border.y() * blur.fRowBytes];
+            const size_t offset = static_cast<size_t>(border.y()) * blur.fRowBytes + border.x();
+            const uint8_t* blurStart = blur.image() + offset;
             switch (src.fFormat) {
                 case SkMask::kBW_Format:
                     merge_src_with_blur(
-                            dst->image(), dst->fRowBytes,
+                            (*dst).image(), (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kBW_Format>(src.fImage, 0), src.fRowBytes,
                             blurStart, blur.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
                     break;
                 case SkMask::kA8_Format:
                     merge_src_with_blur(
-                            dst->image(), dst->fRowBytes,
+                            (*dst).image(), (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kA8_Format>(src.fImage), src.fRowBytes,
                             blurStart, blur.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
@@ -258,7 +274,7 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
                 case SkMask::kARGB32_Format: {
                     const uint32_t* srcARGB = reinterpret_cast<const uint32_t*>(src.fImage);
                     merge_src_with_blur(
-                            dst->image(), dst->fRowBytes,
+                            (*dst).image(), (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kARGB32_Format>(srcARGB), src.fRowBytes,
                             blurStart, blur.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
@@ -266,7 +282,7 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
                 case SkMask::kLCD16_Format: {
                     const uint16_t* srcLCD = reinterpret_cast<const uint16_t*>(src.fImage);
                     merge_src_with_blur(
-                            dst->image(), dst->fRowBytes,
+                            (*dst).image(), (*dst).fRowBytes,
                             SkMask::AlphaIter<SkMask::kLCD16_Format>(srcLCD), src.fRowBytes,
                             blurStart, blur.fRowBytes,
                             src.fBounds.width(), src.fBounds.height());
@@ -275,6 +291,8 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
                     SK_ABORT("Unhandled format.");
             }
         } break;
+        default:
+            SK_ABORT("Invalid validated blur style.");
     }
 
     return true;
@@ -328,12 +346,15 @@ static float gaussianIntegral(float x) {
     float x3 = x2*x;
 
     if ( x > 0.5f ) {
-        return 0.5625f - (x3 / 6.0f - 3.0f * x2 * 0.25f + 1.125f * x);
+        const float integral = 0.5625f - (x3 / 6.0f - 3.0f * x2 * 0.25f + 1.125f * x);
+        return integral;
     }
     if ( x > -0.5f ) {
-        return 0.5f - (0.75f * x - x3 / 3.0f);
+        const float integral = 0.5f - (0.75f * x - x3 / 3.0f);
+        return integral;
     }
-    return 0.4375f + (-x3 / 6.0f - 3.0f * x2 * 0.25f - 1.125f * x);
+    const float integral = 0.4375f + (-x3 / 6.0f - 3.0f * x2 * 0.25f - 1.125f * x);
+    return integral;
 }
 
 /*  ComputeBlurProfile fills in an array of floating
@@ -355,7 +376,7 @@ void SkBlurMask::ComputeBlurProfile(uint8_t* profile, int size, SkScalar sigma) 
     for (int x = 1 ; x < size ; ++x) {
         float scaled_x = (center - x - .5f) * invr;
         float gi = gaussianIntegral(scaled_x);
-        profile[x] = 255 - (uint8_t) (255.f * gi);
+        profile[x] = static_cast<uint8_t>(255 - static_cast<uint8_t>(255.f * gi));
     }
 }
 
@@ -368,137 +389,134 @@ void SkBlurMask::ComputeBlurProfile(uint8_t* profile, int size, SkScalar sigma) 
 
 uint8_t SkBlurMask::ProfileLookup(const uint8_t *profile, int loc,
                                   int blurredWidth, int sharpWidth) {
-    // how far are we from the original edge?
-    int dx = SkAbs32(((loc << 1) + 1) - blurredWidth) - sharpWidth;
-    int ox = dx >> 1;
-    if (ox < 0) {
-        ox = 0;
-    }
-
-    return profile[ox];
+    // For 0 <= loc < blurredWidth <= INT32_MAX, center before doubling.
+    // This keeps the signed distance within [-INT32_MAX, INT32_MAX] without
+    // widening every lane of the scanline kernel. sharpWidth is in [0,width].
+    const int center = blurredWidth / 2;
+    const int delta = loc - center;
+    const int distance = 2 * delta + ((blurredWidth & 1) == 0 ? 1 : 0);
+    const int absolute = distance < 0 ? -distance : distance;
+    const int dx = absolute - sharpWidth;
+    const int offset = dx > 0 ? dx / 2 : 0;
+    return profile[offset];
 }
 
-void SkBlurMask::ComputeBlurredScanline(uint8_t *pixels, const uint8_t *profile,
-                                        unsigned int width, SkScalar sigma) {
-
-    unsigned int profile_size = SkScalarCeilToInt(6*sigma);
-    skia_private::AutoTMalloc<uint8_t> horizontalScanline(width);
-
-    unsigned int sw = width - profile_size;
-    // nearest odd number less than the profile size represents the center
-    // of the (2x scaled) profile
-    int center = ( profile_size & ~1 ) - 1;
-
-    int w = sw - center;
-
-    for (unsigned int x = 0 ; x < width ; ++x) {
-       if (profile_size <= sw) {
-           pixels[x] = ProfileLookup(profile, x, width, w);
-       } else {
-           float span = float(sw)/(2*sigma);
-           float giX = 1.5f - (x+.5f)/(2*sigma);
-           pixels[x] = (uint8_t) (255 * (gaussianIntegral(giX) - gaussianIntegral(giX + span)));
-       }
+void SkBlurMask::ComputeBlurredScanline(uint8_t* pixels, const uint8_t* profile,
+                                       unsigned int width, SkScalar sigma) {
+    const unsigned int profile_size = static_cast<unsigned int>(SkScalarCeilToInt(6 * sigma));
+    SkASSERT(profile_size > 0 && profile_size <= width && width <= INT32_MAX);
+    const unsigned int sharp_width = width - profile_size;
+    // The nearest odd value below profile_size is the doubled profile center.
+    const int center = static_cast<int>(profile_size & ~1U) - 1;
+    const int sharp_extent = static_cast<int>(sharp_width) - center;
+    if (profile_size <= sharp_width) {
+        for (unsigned int x = 0; x < width; ++x) {
+            pixels[x] = ProfileLookup(profile, static_cast<int>(x), static_cast<int>(width), sharp_extent);
+        }
+        return;
+    }
+    const float span = static_cast<float>(sharp_width) / (2 * sigma);
+    for (unsigned int x = 0; x < width; ++x) {
+        const float giX = 1.5f - (static_cast<float>(x) + .5f) / (2 * sigma);
+        const float coverage = 255 * (gaussianIntegral(giX) - gaussianIntegral(giX + span));
+        pixels[x] = static_cast<uint8_t>(coverage);
     }
 }
 
-bool SkBlurMask::BlurRect(SkScalar sigma,
-                          SkMaskBuilder* dst,
-                          const SkRect& src,
-                          SkBlurStyle style,
-                          SkIVector* margin,
+bool SkBlurMask::BlurRect(SkScalar sigma, SkMaskBuilder* dst, const SkRect& src,
+                          SkBlurStyle style, SkIVector* margin,
                           SkMaskBuilder::CreateMode createMode) {
-    int profileSize = SkScalarCeilToInt(6*sigma);
-    if (profileSize <= 0) {
-        return false;   // no blur to compute
+    if (dst == nullptr || !valid_style(style) || !std::isfinite(sigma) || sigma <= 0 ||
+        !src.isFinite() || src.isEmpty()) return false;
+    switch (createMode) {
+        case SkMaskBuilder::kJustComputeBounds_CreateMode:
+        case SkMaskBuilder::kJustRenderImage_CreateMode:
+        case SkMaskBuilder::kComputeBoundsAndRenderImage_CreateMode:
+            break;
+        default:
+            return false;
     }
-
-    int pad = profileSize/2;
-    if (margin) {
-        margin->set( pad, pad );
-    }
-
-    dst->bounds().setLTRB(SkScalarRoundToInt(src.fLeft - pad),
-                         SkScalarRoundToInt(src.fTop - pad),
-                         SkScalarRoundToInt(src.fRight + pad),
-                         SkScalarRoundToInt(src.fBottom + pad));
-
-    dst->rowBytes() = dst->fBounds.width();
-    dst->format() = SkMask::kA8_Format;
-    dst->image() = nullptr;
-
-    int             sw = SkScalarFloorToInt(src.width());
-    int             sh = SkScalarFloorToInt(src.height());
-
+    const int profileSize = SkScalarCeilToInt(6 * sigma);
+    if (profileSize <= 0) return false;
+    const int pad = profileSize / 2;
+    // Check the unrounded coordinate range before the float-to-int helpers clamp.
+    const double left = static_cast<double>(src.fLeft) - pad;
+    const double top = static_cast<double>(src.fTop) - pad;
+    const double right = static_cast<double>(src.fRight) + pad;
+    const double bottom = static_cast<double>(src.fBottom) + pad;
+    if (left < INT32_MIN || top < INT32_MIN || right > INT32_MAX || bottom > INT32_MAX) return false;
+    const SkIRect bounds = SkIRect::MakeLTRB(SkScalarRoundToInt(src.fLeft - pad),
+                                            SkScalarRoundToInt(src.fTop - pad),
+                                            SkScalarRoundToInt(src.fRight + pad),
+                                            SkScalarRoundToInt(src.fBottom + pad));
+    const int64_t width = bounds.width64();
+    const int64_t height = bounds.height64();
+    if (width <= 0 || height <= 0 || width > INT32_MAX || height > INT32_MAX) return false;
+    const SkIRect innerBounds = src.round();
+    const int sw = SkScalarFloorToInt(src.width());
+    const int sh = SkScalarFloorToInt(src.height());
+    if (sw < 0 || sh < 0 || static_cast<int64_t>(sw) + 2 * pad > width ||
+        static_cast<int64_t>(sh) + 2 * pad > height) return false;
+    // The analytic inner shortcut historically uses floor-sized scanlines.
+    // Refuse inconsistent rounded geometry instead of publishing a partial mask.
+    if (style == kInner_SkBlurStyle &&
+        (sw <= 0 || sh <= 0 || innerBounds.width64() != sw || innerBounds.height64() != sh)) return false;
+    if (width < profileSize || height < profileSize) return false;
+    SkMaskBuilder result(nullptr, bounds, static_cast<uint32_t>(width), SkMask::kA8_Format);
+    const size_t dstSize = result.computeImageSize();
+    if (dstSize == 0) return false;
+    if (margin != nullptr) (*margin).set(pad, pad);
     if (createMode == SkMaskBuilder::kJustComputeBounds_CreateMode) {
         if (style == kInner_SkBlurStyle) {
-            dst->bounds() = src.round(); // restore trimmed bounds
-            dst->rowBytes() = sw;
+            result.bounds() = innerBounds;
+            result.rowBytes() = static_cast<uint32_t>(sw);
         }
+        *dst = std::move(result);
         return true;
     }
 
     AutoTMalloc<uint8_t> profile(profileSize);
-
-    ComputeBlurProfile(profile, profileSize, sigma);
-
-    size_t dstSize = dst->computeImageSize();
-    if (0 == dstSize) {
-        return false;   // too big to allocate, abort
-    }
-
-    uint8_t* dp = SkMaskBuilder::AllocImage(dstSize);
-    dst->image() = dp;
-
-    int dstHeight = dst->fBounds.height();
-    int dstWidth = dst->fBounds.width();
-
-    uint8_t *outptr = dp;
-
+    ComputeBlurProfile(profile.get(), profileSize, sigma);
+    const int dstWidth = static_cast<int>(width);
+    const int dstHeight = static_cast<int>(height);
     AutoTMalloc<uint8_t> horizontalScanline(dstWidth);
     AutoTMalloc<uint8_t> verticalScanline(dstHeight);
-
-    ComputeBlurredScanline(horizontalScanline, profile, dstWidth, sigma);
-    ComputeBlurredScanline(verticalScanline, profile, dstHeight, sigma);
-
-    for (int y = 0 ; y < dstHeight ; ++y) {
-        for (int x = 0 ; x < dstWidth ; x++) {
-            unsigned int maskval = SkMulDiv255Round(horizontalScanline[x], verticalScanline[y]);
-            *(outptr++) = maskval;
+    ComputeBlurredScanline(horizontalScanline.get(), profile.get(), dstWidth, sigma);
+    ComputeBlurredScanline(verticalScanline.get(), profile.get(), dstHeight, sigma);
+    SkAutoMaskFreeImage pixels(SkMaskBuilder::AllocImage(dstSize));
+    for (int y = 0; y < dstHeight; ++y) {
+        uint8_t* row = pixels.get() + static_cast<size_t>(y) * dstWidth;
+        const uint8_t vertical = verticalScanline[y];
+        for (int x = 0; x < dstWidth; ++x) {
+            // Byte coverage bounds the product by 65025. Adding 128 and then
+            // its high byte reaches at most 65407: every stage fits uint16_t.
+            // This is exactly SkMulDiv255Round, with its lane bounds explicit.
+            const uint16_t product = static_cast<uint16_t>(horizontalScanline[x] * vertical);
+            const uint16_t rounded = static_cast<uint16_t>(product + 128);
+            const uint16_t combined = static_cast<uint16_t>(rounded + (rounded >> 8));
+            row[x] = static_cast<uint8_t>(combined >> 8);
         }
     }
-
     if (style == kInner_SkBlurStyle) {
-        // now we allocate the "real" dst, mirror the size of src
-        size_t srcSize = (size_t)(src.width() * src.height());
-        if (0 == srcSize) {
-            return false;   // too big to allocate, abort
+        const size_t innerSize = static_cast<size_t>(sw) * sh;
+        SkAutoMaskFreeImage inner(SkMaskBuilder::AllocImage(innerSize));
+        for (int y = 0; y < sh; ++y) {
+            const size_t sourceOffset = static_cast<size_t>(y + pad) * dstWidth + pad;
+            uint8_t* row = inner.get() + static_cast<size_t>(y) * sw;
+            std::memcpy(row, pixels.get() + sourceOffset, static_cast<size_t>(sw));
         }
-        dst->image() = SkMaskBuilder::AllocImage(srcSize);
-        for (int y = 0 ; y < sh ; y++) {
-            uint8_t *blur_scanline = dp + (y+pad)*dstWidth + pad;
-            uint8_t *inner_scanline = dst->image() + y*sw;
-            memcpy(inner_scanline, blur_scanline, sw);
-        }
-        SkMaskBuilder::FreeImage(dp);
-
-        dst->bounds() = src.round(); // restore trimmed bounds
-        dst->rowBytes() = sw;
-
-    } else if (style == kOuter_SkBlurStyle) {
-        for (int y = pad ; y < dstHeight-pad ; y++) {
-            uint8_t *dst_scanline = dp + y*dstWidth + pad;
-            memset(dst_scanline, 0, sw);
-        }
-    } else if (style == kSolid_SkBlurStyle) {
-        for (int y = pad ; y < dstHeight-pad ; y++) {
-            uint8_t *dst_scanline = dp + y*dstWidth + pad;
-            memset(dst_scanline, 0xff, sw);
+        pixels = std::move(inner);
+        result.bounds() = innerBounds;
+        result.rowBytes() = static_cast<uint32_t>(sw);
+    } else if (style == kOuter_SkBlurStyle || style == kSolid_SkBlurStyle) {
+        const int fill = style == kSolid_SkBlurStyle ? 255 : 0;
+        for (int y = pad; y < dstHeight - pad; ++y) {
+            uint8_t* row = pixels.get() + static_cast<size_t>(y) * dstWidth + pad;
+            std::memset(row, fill, static_cast<size_t>(sw));
         }
     }
-    // normal and solid styles are the same for analytic rect blurs, so don't
-    // need to handle solid specially.
-
+    result.image() = pixels.release();
+    *dst = std::move(result);
     return true;
 }
 
@@ -506,159 +524,122 @@ bool SkBlurMask::BlurRect(SkScalar sigma,
 // gaussian kernel.  It's "ground truth" in a sense; too slow to be used, but very
 // useful for correctness comparisons.
 
-bool SkBlurMask::BlurGroundTruth(SkScalar sigma,
-                                 SkMaskBuilder* dst,
-                                 const SkMask& src,
-                                 SkBlurStyle style,
-                                 SkIVector* margin) {
-    if (src.fFormat != SkMask::kA8_Format) {
-        return false;
+bool SkBlurMask::BlurGroundTruth(SkScalar sigma, SkMaskBuilder* dst,
+                                 const SkMask& src, SkBlurStyle style, SkIVector* margin) {
+    if (dst == nullptr || src.fFormat != SkMask::kA8_Format || !valid_style(style) ||
+        !std::isfinite(sigma) || sigma <= 0) return false;
+    const int64_t sourceWidth = src.fBounds.width64();
+    const int64_t sourceHeight = src.fBounds.height64();
+    if (sourceWidth <= 0 || sourceHeight <= 0 || sourceWidth > INT32_MAX ||
+        sourceHeight > INT32_MAX || src.fRowBytes > INT32_MAX) return false;
+    if (src.fImage != nullptr && src.fRowBytes < sourceWidth) return false;
+    const float variance = sigma * sigma;
+    const int windowSize = SkScalarCeilToInt(sigma * 6) | 1;
+    if (windowSize <= 0) return false;
+    const int pad = windowSize >> 1;
+    const SkMask metadata(nullptr, src.fBounds, src.fRowBytes, SkMask::kA8_Format);
+    SkMaskBuilder result = SkMaskBuilder::PrepareDestination(pad, pad, metadata);
+    const size_t dstSize = result.computeImageSize();
+    if (dstSize == 0) return false;
+    if (src.fImage == nullptr) {
+        if (style == kInner_SkBlurStyle) {
+            result.bounds() = src.fBounds;
+            result.rowBytes() = src.fRowBytes;
+        }
+        *dst = std::move(result);
+        if (margin != nullptr) (*margin).set(pad, pad);
+        return true;
     }
 
-    float variance = sigma * sigma;
-
-    int windowSize = SkScalarCeilToInt(sigma*6);
-    // round window size up to nearest odd number
-    windowSize |= 1;
-
+    const int64_t paddedWidth = sourceWidth + 4 * static_cast<int64_t>(pad);
+    const int64_t temporaryWidth = sourceHeight + 4 * static_cast<int64_t>(pad);
+    const int64_t temporaryHeight = paddedWidth - 2 * static_cast<int64_t>(pad);
+    if (paddedWidth > INT32_MAX || temporaryWidth > INT32_MAX || temporaryHeight > INT32_MAX) return false;
+    const int64_t padCount = paddedWidth * sourceHeight;
+    const int64_t tmpCount = temporaryWidth * temporaryHeight;
+    if (padCount > INT32_MAX || tmpCount > INT32_MAX / static_cast<int64_t>(sizeof(float))) return false;
+    const int srcWidth = static_cast<int>(sourceWidth);
+    const int srcHeight = static_cast<int>(sourceHeight);
+    const int dstWidth = result.fBounds.width();
+    const int padWidth = static_cast<int>(paddedWidth);
+    const int tmpWidth = static_cast<int>(temporaryWidth);
+    const int tmpHeight = static_cast<int>(temporaryHeight);
     AutoTMalloc<float> gaussWindow(windowSize);
-
-    int halfWindow = windowSize >> 1;
-
-    gaussWindow[halfWindow] = 1;
-
+    gaussWindow[pad] = 1;
     float windowSum = 1;
-    for (int x = 1 ; x <= halfWindow ; ++x) {
-        float gaussian = expf(-x*x / (2*variance));
-        gaussWindow[halfWindow + x] = gaussWindow[halfWindow-x] = gaussian;
-        windowSum += 2*gaussian;
+    for (int x = 1; x <= pad; ++x) {
+        const float position = static_cast<float>(x);
+        const float gaussian = expf(-position * position / (2 * variance));
+        gaussWindow[pad + x] = gaussian;
+        gaussWindow[pad - x] = gaussian;
+        windowSum += 2 * gaussian;
     }
-
-    // leave the filter un-normalized for now; we will divide by the normalization
-    // sum later;
-
-    int pad = halfWindow;
-    if (margin) {
-        margin->set( pad, pad );
+    AutoTMalloc<uint8_t> padPixels(static_cast<size_t>(padCount));
+    std::memset(padPixels.get(), 0, static_cast<size_t>(padCount));
+    for (int y = 0; y < srcHeight; ++y) {
+        uint8_t* padded = padPixels.get() + static_cast<size_t>(y) * padWidth + 2 * pad;
+        const uint8_t* source = src.fImage + static_cast<size_t>(y) * src.fRowBytes;
+        std::memcpy(padded, source, static_cast<size_t>(srcWidth));
     }
-
-    dst->bounds() = src.fBounds;
-    dst->bounds().outset(pad, pad);
-
-    dst->rowBytes() = dst->fBounds.width();
-    dst->format() = SkMask::kA8_Format;
-    dst->image() = nullptr;
-
-    if (src.fImage) {
-
-        size_t dstSize = dst->computeImageSize();
-        if (0 == dstSize) {
-            return false;   // too big to allocate, abort
-        }
-
-        int             srcWidth = src.fBounds.width();
-        int             srcHeight = src.fBounds.height();
-        int             dstWidth = dst->fBounds.width();
-
-        const uint8_t*  srcPixels = src.fImage;
-        uint8_t*        dstPixels = SkMaskBuilder::AllocImage(dstSize);
-        SkAutoMaskFreeImage autoFreeDstPixels(dstPixels);
-
-        // do the actual blur.  First, make a padded copy of the source.
-        // use double pad so we never have to check if we're outside anything
-
-        int padWidth = srcWidth + 4*pad;
-        int padHeight = srcHeight;
-        int padSize = padWidth * padHeight;
-
-        AutoTMalloc<uint8_t> padPixels(padSize);
-        memset(padPixels, 0, padSize);
-
-        for (int y = 0 ; y < srcHeight; ++y) {
-            uint8_t* padptr = padPixels + y * padWidth + 2*pad;
-            const uint8_t* srcptr = srcPixels + y * srcWidth;
-            memcpy(padptr, srcptr, srcWidth);
-        }
-
-        // blur in X, transposing the result into a temporary floating point buffer.
-        // also double-pad the intermediate result so that the second blur doesn't
-        // have to do extra conditionals.
-
-        int tmpWidth = padHeight + 4*pad;
-        int tmpHeight = padWidth - 2*pad;
-        int tmpSize = tmpWidth * tmpHeight;
-
-        AutoTMalloc<float> tmpImage(tmpSize);
-        memset(tmpImage, 0, tmpSize*sizeof(tmpImage[0]));
-
-        for (int y = 0 ; y < padHeight ; ++y) {
-            uint8_t *srcScanline = padPixels + y*padWidth;
-            for (int x = pad ; x < padWidth - pad ; ++x) {
-                float *outPixel = tmpImage + (x-pad)*tmpWidth + y + 2*pad; // transposed output
-                uint8_t *windowCenter = srcScanline + x;
-                for (int i = -pad ; i <= pad ; ++i) {
-                    *outPixel += gaussWindow[pad+i]*windowCenter[i];
-                }
-                *outPixel /= windowSum;
+    AutoTMalloc<float> tmpImage(static_cast<size_t>(tmpCount));
+    std::fill_n(tmpImage.get(), static_cast<size_t>(tmpCount), 0.0f);
+    // Double padding keeps both convolution interiors free of boundary branches.
+    // The first pass transposes; the second restores the original orientation.
+    for (int y = 0; y < srcHeight; ++y) {
+        const uint8_t* source = padPixels.get() + static_cast<size_t>(y) * padWidth;
+        for (int x = pad; x < padWidth - pad; ++x) {
+            const uint8_t* center = source + x;
+            float sum = 0;
+            for (int i = -pad; i <= pad; ++i) {
+                sum += gaussWindow[pad + i] * center[i];
             }
+            const size_t offset = static_cast<size_t>(x - pad) * tmpWidth + y + 2 * pad;
+            tmpImage[offset] = sum / windowSum;
         }
-
-        // blur in Y; now filling in the actual desired destination.  We have to do
-        // the transpose again; these transposes guarantee that we read memory in
-        // linear order.
-
-        for (int y = 0 ; y < tmpHeight ; ++y) {
-            float *srcScanline = tmpImage + y*tmpWidth;
-            for (int x = pad ; x < tmpWidth - pad ; ++x) {
-                float *windowCenter = srcScanline + x;
-                float finalValue = 0;
-                for (int i = -pad ; i <= pad ; ++i) {
-                    finalValue += gaussWindow[pad+i]*windowCenter[i];
-                }
-                finalValue /= windowSum;
-                uint8_t *outPixel = dstPixels + (x-pad)*dstWidth + y; // transposed output
-                int integerPixel = int(finalValue + 0.5f);
-                *outPixel = SkTPin(SkClampPos(integerPixel), 0, 255);
+    }
+    SkAutoMaskFreeImage pixels(SkMaskBuilder::AllocImage(dstSize));
+    for (int y = 0; y < tmpHeight; ++y) {
+        const float* source = tmpImage.get() + static_cast<size_t>(y) * tmpWidth;
+        for (int x = pad; x < tmpWidth - pad; ++x) {
+            const float* center = source + x;
+            float finalValue = 0;
+            for (int i = -pad; i <= pad; ++i) {
+                finalValue += gaussWindow[pad + i] * center[i];
             }
+            finalValue /= windowSum;
+            const int integerPixel = static_cast<int>(finalValue + 0.5f);
+            const size_t offset = static_cast<size_t>(x - pad) * dstWidth + y;
+            pixels.get()[offset] = static_cast<uint8_t>(SkTPin(SkClampPos(integerPixel), 0, 255));
         }
-
-        dst->image() = dstPixels;
-        switch (style) {
-            case kNormal_SkBlurStyle:
-                break;
-            case kSolid_SkBlurStyle: {
-                clamp_solid_with_orig(
-                        dstPixels + pad*dst->fRowBytes + pad, dst->fRowBytes,
-                        SkMask::AlphaIter<SkMask::kA8_Format>(srcPixels), src.fRowBytes,
-                        srcWidth, srcHeight);
-            } break;
-            case kOuter_SkBlurStyle: {
-                clamp_outer_with_orig(
-                        dstPixels + pad*dst->fRowBytes + pad, dst->fRowBytes,
-                        SkMask::AlphaIter<SkMask::kA8_Format>(srcPixels), src.fRowBytes,
-                        srcWidth, srcHeight);
-            } break;
-            case kInner_SkBlurStyle: {
-                // now we allocate the "real" dst, mirror the size of src
-                size_t srcSize = src.computeImageSize();
-                if (0 == srcSize) {
-                    return false;   // too big to allocate, abort
-                }
-                dst->image() = SkMaskBuilder::AllocImage(srcSize);
-                merge_src_with_blur(dst->image(), src.fRowBytes,
-                    SkMask::AlphaIter<SkMask::kA8_Format>(srcPixels), src.fRowBytes,
-                    dstPixels + pad*dst->fRowBytes + pad,
-                    dst->fRowBytes, srcWidth, srcHeight);
-                SkMaskBuilder::FreeImage(dstPixels);
-            } break;
-        }
-        autoFreeDstPixels.release();
     }
-
-    if (style == kInner_SkBlurStyle) {
-        dst->bounds() = src.fBounds; // restore trimmed bounds
-        dst->rowBytes() = src.fRowBytes;
+    const size_t inset = static_cast<size_t>(pad) * result.fRowBytes + pad;
+    switch (style) {
+        case kNormal_SkBlurStyle:
+            break;
+        case kSolid_SkBlurStyle:
+            clamp_solid_with_orig(pixels.get() + inset, result.fRowBytes,
+                SkMask::AlphaIter<SkMask::kA8_Format>(src.fImage), src.fRowBytes, srcWidth, srcHeight);
+            break;
+        case kOuter_SkBlurStyle:
+            clamp_outer_with_orig(pixels.get() + inset, result.fRowBytes,
+                SkMask::AlphaIter<SkMask::kA8_Format>(src.fImage), src.fRowBytes, srcWidth, srcHeight);
+            break;
+        case kInner_SkBlurStyle: {
+            const size_t innerSize = src.computeImageSize();
+            if (innerSize == 0) return false;
+            SkAutoMaskFreeImage inner(SkMaskBuilder::AllocImage(innerSize, SkMaskBuilder::kZeroInit_Alloc));
+            merge_src_with_blur(inner.get(), src.fRowBytes,
+                SkMask::AlphaIter<SkMask::kA8_Format>(src.fImage), src.fRowBytes,
+                pixels.get() + inset, result.fRowBytes, srcWidth, srcHeight);
+            pixels = std::move(inner);
+            result.bounds() = src.fBounds;
+            result.rowBytes() = src.fRowBytes;
+        } break;
+        default:
+            SK_ABORT("Invalid validated blur style.");
     }
-
+    result.image() = pixels.release();
+    *dst = std::move(result);
+    if (margin != nullptr) (*margin).set(pad, pad);
     return true;
 }

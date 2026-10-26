@@ -21,6 +21,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Pixel conversion and row copies | `src/core/SkConvertPixels.cpp/.h`, `src/core/SkRectMemcpy.h` | 21,420 byte-exact format/alpha/color-space cases, row padding, exact extents, in-place swaps and invalid-input rejection |
 | Pixel views and scaling | `include/core/SkPixmap.h`, `src/core/SkPixmap.cpp`, `src/core/SkPixmapDraw.cpp` | Color getters, alpha/opacity, clipped reads/fills/subsets, named fill kernels, temporary-metadata borrow rejection and five sampling modes |
 | Mask descriptors and Gaussian blur | `src/core/SkMask.cpp/.h`, `src/core/SkMaskBlurFilter.cpp/.h` | Checked padded bounds, explicit borrowed storage, move-empty descriptors, exact last-row extents and 304 reference blur cases |
+| Blur style composition and analytic rectangles | `src/core/SkBlurMask.cpp/.h` | All four styles, exact analytic profiles, checked temporary extents, padded reference convolution, bounded 16-bit coverage arithmetic |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -125,8 +126,14 @@ capacity before loading vector arguments. Large-radius scans retain counts for
 strided columns instead of constructing a logical end pointer beyond the backing
 allocation. Source rows are borrowed individually; small-radius tail writes form
 only live row addresses. Results and measurement limits are in MASKS.md.
-SkBlurMask, blur-filter dispatch and the remaining mask rasterizers are still
-unconverted; this batch does not mark the whole blur subsystem complete.
+SkBlurMask is now converted separately: style-composition loops form live row
+addresses; analytic rectangle generation removes unused scanline allocations and
+selects its profile formula before traversal. Coverage multiplication uses proven
+16-bit intermediate bounds with exactly the original divide-by-255 rounding.
+The direct Gaussian comparison routine now respects source stride and checks
+scratch extents. Private failure/ownership contracts and exceptional geometry
+are recorded in BLUR_STYLES.md. Blur-filter dispatch and remaining mask
+rasterizers are still unconverted; this does not mark the subsystem complete.
 
 ## Still required
 
