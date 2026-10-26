@@ -52,7 +52,10 @@ find_package(stx_skia CONFIG REQUIRED)
 target_link_libraries(your_private_renderer PRIVATE stx_skia::stx_skia)
 ```
 
-The exported target requires C++20. Keep Skia types behind the application's
+The exported target requires C++20 and no RTTI for the private renderer target.
+Its classes do not supply RTTI; subclasses and instrumented consumers inherit
+the same setting through CMake. Windows Clang consumers also inherit the
+Microsoft syntax extension required by upstream headers. Keep Skia types behind the application's
 private renderer adapter. Installed headers include upstream declarations beyond
 the admitted subset; their presence does not promise those facilities are linked.
 `SkImages::DeferredFromEncodedData` rejects encoded input. Decode externally.

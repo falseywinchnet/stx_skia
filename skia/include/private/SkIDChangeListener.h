@@ -18,7 +18,7 @@
 /**
  * Used to be notified when a gen/unique ID is invalidated, typically to preemptively purge
  * associated items from a cache that are no longer reachable. The listener can
- * be marked for deregistration if the cached item is remove before the listener is
+ * be marked for deregistration if the cached item is removed before the listener is
  * triggered. This prevents unbounded listener growth when cache items are routinely
  * removed before the gen ID/unique ID is invalidated.
  */
@@ -37,9 +37,19 @@ public:
     void markShouldDeregister() { fShouldDeregister.store(true, std::memory_order_relaxed); }
 
     /** Indicates whether markShouldDeregister was called. */
-    bool shouldDeregister() { return fShouldDeregister.load(std::memory_order_acquire); }
+    bool shouldDeregister() {
+        const bool deregister = fShouldDeregister.load(std::memory_order_acquire);
+        return deregister;
+    }
 
-    /** Manages a list of SkIDChangeListeners. */
+    /** Owns listener references. Registration, counting, reset and changed() are
+     *  serialized by the list mutex. Notifications run under that mutex, so a
+     *  listener must not reenter the same list. Notification order is unspecified:
+     *  removing deregistered entries may move the final entry into their place.
+     *  Destruction requires exclusive ownership and notifies remaining listeners.
+     *  Any context borrowed by a listener must outlive that listener until notification
+     *  or deregistration and release have completed.
+     */
     class List {
     public:
         List();
@@ -53,8 +63,7 @@ public:
         void add(sk_sp<SkIDChangeListener> listener) SK_EXCLUDES(fMutex);
 
         /**
-         * The number of registered listeners (including deregisterd listeners that are yet-to-be
-         * removed.
+         * The number of stored listeners, including deregistered listeners awaiting removal.
          */
         int count() const SK_EXCLUDES(fMutex);
 

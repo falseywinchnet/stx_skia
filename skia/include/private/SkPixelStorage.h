@@ -24,20 +24,27 @@ public:
         kPixelRef,
     };
 
-    SkPixelStorage(Type type);
+    explicit SkPixelStorage(Type type);
     ~SkPixelStorage() override = default;
 
     uint32_t getPixelStorageId() const { return fID; }
     Type type() const { return fType; }
 
-    uint32_t getContentId() const { return fContentID.load(std::memory_order_relaxed); }
-    uint32_t incrementContentId() { return fContentID.fetch_add(1, std::memory_order_relaxed) + 1; }
+    uint32_t getContentId() const {
+        const uint32_t content = fContentID.load(std::memory_order_relaxed);
+        return content;
+    }
+    uint32_t incrementContentId() {
+        const uint32_t previous = fContentID.fetch_add(1, std::memory_order_relaxed);
+        const uint32_t content = previous + 1;
+        return content;
+    }
 
 private:
     Type fType;
     /**
-     * fID is a static identifier that differenciates PixelStorages. This is assigned at
-     * construciton and does not change.
+     * fID is a static identifier that differentiates PixelStorages. This is assigned at
+     * construction and does not change.
      */
     uint32_t fID;
     /**

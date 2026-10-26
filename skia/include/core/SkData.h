@@ -30,13 +30,18 @@ public:
      *  All empty objects compare as equal.
      */
     bool operator==(const SkData& rhs) const;
-    bool operator!=(const SkData& rhs) const { return !(*this == rhs); }
+    bool operator!=(const SkData& rhs) const {
+        const bool different = !(*this == rhs);
+        return different;
+    }
 
     /**
      * Calls == operator, but first checks if other is null (in which case it returns false)
      */
     bool equals(const SkData* other) const {
-        return (other != nullptr) && *this == *other;
+        if (other == nullptr) return false;
+        const bool equal = *this == *other;
+        return equal;
     }
 
     /**
@@ -44,31 +49,53 @@ public:
      * arguments are null.
      */
     static bool Equals(const SkData* a, const SkData* b) {
-        return (a == nullptr) ? (b == nullptr) : a->equals(b);
+        if (a == nullptr) {
+            const bool both_null = b == nullptr;
+            return both_null;
+        }
+        const bool equal = (*a).equals(b);
+        return equal;
     }
 
     /**
      *  Returns the number of bytes stored.
      */
-    size_t size() const { return fSpan.size(); }
+    size_t size() const {
+        const size_t length = fSpan.size();
+        return length;
+    }
 
     /**
      *  Returns the ptr to the data.
      */
-    const void* data() const { return fSpan.data(); }
+    const void* data() const {
+        const void* address = fSpan.data();
+        return address;
+    }
 
-    bool empty() const { return fSpan.empty(); }
+    bool empty() const {
+        const bool is_empty = fSpan.empty();
+        return is_empty;
+    }
 
-    const uint8_t* bytes() const { return reinterpret_cast<const uint8_t*>(this->data()); }
+    const uint8_t* bytes() const {
+        const uint8_t* address = reinterpret_cast<const uint8_t*>(data());
+        return address;
+    }
 
-    SkSpan<const uint8_t> byteSpan() const { return {this->bytes(), this->size()}; }
+    SkSpan<const uint8_t> byteSpan() const {
+        const SkSpan<const uint8_t> view = {bytes(), size()};
+        return view;
+    }
 
     /**
      *  USE WITH CAUTION.
-     *  Be sure other 'owners' of this object are not accessing it in aother thread.
+     *  The caller must have exclusive write access, including shared subsets.
+     *  The writable borrow lasts only while the backing owner remains alive.
      */
     void* writable_data() {
-        return fSpan.data();
+        void* address = fSpan.data();
+        return address;
     }
 
     /** Attempt to create a deep copy of the original data, using the default allocator.
@@ -98,7 +125,7 @@ public:
      *  Function that, if provided, will be called when the SkData goes out
      *  of scope, allowing for custom allocation/freeing of the data's contents.
      */
-    typedef void (*ReleaseProc)(const void* ptr, void* context);
+    using ReleaseProc = void (*)(const void* address, void* context);
 
     /**
      *  Create a new dataref by copying the specified data
@@ -137,12 +164,13 @@ public:
      *  SkData. Suitable for globals.
      */
     static sk_sp<SkData> MakeWithoutCopy(const void* data, size_t length) {
-        return MakeWithProc(data, length, NoopReleaseProc, nullptr);
+        sk_sp<SkData> result = MakeWithProc(data, length, NoopReleaseProc, nullptr);
+        return result;
     }
 
     /**
      *  Create a new dataref from a pointer allocated by malloc. The Data object
-     *  takes ownership of that allocation, and will handling calling sk_free.
+     *  takes ownership of that allocation, and will call sk_free.
      */
     static sk_sp<SkData> MakeFromMalloc(const void* data, size_t length);
 
@@ -180,14 +208,15 @@ public:
     /**
      *  DEPRECATED variant of src->shareSubset(offset, length)
      *
-     *  This variant checks if shaerSubset() returned null (because offset or length were out-of-range)
+     *  This variant checks if shareSubset() returned null (because offset or length were out-of-range)
      *  and returns an empty SkData, rather than returning null.
      */
     static sk_sp<SkData> MakeSubset(const SkData* src, size_t offset, size_t length) {
-        if (sk_sp<SkData> dst = const_cast<SkData*>(src)->shareSubset(offset, length)) {
-            return dst;
-        }
-        return SkData::MakeEmpty();
+        SkData& source = *const_cast<SkData*>(src);
+        sk_sp<SkData> result = source.shareSubset(offset, length);
+        if (result) return result;
+        result = SkData::MakeEmpty();
+        return result;
     }
 
     /**
@@ -199,7 +228,10 @@ public:
     /**
      *  DEPRECATED -- use empty()
      */
-    bool isEmpty() const { return fSpan.empty(); }
+    bool isEmpty() const {
+        const bool is_empty = fSpan.empty();
+        return is_empty;
+    }
 
 private:
     friend class SkNVRefCnt<SkData>;

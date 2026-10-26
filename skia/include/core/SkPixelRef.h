@@ -13,7 +13,6 @@
 #include "include/private/SkAPI.h"
 #include "include/private/SkIDChangeListener.h"
 #include "include/private/SkPixelStorage.h"
-#include "include/private/SkTo.h"
 
 #include <atomic>
 #include <cstddef>
@@ -24,14 +23,20 @@ class SkDiscardableMemory;
 /** \class SkPixelRef
 
     This class is the smart container for pixel memory, and is used with SkBitmap.
-    This class can be shared/accessed between multiple threads.
+    Reference counting, generation-ID acquisition and listener registration
+    support shared access. Pixel edits, mutability changes and dimension resets
+    require external synchronization; sharing this owner does not synchronize
+    its pixel buffer.
 */
 class SK_API SkPixelRef : public SkPixelStorage {
 public:
     SkPixelRef(int width, int height, void* addr, size_t rowBytes);
     ~SkPixelRef() override;
 
-    SkISize dimensions() const { return {fWidth, fHeight}; }
+    SkISize dimensions() const {
+        const SkISize size = {fWidth, fHeight};
+        return size;
+    }
     int width() const { return fWidth; }
     int height() const { return fHeight; }
     void* pixels() const { return fPixels; }
@@ -53,7 +58,10 @@ public:
     /** Returns true if this pixelref is marked as immutable, meaning that the
         contents of its pixels will not change for the lifetime of the pixelref.
     */
-    bool isImmutable() const { return fMutability != kMutable; }
+    bool isImmutable() const {
+        const bool immutable = fMutability != kMutable;
+        return immutable;
+    }
 
     /** Marks this pixelref is immutable, meaning that the contents of its
         pixels will not change for the lifetime of the pixelref. This state can
@@ -90,7 +98,11 @@ private:
     size_t              fRowBytes;
 
     // Bottom bit indicates the Gen ID is unique.
-    bool genIDIsUnique() const { return SkToBool(fTaggedGenID.load() & 1); }
+    bool genIDIsUnique() const {
+        const uint32_t tagged = fTaggedGenID.load();
+        const bool unique = (tagged & 1U) != 0;
+        return unique;
+    }
     mutable std::atomic<uint32_t> fTaggedGenID;
 
     SkIDChangeListener::List fGenIDChangeListeners;

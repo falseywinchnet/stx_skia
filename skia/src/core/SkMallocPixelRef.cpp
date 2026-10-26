@@ -16,67 +16,68 @@
 
 #include <utility>
 
-static bool is_valid(const SkImageInfo& info) {
+namespace {
+bool is_valid(const SkImageInfo& info) {
+    const unsigned int color_type = static_cast<unsigned int>(info.colorType());
+    const unsigned int alpha_type = static_cast<unsigned int>(info.alphaType());
     if (info.width() < 0 || info.height() < 0 ||
-        (unsigned)info.colorType() > (unsigned)kLastEnum_SkColorType ||
-        (unsigned)info.alphaType() > (unsigned)kLastEnum_SkAlphaType)
-    {
+        color_type > static_cast<unsigned int>(kLastEnum_SkColorType) ||
+        alpha_type > static_cast<unsigned int>(kLastEnum_SkAlphaType)) {
         return false;
     }
     return true;
 }
 
-sk_sp<SkPixelRef> SkMallocPixelRef::MakeAllocate(const SkImageInfo& info, size_t rowBytes) {
-    if (rowBytes == 0) {
-        rowBytes = info.minRowBytes();
-        // rowBytes can still be zero, if it overflowed (width * bytesPerPixel > size_t)
-        // or if colortype is unknown
-    }
-    if (!is_valid(info) || !info.validRowBytes(rowBytes)) {
-        return nullptr;
-    }
-    size_t size = info.computeByteSize(rowBytes);
-    if (SkImageInfo::ByteSizeOverflowed(size)) {
-        return nullptr;
-    }
-#if defined(SK_BUILD_FOR_FUZZER)
-    if (size > 10000000) {
-        return nullptr;
-    }
-#endif
-    void* addr = sk_calloc_canfail(size);
-    if (nullptr == addr) {
-        return nullptr;
-    }
+class AllocatedPixelRef final : public SkPixelRef {
+public:
+    AllocatedPixelRef(int width, int height, void* pixels, size_t row_bytes)
+        : SkPixelRef(width, height, pixels, row_bytes) {}
 
-    struct PixelRef final : public SkPixelRef {
-        PixelRef(int w, int h, void* s, size_t r) : SkPixelRef(w, h, s, r) {}
-        ~PixelRef() override { sk_free(this->pixels()); }
-    };
-    return sk_sp<SkPixelRef>(new PixelRef(info.width(), info.height(), addr, rowBytes));
+    ~AllocatedPixelRef() override {
+        sk_free(pixels());
+    }
+};
+
+class DataPixelRef final : public SkPixelRef {
+public:
+    DataPixelRef(int width, int height, void* pixels, size_t row_bytes, sk_sp<SkData> data)
+        : SkPixelRef(width, height, pixels, row_bytes), fData(std::move(data)) {}
+
+private:
+    // Retain the data owner for every access through the base pixel view.
+    sk_sp<SkData> fData;
+};
+}
+
+sk_sp<SkPixelRef> SkMallocPixelRef::MakeAllocate(const SkImageInfo& info, size_t row_bytes) {
+    if (row_bytes == 0) {
+        // Unknown color types and overflowing minimum strides may still give zero.
+        row_bytes = info.minRowBytes();
+    }
+    if (!is_valid(info) || !info.validRowBytes(row_bytes)) return nullptr;
+    const size_t size = info.computeByteSize(row_bytes);
+    if (SkImageInfo::ByteSizeOverflowed(size)) return nullptr;
+#if defined(SK_BUILD_FOR_FUZZER)
+    if (size > 10000000) return nullptr;
+#endif
+    void* pixels = sk_calloc_canfail(size);
+    if (pixels == nullptr) return nullptr;
+    sk_sp<SkPixelRef> result(new AllocatedPixelRef(info.width(), info.height(), pixels, row_bytes));
+    return result;
 }
 
 sk_sp<SkPixelRef> SkMallocPixelRef::MakeWithData(const SkImageInfo& info,
-                                                 size_t rowBytes,
-                                                 sk_sp<SkData> data) {
+                                              size_t row_bytes, sk_sp<SkData> data) {
     SkASSERT(data != nullptr);
-    if (!is_valid(info)) {
-        return nullptr;
-    }
-    // TODO: what should we return if computeByteSize returns 0?
-    // - the info was empty?
-    // - we overflowed computing the size?
-    if ((rowBytes < info.minRowBytes()) || (data->size() < info.computeByteSize(rowBytes))) {
-        return nullptr;
-    }
-    struct PixelRef final : public SkPixelRef {
-        sk_sp<SkData> fData;
-        PixelRef(int w, int h, void* s, size_t r, sk_sp<SkData> d)
-            : SkPixelRef(w, h, s, r), fData(std::move(d)) {}
-    };
-    void* pixels = const_cast<void*>(data->data());
-    sk_sp<SkPixelRef> pr(new PixelRef(info.width(), info.height(), pixels, rowBytes,
-                                      std::move(data)));
-    pr->setImmutable(); // since we were created with (immutable) data
-    return pr;
+    if (!is_valid(info)) return nullptr;
+    const size_t minimum_stride = info.minRowBytes();
+    if (row_bytes < minimum_stride) return nullptr;
+    const size_t required_bytes = info.computeByteSize(row_bytes);
+    if ((*data).size() < required_bytes) return nullptr;
+
+    void* pixels = const_cast<void*>((*data).data());
+    sk_sp<SkPixelRef> result(new DataPixelRef(info.width(), info.height(), pixels,
+                                           row_bytes, std::move(data)));
+    (*result).setImmutable();
+    return result;
 }

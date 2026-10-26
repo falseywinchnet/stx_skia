@@ -11,17 +11,20 @@
 class SkPixelRef;
 
 /**
- *  Return a new SkMallocPixelRef with the provided pixel storage and
+ *  Return a new pixel reference with the provided pixel storage and
  *  rowBytes. On destruction, ReleaseProc will be called.
  *
- *  If ReleaseProc is NULL, the pixels will never be released. This
+ *  If ReleaseProc is null, the pixels will never be released. This
  *  can be useful if the pixels were stack allocated. However, such an
- *  SkMallocPixelRef must not live beyond its pixels (e.g. by copying
+ *  pixel reference must not live beyond its pixels (e.g. by copying
  *  an SkBitmap pointing to it, or drawing to an SkPicture).
  *
- *  Returns NULL on failure.
+ *  Nonnegative dimensions and a valid pixel extent are caller preconditions.
+ *  A supplied callback owns release of the allocation; a null callback borrows
+ *  pixels until the final reference is destroyed. Object allocation follows
+ *  Skia's fail-fast policy.
  */
-sk_sp<SkPixelRef> SkMakePixelRefWithProc(int w, int h, size_t rowBytes, void* addr,
-                                         void (*releaseProc)(void* addr, void* ctx), void* ctx);
+sk_sp<SkPixelRef> SkMakePixelRefWithProc(int width, int height, size_t row_bytes, void* pixels,
+                                      void (*release)(void* pixels, void* context), void* context);
 
 #endif  // SkPixelRefPriv_DEFINED

@@ -51,3 +51,15 @@ New `src/`, `include/stx_skia/`, tests and tools are original project additions.
 `integration/gui_forms_8d1f2be0.patch` is derived from the pinned GUI.Forms sources
 and retains their license. Its generated fixture and dependency checkouts are
 excluded from version control. Benchmark archives/binaries are not distributed.
+
+
+## Pixel ownership conversion
+
+The second batch converts SkData's header and the SkPixelStorage, SkPixelRef,
+SkMallocPixelRef and SkIDChangeListener implementations and headers. Original
+versions are retained under `baseline/skia/` and used by the reference build.
+Callback sequencing, identity arithmetic and atomic ordering are preserved.
+The callback-owned, allocated and data-backed pixel references now have named
+implementation classes; listener traversal has explicit types and mutation order.
+Upstream notices remain on every derivative file. The new pixel_ref test is an
+original deterministic contract test, not an imported upstream test suite.

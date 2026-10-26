@@ -1,0 +1,39 @@
+# Pixel ownership conversion
+
+The next conversion covers SkData's header, SkPixelStorage, SkPixelRef,
+SkMallocPixelRef, SkIDChangeListener and their required headers. It preserves
+pixel arithmetic, atomic ordering and callback order. Original implementations
+and headers are selected in the baseline build from retained source copies.
+
+The new pixel_ref_contract exercises zeroed allocation, explicit padded strides,
+short-buffer rejection, retained data, callback release, dropped registrations,
+one-shot invalidation, revocation cleanup, reset/destruction and shared identity
+reads from eight threads. The latter exercises atomic IDs and counters; it does
+not permit or test concurrent writes to the image's pixels.
+
+macOS M4, non-Apple LLVM 23.1.2:
+
+- Four standalone tests pass against the original and converted implementations.
+- All 24 rendered outputs remain byte-identical to the original baseline.
+- Instrumented complete standalone suite: **PASS**.
+- House spelling and lifetime checkers: 19 files, zero findings in each checker.
+
+No new timing advantage is claimed for this conversion. It makes ownership,
+callback execution and state initialization explicit; the prior benchmark record
+remains evidence for the earlier measured implementation only.
+
+The first CI run independently passed the release suite, pixel comparison and
+relocated installation on both Linux arm64 and x64. Linux arm64's instrumented
+build then failed to link because client UBSan instrumentation expected RTTI
+that the Skia archive does not provide. A derived listener in the new macOS test
+reproduced the missing RTTI contract. CMake now exports the no-RTTI requirement
+for private renderer consumers. This preserves the upstream library's contract;
+it does not claim coverage of RTTI-dependent instrumentation.
+
+Windows CLANG64 failed compilation because upstream headers use __forceinline.
+The existing GUI.Forms GN profile supplies -fms-extensions, and the CMake target
+now supplies that same requirement to the library and its consumers. These are
+build failures, not runtime review findings. Corrected native CI remains required.
+
+The updated installed consumer and seven GUI.Forms integration tests are being
+rerun as a separate gate. Their result will be added once execution completes.

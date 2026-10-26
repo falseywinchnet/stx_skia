@@ -46,3 +46,6 @@ pixel storage, masks and exercised kernels with per-change measurements.
 
 The independent Daybreak review and full GUI.Forms stage gate remain separate.
 No single primitive suite establishes universal pixel equivalence or speed.
+
+Full conversion remains active. See [the conversion ledger](CONVERSION.md) for
+completed ownership boundaries and the remaining production scope.

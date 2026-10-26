@@ -10,14 +10,6 @@
 #include "include/private/SkAssert.h"
 
 #include <utility>
-/**
- * Used to be notified when a gen/unique ID is invalidated, typically to preemptively purge
- * associated items from a cache that are no longer reachable. The listener can
- * be marked for deregistration if the cached item is remove before the listener is
- * triggered. This prevents unbounded listener growth when cache items are routinely
- * removed before the gen ID/unique ID is invalidated.
- */
-
 SkIDChangeListener::SkIDChangeListener() : fShouldDeregister(false) {}
 
 SkIDChangeListener::~SkIDChangeListener() = default;
@@ -29,10 +21,9 @@ List::List() = default;
 List::~List() {
     // We don't need the mutex. No other thread should have this list while it's being
     // destroyed.
-    for (auto& listener : fListeners) {
-        if (!listener->shouldDeregister()) {
-            listener->changed();
-        }
+    for (sk_sp<SkIDChangeListener>& listener : fListeners) {
+        SkIDChangeListener& target = *listener;
+        if (!target.shouldDeregister()) target.changed();
     }
 }
 
@@ -40,13 +31,18 @@ void List::add(sk_sp<SkIDChangeListener> listener) {
     if (!listener) {
         return;
     }
-    SkASSERT(!listener->shouldDeregister());
+    SkASSERT(!(*listener).shouldDeregister());
 
     SkAutoMutexExclusive lock(fMutex);
     // Clean out any stale listeners before we append the new one.
-    for (int i = 0; i < fListeners.size(); ++i) {
-        if (fListeners[i]->shouldDeregister()) {
-            fListeners.removeShuffle(i--);  // No need to preserve the order after i.
+    int index = 0;
+    while (index < fListeners.size()) {
+        SkIDChangeListener& target = *fListeners[index];
+        if (target.shouldDeregister()) {
+            // Revisit the replacement moved from the end. Registration order is not promised.
+            fListeners.removeShuffle(index);
+        } else {
+            ++index;
         }
     }
     fListeners.push_back(std::move(listener));
@@ -54,15 +50,15 @@ void List::add(sk_sp<SkIDChangeListener> listener) {
 
 int List::count() const {
     SkAutoMutexExclusive lock(fMutex);
-    return fListeners.size();
+    const int count = fListeners.size();
+    return count;
 }
 
 void List::changed() {
     SkAutoMutexExclusive lock(fMutex);
-    for (auto& listener : fListeners) {
-        if (!listener->shouldDeregister()) {
-            listener->changed();
-        }
+    for (sk_sp<SkIDChangeListener>& listener : fListeners) {
+        SkIDChangeListener& target = *listener;
+        if (!target.shouldDeregister()) target.changed();
     }
     fListeners.clear();
 }
