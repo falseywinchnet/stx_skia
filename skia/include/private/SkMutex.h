@@ -14,20 +14,16 @@
 #include "include/private/SkThreadAnnotations.h"
 #include "include/private/SkThreadID.h"
 
-/**
- * class SkMutex
- *
- * This allows us to have a mutex without needing the one in
- * the C++ std library which does not work with all clients.
- * go/cstyle#Disallowed_Stdlib
- */
+// Non-recursive exclusive lock. Uncontended acquisition/release use the semaphore's
+// acquire/release atomic path; contention may block in the OS. The releasing
+// thread must own the lock. Finish all holders/waiters before destruction.
 
 class SK_CAPABILITY("mutex") SkMutex {
 public:
     constexpr SkMutex() = default;
 
     ~SkMutex() {
-        this->assertNotHeld();
+        assertNotHeld();
     }
 
     void acquire() SK_ACQUIRE() {
@@ -36,7 +32,7 @@ public:
     }
 
     void release() SK_RELEASE_CAPABILITY() {
-        this->assertHeld();
+        assertHeld();
         SkDEBUGCODE(fOwner = kIllegalThreadID;)
         fSemaphore.signal();
     }
@@ -56,7 +52,10 @@ private:
 
 class SK_SCOPED_CAPABILITY SkAutoMutexExclusive {
 public:
-    SkAutoMutexExclusive(SkMutex& mutex) SK_ACQUIRE(mutex) : fMutex(mutex) { fMutex.acquire(); }
+    // The borrowed mutex outlives this non-transferable guard.
+    explicit SkAutoMutexExclusive(SkMutex& mutex) SK_ACQUIRE(mutex) : fMutex(mutex) {
+        fMutex.acquire();
+    }
     ~SkAutoMutexExclusive() SK_RELEASE_CAPABILITY() { fMutex.release(); }
 
     SkAutoMutexExclusive(const SkAutoMutexExclusive&) = delete;

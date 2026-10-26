@@ -6,78 +6,135 @@
  */
 
 #include "include/private/SkSemaphore.h"
-
-#include "include/private/SkFeatures.h" // IWYU pragma: keep
+#include "include/private/SkFeatures.h"
 
 #if defined(SK_BUILD_FOR_MAC) || defined(SK_BUILD_FOR_IOS)
-    #include <dispatch/dispatch.h>
+#include <dispatch/dispatch.h>
 
-    struct SkSemaphore::OSSemaphore {
-        dispatch_semaphore_t fSemaphore;
+struct SkSemaphore::OSSemaphore {
+    dispatch_semaphore_t fSemaphore = nullptr;
 
-        OSSemaphore()  { fSemaphore = dispatch_semaphore_create(0/*initial count*/); }
-        ~OSSemaphore() { dispatch_release(fSemaphore); }
+    OSSemaphore() {
+        fSemaphore = dispatch_semaphore_create(0);
+        if (fSemaphore == nullptr) {
+            SK_ABORT("Cannot create OS semaphore");
+        }
+    }
+    ~OSSemaphore() { dispatch_release(fSemaphore); }
 
-        void signal(int n) { while (n --> 0) { dispatch_semaphore_signal(fSemaphore); } }
-        void wait() { dispatch_semaphore_wait(fSemaphore, DISPATCH_TIME_FOREVER); }
-    };
+    void signal(int count) {
+        for (int index = 0; index < count; ++index) {
+            // A nonzero result reports a woken waiter, not failure.
+            dispatch_semaphore_signal(fSemaphore);
+        }
+    }
+    void wait() {
+        const long result = dispatch_semaphore_wait(fSemaphore, DISPATCH_TIME_FOREVER);
+        if (result != 0) {
+            SK_ABORT("Cannot wait on OS semaphore");
+        }
+    }
+};
 #elif defined(SK_BUILD_FOR_WIN)
 #include "src/core/SkLeanWindows.h"
 
-    struct SkSemaphore::OSSemaphore {
-        HANDLE fSemaphore;
+struct SkSemaphore::OSSemaphore {
+    HANDLE fSemaphore = nullptr;
 
-        OSSemaphore()  {
-            fSemaphore = CreateSemaphore(nullptr    /*security attributes, optional*/,
-                                         0       /*initial count*/,
-                                         MAXLONG /*max count*/,
-                                         nullptr    /*name, optional*/);
+    OSSemaphore() {
+        fSemaphore = CreateSemaphoreW(nullptr, 0, MAXLONG, nullptr);
+        if (fSemaphore == nullptr) {
+            SK_ABORT("Cannot create OS semaphore");
         }
-        ~OSSemaphore() { CloseHandle(fSemaphore); }
-
-        void signal(int n) {
-            ReleaseSemaphore(fSemaphore, n, nullptr/*returns previous count, optional*/);
+    }
+    ~OSSemaphore() {
+        const BOOL closed = CloseHandle(fSemaphore);
+        if (!closed) {
+            SK_ABORT("Cannot close OS semaphore");
         }
-        void wait() { WaitForSingleObject(fSemaphore, INFINITE/*timeout in ms*/); }
-    };
+    }
+    void signal(int count) {
+        const BOOL released = ReleaseSemaphore(fSemaphore, static_cast<LONG>(count), nullptr);
+        if (!released) {
+            SK_ABORT("Cannot signal OS semaphore");
+        }
+    }
+    void wait() {
+        const DWORD result = WaitForSingleObject(fSemaphore, INFINITE);
+        if (result != WAIT_OBJECT_0) {
+            SK_ABORT("Cannot wait on OS semaphore");
+        }
+    }
+};
 #else
-    // It's important we test for Mach before this.  This code will compile but not work there.
-    #include <errno.h>
-    #include <semaphore.h>
-    struct SkSemaphore::OSSemaphore {
-        sem_t fSemaphore;
+// macOS uses dispatch above: its unnamed POSIX semaphores are not supported.
+#include <cerrno>
+#include <semaphore.h>
 
-        OSSemaphore()  { sem_init(&fSemaphore, 0/*cross process?*/, 0/*initial count*/); }
-        ~OSSemaphore() { sem_destroy(&fSemaphore); }
+struct SkSemaphore::OSSemaphore {
+    sem_t fSemaphore{};
 
-        void signal(int n) { while (n --> 0) { sem_post(&fSemaphore); } }
-        void wait() {
-            // Try until we're not interrupted.
-            while(sem_wait(&fSemaphore) == -1 && errno == EINTR);
+    OSSemaphore() {
+        const int result = sem_init(&fSemaphore, 0, 0);
+        if (result != 0) {
+            SK_ABORT("Cannot create OS semaphore");
         }
-    };
+    }
+    ~OSSemaphore() {
+        const int result = sem_destroy(&fSemaphore);
+        if (result != 0) {
+            SK_ABORT("Cannot destroy OS semaphore");
+        }
+    }
+    void signal(int count) {
+        for (int index = 0; index < count; ++index) {
+            const int result = sem_post(&fSemaphore);
+            if (result != 0) {
+                SK_ABORT("Cannot signal OS semaphore");
+            }
+        }
+    }
+    void wait() {
+        for (;;) {
+            const int result = sem_wait(&fSemaphore);
+            if (result == 0) {
+                return;
+            }
+            if (errno != EINTR) {
+                SK_ABORT("Cannot wait on OS semaphore");
+            }
+        }
+    }
+};
 #endif
 
-///////////////////////////////////////////////////////////////////////////////
-
 SkSemaphore::~SkSemaphore() {
+    // Caller has joined all waiters/signallers, including lazy initialization.
     delete fOSSemaphore;
 }
 
-void SkSemaphore::osSignal(int n) {
-    fOSSemaphoreOnce([this] { fOSSemaphore = new OSSemaphore; });
-    fOSSemaphore->signal(n);
+void SkSemaphore::InitializeOSSemaphore(SkSemaphore& owner) {
+    owner.fOSSemaphore = new OSSemaphore;
+}
+
+void SkSemaphore::osSignal(int count) {
+    fOSSemaphoreOnce(InitializeOSSemaphore, *this);
+    (*fOSSemaphore).signal(count);
 }
 
 void SkSemaphore::osWait() {
-    fOSSemaphoreOnce([this] { fOSSemaphore = new OSSemaphore; });
-    fOSSemaphore->wait();
+    fOSSemaphoreOnce(InitializeOSSemaphore, *this);
+    (*fOSSemaphore).wait();
 }
 
 bool SkSemaphore::try_wait() {
     int count = fCount.load(std::memory_order_relaxed);
-    if (count > 0) {
-        return fCount.compare_exchange_weak(count, count-1, std::memory_order_acquire);
+    if (count <= 0) {
+        return false;
     }
-    return false;
+    const int remaining = count - 1;
+    const bool acquired = fCount.compare_exchange_weak(count, remaining,
+                                                      std::memory_order_acquire,
+                                                      std::memory_order_acquire);
+    return acquired;
 }

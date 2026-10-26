@@ -13,7 +13,7 @@
 
 #include <cstdint>
 
-typedef int64_t SkThreadID;
+using SkThreadID = int64_t;
 
 // SkMutex.h uses SkGetThreadID in debug only code.
 SkDEBUGCODE(SK_SPI) SkThreadID SkGetThreadID();

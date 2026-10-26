@@ -558,6 +558,22 @@ already-most-recent block. Native object layouts are unchanged (64-byte pool,
 56-byte block in measured Release); synchronized getter cost is explicitly
 measured. See ../results/2026-10-26/DISCARDABLE_POOL.md and its timing/layout files.
 
+## Semaphore, mutex, once and thread identity
+
+SkSemaphore.h/.cpp, SkMutex.h, SkOnce.h and SkThreadID.h/.cpp now state permit,
+publication, blocking, callback and destruction contracts. Named lazy OS
+initialization replaces lambdas; native API failures stop explicitly, and POSIX
+interruption retries are visible. Valid-operation acquire/release orders are
+unchanged. Native representative fast-path assembly matches the original byte
+for byte; measured tiny timing differences and unchanged layouts are recorded in
+../results/2026-10-26/SYNCHRONIZATION.md rather than claimed as a speed gain.
+
+The unused SkSharedMutex reader/writer implementation is reference-only. Its sole
+remaining CPU include was unused and is removed; SkFlattenable.cpp remains
+otherwise unconverted. Candidate source/symbol checks reject the removed lock.
+The synchronization fixture exercises permits, publication, exclusion, once
+initialization and live thread identities alongside the complete rendering gate.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
