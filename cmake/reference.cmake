@@ -428,3 +428,10 @@ foreach(unit IN ITEMS src/core/SkColorFilter.cpp src/effects/colorfilters/SkColo
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
+
+# Preserve the original color-space plan and Gaussian coverage filter.
+foreach(unit IN ITEMS src/core/SkColorSpaceXformSteps.cpp
+                      src/effects/colorfilters/SkGaussianColorFilter.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()

@@ -1067,8 +1067,9 @@ preserved; table storage is copied once and retained explicitly. Temporary
 coefficient/table borrows are rejected. Both release suites pass, the complete
 instrumented suite returns PASS, and nine output artifacts match the reference
 byte for byte. See ../results/2026-10-26/COLOR_ADJUSTMENT_CONVERSION.md.
-Composition and working-space handling are recorded below; blend-color filters,
-color conversion kernels and skcms remain in the conversion programme.
+Composition and working-space handling are recorded below. The shared conversion
+plan and remaining color filters are covered by the next recorded group; skcms
+and raster kernels remain in the conversion programme.
 
 ## Color-filter composition and working spaces
 
@@ -1080,6 +1081,17 @@ coefficients are assembled as seven-element and nine-element arrays rather than
 traversing separate struct members or matrix rows as one array. The reference
 keeps the original implementation. See
 ../results/2026-10-26/COLOR_COMPOSITION_CONVERSION.md for test scope and results.
+
+## Shared color-conversion plan and remaining color filters
+
+SkColorSpaceXformSteps now owns initialized coefficient arrays and explicitly
+separates immediate scalar conversion from pipeline construction that borrows
+those arrays. Temporary plans cannot publish borrowed pipeline stages. The
+blend-mode and Gaussian coverage filters are converted, preserving their mode
+simplifications and approximation. The 576-plan comparison includes SDR/HDR,
+alpha conventions and raster tails, with all eleven output files matching the
+reference. See ../results/2026-10-26/COLOR_PLAN_CONVERSION.md. Lower-level raster
+and skcms arithmetic remain separate conversion work.
 
 ## Still required
 

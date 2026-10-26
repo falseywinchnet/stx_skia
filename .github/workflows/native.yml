@@ -17,8 +17,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Configure and test
         run: |
+          set -eu
           sh tools/build_native.sh baseline
           sh tools/build_native.sh candidate
+          cmake -E compare_files build/baseline/color-plans.raw build/candidate/color-plans.raw
+          cmake -E compare_files build/baseline/color-adjustments.raw build/candidate/color-adjustments.raw
+          cmake -E compare_files build/baseline/color-composition.raw build/candidate/color-composition.raw
           cmake -E compare_files build/baseline/shader-blends.raw build/candidate/shader-blends.raw
           cmake -E compare_files build/baseline/layers.raw build/candidate/layers.raw
           cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
@@ -44,8 +48,12 @@ jobs:
           install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja
       - name: Configure and test
         run: |
+          set -eu
           sh tools/build_native.sh baseline
           sh tools/build_native.sh candidate
+          cmake -E compare_files build/baseline/color-plans.raw build/candidate/color-plans.raw
+          cmake -E compare_files build/baseline/color-adjustments.raw build/candidate/color-adjustments.raw
+          cmake -E compare_files build/baseline/color-composition.raw build/candidate/color-composition.raw
           cmake -E compare_files build/baseline/shader-blends.raw build/candidate/shader-blends.raw
           cmake -E compare_files build/baseline/layers.raw build/candidate/layers.raw
           cmake -E compare_files build/baseline/render.raw build/candidate/render.raw

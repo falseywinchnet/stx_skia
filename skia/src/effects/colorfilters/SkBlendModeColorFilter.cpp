@@ -50,30 +50,30 @@ bool SkBlendModeColorFilter::onIsAlphaUnchanged() const {
 
 void SkBlendModeColorFilter::flatten(SkWriteBuffer& buffer) const {
     buffer.writeColor4f(fColor);
-    buffer.writeUInt((int)fMode);
+    buffer.writeUInt(static_cast<uint32_t>(fMode));
 }
 
 sk_sp<SkFlattenable> SkBlendModeColorFilter::CreateProc(SkReadBuffer& buffer) {
+    SkColor4f color{};
     if (buffer.isVersionLT(SkPicturePriv::kBlend4fColorFilter)) {
-        // Color is 8-bit, sRGB
-        SkColor color = buffer.readColor();
-        SkBlendMode mode = (SkBlendMode)buffer.readUInt();
-        return SkColorFilters::Blend(SkColor4f::FromColor(color), /*sRGB*/ nullptr, mode);
+        const SkColor packed = buffer.readColor();
+        color = SkColor4f::FromColor(packed);
     } else {
-        // Color is 32-bit, sRGB
-        SkColor4f color;
         buffer.readColor4f(&color);
-        SkBlendMode mode = (SkBlendMode)buffer.readUInt();
-        return SkColorFilters::Blend(color, /*sRGB*/ nullptr, mode);
     }
+    const SkBlendMode mode = static_cast<SkBlendMode>(buffer.readUInt());
+    sk_sp<SkFlattenable> filter = SkColorFilters::Blend(color, /*sRGB*/ nullptr, mode);
+    return filter;
 }
 
 bool SkBlendModeColorFilter::appendStages(const SkStageRec& rec, bool shaderIsOpaque) const {
-    rec.fPipeline->append(SkRasterPipelineOp::move_src_dst);
+    SkRasterPipeline& pipeline = *rec.fPipeline;
+    pipeline.append(SkRasterPipelineOp::move_src_dst);
     SkColor4f color = fColor;
-    SkColorSpaceXformSteps(sk_srgb_singleton(), kUnpremul_SkAlphaType,
-                           rec.fDstCS,          kPremul_SkAlphaType).apply(color.vec());
-    rec.fPipeline->appendConstantColor(rec.fAlloc, color.vec());
+    const SkColorSpaceXformSteps conversion(sk_srgb_singleton(), kUnpremul_SkAlphaType,
+                                            rec.fDstCS, kPremul_SkAlphaType);
+    conversion.apply(color.vec());
+    pipeline.appendConstantColor(rec.fAlloc, color.vec());
     SkBlendMode_AppendStages(fMode, rec.fPipeline);
     return true;
 }
@@ -90,11 +90,12 @@ sk_sp<SkColorFilter> SkColorFilters::Blend(const SkColor4f& color,
     // First map to sRGB to simplify storage in the actual SkColorFilter instance, staying unpremul
     // until the final dst color space is known when actually filtering. Also pin the alpha to [0,1]
     SkColor4f srgb = color.pinAlpha();
-    SkColorSpaceXformSteps(colorSpace.get(),    kUnpremul_SkAlphaType,
-                           sk_srgb_singleton(), kUnpremul_SkAlphaType).apply(srgb.vec());
+    const SkColorSpaceXformSteps conversion(colorSpace.get(), kUnpremul_SkAlphaType,
+                                            sk_srgb_singleton(), kUnpremul_SkAlphaType);
+    conversion.apply(srgb.vec());
 
     // Next collapse some modes if possible
-    float alpha = srgb.fA;
+    const float alpha = srgb.fA;
     if (SkBlendMode::kClear == mode) {
         srgb = SkColors::kTransparent;
         mode = SkBlendMode::kSrc;
@@ -119,9 +120,12 @@ sk_sp<SkColorFilter> SkColorFilters::Blend(const SkColor4f& color,
         return nullptr;
     }
 
-    return sk_sp<SkColorFilter>(new SkBlendModeColorFilter(srgb, mode));
+    sk_sp<SkColorFilter> filter(new SkBlendModeColorFilter(srgb, mode));
+    return filter;
 }
 
 sk_sp<SkColorFilter> SkColorFilters::Blend(SkColor color, SkBlendMode mode) {
-    return Blend(SkColor4f::FromColor(color), /*sRGB*/ nullptr, mode);
+    const SkColor4f unpacked = SkColor4f::FromColor(color);
+    sk_sp<SkColorFilter> filter = Blend(unpacked, /*sRGB*/ nullptr, mode);
+    return filter;
 }

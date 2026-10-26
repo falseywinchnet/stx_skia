@@ -20,14 +20,16 @@
 SkGaussianColorFilter::SkGaussianColorFilter() : SkColorFilterBase() {}
 
 bool SkGaussianColorFilter::appendStages(const SkStageRec& rec, bool shaderIsOpaque) const {
-    rec.fPipeline->append(SkRasterPipelineOp::gauss_a_to_rgba);
+    (*rec.fPipeline).append(SkRasterPipelineOp::gauss_a_to_rgba);
     return true;
 }
 
 sk_sp<SkFlattenable> SkGaussianColorFilter::CreateProc(SkReadBuffer&) {
-    return SkColorFilterPriv::MakeGaussian();
+    sk_sp<SkFlattenable> filter = SkColorFilterPriv::MakeGaussian();
+    return filter;
 }
 
 sk_sp<SkColorFilter> SkColorFilterPriv::MakeGaussian() {
-    return sk_sp<SkColorFilter>(new SkGaussianColorFilter);
+    sk_sp<SkColorFilter> filter(new SkGaussianColorFilter);
+    return filter;
 }
