@@ -574,6 +574,23 @@ otherwise unconverted. Candidate source/symbol checks reject the removed lock.
 The synchronization fixture exercises permits, publication, exclusion, once
 initialization and live thread identities alongside the complete rendering gate.
 
+## Raw array storage and triangulation cells
+
+SkTDArray.h / SkTDArray.cpp now express raw-element requirements, live length,
+allocation ownership and borrowed access. Move leaves the source empty; size and
+capacity arithmetic is checked before mutation; self-insertion preserves its
+source through growth and tail movement without temporary allocation. The owner
+retains its original fields and measured 24-byte Release layout. Existing-element
+push and empty operations have explicit behavior; temporary-owner borrows are
+rejected. Boundary corrections are recorded separately from unchanged behavior.
+
+The polygon triangulation grid now uses a typed array of live intrusive lists;
+its old raw storage skipped construction. This targeted adaptation is not a
+whole-file conversion of SkPolyUtils.cpp. The original remains in the reference
+build. Both releases pass 29 tests, nine artifacts match, and instrumented,
+installed-consumer and GUI.Forms gates pass. The measured small insert/erase
+regression is retained in ../results/2026-10-26/TD_ARRAY.md and its raw timings.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

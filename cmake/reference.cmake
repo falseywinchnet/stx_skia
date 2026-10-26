@@ -329,7 +329,7 @@ foreach(unit IN ITEMS SkSemaphore SkThreadID SkSharedMutex)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
 
-foreach(unit IN ITEMS src/utils/SkPolyUtils.cpp)
+foreach(unit IN ITEMS src/core/SkTDArray.cpp src/utils/SkPolyUtils.cpp)
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
