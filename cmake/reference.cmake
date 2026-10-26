@@ -318,3 +318,8 @@ foreach(unit IN ITEMS SkResourceCache SkSynchronizedResourceCache)
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
+
+# Removed unused task scheduler remains available only to the reference build.
+list(APPEND stx_sources
+    baseline/skia/src/core/SkExecutor.cpp
+    baseline/skia/src/core/SkTaskGroup.cpp)

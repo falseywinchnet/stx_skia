@@ -103,7 +103,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkEdge.cpp
     skia/src/core/SkEdgeBuilder.cpp
     skia/src/core/SkEdgeClipper.cpp
-    skia/src/core/SkExecutor.cpp
     skia/src/core/SkFlattenable.cpp
     skia/src/core/SkFloatingPoint.cpp
     skia/src/core/SkFont.cpp
@@ -238,7 +237,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkSynchronizedResourceCache.cpp
     skia/src/core/SkTDArray.cpp
     skia/src/core/SkTSearch.cpp
-    skia/src/core/SkTaskGroup.cpp
     skia/src/core/SkTextBlob.cpp
     skia/src/core/SkThreadID.cpp
     skia/src/core/SkTime.cpp

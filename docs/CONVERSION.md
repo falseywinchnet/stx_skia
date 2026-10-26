@@ -484,6 +484,15 @@ strict-budget policies remain. New deterministic tests cover those policies,
 boundaries. See ../results/2026-10-26/RESOURCE_CACHE.md. Hash-table, message-bus and
 mutex/semaphore implementations remain separate conversion work.
 
+## Remove the unused task scheduler
+
+SkExecutor and SkTaskGroup sources/headers are reference-only. The candidate
+source closure and archive contain neither scheduler; no retained raster consumer
+calls them. The relocated installed consumer checks their headers are absent.
+GUI.Forms' atomic batch pool is the owner's worker-execution reference; cache
+mutexes remain a separate shared-state synchronization boundary. See
+../results/2026-10-26/SCHEDULER_PRUNE.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

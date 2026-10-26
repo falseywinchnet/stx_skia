@@ -1,3 +1,7 @@
+#if __has_include("include/core/SkExecutor.h") || __has_include("src/core/SkTaskGroup.h")
+#error "The installed CPU package must not expose the removed Skia scheduler"
+#endif
+
 #include <stx_skia/pixel_storage.hpp>
 #include "include/core/SkCanvas.h"
 #include "include/core/SkSurface.h"

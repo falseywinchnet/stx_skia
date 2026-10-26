@@ -50,3 +50,11 @@ No single primitive suite establishes universal pixel equivalence or speed.
 
 Full conversion remains active. See [the conversion ledger](CONVERSION.md) for
 completed ownership boundaries and the remaining production scope.
+
+Worker execution follows the owner's GUI.Forms threadpool_atomic_fast reference:
+batched publication, chunk claims, locally accumulated completion and small-work
+execution on the caller. The unused Skia executor/task-group pool is removed.
+Do not infer that atomics alone make the shared cache graph safe: cache records,
+hash/list mutation, publication and destruction still require one coordinated
+access protocol. Future parallel raster work must first identify independent
+buffers/workspaces and measure dispatch cost against useful work.

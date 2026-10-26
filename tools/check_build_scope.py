@@ -12,7 +12,8 @@ def main():
     forbidden_paths = ["/src/gpu/", "/src/codec/", "/src/encode/", "/src/android/",
                        "SkImageGeneratorCG.cpp", "SkFontMgr_mac", "SkTypeface_mac",
                        "SkTypeface_FreeType", "SkOpts_ml3", "SkOpts_ml4",
-                       "skcms_TransformHsw", "skcms_TransformSkx"]
+                       "skcms_TransformHsw", "skcms_TransformSkx",
+                       "SkExecutor.cpp", "SkTaskGroup.cpp"]
     for command in commands:
         name = command["file"]
         for pattern in forbidden_paths:
@@ -21,7 +22,8 @@ def main():
     symbols = subprocess.check_output(["llvm-nm", "--defined-only", "-C",
                                       str(directory / "libstx_skia.a")], text=True)
     for pattern in ["SkCodec::", "SkImageGeneratorCG::", "SkPngCodec::",
-                    "SkFontMgr_New_CoreText", "SkTypeface_FreeType::"]:
+                    "SkFontMgr_New_CoreText", "SkTypeface_FreeType::",
+                    "SkExecutor::", "SkTaskGroup::", "SkThreadPool<"]:
         if pattern in symbols:
             rejected.append(pattern)
     if rejected:
