@@ -111,7 +111,9 @@ bool snapshots(bool wrapped, bool discard) {
     if ((*surface).makeImageSnapshot(SkIRect::MakeXYWH(20, 20, 4, 4))) return false;
 
     if (discard) {
-        (*surface).notifyContentWillChange(SkSurface::kDiscard_ContentChangeMode);
+        if (!(*surface).notifyContentWillChange(SkSurface::kDiscard_ContentChangeMode)) {
+            return false;
+        }
         canvas.clear(SK_ColorRED);
     }
     SkPaint paint;
@@ -128,6 +130,26 @@ bool snapshots(bool wrapped, bool discard) {
     SkPixmap subsetPixels;
     if (!(*subset).peekPixels(&subsetPixels)) return false;
     return subsetPixels.getColor(0, 0) == SK_ColorRED;
+}
+
+bool external_write_preserves_snapshot() {
+    sk_sp<SkSurface> surface = SkSurfaces::Raster(image_info());
+    if (!surface) return false;
+    SkCanvas* canvas = (*surface).getCanvas();
+    if (canvas == nullptr) return false;
+    (*canvas).clear(SK_ColorRED);
+    sk_sp<SkImage> snapshot = (*surface).makeImageSnapshot();
+    if (!snapshot) return false;
+    if (!(*surface).notifyContentWillChange(SkSurface::kRetain_ContentChangeMode)) {
+        return false;
+    }
+    SkPixmap writable;
+    if (!(*surface).peekPixels(&writable)) return false;
+    *writable.writable_addr32(2, 2) = SK_ColorGREEN;
+    SkPixmap oldPixels;
+    if (!(*snapshot).peekPixels(&oldPixels)) return false;
+    return oldPixels.getColor(2, 2) == SK_ColorRED &&
+           writable.getColor(2, 2) == SK_ColorGREEN;
 }
 
 bool old_allocation_release() {
@@ -383,6 +405,7 @@ bool related_surfaces() {
 }
 
 int main() {
+    if (!external_write_preserves_snapshot()) return 10;
     for (int wrapped = 0; wrapped < 2; ++wrapped) {
         for (int discard = 0; discard < 2; ++discard) {
             if (!snapshots(wrapped != 0, discard != 0)) return 1;

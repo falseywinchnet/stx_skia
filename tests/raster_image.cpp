@@ -25,6 +25,9 @@
 #include <cstring>
 #include <memory>
 #include <utility>
+#if !defined(_WIN32)
+#include <sys/mman.h>
+#endif
 
 class GrDirectContext;
 template <typename T>
@@ -513,6 +516,41 @@ bool generated_reads(bool succeed) {
     }
     return true;
 }
+
+#if !defined(_WIN32) && !defined(STX_SKIA_REFERENCE)
+bool oversized_immutable_rescale() {
+    constexpr int largeHeight = (1 << 28) + 1;
+    constexpr std::size_t largeStride = 8;
+    constexpr std::size_t mappedBytes = static_cast<std::size_t>(largeHeight) * largeStride;
+    // Reserve the declared backing without touching its pages. The rescale
+    // path must reject the full extent before reading outside the first pixel.
+    void* mapped = mmap(nullptr, mappedBytes, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (mapped == MAP_FAILED) return false;
+
+    bool passed = false;
+    {
+        const SkImageInfo largeInfo = SkImageInfo::Make(1, largeHeight,
+            kRGBA_8888_SkColorType, kPremul_SkAlphaType);
+        SkBitmap bitmap;
+        if (bitmap.installPixels(largeInfo, mapped, largeStride)) {
+            bitmap.setImmutable();
+            sk_sp<SkImage> image = SkImages::RasterFromBitmap(bitmap);
+            if (image) {
+                ReadState state;
+                const SkImageInfo resultInfo = largeInfo.makeWH(1, 1);
+                const SkIRect source = SkIRect::MakeXYWH(0, 0, 1, 1);
+                (*image).asyncRescaleAndReadPixels(resultInfo, source,
+                    SkImage::RescaleGamma::kSrc, SkImage::RescaleMode::kNearest,
+                    record_read, &state);
+                passed = state.calls == 1 && state.result == nullptr;
+            }
+        }
+    }
+    const int unmapped = munmap(mapped, mappedBytes);
+    return passed && unmapped == 0;
+}
+#endif
 }
 
 int main() {
@@ -521,6 +559,9 @@ int main() {
     if (!mipmaps_and_subsets()) return 3;
     if (!conversions_and_reads()) return 4;
     if (!generated_reads(false) || !generated_reads(true)) return 5;
+#if !defined(_WIN32) && !defined(STX_SKIA_REFERENCE)
+    if (!oversized_immutable_rescale()) return 9;
+#endif
     if (!facade_scaling()) return 6;
     if (!facade_shaders()) return 7;
     if (!mipmap_selection()) return 8;

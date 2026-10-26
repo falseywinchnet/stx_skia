@@ -1017,6 +1017,13 @@ case where the allocation could succeed but bitmap setup rejected an
 unrepresentable stride. See
 ../results/2026-10-26/OWNED_RASTER_STRIDE.md.
 
+A focused review of all 20 image-implementation files found two failure
+paths. External-write notification now returns the copy-on-write preparation
+result, and rescaling reports a null result when temporary image construction
+fails. The public API and large-image regressions are recorded in
+../results/2026-10-26/IMAGE_PATH_REVIEW.md. This review does not complete the
+remaining image, canvas, or pixel pipeline conversion.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

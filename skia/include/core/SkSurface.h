@@ -88,7 +88,9 @@ public:
     };
     // Notify before external writes. Discard allows replacement backing without
     // copying the old contents; retain preserves them when separating snapshots.
-    void notifyContentWillChange(ContentChangeMode mode);
+    // Returns false if snapshot separation fails; do not write in that case.
+    // Obtain the writable pixel view after a successful notification.
+    [[nodiscard]] bool notifyContentWillChange(ContentChangeMode mode);
 
     // Non-owning CPU recorder; null for a null surface.
     SkRecorder* baseRecorder() const;

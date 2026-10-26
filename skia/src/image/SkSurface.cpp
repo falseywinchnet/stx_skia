@@ -65,11 +65,10 @@ uint32_t SkSurface::generationID() {
     return fGenerationID;
 }
 
-void SkSurface::notifyContentWillChange(ContentChangeMode mode) {
+bool SkSurface::notifyContentWillChange(ContentChangeMode mode) {
     SkSurface_Base& base = *asSB(this);
     const bool prepared = base.aboutToDraw(mode);
-    // The inherited notification API does not report allocation failure.
-    (void)prepared;
+    return prepared;
 }
 
 SkCanvas* SkSurface::getCanvas() {
