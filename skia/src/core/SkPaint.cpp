@@ -11,7 +11,6 @@
 #include "include/core/SkBlendMode.h"
 #include "include/core/SkBlender.h"
 #include "include/core/SkColorFilter.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPathEffect.h"
 #include "include/core/SkRect.h"
@@ -70,7 +69,6 @@ bool operator==(const SkPaint& a, const SkPaint& b) {
         && EQUAL(fMaskFilter)
         && EQUAL(fColorFilter)
         && EQUAL(fBlender)
-        && EQUAL(fImageFilter)
         && EQUAL(fColor4f)
         && EQUAL(fWidth)
         && EQUAL(fMiterLimit)
@@ -83,7 +81,6 @@ bool operator==(const SkPaint& a, const SkPaint& b) {
     sk_sp<Sk##type> SkPaint::ref##type() const { return f##type; }
 DEFINE_FIELD_REF(ColorFilter)
 DEFINE_FIELD_REF(Blender)
-DEFINE_FIELD_REF(ImageFilter)
 DEFINE_FIELD_REF(MaskFilter)
 DEFINE_FIELD_REF(PathEffect)
 DEFINE_FIELD_REF(Shader)
@@ -92,7 +89,6 @@ DEFINE_FIELD_REF(Shader)
 #define DEFINE_FIELD_SET(Field) \
     void SkPaint::set##Field(sk_sp<Sk##Field> f) { f##Field = std::move(f); }
 DEFINE_FIELD_SET(ColorFilter)
-DEFINE_FIELD_SET(ImageFilter)
 DEFINE_FIELD_SET(MaskFilter)
 DEFINE_FIELD_SET(PathEffect)
 DEFINE_FIELD_SET(Shader)
@@ -199,9 +195,6 @@ void SkPaint::setStrokeJoin(Join jt) {
 ///////////////////////////////////////////////////////////////////////////////
 
 bool SkPaint::canComputeFastBounds() const {
-    if (this->getImageFilter() && !this->getImageFilter()->canComputeFastBounds()) {
-        return false;
-    }
     // Pass nullptr for the bounds to determine if they can be computed
     if (this->getPathEffect() &&
         !as_PEB(this->getPathEffect())->computeFastBounds(nullptr)) {
@@ -219,7 +212,6 @@ const SkRect& SkPaint::computeFastBounds(const SkRect& orig, SkRect* storage) co
         uintptr_t effects = 0;
         effects |= reinterpret_cast<uintptr_t>(this->getMaskFilter());
         effects |= reinterpret_cast<uintptr_t>(this->getPathEffect());
-        effects |= reinterpret_cast<uintptr_t>(this->getImageFilter());
         if (!effects) {
             return orig;
         }
@@ -249,10 +241,6 @@ const SkRect& SkPaint::doComputeFastBounds(const SkRect& origSrc,
         as_MFB(this->getMaskFilter())->computeFastBounds(*storage, storage);
     }
 
-    if (this->getImageFilter()) {
-        *storage = this->getImageFilter()->computeFastBounds(*storage);
-    }
-
     return *storage;
 }
 
@@ -261,13 +249,6 @@ const SkRect& SkPaint::doComputeFastBounds(const SkRect& origSrc,
 // return true if the filter exists, and may affect alpha
 static bool affects_alpha(const SkColorFilter* cf) {
     return cf && !as_CFB(cf)->isAlphaUnchanged();
-}
-
-// return true if the filter exists, and may affect alpha
-static bool affects_alpha(const SkImageFilter* imf) {
-    // TODO: check if we should allow imagefilters to broadcast that they don't affect alpha
-    // ala colorfilters
-    return imf != nullptr;
 }
 
 bool SkPaint::nothingToDraw() const {
@@ -282,7 +263,7 @@ bool SkPaint::nothingToDraw() const {
         case SkBlendMode::kDstOver:
         case SkBlendMode::kPlus:
             if (0 == this->getAlpha()) {
-                return !affects_alpha(fColorFilter.get()) && !affects_alpha(fImageFilter.get());
+                return !affects_alpha(fColorFilter.get());
             }
             break;
         case SkBlendMode::kDst:

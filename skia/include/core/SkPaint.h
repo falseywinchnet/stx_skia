@@ -24,7 +24,6 @@
 class SkBlender;
 class SkColorFilter;
 class SkColorSpace;
-class SkImageFilter;
 class SkMaskFilter;
 class SkPathEffect;
 class SkShader;
@@ -66,12 +65,12 @@ public:
     explicit SkPaint(const SkColor4f& color, SkColorSpace* colorSpace = nullptr);
 
     /** Makes a shallow copy of SkPaint. SkPathEffect, SkShader,
-        SkMaskFilter, SkColorFilter, and SkImageFilter are shared
+        SkMaskFilter, SkColorFilter and SkBlender are shared
         between the original paint and the copy. Objects containing SkRefCnt increment
         their references by one.
 
         The referenced objects SkPathEffect, SkShader, SkMaskFilter, SkColorFilter,
-        and SkImageFilter cannot be modified after they are created.
+        and SkBlender cannot be modified after they are created.
         This prevents objects with SkRefCnt from being modified once SkPaint refers to them.
 
         @param paint  original to copy
@@ -94,13 +93,13 @@ public:
     SkPaint(SkPaint&& paint);
 
     /** Decreases SkPaint SkRefCnt of owned objects: SkPathEffect, SkShader,
-        SkMaskFilter, SkColorFilter, and SkImageFilter. If the
+        SkMaskFilter, SkColorFilter and SkBlender. If the
         objects containing SkRefCnt go to zero, they are deleted.
     */
     ~SkPaint();
 
     /** Makes a shallow copy of SkPaint. SkPathEffect, SkShader,
-        SkMaskFilter, SkColorFilter, and SkImageFilter are shared
+        SkMaskFilter, SkColorFilter and SkBlender are shared
         between the original paint and the copy. Objects containing SkRefCnt in the
         prior destination are decreased by one, and the referenced objects are deleted if the
         resulting count is zero. Objects containing SkRefCnt in the parameter paint
@@ -129,7 +128,7 @@ public:
 
     /** Compares a and b, and returns true if a and b are equivalent. May return false
         if SkPathEffect, SkShader, SkMaskFilter, SkColorFilter,
-        or SkImageFilter have identical contents but different pointers.
+        or SkBlender have identical contents but different pointers.
 
         @param a  SkPaint to compare
         @param b  SkPaint to compare
@@ -139,7 +138,7 @@ public:
 
     /** Compares a and b, and returns true if a and b are not equivalent. May return true
         if SkPathEffect, SkShader, SkMaskFilter, SkColorFilter,
-        or SkImageFilter have identical contents but different pointers.
+        or SkBlender have identical contents but different pointers.
 
         @param a  SkPaint to compare
         @param b  SkPaint to compare
@@ -559,34 +558,6 @@ public:
     */
     void setMaskFilter(sk_sp<SkMaskFilter> maskFilter);
 
-    /** Returns SkImageFilter if set, or nullptr.
-        Does not alter SkImageFilter SkRefCnt.
-
-        @return  SkImageFilter if previously set, nullptr otherwise
-    */
-    SkImageFilter* getImageFilter() const { return fImageFilter.get(); }
-
-    /** Returns SkImageFilter if set, or nullptr.
-        Increases SkImageFilter SkRefCnt by one.
-
-        @return  SkImageFilter if previously set, nullptr otherwise
-
-        example: https://fiddle.skia.org/c/@Paint_refImageFilter
-    */
-    sk_sp<SkImageFilter> refImageFilter() const;
-
-    /** Sets SkImageFilter to imageFilter, decreasing SkRefCnt of the previous
-        SkImageFilter. Pass nullptr to clear SkImageFilter, and remove SkImageFilter effect
-        on drawing.
-
-        Increments imageFilter SkRefCnt by one.
-
-        @param imageFilter  how SkImage is sampled when transformed
-
-        example: https://fiddle.skia.org/c/@Paint_setImageFilter
-    */
-    void setImageFilter(sk_sp<SkImageFilter> imageFilter);
-
     /** Returns true if SkPaint prevents all drawing;
         otherwise, the SkPaint may or may not allow drawing.
 
@@ -665,7 +636,6 @@ private:
     sk_sp<SkShader>       fShader;
     sk_sp<SkMaskFilter>   fMaskFilter;
     sk_sp<SkColorFilter>  fColorFilter;
-    sk_sp<SkImageFilter>  fImageFilter;
     sk_sp<SkBlender>      fBlender;
 
     SkColor4f       fColor4f;
@@ -687,7 +657,6 @@ private:
     static_assert(::sk_is_trivially_relocatable<decltype(fShader)>::value);
     static_assert(::sk_is_trivially_relocatable<decltype(fMaskFilter)>::value);
     static_assert(::sk_is_trivially_relocatable<decltype(fColorFilter)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fImageFilter)>::value);
     static_assert(::sk_is_trivially_relocatable<decltype(fBlender)>::value);
     static_assert(::sk_is_trivially_relocatable<decltype(fColor4f)>::value);
     static_assert(::sk_is_trivially_relocatable<decltype(fBitfields)>::value);

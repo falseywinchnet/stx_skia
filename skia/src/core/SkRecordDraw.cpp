@@ -32,7 +32,6 @@
 #include "include/private/chromium/Slug.h"
 #include "src/core/SkCanvasPriv.h"
 #include "src/core/SkDrawShadowInfo.h"
-#include "src/core/SkImageFilter_Base.h"
 #include "src/core/SkRecord.h"
 #include "src/core/SkRecords.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
@@ -43,7 +42,6 @@
 #include <optional>
 #include <vector>
 
-class SkImageFilter;
 
 void SkRecordDraw(const SkRecord& record,
                   SkCanvas* canvas,
@@ -339,10 +337,8 @@ private:
     static bool PaintMayAffectTransparentBlack(const SkPaint* paint) {
         if (paint) {
             // FIXME: this is very conservative
-            if ((paint->getImageFilter() &&
-                 as_IFB(paint->getImageFilter())->affectsTransparentBlack()) ||
-                (paint->getColorFilter() &&
-                 as_CFB(paint->getColorFilter())->affectsTransparentBlack())) {
+            if (paint->getColorFilter() &&
+                as_CFB(paint->getColorFilter())->affectsTransparentBlack()) {
                 return true;
             }
             const auto bm = paint->asBlendMode();

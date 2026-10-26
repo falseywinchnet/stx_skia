@@ -25,8 +25,9 @@ unused effects and wider CPU-dispatch objects. Excluded GPU implementations,
 unused modules and upstream infrastructure have also been removed from the tree.
 All 17 general image-filter factory implementations and their public factory
 header are removed from the candidate. GUI.Forms owns CSS and backdrop effects.
-Picture/text internals, core layer/filter plumbing and SkSL remain removal work;
-removing the factories alone does not establish that those dependencies are gone.
+The core image-filter graph, cache, paint field and device/image entry points are
+also removed. Ordinary layers compose devices directly. Picture/text internals
+and SkSL remain removal work.
 
 On the initial recorded M4/macOS build, the candidate passed seven selected GUI.Forms
 renderer tests and produced byte-identical output across 24 baseline comparison

@@ -72,15 +72,6 @@ static bool fold_opacity_layer_color_to_paint(const SkPaint* layerPaint,
         return false;
     }
 
-    if (!isSaveLayer && paint->getImageFilter()) {
-        // For normal draws, the paint color is used as one input for the color for the draw. Image
-        // filter will operate on the result, and thus we can not change the input.
-        // For layer saves, the image filter is applied to the layer contents. The layer is then
-        // modulated with the paint color, so it's fine to proceed with the fold for saveLayer
-        // paints with image filters.
-        return false;
-    }
-
     if (paint->getColorFilter()) {
         // Filter input depends on the paint color.
 
@@ -103,8 +94,7 @@ static bool fold_opacity_layer_color_to_paint(const SkPaint* layerPaint,
             layerPaint->getShader()      ||
             !layerPaint->isSrcOver()     ||
             layerPaint->getMaskFilter()  ||
-            layerPaint->getColorFilter() ||
-            layerPaint->getImageFilter()) {
+            layerPaint->getColorFilter()) {
             return false;
         }
         paint->setAlpha(SkMulDiv255Round(paint->getAlpha(), SkColorGetA(layerColor)));
@@ -147,7 +137,7 @@ static bool effectively_srcover(const SkPaint* paint) {
         return true;
     }
     // src-mode with opaque and no effects (which might change opaqueness) is ok too.
-    return !paint->getShader() && !paint->getColorFilter() && !paint->getImageFilter() &&
+    return !paint->getShader() && !paint->getColorFilter() &&
            0xFF == paint->getAlpha() && paint->asBlendMode() == SkBlendMode::kSrc;
 }
 

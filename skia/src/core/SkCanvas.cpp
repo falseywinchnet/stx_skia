@@ -130,7 +130,7 @@ bool SkCanvas::wouldOverwriteEntireSurface(const SkRect* rect, const SkPaint* pa
               paintStyle == SkPaint::kStrokeAndFill_Style)) {
             return false;
         }
-        if (paint->getMaskFilter() || paint->getPathEffect() || paint->getImageFilter()) {
+        if (paint->getMaskFilter() || paint->getPathEffect()) {
             return false; // conservative
         }
     }
@@ -246,7 +246,6 @@ std::optional<PreparedDraw> SkCanvas::aboutToDraw(
         }
     }
 
-    SkASSERT_RELEASE(paint.getImageFilter() == nullptr);
     std::optional<PreparedDraw> prepared(std::in_place, paint);
     return prepared;
 }
@@ -515,9 +514,6 @@ void SkCanvas::internalSaveLayer(const SaveLayerRec& rec, SaveLayerStrategy stra
 
     SkPaint restorePaint;
     if (rec.fPaint != nullptr) restorePaint = *rec.fPaint;
-    // Until the remaining paint serialization surface is removed, reject its
-    // unsupported image-filter state explicitly instead of dropping an effect.
-    SkASSERT_RELEASE(restorePaint.getImageFilter() == nullptr);
     restorePaint.setStyle(SkPaint::kFill_Style);
     restorePaint.setPathEffect(nullptr);
     restorePaint.setMaskFilter(nullptr);
@@ -1363,7 +1359,7 @@ void SkCanvas::experimental_DrawEdgeAAImageSet(const ImageSetEntry imageSet[], i
     TRACE_EVENT0("skia", TRACE_FUNC);
     // Route single, rectangular quads to drawImageRect() to take advantage of image filter
     // optimizations that avoid a layer.
-    if (paint && (paint->getImageFilter() || paint->getMaskFilter()) && cnt == 1) {
+    if (paint && paint->getMaskFilter() && cnt == 1) {
         const auto& entry = imageSet[0];
         // If the preViewMatrix is skipped or a positive-scale + translate matrix, we can apply it
         // to the entry's dstRect w/o changing output behavior.
@@ -1434,7 +1430,7 @@ void SkCanvas::onDrawPoints(PointMode mode, size_t count, const SkPoint pts[],
      *  Note: it would be "correct" to never compute this, it is just considered
      *        an optimization opportunity.
      */
-    if (paint.getImageFilter() || paint.getMaskFilter()) {
+    if (paint.getMaskFilter()) {
         auto bounds = SkRect::Bounds({pts, count});
         if (!bounds) {
             return;
@@ -2165,7 +2161,7 @@ void SkCanvas::onDrawEdgeAAImageSet2(const ImageSetEntry imageSet[], int count,
     // individual entries and Chromium's occlusion culling already makes it likely that at least one
     // entry will be visible. So, we only calculate the draw bounds when it's trivial (count == 1),
     // or we need it for the autolooper (since it greatly improves image filter perf).
-    bool needsAutoLayer = SkToBool(realPaint.getImageFilter() || realPaint.getMaskFilter());
+    bool needsAutoLayer = SkToBool(realPaint.getMaskFilter());
     bool setBoundsValid = count == 1 || needsAutoLayer;
     SkRect setBounds = imageSet[0].fDstRect;
     if (imageSet[0].fMatrixIndex >= 0) {

@@ -208,8 +208,9 @@ remaining render output matches the original implementations for that revised
 contract. No output/timing comparison across the two different scene definitions
 is claimed.
 
-The core SkImageFilter/FilterTypes/layer machinery and SkSL still compile. Their
-removal, and removal of Skia's text/font internals, remain explicit next work.
+That first removal left core SkImageFilter/FilterTypes/layer machinery compiled.
+The subsequent CPU-layer and core-removal batches below remove it. SkSL and
+Skia's text/font internals remain explicit next work.
 SkCanvas and SkCanvasPriv receive narrow dependency edits, not full house-style
 conversion. See IMAGE_FILTER_PRUNING.md for the exact scope.
 
@@ -223,9 +224,21 @@ initialization from previous pixels are covered by 256 new differential scenes.
 The established 0.001-pixel layer-bound rounding tolerance is preserved.
 
 This converts the rewritten layer path, not the entire canvas or recording
-implementation. SkPaint's remaining image-filter interface is explicitly rejected
-by the reduced canvas pending removal. Device/image filtering interfaces,
-SkImageFilter cache/types and SkSL remain removal work. See CPU_LAYERS.md.
+implementation. The temporary canvas rejection of SkPaint image filters is superseded by the
+core-removal batch below. See CPU_LAYERS.md for this batch's original scope.
+
+## Core image-filter removal
+
+The five remaining core image-filter implementation units, their public/private
+headers, cache and filtering backend are reference-only. SkPaint no longer owns
+or exposes an image filter; device/image filtering entry points and dependent
+branches are removed. Paint serialization preserves its historical null slot and
+rejects nonzero image-filter tags. Ordinary layers retain device composition.
+
+This is dependency removal, not full conversion of paint, devices or recording.
+Original copies isolate the baseline from these changes. The paint contract test
+checks API absence, ordinary serialization and unsupported-record rejection;
+existing rendering comparisons cover retained effects. See IMAGE_FILTER_CORE.md.
 
 ## Still required
 
@@ -236,8 +249,8 @@ SkImageFilter cache/types and SkSL remain removal work. See CPU_LAYERS.md.
 - Remove unused picture/text/serialization paths through actual dependency
   work. Preserve external glyph coverage and all admitted drawing behavior.
 - Convert remaining retained filter, shader, color and skcms implementation;
-  remove general image filters and runtime/SkSL effects under the clarified owner
-  contract, retaining blur masks, matrix color filters and shader masks.
+  remove runtime/SkSL effects under the clarified owner contract, retaining blur
+  masks, matrix color filters and shader masks. General image filters are removed.
 - Audit every retained production header and build/source list, including
   templates, generated runtime support and platform ports. Syntax-checker success
   alone is not semantic conversion evidence.

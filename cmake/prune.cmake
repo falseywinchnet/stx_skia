@@ -10,5 +10,8 @@ list(FILTER stx_sources EXCLUDE REGEX "skia/src/effects/(Sk1DPathEffect|Sk2DPath
 list(FILTER stx_sources EXCLUDE REGEX "skia/src/core/.*_opts_(ssse3|ml3|lasx|avx|erms)\\.cpp$")
 
 # General image effects belong to GUI.Forms. Factory implementations and the
-# mask-to-image adapters are removed; core layer/filter plumbing is next.
+# mask-to-image adapters are removed; core implementations are excluded below.
 list(FILTER stx_sources EXCLUDE REGEX "skia/src/effects/imagefilters/")
+
+# CSS/backdrop image evaluation belongs to the first-party GUI.Forms engine.
+list(FILTER stx_sources EXCLUDE REGEX "skia/src/core/(SkBlurEngine|SkImageFilter|SkImageFilterCache|SkImageFilterTypes|SkLocalMatrixImageFilter)\\.cpp$")

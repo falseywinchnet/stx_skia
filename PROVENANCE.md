@@ -195,3 +195,15 @@ records and evaluation from canvas drawing, retaining direct device composition.
 The remaining serialization code rejects withdrawn layer filter flags. New
 original tests/layers.cpp checks complete output against the unchanged reference
 implementations and independent group-alpha/empty-layer expectations.
+
+
+## Core image-filter removal
+
+SkImageFilter, SkImageFilterCache, SkImageFilterTypes, SkBlurEngine and
+SkLocalMatrixImageFilter implementations and associated headers now live only in
+baseline/skia. Original copies of affected paint, device, image, read-buffer and
+utility files preserve the reference profile. The derivative removes the paint
+owner/API, device/image filter entry points and cache purges. Historical paint
+records retain a zero slot and reject unsupported image-filter entries.
+New tests/paint.cpp checks this contract; the installed-consumer test verifies
+API absence. These edits do not claim full conversion of the adapted files.

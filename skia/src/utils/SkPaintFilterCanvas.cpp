@@ -188,7 +188,6 @@ void SkPaintFilterCanvas::onDrawPicture(const SkPicture* picture, const SkMatrix
         if (originalPaint == nullptr) {
             if (   newPaint->getAlphaf()      == 1.0f
                 && newPaint->getColorFilter() == nullptr
-                && newPaint->getImageFilter() == nullptr
                 && newPaint->asBlendMode()    == SkBlendMode::kSrcOver) {
                 // restore the original nullptr
                 newPaint = nullptr;

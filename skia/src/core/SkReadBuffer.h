@@ -12,7 +12,6 @@
 #include "include/core/SkColorFilter.h"
 #include "include/core/SkFlattenable.h"
 #include "include/core/SkFourByteTag.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPathEffect.h"
 #include "include/core/SkPoint.h"
@@ -26,7 +25,6 @@
 #include "include/private/SkAlign.h"
 #include "include/private/SkAssert.h"
 #include "src/core/SkBlenderBase.h"
-#include "src/core/SkImageFilter_Base.h"
 #include "src/core/SkMaskFilterBase.h"
 #include "src/core/SkPaintPriv.h"
 #include "src/core/SkPicturePriv.h"
@@ -137,7 +135,6 @@ public:
         return sk_sp<T>((T*)this->readFlattenable(T::GetFlattenableType()));
     }
     sk_sp<SkColorFilter> readColorFilter() { return this->readFlattenable<SkColorFilterBase>(); }
-    sk_sp<SkImageFilter> readImageFilter() { return this->readFlattenable<SkImageFilter_Base>(); }
     sk_sp<SkBlender> readBlender() { return this->readFlattenable<SkBlenderBase>(); }
     sk_sp<SkMaskFilter> readMaskFilter() { return this->readFlattenable<SkMaskFilterBase>(); }
     sk_sp<SkPathEffect> readPathEffect() { return this->readFlattenable<SkPathEffect>(); }

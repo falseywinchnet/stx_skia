@@ -1,6 +1,6 @@
 # Original implementations retained for differential tests during conversion.
 foreach(unit IN ITEMS SkPixelRef SkMallocPixelRef SkPixelStorage SkIDChangeListener SkMatrix SkDevice
-        SkAutoPixmapStorage SkSafeMath SkReadPixelsRec SkWritePixelsRec SkImageInfo SkConvertPixels SkPixmap SkPixmapDraw SkMask SkMaskBlurFilter SkBlurMask SkCachedData SkMaskFilterBase SkMaskFilter SkBlurMaskFilterImpl SkCanvasPriv SkCanvas SkRecordCanvas SkPictureRecord SkPicturePlayback SkRecordDraw SkRecordOpts)
+        SkAutoPixmapStorage SkSafeMath SkReadPixelsRec SkWritePixelsRec SkImageInfo SkConvertPixels SkPixmap SkPixmapDraw SkMask SkMaskBlurFilter SkBlurMask SkCachedData SkMaskFilterBase SkMaskFilter SkBlurMaskFilterImpl SkCanvasPriv SkCanvas SkRecordCanvas SkPictureRecord SkPicturePlayback SkRecordDraw SkRecordOpts SkPaint SkPaintPriv SkGraphics SkBitmapDevice SkBlitter_Sprite SkBlurEngine SkImageFilter SkImageFilterCache SkImageFilterTypes SkLocalMatrixImageFilter)
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
@@ -13,3 +13,8 @@ file(GLOB stx_reference_image_filters CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURREN
     "baseline/skia/src/effects/imagefilters/*.cpp")
 list(FILTER stx_sources EXCLUDE REGEX "^skia/src/effects/imagefilters/")
 list(APPEND stx_sources ${stx_reference_image_filters})
+
+foreach(unit IN ITEMS src/utils/SkPaintFilterCanvas.cpp src/image/SkImage_RasterFactories.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()

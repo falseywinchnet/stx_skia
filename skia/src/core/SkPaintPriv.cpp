@@ -11,7 +11,6 @@
 #include "include/core/SkBlender.h"
 #include "include/core/SkColorFilter.h"
 #include "include/core/SkColorType.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPathEffect.h"
@@ -126,7 +125,7 @@ bool SkPaintPriv::ShouldDither(const SkPaint& p, SkColorType dstCT) {
     }
 
     // Otherwise, dither is only needed for non-const paints.
-    return p.getImageFilter() || p.getMaskFilter() ||
+    return p.getMaskFilter() ||
            (p.getShader() && !as_SB(p.getShader())->isConstant());
 }
 
@@ -265,7 +264,6 @@ void SkPaintPriv::Flatten(const SkPaint& paint, SkWriteBuffer& buffer) {
         paint.getShader() ||
         paint.getMaskFilter() ||
         paint.getColorFilter() ||
-        paint.getImageFilter() ||
         !paint.asBlendMode()) {
         flatFlags |= kHasEffects_FlatFlag;
     }
@@ -281,7 +279,7 @@ void SkPaintPriv::Flatten(const SkPaint& paint, SkWriteBuffer& buffer) {
         buffer.writeFlattenable(paint.getShader());
         buffer.writeFlattenable(paint.getMaskFilter());
         buffer.writeFlattenable(paint.getColorFilter());
-        buffer.writeFlattenable(paint.getImageFilter());
+        buffer.write32(0); // Retain the historical null image-filter slot.
         buffer.writeFlattenable(paint.getBlender());
     }
 }
@@ -306,7 +304,6 @@ SkPaint SkPaintPriv::Unflatten(SkReadBuffer& buffer) {
         paint.setShader(nullptr);
         paint.setMaskFilter(nullptr);
         paint.setColorFilter(nullptr);
-        paint.setImageFilter(nullptr);
     } else if (buffer.isVersionLT(SkPicturePriv::kSkBlenderInSkPaint)) {
         // This paint predates the introduction of user blend functions (via SkBlender).
         paint.setPathEffect(buffer.readPathEffect());
@@ -314,13 +311,15 @@ SkPaint SkPaintPriv::Unflatten(SkReadBuffer& buffer) {
         paint.setMaskFilter(buffer.readMaskFilter());
         paint.setColorFilter(buffer.readColorFilter());
         (void)buffer.read32();  // was drawLooper (now deprecated)
-        paint.setImageFilter(buffer.readImageFilter());
+        const uint32_t imageFilterTag = buffer.read32();
+        buffer.validate(imageFilterTag == 0); // Image-filter records are not admitted.
     } else {
         paint.setPathEffect(buffer.readPathEffect());
         paint.setShader(buffer.readShader());
         paint.setMaskFilter(buffer.readMaskFilter());
         paint.setColorFilter(buffer.readColorFilter());
-        paint.setImageFilter(buffer.readImageFilter());
+        const uint32_t imageFilterTag = buffer.read32();
+        buffer.validate(imageFilterTag == 0); // Image-filter records are not admitted.
         paint.setBlender(buffer.readBlender());
     }
 

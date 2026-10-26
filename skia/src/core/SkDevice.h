@@ -37,7 +37,6 @@ struct SkArc;
 class SkColorSpace;
 class SkMesh;
 struct SkDrawShadowRec;
-class SkImageFilter;
 class SkRasterHandleAllocator;
 class SkSpecialImage;
 class GrRecordingContext;
@@ -60,10 +59,6 @@ namespace sktext {
 class GlyphRunList;
 }
 
-namespace skif {
-class Backend;
-class Mapping;
-}
 namespace skgpu::ganesh {
 class Device;
 }
@@ -87,16 +82,9 @@ struct SkStrikeDeviceInfo {
  * SkDevice is the internal API and implementation that SkCanvas will use to perform rendering and
  * implement the saveLayer abstraction. A device wraps some pixel allocation (for non-document based
  * devices) or wraps some other container that stores rendering operations. The drawing operations
- * perform equivalently to their corresponding functions in SkCanvas except that the canvas is
- * responsible for all SkImageFilters. An image filter is applied by automatically creating a layer,
- * drawing the filter-less paint into the layer, and then evaluating the filter on the layer's
- * image.
- *
- * Each layer in an SkCanvas stack is represented by an SkDevice instance that was created by the
- * parent SkDevice (up to the canvas's base device). In most cases these devices will be pixel
- * aligned with one another but may differ in size based on the known extent of the active clip. In
- * complex image filtering scenarios, they may not be axis aligned, although the effective pixel
- * size should remain approximately equal across all devices in a canvas.
+ * perform the drawing requested by SkCanvas. Each canvas layer owns a device
+ * created by its parent. CPU layers remain aligned to the parent pixel grid,
+ * with their allocation extent restricted by the active clip and layer bounds.
  *
  * While SkCanvas manages a single stack of layers and canvas transforms, SkDevice does not have a
  * stack of transforms. Instead, it has a single active transform that is modified as needed by
@@ -168,7 +156,6 @@ public:
      *  On failure, returns false and ignores the pixmap parameter.
      */
     bool peekPixels(SkPixmap*);
-
 
     // -- Device's transform (both current transform affecting draws, and its fixed global mapping)
 
@@ -469,19 +456,6 @@ public:
         return false;
     }
 
-    /**
-     * Evaluate 'filter' and draw the final output into this device using 'paint'. The 'mapping'
-     * defines the parameter-to-layer space transform used to evaluate the image filter on 'src',
-     * and the layer-to-device space transform that is used to draw the result into this device.
-     * Since 'mapping' fully specifies the transform, this draw function ignores the current
-     * local-to-device matrix (i.e. just like drawSpecial and drawDevice).
-     *
-     * The final paint must not have an image filter or mask filter set on it; a shader is ignored.
-     * The provided color type will be used for any intermediate surfaces that need to be created as
-     * part of filter evaluation. It does not have to be src's color type or this Device's type.
-     */
-    void drawFilteredImage(const skif::Mapping& mapping, SkSpecialImage* src, SkColorType ct,
-                           const SkImageFilter*, const SkSamplingOptions&, const SkPaint&);
 
 protected:
     // Configure the device's coordinate spaces, specifying both how its device image maps back to
@@ -514,9 +488,6 @@ private:
     friend class SkCanvas; // for setOrigin/setDeviceCoordinateSystem
     friend class DeviceTestingAccess;
 
-    // Defaults to a CPU image filtering backend.
-    virtual sk_sp<skif::Backend> createImageFilteringBackend(const SkSurfaceProps& surfaceProps,
-                                                             SkColorType colorType) const;
 
     // Implementations can assume that the device from (x,y) to (w,h) will fit within dst.
     virtual bool onReadPixels(const SkPixmap&, int x, int y) { return false; }

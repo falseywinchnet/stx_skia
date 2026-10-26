@@ -8,7 +8,6 @@
 #include "src/core/SkPictureRecord.h"
 
 #include "include/core/SkBlendMode.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkMatrix.h"
 #include "include/core/SkPoint.h"
 #include "include/core/SkPoint3.h"

@@ -308,15 +308,7 @@ sk_sp<SkDevice> SkBitmapDevice::createDevice(const CreateInfo& cinfo, const SkPa
     const SkSurfaceProps surfaceProps =
         this->surfaceProps().cloneWithPixelGeometry(cinfo.fPixelGeometry);
 
-    // Need to force L32 for now if we have an image filter.
-    // If filters ever support other colortypes, e.g. F16, we can modify this check.
-    SkImageInfo info = cinfo.fInfo;
-    if (layerPaint && layerPaint->getImageFilter()) {
-        // TODO: can we query the imagefilter, to see if it can handle floats (so we don't always
-        //       use N32 when the layer itself was float)?
-        info = info.makeColorType(kN32_SkColorType);
-    }
-
+    const SkImageInfo info = cinfo.fInfo;
     return SkBitmapDevice::Create(info, surfaceProps, cinfo.fAllocator);
 }
 
@@ -577,7 +569,6 @@ void SkBitmapDevice::drawSpecial(SkSpecialImage* src,
                                  const SkSamplingOptions& sampling,
                                  const SkPaint& paint,
                                  SkCanvas::SrcRectConstraint) {
-    SkASSERT(!paint.getImageFilter());
     SkASSERT(!paint.getMaskFilter());
     SkASSERT(!src->isGaneshBacked());
     SkASSERT(!src->isGraphiteBacked());

@@ -11,7 +11,6 @@
 #include "src/core/SkBlitMask.h"
 #include "src/core/SkBlitRow.h"
 #include "src/core/SkCpu.h"
-#include "src/core/SkImageFilter_Base.h"
 #include "src/core/SkMemset.h"
 #include "src/core/SkOpts.h"
 #include "src/core/SkResourceCache.h"
@@ -40,7 +39,6 @@ void SkGraphics::DumpMemoryStatistics(SkTraceMemoryDump* dump) {
 void SkGraphics::PurgeAllCaches() {
     SkGraphics::PurgeFontCache();
     SkGraphics::PurgeResourceCache();
-    SkImageFilter_Base::PurgeCache();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -95,7 +93,6 @@ size_t SkGraphics::SetResourceCacheSingleAllocationByteLimit(size_t newLimit) {
 }
 
 void SkGraphics::PurgeResourceCache() {
-    SkImageFilter_Base::PurgeCache();
     return SkResourceCache::PurgeAll();
 }
 

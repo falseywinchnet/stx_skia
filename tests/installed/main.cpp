@@ -6,6 +6,10 @@
 #include <vector>
 #include <cstddef>
 
+template <typename T>
+concept HasImageFiltering = requires(T& paint) { paint.getImageFilter(); };
+static_assert(!HasImageFiltering<SkPaint>);
+
 namespace {
 struct ConsumerBase {
     virtual ~ConsumerBase() = default;

@@ -85,7 +85,7 @@ public:
         if (dst.colorType() != src.colorType()) {
             return false;
         }
-        if (paint.getMaskFilter() || paint.getColorFilter() || paint.getImageFilter()) {
+        if (paint.getMaskFilter() || paint.getColorFilter()) {
             return false;
         }
         if (0xFF != paint.getAlpha()) {

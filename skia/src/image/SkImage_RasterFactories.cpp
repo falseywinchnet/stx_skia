@@ -15,8 +15,6 @@
 #include "include/core/SkRefCnt.h"
 #include "include/private/SkMath.h"
 #include "src/core/SkCompressedDataUtils.h"
-#include "src/core/SkImageFilterTypes.h"
-#include "src/core/SkImageFilter_Base.h"
 #include "src/image/SkImage_Base.h"
 #include "src/image/SkImage_Raster.h"
 
@@ -24,7 +22,6 @@
 #include <cstdint>
 #include <utility>
 
-class SkImageFilter;
 struct SkIPoint;
 struct SkIRect;
 enum class SkTextureCompressionType;
@@ -103,25 +100,6 @@ sk_sp<SkImage> RasterFromData(const SkImageInfo& info, sk_sp<SkData> data, size_
 
     return sk_make_sp<SkImage_Raster>(
             info, std::move(data), rowBytes, /*mips=*/nullptr, kNeedNewImageUniqueID);
-}
-
-sk_sp<SkImage> MakeWithFilter(sk_sp<SkImage> src,
-                              const SkImageFilter* filter,
-                              const SkIRect& subset,
-                              const SkIRect& clipBounds,
-                              SkIRect* outSubset,
-                              SkIPoint* offset) {
-    if (!src || !filter) {
-        return nullptr;
-    }
-
-    sk_sp<skif::Backend> backend = skif::MakeRasterBackend({}, src->colorType());
-    return as_IFB(filter)->makeImageWithFilter(std::move(backend),
-                                               std::move(src),
-                                               subset,
-                                               clipBounds,
-                                               outSubset,
-                                               offset);
 }
 
 // TODO: this could be improved to decode and make use of the mipmap

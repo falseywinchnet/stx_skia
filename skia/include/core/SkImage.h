@@ -25,7 +25,6 @@ class SkBitmap;
 class SkColorSpace;
 class SkData;
 class SkImage;
-class SkImageFilter;
 class SkImageGenerator;
 class SkMatrix;
 class SkMipmap;
@@ -215,34 +214,6 @@ SK_API sk_sp<SkImage> RasterFromPixmap(const SkPixmap& pixmap,
 SK_API sk_sp<SkImage> RasterFromData(const SkImageInfo& info,
                                      sk_sp<SkData> pixels,
                                      size_t rowBytes);
-
-/** Creates a filtered SkImage on the CPU. filter processes the src image, potentially changing
-    the color, position, and size. subset is the bounds of src that are processed
-    by filter. clipBounds is the expected bounds of the filtered SkImage. outSubset
-    is required storage for the actual bounds of the filtered SkImage. offset is
-    required storage for translation of returned SkImage.
-
-    Returns nullptr a filtered result could not be created. If nullptr is returned, outSubset
-    and offset are undefined.
-
-    Useful for animation of SkImageFilter that varies size from frame to frame.
-    outSubset describes the valid bounds of returned image. offset translates the returned SkImage
-    to keep subsequent animation frames aligned with respect to each other.
-
-    @param src         the image to be filtered
-    @param filter      the image filter to be applied
-    @param subset      bounds of SkImage processed by filter
-    @param clipBounds  expected bounds of filtered SkImage
-    @param outSubset   storage for returned SkImage bounds
-    @param offset      storage for returned SkImage translation
-    @return            filtered SkImage, or nullptr
-*/
-SK_API sk_sp<SkImage> MakeWithFilter(sk_sp<SkImage> src,
-                                     const SkImageFilter* filter,
-                                     const SkIRect& subset,
-                                     const SkIRect& clipBounds,
-                                     SkIRect* outSubset,
-                                     SkIPoint* offset);
 
 }  // namespace SkImages
 

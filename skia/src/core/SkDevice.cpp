@@ -29,8 +29,6 @@
 #include "include/private/chromium/Slug.h"  // IWYU pragma: keep
 #include "src/core/SkColorPriv.h"
 #include "src/core/SkEnumerate.h"
-#include "src/core/SkImageFilterTypes.h"
-#include "src/core/SkImageFilter_Base.h"
 #include "src/core/SkLatticeIter.h"
 #include "src/core/SkMatrixPriv.h"
 #include "src/core/SkMemset.h"
@@ -320,11 +318,6 @@ sk_sp<SkSpecialImage> SkDevice::snapSpecial() {
     return this->snapSpecial(SkIRect::MakeWH(this->width(), this->height()));
 }
 
-sk_sp<skif::Backend> SkDevice::createImageFilteringBackend(const SkSurfaceProps& surfaceProps,
-                                                           SkColorType colorType) const {
-    return skif::MakeRasterBackend(surfaceProps, colorType);
-}
-
 void SkDevice::drawDevice(SkDevice* device,
                           const SkSamplingOptions& sampling,
                           const SkPaint& paint) {
@@ -340,40 +333,6 @@ void SkDevice::drawDevice(SkDevice* device,
         this->drawSpecial(deviceImage.get(), relativeTransform, sampling, paint,
                           strict ? SkCanvas::kStrict_SrcRectConstraint
                                  : SkCanvas::kFast_SrcRectConstraint);
-    }
-}
-
-void SkDevice::drawFilteredImage(const skif::Mapping& mapping,
-                                 SkSpecialImage* src,
-                                 SkColorType colorType,
-                                 const SkImageFilter* filter,
-                                 const SkSamplingOptions& sampling,
-                                 const SkPaint& paint) {
-    SkASSERT(!paint.getImageFilter() && !paint.getMaskFilter());
-
-    skif::LayerSpace<SkIRect> targetOutput = mapping.deviceToLayer(
-            skif::DeviceSpace<SkIRect>(this->devClipBounds()));
-
-    if (colorType == kUnknown_SkColorType) {
-        colorType = kRGBA_8888_SkColorType;
-    }
-
-    skif::Stats stats;
-    skif::Context ctx{this->createImageFilteringBackend(src ? src->props() : this->surfaceProps(),
-                                                        colorType),
-                      mapping,
-                      targetOutput,
-                      skif::FilterResult(sk_ref_sp(src)),
-                      this->imageInfo().colorSpace(),
-                      &stats};
-
-    SkIPoint offset;
-    sk_sp<SkSpecialImage> result = as_IFB(filter)->filterImage(ctx).imageAndOffset(ctx, &offset);
-    stats.reportStats();
-    if (result) {
-        SkMatrix deviceMatrixWithOffset = mapping.layerToDevice().asM33();
-        deviceMatrixWithOffset.preTranslate(offset.fX, offset.fY);
-        this->drawSpecial(result.get(), deviceMatrixWithOffset, sampling, paint);
     }
 }
 

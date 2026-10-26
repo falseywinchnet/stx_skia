@@ -10,7 +10,6 @@
 
 #include "include/core/SkColorFilter.h"
 #include "include/core/SkFont.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPathEffect.h"
 #include "include/core/SkShader.h"

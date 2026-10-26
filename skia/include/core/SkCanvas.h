@@ -13,7 +13,6 @@
 #include "include/core/SkClipOp.h"
 #include "include/core/SkColor.h"
 #include "include/core/SkFontTypes.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkM44.h"
 #include "include/core/SkMatrix.h"
@@ -612,7 +611,7 @@ public:
         SkRect bounds suggests but does not define the SkSurface size. To clip drawing to
         a specific rectangle, use clipRect().
 
-        Optional SkPaint paint applies alpha, SkColorFilter, SkImageFilter, and
+        Optional SkPaint paint applies alpha, SkColorFilter, and
         SkBlendMode when restore() is called.
 
         Call restoreToCount() with returned value to restore this and subsequent saves.
@@ -636,7 +635,7 @@ public:
         SkRect bounds suggests but does not define the layer size. To clip drawing to
         a specific rectangle, use clipRect().
 
-        Optional SkPaint paint applies alpha, SkColorFilter, SkImageFilter, and
+        Optional SkPaint paint applies alpha, SkColorFilter, and
         SkBlendMode when restore() is called.
 
         Call restoreToCount() with returned value to restore this and subsequent saves.
@@ -1139,7 +1138,7 @@ public:
     void discard() { this->onDiscard(); }
 
     /** Fills clip with SkPaint paint. SkPaint components, SkShader,
-        SkColorFilter, SkImageFilter, and SkBlendMode affect drawing;
+        SkColorFilter, SkBlendMode affect drawing;
         SkMaskFilter and SkPathEffect in paint are ignored.
 
         @param paint  graphics state used to fill SkCanvas
@@ -1485,7 +1484,7 @@ public:
 
         Additionally transform draw using clip, SkMatrix, and optional SkPaint paint.
 
-        If SkPaint paint is supplied, apply SkColorFilter, alpha, SkImageFilter, and
+        If SkPaint paint is supplied, apply SkColorFilter, alpha, and
         SkBlendMode. If image is kAlpha_8_SkColorType, apply SkShader.
         If paint contains SkMaskFilter, generate mask from image bounds.
         Any SkMaskFilter on paint is ignored as is paint anti-aliasing state.
@@ -1498,7 +1497,7 @@ public:
         @param center  SkIRect edge of image corners and sides
         @param dst     destination SkRect of image to draw to
         @param filter  what technique to use when sampling the image
-        @param paint   SkPaint containing SkBlendMode, SkColorFilter, SkImageFilter,
+        @param paint   SkPaint containing SkBlendMode, SkColorFilter,
                        and so on; or nullptr
     */
     void drawImageNine(const SkImage* image, const SkIRect& center, const SkRect& dst,
@@ -1544,7 +1543,7 @@ public:
 
         Additionally transform draw using clip, SkMatrix, and optional SkPaint paint.
 
-        If SkPaint paint is supplied, apply SkColorFilter, alpha, SkImageFilter, and
+        If SkPaint paint is supplied, apply SkColorFilter, alpha, and
         SkBlendMode. If image is kAlpha_8_SkColorType, apply SkShader.
         If paint contains SkMaskFilter, generate mask from image bounds.
         Any SkMaskFilter on paint is ignored as is paint anti-aliasing state.
@@ -1558,7 +1557,7 @@ public:
         @param lattice  division of bitmap into fixed and variable rectangles
         @param dst      destination SkRect of image to draw to
         @param filter   what technique to use when sampling the image
-        @param paint    SkPaint containing SkBlendMode, SkColorFilter, SkImageFilter,
+        @param paint    SkPaint containing SkBlendMode, SkColorFilter,
                         and so on; or nullptr
     */
     void drawImageLattice(const SkImage* image, const Lattice& lattice, const SkRect& dst,
@@ -1677,7 +1676,7 @@ public:
         size is 12 point.
 
         All elements of paint: SkPathEffect, SkMaskFilter, SkShader,
-        SkColorFilter, and SkImageFilter; apply to text. By
+        SkColorFilter; apply to text. By
         default, draws filled black glyphs.
 
         @param text        character code points or glyphs drawn
@@ -1705,7 +1704,7 @@ public:
         size is 12 point.
 
         All elements of paint: SkPathEffect, SkMaskFilter, SkShader,
-        SkColorFilter, and SkImageFilter; apply to text. By
+        SkColorFilter; apply to text. By
         default, draws filled black glyphs.
 
         @param str     character code points drawn,
@@ -1734,7 +1733,7 @@ public:
         size is 12 point.
 
         All elements of paint: SkPathEffect, SkMaskFilter, SkShader,
-        SkColorFilter, and SkImageFilter; apply to text. By
+        SkColorFilter; apply to text. By
         default, draws filled black glyphs.
 
         @param str     character code points drawn,
@@ -1758,7 +1757,7 @@ public:
        The drawing obeys the current transform matrix and clipping.
 
        All elements of paint: SkPathEffect, SkMaskFilter, SkShader,
-       SkColorFilter, and SkImageFilter; apply to text. By
+       SkColorFilter; apply to text. By
        default, draws filled black glyphs.
 
        @param glyphs          the span of glyphIDs to draw
@@ -1781,7 +1780,7 @@ public:
         The drawing obeys the current transform matrix and clipping.
 
         All elements of paint: SkPathEffect, SkMaskFilter, SkShader,
-        SkColorFilter, and SkImageFilter; apply to text. By
+        SkColorFilter; apply to text. By
         default, draws filled black glyphs.
 
         @param count       number of glyphs to draw
@@ -1803,7 +1802,7 @@ public:
         The drawing obeys the current transform matrix and clipping.
 
         All elements of paint: SkPathEffect, SkMaskFilter, SkShader,
-        SkColorFilter, and SkImageFilter; apply to text. By
+        SkColorFilter; apply to text. By
         default, draws filled black glyphs.
 
         @param count    number of glyphs to draw
@@ -1852,7 +1851,7 @@ public:
         SkTextEncoding must be set to SkTextEncoding::kGlyphID.
 
         Elements of paint: SkPathEffect, SkMaskFilter, SkShader, SkColorFilter,
-        and SkImageFilter; apply to blob.
+        and other paint effects; apply to blob.
 
         @param blob   glyphs, positions, and their paints' text size, typeface, and so on
         @param x      horizontal offset applied to blob
@@ -1889,7 +1888,7 @@ public:
 
     /** Draws SkPicture picture, using clip and SkMatrix; transforming picture with
         SkMatrix matrix, if provided; and use SkPaint paint alpha, SkColorFilter,
-        SkImageFilter, and SkBlendMode, if provided.
+        SkBlendMode, if provided.
 
         If paint is non-null, then the picture is always drawn into a temporary layer before
         actually landing on the canvas. Note that drawing into a layer can also change its
@@ -1905,7 +1904,7 @@ public:
 
     /** Draws SkPicture picture, using clip and SkMatrix; transforming picture with
         SkMatrix matrix, if provided; and use SkPaint paint alpha, SkColorFilter,
-        SkImageFilter, and SkBlendMode, if provided.
+        SkBlendMode, if provided.
 
         If paint is non-null, then the picture is always drawn into a temporary layer before
         actually landing on the canvas. Note that drawing into a layer can also change its
@@ -2015,7 +2014,7 @@ public:
                    const SkPoint texCoords[4], SkBlendMode mode, const SkPaint& paint);
 
     /** Draws a set of sprites from atlas, using clip, SkMatrix, and optional SkPaint paint.
-        paint uses anti-alias, alpha, SkColorFilter, SkImageFilter, and SkBlendMode
+        paint uses anti-alias, alpha, SkColorFilter, SkBlendMode
         to draw, if present. For each entry in the array, SkRect tex locates sprite in
         atlas, and SkRSXform xform transforms it into destination space.
 
@@ -2038,7 +2037,7 @@ public:
         @param mode      SkBlendMode combining colors and sprites
         @param sampling  SkSamplingOptions used when sampling from the atlas image
         @param cullRect  bounds of transformed sprites for efficient clipping; may be nullptr
-        @param paint     SkColorFilter, SkImageFilter, SkBlendMode, and so on; may be nullptr
+        @param paint     SkColorFilter, SkBlendMode, and so on; may be nullptr
     */
     void drawAtlas(const SkImage* atlas, SkSpan<const SkRSXform> xform,
                    SkSpan<const SkRect> tex, SkSpan<const SkColor> colors, SkBlendMode mode,
