@@ -1,5 +1,9 @@
 #include "include/core/SkStream.h"
 #include "include/core/SkPathBuilder.h"
+#include "include/core/SkBitmap.h"
+#include "include/core/SkBlurTypes.h"
+#include "include/core/SkMaskFilter.h"
+#include "include/core/SkPaint.h"
 #include "src/core/SkAAClip.h"
 #include "src/core/SkBase64.h"
 #include "src/core/SkMask.h"
@@ -171,6 +175,17 @@ bool oversized_clip_mask() {
     clip.copyToMask(&mask);
     return mask.isEmpty() && mask.image() == nullptr && mask.rowBytes() == 0;
 }
+
+bool oversized_filtered_alpha() {
+    SkBitmap source;
+    const SkImageInfo info = SkImageInfo::MakeA8(50000, 50000);
+    if (!source.setInfo(info)) return false;
+    SkPaint paint;
+    paint.setMaskFilter(SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, 3.0F));
+    SkBitmap output;
+    if (source.extractAlpha(&output, &paint, nullptr)) return false;
+    return output.isNull();
+}
 }
 
 int main() {
@@ -193,6 +208,10 @@ int main() {
     if (!oversized_clip_mask()) {
         std::fprintf(stderr, "oversized clip mask contract failed\n");
         return 5;
+    }
+    if (!oversized_filtered_alpha()) {
+        std::fprintf(stderr, "oversized filtered alpha contract failed\n");
+        return 6;
     }
     return 0;
 }

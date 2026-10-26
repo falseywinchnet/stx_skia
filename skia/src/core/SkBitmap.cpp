@@ -559,6 +559,9 @@ bool SkBitmap::extractAlpha(SkBitmap* dst, const SkPaint* paint,
     if (this->width() == 0 || this->height() == 0) {
         return false;
     }
+    if (this->width() > std::numeric_limits<int>::max() - 3) {
+        return false;
+    }
     srcM.bounds().setWH(this->width(), this->height());
     srcM.rowBytes() = SkAlign4(this->width());
     srcM.format() = SkMask::kA8_Format;
@@ -588,7 +591,11 @@ bool SkBitmap::extractAlpha(SkBitmap* dst, const SkPaint* paint,
         tmpBitmap.swap(*dst);
         return true;
     }
-    srcM.image() = SkMaskBuilder::AllocImage(srcM.computeImageSize());
+    const size_t sourceMaskSize = srcM.computeImageSize();
+    if (sourceMaskSize == 0) {
+        return false;
+    }
+    srcM.image() = SkMaskBuilder::AllocImage(sourceMaskSize);
     SkAutoMaskFreeImage srcCleanup(srcM.image());
 
     GetBitmapAlpha(*this, srcM.image(), srcM.fRowBytes);
