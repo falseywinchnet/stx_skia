@@ -23,7 +23,6 @@ class SkData;
 class SkDrawable;
 class SkImage;
 class SkPath;
-class SkPicture;
 class SkRRect;
 class SkRegion;
 class SkTextBlob;
@@ -176,26 +175,7 @@ void SkPaintFilterCanvas::onDrawPatch(const SkPoint cubics[12], const SkColor co
     }
 }
 
-void SkPaintFilterCanvas::onDrawPicture(const SkPicture* picture, const SkMatrix* m,
-                                        const SkPaint* originalPaint) {
-    AutoPaintFilter apf(this, originalPaint);
-    if (apf.shouldDraw()) {
-        const SkPaint* newPaint = &apf.paint();
 
-        // Passing a paint (-vs- passing null) makes drawPicture draw into a layer...
-        // much slower, and can produce different blending. Thus we should only do this
-        // if the filter's effect actually impacts the picture.
-        if (originalPaint == nullptr) {
-            if (   newPaint->getAlphaf()      == 1.0f
-                && newPaint->getColorFilter() == nullptr
-                && newPaint->asBlendMode()    == SkBlendMode::kSrcOver) {
-                // restore the original nullptr
-                newPaint = nullptr;
-            }
-        }
-        this->SkNWayCanvas::onDrawPicture(picture, m, newPaint);
-    }
-}
 
 void SkPaintFilterCanvas::onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix) {
     // There is no paint to filter in this case, but we can still filter on type.

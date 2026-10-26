@@ -18,8 +18,6 @@
 #include "include/core/SkScalar.h"
 #include "include/core/SkSize.h"
 #include "include/core/SkSurface.h"
-#include "src/capture/SkCaptureCanvas.h"
-#include "src/capture/SkCaptureManager.h"
 #include "src/image/SkRescaleAndReadPixels.h"
 
 #include <atomic>
@@ -133,10 +131,4 @@ uint32_t SkSurface_Base::newGenerationID() {
     SkASSERT(!fCachedCanvas || fCachedCanvas->getSurfaceBase() == this);
     static std::atomic<uint32_t> nextID{1};
     return nextID.fetch_add(1, std::memory_order_relaxed);
-}
-
-void SkSurface_Base::createCaptureBreakpoint() {
-    if (this->baseRecorder()) {
-        this->baseRecorder()->createCaptureBreakpoint(this);
-    }
 }

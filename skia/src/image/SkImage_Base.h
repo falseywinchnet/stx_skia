@@ -15,7 +15,7 @@
 #include "include/core/SkTypes.h"
 #include "include/private/SkPixelStorage.h"
 #include "include/private/SkTDArray.h"
-#include "src/capture/SkCaptureManager.h"
+#include "include/private/SkTArray.h"
 #include "src/core/SkMipmap.h"
 
 #include <atomic>

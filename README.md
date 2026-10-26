@@ -29,8 +29,9 @@ The core image-filter graph, cache, paint field and device/image entry points ar
 also removed. Ordinary layers compose devices directly. SkSL/runtime effects, programmable
 meshes and shader-language capability APIs are also removed. The canvas no longer
 exposes text drawing or owns glyph-run scratch; external A8 glyph-mask composition
-remains. Picture serialization, typefaces and strike-cache internals remain removal
-work.
+remains. Picture recording/playback/capture, picture-backed images and shaders,
+font parsing/rasterization, text blobs, typefaces and strike caches are removed.
+The retained CPU pipeline has no font engine dependency.
 
 On the initial recorded M4/macOS build, the candidate passed seven selected GUI.Forms
 renderer tests and produced byte-identical output across 24 baseline comparison

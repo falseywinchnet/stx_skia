@@ -189,3 +189,93 @@ list(APPEND stx_sources baseline/skia/src/core/SkCanvas_Raster.cpp)
 
 list(REMOVE_ITEM stx_sources skia/src/core/SkTextBlob.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkTextBlob.cpp)
+
+# Original picture/capture implementations and adapted entry points.
+foreach(unit IN ITEMS
+    src/capture/SkCapture.cpp
+    src/capture/SkCaptureCanvas.cpp
+    src/capture/SkCaptureManager.cpp
+    src/core/SkBBHFactory.cpp
+    src/core/SkBigPicture.cpp
+    src/core/SkCPURecorder.cpp
+    src/core/SkCanvas.cpp
+    src/core/SkDrawable.cpp
+    src/core/SkPicture.cpp
+    src/core/SkPictureData.cpp
+    src/core/SkPictureFlat.cpp
+    src/core/SkPicturePlayback.cpp
+    src/core/SkPictureRecord.cpp
+    src/core/SkPictureRecorder.cpp
+    src/core/SkRTree.cpp
+    src/core/SkRecord.cpp
+    src/core/SkRecordCanvas.cpp
+    src/core/SkRecordDraw.cpp
+    src/core/SkRecordOpts.cpp
+    src/core/SkRecordedDrawable.cpp
+    src/core/SkRecords.cpp
+    src/image/SkImage_LazyFactories.cpp
+    src/image/SkImage_Picture.cpp
+    src/image/SkPictureImageGenerator.cpp
+    src/image/SkSurface_Base.cpp
+    src/shaders/SkPictureShader.cpp
+    src/utils/SkMultiPictureDocument.cpp
+    src/utils/SkNWayCanvas.cpp
+    src/utils/SkPaintFilterCanvas.cpp
+)
+    list(REMOVE_ITEM stx_sources skia/${unit} baseline/skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()
+
+# Original font closure and adapted resource/serialization boundaries.
+foreach(unit IN ITEMS
+    src/core/SkDescriptor.cpp
+    src/core/SkFont.cpp
+    src/core/SkFontDescriptor.cpp
+    src/core/SkFontMetricsPriv.cpp
+    src/core/SkFontMgr.cpp
+    src/core/SkFontStream.cpp
+    src/core/SkFont_serial.cpp
+    src/core/SkGlyph.cpp
+    src/core/SkGraphics.cpp
+    src/core/SkReadBuffer.cpp
+    src/core/SkScalerContext.cpp
+    src/core/SkStrike.cpp
+    src/core/SkStrikeCache.cpp
+    src/core/SkStrikeRef.cpp
+    src/core/SkStrikeSpec.cpp
+    src/core/SkTextBlob.cpp
+    src/core/SkTypeface.cpp
+    src/core/SkTypefaceCache.cpp
+    src/core/SkTypeface_remote.cpp
+    src/core/SkWriteBuffer.cpp
+    src/text/SlugFromBuffer.cpp
+    src/text/StrikeForGPU.cpp
+    src/utils/SkCharToGlyphCache.cpp
+    src/utils/SkCustomTypeface.cpp
+    src/utils/SkOrderedFontMgr.cpp
+    src/utils/mac/SkCTFont.cpp
+    src/utils/mac/SkCTFontCreateExactCopy.cpp
+    src/utils/win/SkDWriteFontFileStream.cpp
+)
+    list(REMOVE_ITEM stx_sources skia/${unit} baseline/skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()
+
+list(REMOVE_ITEM stx_sources skia/src/utils/win/SkDWrite.cpp)
+list(APPEND stx_sources baseline/skia/src/utils/win/SkDWrite.cpp)
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkMaskGamma.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkMaskGamma.cpp)
+
+if(NOT APPLE)
+    list(FILTER stx_sources EXCLUDE REGEX "baseline/skia/src/utils/mac/.*\\.cpp$")
+endif()
+
+list(REMOVE_ITEM stx_sources skia/src/sfnt/SkOTUtils.cpp)
+list(APPEND stx_sources baseline/skia/src/sfnt/SkOTUtils.cpp)
+
+list(REMOVE_ITEM stx_sources skia/src/sfnt/SkOTTable_name.cpp)
+list(APPEND stx_sources baseline/skia/src/sfnt/SkOTTable_name.cpp)
+
+list(REMOVE_ITEM stx_sources skia/src/image/SkTiledImageUtils.cpp)
+list(APPEND stx_sources baseline/skia/src/image/SkTiledImageUtils.cpp)

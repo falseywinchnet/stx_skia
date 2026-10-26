@@ -57,7 +57,6 @@ class SkDrawable;
 class SkImage;
 class SkPaintFilterCanvas;
 class SkPath;
-class SkPicture;
 class SkPixmap;
 class SkRRect;
 class SkRegion;
@@ -1650,63 +1649,6 @@ public:
                                          const SkSamplingOptions&, const SkPaint* paint = nullptr,
                                          SrcRectConstraint constraint = kStrict_SrcRectConstraint);
 
-    /** Draws SkPicture picture, using clip and SkMatrix.
-        Clip and SkMatrix are unchanged by picture contents, as if
-        save() was called before and restore() was called after drawPicture().
-
-        SkPicture records a series of draw commands for later playback.
-
-        @param picture  recorded drawing commands to play
-    */
-    void drawPicture(const SkPicture* picture) {
-        this->drawPicture(picture, nullptr, nullptr);
-    }
-
-    /** Draws SkPicture picture, using clip and SkMatrix.
-        Clip and SkMatrix are unchanged by picture contents, as if
-        save() was called before and restore() was called after drawPicture().
-
-        SkPicture records a series of draw commands for later playback.
-
-        @param picture  recorded drawing commands to play
-    */
-    void drawPicture(const sk_sp<SkPicture>& picture) {
-        this->drawPicture(picture.get());
-    }
-
-    /** Draws SkPicture picture, using clip and SkMatrix; transforming picture with
-        SkMatrix matrix, if provided; and use SkPaint paint alpha, SkColorFilter,
-        SkBlendMode, if provided.
-
-        If paint is non-null, then the picture is always drawn into a temporary layer before
-        actually landing on the canvas. Note that drawing into a layer can also change its
-        appearance if there are any non-associative blendModes inside any of the pictures elements.
-
-        @param picture  recorded drawing commands to play
-        @param matrix   SkMatrix to rotate, scale, translate, and so on; may be nullptr
-        @param paint    SkPaint to apply transparency, filtering, and so on; may be nullptr
-
-        example: https://fiddle.skia.org/c/@Canvas_drawPicture_3
-    */
-    void drawPicture(const SkPicture* picture, const SkMatrix* matrix, const SkPaint* paint);
-
-    /** Draws SkPicture picture, using clip and SkMatrix; transforming picture with
-        SkMatrix matrix, if provided; and use SkPaint paint alpha, SkColorFilter,
-        SkBlendMode, if provided.
-
-        If paint is non-null, then the picture is always drawn into a temporary layer before
-        actually landing on the canvas. Note that drawing into a layer can also change its
-        appearance if there are any non-associative blendModes inside any of the pictures elements.
-
-        @param picture  recorded drawing commands to play
-        @param matrix   SkMatrix to rotate, scale, translate, and so on; may be nullptr
-        @param paint    SkPaint to apply transparency, filtering, and so on; may be nullptr
-    */
-    void drawPicture(const sk_sp<SkPicture>& picture, const SkMatrix* matrix,
-                     const SkPaint* paint) {
-        this->drawPicture(picture.get(), matrix, paint);
-    }
-
     /** Draws SkVertices vertices, a triangle mesh, using clip and SkMatrix.
         If paint contains an SkShader and vertices does not contain texCoords, the shader
         is mapped using the vertices' positions.
@@ -2001,8 +1943,7 @@ protected:
     virtual void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&);
 
     virtual void onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix);
-    virtual void onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
-                               const SkPaint* paint);
+
 
     virtual void onDrawEdgeAAQuad(const SkRect& rect, const SkPoint clip[4], QuadAAFlags aaFlags,
                                   const SkColor4f& color, SkBlendMode mode);
@@ -2131,7 +2072,6 @@ private:
     }
     friend class SkSurface_Base;
     friend class SkSurface_Ganesh;
-    friend class SkCaptureCanvas;
 
     SkIRect fClipRestrictionRect = SkIRect::MakeEmpty();
     int fClipRestrictionSaveCount = -1;
@@ -2147,7 +2087,6 @@ private:
     friend class SkSurface_Raster;  // needs getDevice()
     friend class SkNoDrawCanvas;    // needs resetForNextPicture()
     friend class SkNWayCanvas;
-    friend class SkPictureRecord;   // predrawNotify (why does it need it? <reed>)
     friend class SkOverdrawCanvas;
     friend class SkRasterHandleAllocator;
     friend class SkRecords::Draw;
@@ -2167,7 +2106,6 @@ private:
     SkCanvas& operator=(SkCanvas&&) = delete;
     SkCanvas& operator=(const SkCanvas&) = delete;
 
-    friend class SkPicturePlayback;
     /** Experimental
      *  Saves the specified subset of the current pixels in the current layer,
      *  and then clears those pixels to transparent black.

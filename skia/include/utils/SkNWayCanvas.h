@@ -102,7 +102,7 @@ protected:
     void onClipRegion(const SkRegion&, SkClipOp) override;
     void onResetClip() override;
 
-    void onDrawPicture(const SkPicture*, const SkMatrix*, const SkPaint*) override;
+
     void onDrawDrawable(SkDrawable*, const SkMatrix*) override;
     void onDrawAnnotation(const SkRect&, const char[], SkData*) override;
 

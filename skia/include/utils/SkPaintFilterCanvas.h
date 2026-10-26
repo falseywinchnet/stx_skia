@@ -104,7 +104,7 @@ protected:
     void onDrawPatch(const SkPoint cubics[12], const SkColor colors[4],
                              const SkPoint texCoords[4], SkBlendMode,
                              const SkPaint& paint) override;
-    void onDrawPicture(const SkPicture*, const SkMatrix*, const SkPaint*) override;
+
     void onDrawDrawable(SkDrawable*, const SkMatrix*) override;
 
     void onDrawAnnotation(const SkRect& rect, const char key[], SkData* value) override;

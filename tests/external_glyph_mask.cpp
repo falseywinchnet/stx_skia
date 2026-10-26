@@ -1,5 +1,6 @@
 #include "include/core/SkCanvas.h"
 #include "include/core/SkData.h"
+#include "include/core/SkGraphics.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkSurface.h"
@@ -13,10 +14,23 @@ template <typename T>
 concept HasTextBlobDrawing = requires(T& canvas, const SkPaint& paint) {
     canvas.drawTextBlob(nullptr, 0.0f, 0.0f, paint);
 };
+template <typename T>
+concept HasPictureDrawing = requires(T& canvas) {
+    canvas.drawPicture(nullptr);
+};
+template <typename T>
+concept HasFontCache = requires {
+    T::GetFontCacheUsed();
+    T::PurgeFontCache();
+};
 #ifdef STX_SKIA_REFERENCE
 static_assert(HasTextBlobDrawing<SkCanvas>);
+static_assert(HasPictureDrawing<SkCanvas>);
+static_assert(HasFontCache<SkGraphics>);
 #else
 static_assert(!HasTextBlobDrawing<SkCanvas>);
+static_assert(!HasPictureDrawing<SkCanvas>);
+static_assert(!HasFontCache<SkGraphics>);
 #endif
 
 namespace {
@@ -79,10 +93,13 @@ bool check_mask(SkColor color, bool clipped) {
 }
 
 int main() {
+    SkGraphics::Init();
+    SkGraphics::Init();
     const std::array<SkColor, 4> colors = {SK_ColorRED, SK_ColorGREEN, SK_ColorBLUE, SK_ColorWHITE};
     for (SkColor color : colors) {
         if (!check_mask(color, false) || !check_mask(color, true)) return 1;
     }
+    SkGraphics::PurgeAllCaches();
     std::printf("external glyph masks: 8 scenes, 256 coverage levels; canvas %zu bytes; PASS\n", sizeof(SkCanvas));
     return 0;
 }

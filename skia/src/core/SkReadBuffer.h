@@ -47,7 +47,6 @@ class SkPath;
 class SkRRect;
 class SkRegion;
 class SkString;
-class SkTypeface;
 struct SkPoint3;
 
 class SkReadBuffer {
@@ -162,12 +161,8 @@ public:
     // be created (e.g. it was not originally encoded) then this returns an image that doesn't
     // draw.
     sk_sp<SkImage> readImage();
-    sk_sp<SkTypeface> readTypeface();
 
-    void setTypefaceArray(sk_sp<SkTypeface> array[], int count) {
-        fTFArray = array;
-        fTFCount = count;
-    }
+
 
     /**
      *  Call this with a pre-loaded array of Factories, in the same order as
@@ -182,12 +177,7 @@ public:
     const SkDeserialProcs& getDeserialProcs() const { return fProcs; }
 
 
-    bool allowTags(SkFourByteTag tag) const {
-        if (!fProcs.fAllowTagsProc) {
-            return true;
-        }
-        return fProcs.fAllowTagsProc(tag, fProcs.fAllowTagsCtx);
-    }
+
 
     /**
      *  If isValid is false, sets the buffer to be "invalid". Returns true if the buffer
@@ -262,8 +252,6 @@ private:
 
     int fVersion = 0;
 
-    sk_sp<SkTypeface>* fTFArray = nullptr;
-    int                fTFCount = 0;
 
     SkFlattenable::Factory* fFactoryArray = nullptr;
     int                     fFactoryCount = 0;

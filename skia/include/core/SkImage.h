@@ -29,7 +29,6 @@ class SkImageGenerator;
 class SkMatrix;
 class SkMipmap;
 class SkPaint;
-class SkPicture;
 class SkPixmap;
 class SkRecorder;
 class SkShader;
@@ -118,42 +117,6 @@ SK_API sk_sp<SkImage> DeferredFromEncodedData(sk_sp<const SkData> encoded,
     @return                created SkImage, or nullptr
 */
 SK_API sk_sp<SkImage> DeferredFromGenerator(std::unique_ptr<SkImageGenerator> imageGenerator);
-
-enum class BitDepth {
-    kU8,   //!< uses 8-bit unsigned int per color component
-    kF16,  //!< uses 16-bit float per color component
-};
-
-/** Creates SkImage from picture. Returned SkImage width and height are set by dimensions.
-    SkImage draws picture with matrix and paint, set to bitDepth and colorSpace.
-
-    The Picture data is not turned into an image (CPU or GPU) until it is drawn.
-
-    If matrix is nullptr, draws with identity SkMatrix. If paint is nullptr, draws
-    with default SkPaint. colorSpace may be nullptr.
-
-    @param picture     stream of drawing commands
-    @param dimensions  width and height
-    @param matrix      SkMatrix to rotate, scale, translate, and so on; may be nullptr
-    @param paint       SkPaint to apply transparency, filtering, and so on; may be nullptr
-    @param bitDepth    8-bit integer or 16-bit float: per component
-    @param colorSpace  range of colors; may be nullptr
-    @param props       props to use when rasterizing the picture
-    @return            created SkImage, or nullptr
-*/
-SK_API sk_sp<SkImage> DeferredFromPicture(sk_sp<SkPicture> picture,
-                                          const SkISize& dimensions,
-                                          const SkMatrix* matrix,
-                                          const SkPaint* paint,
-                                          BitDepth bitDepth,
-                                          sk_sp<SkColorSpace> colorSpace,
-                                          SkSurfaceProps props);
-SK_API sk_sp<SkImage> DeferredFromPicture(sk_sp<SkPicture> picture,
-                                          const SkISize& dimensions,
-                                          const SkMatrix* matrix,
-                                          const SkPaint* paint,
-                                          BitDepth bitDepth,
-                                          sk_sp<SkColorSpace> colorSpace);
 
 /** Creates a CPU-backed SkImage from pixmap, copying the pixel data.
     As a result, pixmap pixels may be modified or deleted without affecting SkImage.

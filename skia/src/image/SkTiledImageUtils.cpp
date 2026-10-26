@@ -15,7 +15,6 @@
 #include "src/core/SkCanvasPriv.h"
 #include "src/core/SkDevice.h"
 #include "src/image/SkImage_Base.h"
-#include "src/image/SkImage_Picture.h"
 
 #include <string.h>
 
@@ -71,12 +70,6 @@ void GetImageKeyValues(const SkImage* image, uint32_t keyValues[kNumImageKeyValu
         return;
     }
 
-    if (imageBase->type() == SkImage_Base::Type::kLazyPicture) {
-        const SkImage_Picture* pictureImage = static_cast<const SkImage_Picture*>(imageBase);
-        if (pictureImage->getImageKeyValues(keyValues)) {
-            return;
-        }
-    }
 
     keyValues[0] = image->uniqueID();
     memset(&keyValues[1], 0, (kNumImageKeyValues-1) * sizeof(uint32_t));

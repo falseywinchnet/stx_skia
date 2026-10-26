@@ -19,7 +19,6 @@
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPath.h"
 #include "include/core/SkPathEffect.h"
-#include "include/core/SkPicture.h"
 #include "include/core/SkPixmap.h"
 #include "include/core/SkRRect.h"
 #include "include/core/SkRSXform.h"
@@ -2079,38 +2078,7 @@ void SkCanvas::drawArc(const SkRect& oval, SkScalar startAngle,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-#ifdef SK_DISABLE_SKPICTURE
-void SkCanvas::drawPicture(const SkPicture* picture, const SkMatrix* matrix, const SkPaint* paint) {}
 
-void SkCanvas::onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
-                             const SkPaint* paint) {}
-#else
-
-void SkCanvas::drawPicture(const SkPicture* picture, const SkMatrix* matrix, const SkPaint* paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    RETURN_ON_NULL(picture);
-
-    if (matrix && matrix->isIdentity()) {
-        matrix = nullptr;
-    }
-    if (picture->approximateOpCount() <= kMaxPictureOpsToUnrollInsteadOfRef) {
-        SkAutoCanvasMatrixPaint acmp(this, matrix, paint, picture->cullRect());
-        picture->playback(this);
-    } else {
-        this->onDrawPicture(picture, matrix, paint);
-    }
-}
-
-void SkCanvas::onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
-                             const SkPaint* paint) {
-    if (this->internalQuickReject(picture->cullRect(), paint ? *paint : SkPaint{}, matrix)) {
-        return;
-    }
-
-    SkAutoCanvasMatrixPaint acmp(this, matrix, paint, picture->cullRect());
-    picture->playback(this);
-}
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 

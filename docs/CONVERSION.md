@@ -218,7 +218,7 @@ is claimed.
 
 That first removal left core SkImageFilter/FilterTypes/layer machinery compiled.
 The subsequent CPU-layer and core-removal batches below remove it. The runtime
-removal below also removes SkSL. Skia's text/font internals remain next work.
+removal below also removes SkSL. The later picture/font removal below completes that dependency cut.
 SkCanvas and SkCanvasPriv receive narrow dependency edits, not full house-style
 conversion. See IMAGE_FILTER_PRUNING.md for the exact scope.
 
@@ -265,8 +265,7 @@ Invalid enum values also return null before constructing a shader.
 
 This converts SkBlendShader.cpp/.h, not the other adapted canvas, surface, record
 or raster-pipeline files. The subsequent raster-stage pruning below removes compiler-oriented arithmetic
-and execution support from the raster pipeline. Text/font and
-serialization internals still need removal. See ../results/2026-10-26/RUNTIME_REMOVAL.md.
+and execution support from the raster pipeline. The later picture/font removal below removes those dependencies. See ../results/2026-10-26/RUNTIME_REMOVAL.md.
 
 ## Compiler-only raster-stage pruning
 
@@ -294,9 +293,31 @@ The new external glyph-mask test checks every A8 coverage value, four paint
 colors, integer clipping and padded source/destination rows against independent
 RGBA expectations. It also checks text-blob API absence in the candidate and its
 presence in the original reference. This is dependency pruning, not conversion
-of the adapted imported canvas/device/record code. Picture serialization still
-retains text blobs, typefaces and font/strike internals; their removal is next.
+of the adapted imported canvas/device/record code. At this boundary picture serialization still retained text blobs, typefaces and
+font/strike internals; the next boundary below removes them.
 See ../results/2026-10-26/TEXT_DRAWING_REMOVAL.md.
+
+## Picture, capture and font machinery removed
+
+Picture recording/playback/serialization, capture, bounding-box hierarchy and
+record storage, picture-backed images/generators/shaders and multi-picture
+writing are reference-only. Canvas picture APIs, drawable picture snapshots,
+surface capture wrappers and their virtual hooks are removed. Ordinary image
+snapshots, bitmap drawing and direct raster surfaces remain.
+
+Font, typeface, glyph, text-blob, strike/cache and scaler implementations and
+headers are reference-only, together with OpenType helpers and platform font
+backends. Resource serialization no longer carries picture/typeface/slug callbacks
+or typeface tables. Global cache APIs no longer expose font controls. Resource
+cache controls remain. SkGraphics.cpp is converted to explicit execution order;
+SkSerialProcs.h now states the retained synchronous image callback contract.
+Other adapted imported files still await conversion.
+
+The candidate compiles 253 units versus 492 in the original reference on arm64.
+Archive inspection finds no definitions for the removed font, glyph, strike,
+typeface, picture or capture classes. Sixteen tests and seven rendering artifacts
+retain their reference results; the A8 test also asserts picture/font-cache API
+absence. See ../results/2026-10-26/PICTURE_FONT_REMOVAL.md.
 
 ## Still required
 
@@ -304,8 +325,9 @@ See ../results/2026-10-26/TEXT_DRAWING_REMOVAL.md.
   image/pixel views; then mask/blur, sampling, compositing and raster kernels.
 - Convert retained geometry, paths, scan conversion, canvas/device state,
   transforms, clipping and surface/image ownership.
-- Remove unused picture/text/serialization paths through actual dependency
-  work. Preserve external glyph coverage and all admitted drawing behavior.
+- Finish pruning unused generic serialization and unsupported compatibility
+  interfaces. Picture, capture and font machinery are removed; preserve external
+  glyph coverage and all admitted drawing behavior.
 - Convert remaining retained filter, shader, color and skcms implementation;
   retain blur masks, matrix color filters and shader masks. General image filters
   and runtime/SkSL effects and their compiler-only raster stages are removed.

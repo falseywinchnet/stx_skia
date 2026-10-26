@@ -52,8 +52,7 @@ protected:
     void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&) override = 0;
 
     void onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix) override = 0;
-    void onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
-                       const SkPaint* paint) override = 0;
+
 };
 
 #endif

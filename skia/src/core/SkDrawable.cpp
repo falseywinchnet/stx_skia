@@ -9,8 +9,6 @@
 #include "include/core/SkCanvas.h"
 #include "include/core/SkMatrix.h"
 #include "include/core/SkPaint.h"
-#include "include/core/SkPicture.h"  // IWYU pragma: keep
-#include "include/core/SkPictureRecorder.h"
 #include "include/core/SkRect.h"
 #include "include/core/SkRefCnt.h"
 #include "include/core/SkScalar.h"
@@ -57,9 +55,7 @@ void SkDrawable::draw(SkCanvas* canvas, SkScalar x, SkScalar y) {
     this->draw(canvas, &matrix);
 }
 
-sk_sp<SkPicture> SkDrawable::makePictureSnapshot() {
-    return this->onMakePictureSnapshot();
-}
+
 
 uint32_t SkDrawable::getGenerationID() {
     if (0 == fGenerationID) {
@@ -84,15 +80,3 @@ void SkDrawable::notifyDrawingChanged() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-sk_sp<SkPicture> SkDrawable::onMakePictureSnapshot() {
-    SkPictureRecorder recorder;
-
-    const SkRect bounds = this->getBounds();
-    SkCanvas* canvas = recorder.beginRecording(bounds);
-    this->draw(canvas);
-    if ((false)) {
-        draw_bbox(canvas, bounds);
-    }
-    return recorder.finishRecordingAsPicture();
-}

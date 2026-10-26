@@ -14,7 +14,6 @@
 #include "include/core/SkPoint.h"
 #include "include/core/SkPoint3.h"
 #include "include/core/SkRect.h"
-#include "include/core/SkTypeface.h"
 #include "include/private/SkAssert.h"
 #include "include/private/SkTFitsIn.h"
 #include "include/private/SkTo.h"
@@ -34,10 +33,10 @@ class SkRegion;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 SkBinaryWriteBuffer::SkBinaryWriteBuffer(const SkSerialProcs& p)
-        : SkWriteBuffer(p), fFactorySet(nullptr), fTFSet(nullptr) {}
+        : SkWriteBuffer(p), fFactorySet(nullptr) {}
 
 SkBinaryWriteBuffer::SkBinaryWriteBuffer(void* storage, size_t storageSize, const SkSerialProcs& p)
-        : SkWriteBuffer(p), fFactorySet(nullptr), fTFSet(nullptr), fWriter(storage, storageSize) {}
+        : SkWriteBuffer(p), fFactorySet(nullptr), fWriter(storage, storageSize) {}
 
 SkBinaryWriteBuffer::~SkBinaryWriteBuffer() {}
 
@@ -223,32 +222,7 @@ void SkBinaryWriteBuffer::writeImage(const SkImage* image) {
     }
 }
 
-void SkBinaryWriteBuffer::writeTypeface(SkTypeface* obj) {
-    // Write 32 bits (signed)
-    //   0 -- empty font
-    //  >0 -- index
-    //  <0 -- custom (serial procs)
 
-    if (obj == nullptr) {
-        fWriter.write32(0);
-    } else if (fProcs.fTypefaceProc) {
-        auto data = fProcs.fTypefaceProc(obj, fProcs.fTypefaceCtx);
-        if (data) {
-            size_t size = data->size();
-            if (!SkTFitsIn<int32_t>(size)) {
-                size = 0;               // fall back to default font
-            }
-            int32_t ssize = SkToS32(size);
-            fWriter.write32(-ssize);    // negative to signal custom
-            if (size) {
-                this->writePad32(data->data(), size);
-            }
-            return;
-        }
-        // no data means fall through for std behavior
-    }
-    fWriter.write32(fTFSet ? fTFSet->add(obj) : 0);
-}
 
 void SkBinaryWriteBuffer::writePaint(const SkPaint& paint) {
     SkPaintPriv::Flatten(paint, *this);
@@ -258,9 +232,7 @@ void SkBinaryWriteBuffer::setFactoryRecorder(sk_sp<SkFactorySet> rec) {
     fFactorySet = std::move(rec);
 }
 
-void SkBinaryWriteBuffer::setTypefaceRecorder(sk_sp<SkRefCntSet> rec) {
-    fTFSet = std::move(rec);
-}
+
 
 void SkBinaryWriteBuffer::writeFlattenable(const SkFlattenable* flattenable) {
     if (nullptr == flattenable) {

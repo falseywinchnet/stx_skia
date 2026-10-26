@@ -34,7 +34,6 @@ class SkDrawable;
 class SkImage;
 class SkPaint;
 class SkPath;
-class SkPicture;
 class SkRRect;
 class SkRegion;
 class SkTextBlob;
@@ -321,13 +320,7 @@ void SkNWayCanvas::onDrawAtlas2(const SkImage* image, const SkRSXform xform[], c
     }
 }
 
-void SkNWayCanvas::onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
-                                 const SkPaint* paint) {
-    Iter iter(fList);
-    while (iter.next()) {
-        iter->drawPicture(picture, matrix, paint);
-    }
-}
+
 
 void SkNWayCanvas::onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix) {
     Iter iter(fList);

@@ -21,7 +21,6 @@
 #include "include/core/SkRegion.h"
 #include "include/core/SkSize.h"
 #include "include/core/SkString.h"
-#include "include/core/SkTypeface.h"
 #include "include/private/SkMalloc.h"
 #include "src/core/SkAutoMalloc.h"
 #include "src/core/SkMathPriv.h"
@@ -443,30 +442,7 @@ sk_sp<SkImage> SkReadBuffer::readImage() {
     return image ? image : MakeEmptyImage(1, 1);
 }
 
-sk_sp<SkTypeface> SkReadBuffer::readTypeface() {
-    // Read 32 bits (signed)
-    //   0 -- return null (empty font)
-    //  >0 -- index
-    //  <0 -- custom (serial procs) : negative size in bytes
 
-    int32_t index = this->read32();
-    if (index == 0) {
-        return nullptr;
-    } else if (index > 0) {
-        if (!this->validate(index <= fTFCount)) {
-            return nullptr;
-        }
-        return fTFArray[index - 1];
-    } else {    // custom
-        size_t size = sk_negate_to_size_t(index);
-        const void* data = this->skip(size);
-        if (!this->validate(data && fProcs.fTypefaceStreamProc)) {
-            return nullptr;
-        }
-        SkMemoryStream s(data, size, false);
-        return fProcs.fTypefaceStreamProc(s, fProcs.fTypefaceCtx);
-    }
-}
 
 SkFlattenable* SkReadBuffer::readRawFlattenable() {
     if (!this->isValid()) {

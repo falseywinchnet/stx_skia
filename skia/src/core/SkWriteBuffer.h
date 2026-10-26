@@ -32,7 +32,6 @@ class SkPath;
 class SkRefCntSet;
 class SkRegion;
 class SkStream;
-class SkTypeface;
 class SkWStream;
 struct SkIRect;
 struct SkPoint3;
@@ -83,7 +82,6 @@ public:
     virtual void writePath(const SkPath& path) = 0;
     virtual size_t writeStream(SkStream* stream, size_t length) = 0;
     virtual void writeImage(const SkImage*) = 0;
-    virtual void writeTypeface(SkTypeface* typeface) = 0;
     virtual void writePaint(const SkPaint& paint) = 0;
 
     const SkSerialProcs& serialProcs() const { return fProcs; }
@@ -144,7 +142,6 @@ public:
     void writePath(const SkPath& path) override;
     size_t writeStream(SkStream* stream, size_t length) override;
     void writeImage(const SkImage*) override;
-    void writeTypeface(SkTypeface* typeface) override;
     void writePaint(const SkPaint& paint) override;
 
     bool writeToStream(SkWStream*) const;
@@ -152,11 +149,9 @@ public:
     sk_sp<SkData> snapshotAsData() const { return fWriter.snapshotAsData(); }
 
     void setFactoryRecorder(sk_sp<SkFactorySet>);
-    void setTypefaceRecorder(sk_sp<SkRefCntSet>);
 
 private:
     sk_sp<SkFactorySet> fFactorySet;
-    sk_sp<SkRefCntSet> fTFSet;
 
     SkWriter32 fWriter;
 

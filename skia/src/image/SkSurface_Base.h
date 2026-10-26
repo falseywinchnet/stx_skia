@@ -17,7 +17,6 @@
 #include "include/core/SkSurface.h"
 #include "include/core/SkTypes.h"
 #include "include/private/SkPixelStorage.h"
-#include "src/capture/SkCaptureManager.h"
 #include "src/image/SkImage_Base.h"
 
 #include <cstdint>
@@ -168,11 +167,7 @@ public:
 
     sk_sp<SkPixelStorage> getPixelStorage() const { return fPixelStorage; }
 
-    /**
-     * If capturing, signals to the capture manager and capture canvas to break off the recording
-     * SkPicture into a new SkPicture.
-     */
-    void createCaptureBreakpoint();
+
 
     inline SkCanvas* getCachedCanvas();
     inline sk_sp<SkImage> refCachedImage();
@@ -183,11 +178,8 @@ public:
     uint32_t newGenerationID();
 
 private:
-    // fCachedCanvas is the raw pointer to the canvas that is returned to the client.
-    // It can point to either the base canvas or a capture canvas wrapper.
+    // Own the canvas; the cached pointer observes it and never outlives this surface.
     SkCanvas* fCachedCanvas = nullptr;
-    // SkSurface_Base must always own the base canvas. During capture, SkCaptureManager owns any
-    // wrapping capture canvas that fCachedCanvas may point to.
     std::unique_ptr<SkCanvas> fOwnedBaseCanvas = nullptr;
     sk_sp<SkImage>            fCachedImage  = nullptr;
 
@@ -212,13 +204,7 @@ SkCanvas* SkSurface_Base::getCachedCanvas() {
         if (fOwnedBaseCanvas) {
             fOwnedBaseCanvas->setSurfaceBase(this);
         }
-        // Try to wrap base canvas in capture wrapper
-        if (this->baseRecorder()) {
-            fCachedCanvas = this->baseRecorder()->makeCaptureCanvas(fOwnedBaseCanvas.get());
-        }
-        if (!fCachedCanvas) {
-            fCachedCanvas = fOwnedBaseCanvas.get();
-        }
+        fCachedCanvas = fOwnedBaseCanvas.get();
     }
     return fCachedCanvas;
 }
@@ -227,7 +213,6 @@ sk_sp<SkImage> SkSurface_Base::refCachedImage() {
     if (fCachedImage) {
         return fCachedImage;
     }
-    this->createCaptureBreakpoint();
 
     fCachedImage = this->onNewImageSnapshot();
 

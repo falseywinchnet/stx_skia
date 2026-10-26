@@ -18,33 +18,11 @@ class SkData;
 class SkImageGenerator;
 class SkMatrix;
 class SkPaint;
-class SkPicture;
 class SkSurfaceProps;
 enum SkAlphaType : int;
-namespace SkImages { enum class BitDepth; }
 struct SkISize;
 
 namespace SkImageGenerators {
-/** Return a new image generator backed by the specified picture.  If the size is empty or
- *  the picture is NULL, this returns NULL.
- *  The optional matrix and paint arguments are passed to drawPicture() at rasterization
- *  time.
- */
-std::unique_ptr<SkImageGenerator> MakeFromPicture(const SkISize&,
-                                                  sk_sp<SkPicture>,
-                                                  const SkMatrix*,
-                                                  const SkPaint*,
-                                                  SkImages::BitDepth,
-                                                  sk_sp<SkColorSpace>,
-                                                  SkSurfaceProps props);
-
-std::unique_ptr<SkImageGenerator> MakeFromPicture(const SkISize&,
-                                                  sk_sp<SkPicture>,
-                                                  const SkMatrix*,
-                                                  const SkPaint*,
-                                                  SkImages::BitDepth,
-                                                  sk_sp<SkColorSpace>);
-
 /**
  *  If the default image decoder system can interpret the specified (encoded) data, then
  *  this returns a new ImageGenerator for it. Otherwise this returns NULL. Either way

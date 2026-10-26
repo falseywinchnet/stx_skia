@@ -39,8 +39,8 @@ house-style conversions. The remaining large imported implementation is still
 explicitly third-party-derived source awaiting conversion.
 
 Next: native Linux x64/arm64 and Windows CLANG64 gates; coordinator integration;
-then separate picture/text dependencies from canvas and device dispatch, with
-render comparisons at each removal. General image filters and their SkSL/runtime
+then continue conversion of retained canvas/device and raster implementation.
+Picture/text dependencies are removed with matching render comparisons. General image filters and their SkSL/runtime
 dependencies are now removed under the clarified owner contract.
 Retain blur masks, matrix color filters and shader masks. Continue conversion into
 pixel storage, masks and exercised kernels with per-change measurements.
