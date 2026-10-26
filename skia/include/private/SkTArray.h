@@ -40,6 +40,8 @@ namespace skia_private {
       - false: T will be moved via move-constructors.
 */
 template <typename T, bool MEM_MOVE = sk_is_trivially_relocatable_v<T>> class TArray {
+    static_assert(alignof(T) <= alignof(std::max_align_t),
+                  "TArray heap storage supports only fundamental alignment");
 public:
     using value_type = T;
 

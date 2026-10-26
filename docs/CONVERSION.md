@@ -905,8 +905,9 @@ reference comparison and negative performance measurements. The remaining
 container interface and broader source conversion are still open.
 
 The array access pass validates reverse indexing before subtraction, prohibits
-borrows from a temporary owner, and avoids alias snapshots when append fits
-existing capacity. See ../results/2026-10-26/TARRAY_ACCESS.md. These fixes do
+borrows from a temporary owner, avoids alias snapshots when append fits
+existing capacity, and rejects element alignment beyond the heap allocator's
+guarantee. See ../results/2026-10-26/TARRAY_ACCESS.md. These fixes do
 not imply that every retained renderer header has been converted.
 
 ## Still required
