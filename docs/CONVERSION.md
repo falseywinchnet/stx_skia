@@ -15,6 +15,8 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Pixel storage identity | `src/core/SkPixelStorage.cpp`, `include/private/SkPixelStorage.h` | Stable storage identity and concurrent content counters |
 | Pixel ownership and generation | `src/core/SkPixelRef.cpp`, `include/core/SkPixelRef.h`, `src/core/SkPixelRefPriv.h` | Borrowed/callback ownership, one-shot invalidation, generation replacement, shared identity reads |
 | Pixel allocation/data retention | `src/core/SkMallocPixelRef.cpp`, `include/core/SkMallocPixelRef.h` | Zeroed allocation, padded stride, insufficient extent rejection, retained immutable data |
+| Strong/weak reference-count implementation | `include/core/SkRefCnt.h`, `include/private/SkWeakRefCnt.h` | Copy/move/reset, reentrant release, concurrent sharing, weak lock/expiry; compatibility declarations remain as noted below |
+| Borrowed view implementation | `include/core/SkSpan.h` | Empty views, all valid slices of 0–33 elements, reverse traversal, const conversion, compile-time rejection of temporary owning containers |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -34,9 +36,33 @@ original implementations; the baseline include path selects original converted
 headers. Unchanged dependencies are shared. This prevents a conversion from
 silently changing both sides of its differential test.
 
+## Reference and view conversion notes
+
+Reference count increments/decrements and weak locking retain the original atomic
+memory orders. Reset publishes replacement storage before releasing the previous
+owner, preserving reentrant release behavior. The named weak-lock retry state
+makes failed compare/exchange updates explicit.
+
+SkSpan now accepts owning containers only as lvalues. Temporary SkSpan/std::span
+views remain admitted because copying a view does not own or shorten its backing
+allocation. Initializer-list views remain statement-lifetime borrows, annotated
+for the compiler. Their documentation now shows the actual lifetime distinction:
+a named initializer_list extends its backing-array lifetime, while a span initialized
+directly from a temporary list does not extend that lifetime.
+
+The three temporary corner-array call sites in SkMatrix.h, SkMatrix.cpp and
+SkDevice.cpp now bind named arrays before forming views. Those files are only
+adapted here; they are not marked as fully converted.
+
+The spelling checker reports four compatibility declarations in these headers:
+`sk_sp::operator->` and three class-template deduction guides. They are not member
+arrow expressions or trailing-return function definitions. The operator remains
+needed by unconverted source; its removal and explicit template spelling at
+remaining callers are tracked as outstanding, without suppressing the checker.
+
 ## Still required
 
-- Convert retained reference counting, arrays, memory utilities and remaining
+- Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
   image/pixel views; then mask/blur, sampling, compositing and raster kernels.
 - Convert retained geometry, paths, scan conversion, canvas/device state,
   transforms, clipping and surface/image ownership.

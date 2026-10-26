@@ -226,7 +226,8 @@ void SkDevice::drawAtlas(SkSpan<const SkRSXform> xform,
         xform[i].toQuad(tex[i].width(), tex[i].height(), tmp);
         vPos = quad_to_tris(vPos, tmp);
 
-        vTex = quad_to_tris(vTex, tex[i].toQuad());
+        const std::array<SkPoint, 4> texture_corners = tex[i].toQuad();
+        vTex = quad_to_tris(vTex, texture_corners);
 
         if (!colors.empty()) {
             SkOpts::memset32(vCol, colors[i], 6);

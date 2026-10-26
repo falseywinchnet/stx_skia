@@ -1549,7 +1549,8 @@ public:
     */
     void mapRectToQuad(SkPoint dst[4], const SkRect& rect) const {
         // This could potentially be faster if we only transformed each x and y of the rect once.
-        this->mapPoints({dst, 4}, rect.toQuad());
+        const std::array<SkPoint, 4> corners = rect.toQuad();
+        mapPoints({dst, 4}, corners);
     }
 
     /** Sets dst to bounds of src corners mapped by SkMatrix. If matrix contains

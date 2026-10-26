@@ -63,3 +63,18 @@ The callback-owned, allocated and data-backed pixel references now have named
 implementation classes; listener traversal has explicit types and mutation order.
 Upstream notices remain on every derivative file. The new pixel_ref test is an
 original deterministic contract test, not an imported upstream test suite.
+
+
+## Reference and view conversion
+
+SkRefCnt.h, SkWeakRefCnt.h and SkSpan.h retain original copies in baseline/skia/.
+Their implementation conversion preserves atomic ordering and explicit reference
+transfer. SkSpan now refuses temporary owning containers, admits borrowed views,
+and handles empty default views without null-pointer arithmetic. Its caller
+preconditions and fail-fast invalid-range behavior remain.
+
+SkMatrix.h, SkMatrix.cpp and SkDevice.cpp receive only named corner-array lifetime
+adaptations and are separately retained in the baseline; this is not a claim of
+complete conversion of those larger files. The new ownership_views.cpp tests
+are original project tests. Compatibility declarations remaining in the headers
+are recorded in docs/CONVERSION.md.

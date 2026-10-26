@@ -38,7 +38,7 @@ public:
     */
     virtual ~SkRefCntBase() {
     #ifdef SK_DEBUG
-        SkASSERTF(this->getRefCnt() == 1, "fRefCnt was %d", this->getRefCnt());
+        SkASSERTF(getRefCnt() == 1, "fRefCnt was %d", getRefCnt());
         // illegal value, to catch us if we reuse after delete
         fRefCnt.store(0, std::memory_order_relaxed);
     #endif
@@ -48,7 +48,8 @@ public:
      *  Ensures that all previous owner's actions are complete.
      */
     bool unique() const {
-        if (1 == fRefCnt.load(std::memory_order_acquire)) {
+        const int32_t count = fRefCnt.load(std::memory_order_acquire);
+        if (count == 1) {
             // The acquire barrier is only really needed if we return true.  It
             // prevents code conditioned on the result of unique() from running
             // until previous owners are all totally done calling unref().
@@ -60,7 +61,7 @@ public:
     /** Increment the reference count. Must be balanced by a call to unref().
     */
     void ref() const {
-        SkASSERT(this->getRefCnt() > 0);
+        SkASSERT(getRefCnt() > 0);
         // No barrier required.
         (void)fRefCnt.fetch_add(+1, std::memory_order_relaxed);
     }
@@ -70,12 +71,13 @@ public:
         the object needs to have been allocated via new, and not on the stack.
     */
     void unref() const {
-        SkASSERT(this->getRefCnt() > 0);
+        SkASSERT(getRefCnt() > 0);
         // A release here acts in place of all releases we "should" have been doing in ref().
-        if (1 == fRefCnt.fetch_add(-1, std::memory_order_acq_rel)) {
+        const int32_t previous = fRefCnt.fetch_add(-1, std::memory_order_acq_rel);
+        if (previous == 1) {
             // Like unique(), the acquire is only needed on success, to make sure
             // code in internal_dispose() doesn't happen before the decrement.
-            this->internal_dispose();
+            internal_dispose();
         }
     }
 
@@ -84,7 +86,8 @@ private:
 #ifdef SK_DEBUG
     /** Return the reference count. Use only for debugging. */
     int32_t getRefCnt() const {
-        return fRefCnt.load(std::memory_order_relaxed);
+        const int32_t count = fRefCnt.load(std::memory_order_relaxed);
+        return count;
     }
 #endif
 
@@ -93,7 +96,7 @@ private:
      */
     virtual void internal_dispose() const {
     #ifdef SK_DEBUG
-        SkASSERT(0 == this->getRefCnt());
+        SkASSERT(0 == getRefCnt());
         fRefCnt.store(1, std::memory_order_relaxed);
     #endif
         delete this;
@@ -120,35 +123,35 @@ class SK_API SkRefCnt : public SkRefCntBase {
     // "#include SK_REF_CNT_MIXIN_INCLUDE" doesn't work with this build system.
     #if defined(SK_BUILD_FOR_GOOGLE3)
     public:
-        void deref() const { this->unref(); }
+        void deref() const { unref(); }
     #endif
 };
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/** Call obj->ref() and return obj. The obj must not be nullptr.
+/** Call (*obj).ref() and return obj. The obj must not be nullptr.
  */
 template <typename T> static inline T* SkRef(T* obj) {
     SkASSERT(obj);
-    obj->ref();
+    (*obj).ref();
     return obj;
 }
 
-/** Check if the argument is non-null, and if so, call obj->ref() and return obj.
+/** Check if the argument is non-null, and if so, call (*obj).ref() and return obj.
  */
 template <typename T> static inline T* SkSafeRef(T* obj) {
     if (obj) {
-        obj->ref();
+        (*obj).ref();
     }
     return obj;
 }
 
-/** Check if the argument is non-null, and if so, call obj->unref()
+/** Check if the argument is non-null, and if so, call (*obj).unref()
  */
 template <typename T> static inline void SkSafeUnref(T* obj) {
     if (obj) {
-        obj->unref();
+        (*obj).unref();
     }
 }
 
@@ -162,7 +165,7 @@ public:
     SkNVRefCnt() : fRefCnt(1) {}
     ~SkNVRefCnt() {
     #ifdef SK_DEBUG
-        int rc = fRefCnt.load(std::memory_order_relaxed);
+        const int32_t rc = fRefCnt.load(std::memory_order_relaxed);
         SkASSERTF(rc == 1, "NVRefCnt was %d", rc);
     #endif
     }
@@ -172,16 +175,22 @@ public:
     //   - ref() doesn't need any barrier;
     //   - unref() needs a release barrier, and an acquire if it's going to call delete.
 
-    bool unique() const { return 1 == fRefCnt.load(std::memory_order_acquire); }
+    bool unique() const {
+        const int32_t count = fRefCnt.load(std::memory_order_acquire);
+        const bool sole_owner = count == 1;
+        return sole_owner;
+    }
     void ref() const { (void)fRefCnt.fetch_add(+1, std::memory_order_relaxed); }
     void unref() const {
-        if (1 == fRefCnt.fetch_add(-1, std::memory_order_acq_rel)) {
+        const int32_t previous = fRefCnt.fetch_add(-1, std::memory_order_acq_rel);
+        if (previous == 1) {
             // restore the 1 for our destructor's assert
             SkDEBUGCODE(fRefCnt.store(1, std::memory_order_relaxed));
-            delete (const Derived*)this;
+            const Derived* owner = static_cast<const Derived*>(this);
+            delete owner;
         }
     }
-    void  deref() const { this->unref(); }
+    void  deref() const { unref(); }
 
     // This must be used with caution. It is only valid to call this when 'threadIsolatedTestCnt'
     // refs are known to be isolated to the current thread. That is, it is known that there are at
@@ -189,10 +198,11 @@ public:
     // call. Assuming the contract is followed, if this returns false then no other thread has
     // ownership of this. If it returns true then another thread *may* have ownership.
     bool refCntGreaterThan(int32_t threadIsolatedTestCnt) const {
-        int cnt = fRefCnt.load(std::memory_order_acquire);
+        const int32_t cnt = fRefCnt.load(std::memory_order_acquire);
         // If this fails then the above contract has been violated.
         SkASSERT(cnt >= threadIsolatedTestCnt);
-        return cnt > threadIsolatedTestCnt;
+        const bool shared = cnt > threadIsolatedTestCnt;
+        return shared;
     }
 
 private:
@@ -257,7 +267,10 @@ public:
         SkDEBUGCODE(fPtr = nullptr);
     }
 
-    sk_sp<T>& operator=(std::nullptr_t) { this->reset(); return *this; }
+    sk_sp<T>& operator=(std::nullptr_t) {
+        reset();
+        return *this;
+    }
 
     /**
      *  Shares the underlying object referenced by the argument by calling ref() on it. If this
@@ -266,14 +279,16 @@ public:
      */
     sk_sp<T>& operator=(const sk_sp<T>& that) {
         if (this != &that) {
-            this->reset(SkSafeRef(that.get()));
+            T* retained = SkSafeRef(that.get());
+            reset(retained);
         }
         return *this;
     }
     template <typename U,
               typename = typename std::enable_if<std::is_convertible<U*, T*>::value>::type>
     sk_sp<T>& operator=(const sk_sp<U>& that) {
-        this->reset(SkSafeRef(that.get()));
+        T* retained = SkSafeRef(that.get());
+        reset(retained);
         return *this;
     }
 
@@ -283,22 +298,27 @@ public:
      *  will be made.
      */
     sk_sp<T>& operator=(sk_sp<T>&& that) {
-        this->reset(that.release());
+        T* transferred = that.release();
+        reset(transferred);
         return *this;
     }
     template <typename U,
               typename = typename std::enable_if<std::is_convertible<U*, T*>::value>::type>
     sk_sp<T>& operator=(sk_sp<U>&& that) {
-        this->reset(that.release());
+        T* transferred = that.release();
+        reset(transferred);
         return *this;
     }
 
     T& operator*() const {
-        SkASSERT(this->get() != nullptr);
-        return *this->get();
+        SkASSERT(fPtr != nullptr);
+        return *fPtr;
     }
 
-    explicit operator bool() const { return this->get() != nullptr; }
+    explicit operator bool() const {
+        const bool present = fPtr != nullptr;
+        return present;
+    }
 
     T* get() const { return fPtr; }
     T* operator->() const { return fPtr; }
@@ -308,7 +328,8 @@ public:
      *  No call to ref() will be made.
      */
     void reset(T* ptr = nullptr) {
-        // Calling fPtr->unref() may call this->~() or this->reset(T*).
+        // Release can reenter this owner or destroy it. Publish the replacement
+        // before releasing the old reference, and do not touch this afterward.
         // http://wg21.cmeerw.net/lwg/issue998
         // http://wg21.cmeerw.net/lwg/issue2262
         T* oldPtr = fPtr;
@@ -327,7 +348,7 @@ public:
         return ptr;
     }
 
-    void swap(sk_sp<T>& that) /*noexcept*/ {
+    void swap(sk_sp<T>& that) {
         using std::swap;
         swap(fPtr, that.fPtr);
     }
@@ -338,40 +359,48 @@ private:
     T*  fPtr;
 };
 
-template <typename T> inline void swap(sk_sp<T>& a, sk_sp<T>& b) /*noexcept*/ {
+template <typename T> inline void swap(sk_sp<T>& a, sk_sp<T>& b) {
     a.swap(b);
 }
 
 template <typename T, typename U> inline bool operator==(const sk_sp<T>& a, const sk_sp<U>& b) {
-    return a.get() == b.get();
+    const bool same = a.get() == b.get();
+    return same;
 }
-template <typename T> inline bool operator==(const sk_sp<T>& a, std::nullptr_t) /*noexcept*/ {
-    return !a;
+template <typename T> inline bool operator==(const sk_sp<T>& a, std::nullptr_t) {
+    const bool empty = !a;
+    return empty;
 }
-template <typename T> inline bool operator==(std::nullptr_t, const sk_sp<T>& b) /*noexcept*/ {
-    return !b;
+template <typename T> inline bool operator==(std::nullptr_t, const sk_sp<T>& b) {
+    const bool empty = !b;
+    return empty;
 }
 
 template <typename T, typename U> inline bool operator!=(const sk_sp<T>& a, const sk_sp<U>& b) {
-    return a.get() != b.get();
+    const bool different = a.get() != b.get();
+    return different;
 }
-template <typename T> inline bool operator!=(const sk_sp<T>& a, std::nullptr_t) /*noexcept*/ {
-    return static_cast<bool>(a);
+template <typename T> inline bool operator!=(const sk_sp<T>& a, std::nullptr_t) {
+    const bool present = static_cast<bool>(a);
+    return present;
 }
-template <typename T> inline bool operator!=(std::nullptr_t, const sk_sp<T>& b) /*noexcept*/ {
-    return static_cast<bool>(b);
+template <typename T> inline bool operator!=(std::nullptr_t, const sk_sp<T>& b) {
+    const bool present = static_cast<bool>(b);
+    return present;
 }
 
 template <typename C, typename CT, typename T>
-auto operator<<(std::basic_ostream<C, CT>& os, const sk_sp<T>& sp) -> decltype(os << sp.get()) {
-    return os << sp.get();
+std::basic_ostream<C, CT>& operator<<(std::basic_ostream<C, CT>& os, const sk_sp<T>& sp) {
+    os << sp.get();
+    return os;
 }
 
 template <typename T> sk_sp(T*) -> sk_sp<T>;
 
 template <typename T, typename... Args>
 sk_sp<T> sk_make_sp(Args&&... args) {
-    return sk_sp<T>(new T(std::forward<Args>(args)...));
+    sk_sp<T> owner(new T(std::forward<Args>(args)...));
+    return owner;
 }
 
 /*
@@ -381,11 +410,15 @@ sk_sp<T> sk_make_sp(Args&&... args) {
  *  effectively "adopting" it.
  */
 template <typename T> sk_sp<T> sk_ref_sp(T* obj) {
-    return sk_sp<T>(SkSafeRef(obj));
+    T* retained = SkSafeRef(obj);
+    sk_sp<T> owner(retained);
+    return owner;
 }
 
 template <typename T> sk_sp<T> sk_ref_sp(const T* obj) {
-    return sk_sp<T>(const_cast<T*>(SkSafeRef(obj)));
+    const T* retained = SkSafeRef(obj);
+    sk_sp<T> owner(const_cast<T*>(retained));
+    return owner;
 }
 
 #endif

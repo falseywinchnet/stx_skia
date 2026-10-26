@@ -19,7 +19,7 @@ jobs:
         run: |
           sh tools/build_native.sh baseline
           sh tools/build_native.sh candidate
-          cmp build/baseline/render.raw build/candidate/render.raw
+          cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
           sh tools/verify_installed.sh
       - name: Instrumented deterministic suite
         run: sh tools/build_native.sh candidate-sanitize
@@ -39,5 +39,5 @@ jobs:
         run: |
           sh tools/build_native.sh baseline
           sh tools/build_native.sh candidate
-          cmp build/baseline/render.raw build/candidate/render.raw
+          cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
           sh tools/verify_installed.sh

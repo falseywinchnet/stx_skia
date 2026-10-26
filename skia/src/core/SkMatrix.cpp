@@ -1749,7 +1749,8 @@ bool SkMatrixPriv::NearlyAffine(const SkMatrix& m,
 
     // We can map the four points simultaneously.
     SkPoint3 xyw[4];
-    m.mapPointsToHomogeneous(xyw, bounds.toQuad());
+    const std::array<SkPoint, 4> corners = bounds.toQuad();
+    m.mapPointsToHomogeneous(xyw, corners);
 
     // Since the Jacobian is a 3x3 matrix, the determinant is a scalar triple product,
     // and the initial cross product is constant across all four points.
