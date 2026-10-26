@@ -34,7 +34,8 @@ class SkBlurMaskFilterImpl : public SkMaskFilterBase {
 public:
     SkBlurMaskFilterImpl(SkScalar sigma, SkBlurStyle, bool respectCTM);
 
-    // From SkMaskFilterBase.h
+    // The immutable filter shares no mutable scratch. Returned mask pixels are
+    // caller-owned, including unusable allocations returned on failure.
     SkMask::Format getFormat() const override;
     bool filterMask(SkMaskBuilder* dst, const SkMask& src, const SkMatrix&,
                     SkIPoint* margin) const override;
@@ -70,11 +71,10 @@ private:
 
     SK_FLATTENABLE_HOOKS(SkBlurMaskFilterImpl)
 
-    SkScalar    fSigma;
-    SkBlurStyle fBlurStyle;
-    bool        fRespectCTM;
+    const SkScalar fSigma;
+    const SkBlurStyle fBlurStyle;
+    const bool fRespectCTM;
 
-    SkBlurMaskFilterImpl(SkReadBuffer&);
     void flatten(SkWriteBuffer&) const override;
 
     friend class SkBlurMaskFilter;

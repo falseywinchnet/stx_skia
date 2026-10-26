@@ -25,6 +25,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Cached pixel/mask storage | `src/core/SkCachedData.cpp/.h` | Cache/client reference distinction, discard/reacquire and failure states, callback ordering, final release after unlocking and concurrent reference sharing |
 | Mask-filter dispatch and nine-patch ownership | `src/core/SkMaskFilterBase.cpp/.h`, `src/core/SkMaskFilter.cpp`; existing public header reviewed | Adopted cache/allocation owners, failure cleanup, bounded clipped run storage, named image-filter result and 240 rendering comparisons |
 | Shader-mask filtering | `src/effects/SkShaderMaskFilterImpl.cpp/.h`, `include/effects/SkShaderMaskFilter.h` | 576 byte-exact shader masks, checked source metadata, scoped pixel ownership and failure preservation |
+| Blur-filter construction and cached masks | `src/core/SkBlurMaskFilterImpl.cpp/.h` | Explicit shape alternatives, cache/allocation handoff, checked raster extents and 288 reference scenes |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -179,7 +180,22 @@ queries remain allocation-free. The shader still multiplies the input coverage
 through source-in blending. Public shader-mask support remains part of this CPU
 library despite upstream's deprecation notice. See SHADER_MASKS.md for scope and
 verification. This completes the shader-mask implementation previously adapted
-only for ImageFilterResult; blur-filter implementation remains next.
+only for ImageFilterResult; blur-filter construction is now converted in the following batch.
+
+## Blur-filter conversion notes
+
+The blur-filter object is immutable. Raster setup chooses a rounded rectangle or
+rectangle span explicitly rather than receiving anonymous callbacks. Temporary
+source pixels, uncached output pixels and cache references have distinct owners;
+cache-copy failure retains the uncached allocation. Source storage is released
+before cache copying. NinePatch receives exactly one transferred owner.
+
+Aligned row extents are checked before allocation; mask drawing uses local clip
+bounds without negating a signed integer coordinate. Invalid factory enum values
+are rejected. Sigma, Gaussian rounding, fractional rectangle phase and cache keys
+remain unchanged. See BLUR_DISPATCH.md for verification. The image-filter adapter
+is still present in this tested conversion but is now scheduled for removal under
+the owner's clarified contract.
 
 ## Still required
 
@@ -190,7 +206,8 @@ only for ImageFilterResult; blur-filter implementation remains next.
 - Remove unused picture/text/serialization paths through actual dependency
   work. Preserve external glyph coverage and all admitted drawing behavior.
 - Convert remaining retained filter, shader, color and skcms implementation;
-  preserve the planned material capabilities while resolving their dependencies.
+  remove general image filters and runtime/SkSL effects under the clarified owner
+  contract, retaining blur masks, matrix color filters and shader masks.
 - Audit every retained production header and build/source list, including
   templates, generated runtime support and platform ports. Syntax-checker success
   alone is not semantic conversion evidence.

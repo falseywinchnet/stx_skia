@@ -160,3 +160,12 @@ prior signature adaptation. The public SkShaderMaskFilter.h retains an original
 baseline copy as well. Upstream notices remain. The derivative uses SkRectMemcpy,
 checked source metadata and an explicit pixel owner through bitmap/canvas use.
 The expanded mask_filter test adds original deterministic shader comparisons.
+
+
+## Blur-filter construction conversion
+
+SkBlurMaskFilterImpl.cpp/.h now receive full implementation conversion; original
+copies were already retained for differential testing. The derivative replaces
+anonymous drawing callbacks with explicit shape alternatives, scopes temporary
+and cached storage, and checks raster extents. tests/mask_filter.cpp adds
+asymmetric-corner rendering comparisons and invalid-style rejection checks.

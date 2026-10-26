@@ -272,6 +272,12 @@ void draw_shape(SkCanvas& canvas, const SkPaint& paint, int shape) {
             curve.close();
             canvas.drawPath(curve.detach(), paint);
         } break;
+        case 5: {
+            const SkVector radii[4] = {{4, 11}, {19, 6}, {7, 23}, {14, 9}};
+            SkRRect rounded;
+            rounded.setRectRadii(rectangle, radii);
+            canvas.drawRRect(rounded, paint);
+        } break;
         default:
             canvas.drawOval(rectangle, paint);
             break;
@@ -279,6 +285,10 @@ void draw_shape(SkCanvas& canvas, const SkPaint& paint, int shape) {
 }
 
 bool rendering(std::FILE* file) {
+#ifndef STX_SKIA_REFERENCE
+    if (SkMaskFilter::MakeBlur(static_cast<SkBlurStyle>(-1), 2.0f) ||
+        SkMaskFilter::MakeBlur(static_cast<SkBlurStyle>(4), 2.0f)) return false;
+#endif
     constexpr int width = 211;
     constexpr int height = 157;
     constexpr size_t stride = width * 4 + 12;
@@ -286,7 +296,7 @@ bool rendering(std::FILE* file) {
     int cases = 0;
     for (const SkBlurStyle style : {kNormal_SkBlurStyle, kSolid_SkBlurStyle, kOuter_SkBlurStyle, kInner_SkBlurStyle}) {
         for (const float sigma : {0.5f, 3.0f, 9.0f}) {
-            for (int shape = 0; shape < 5; ++shape) {
+            for (int shape = 0; shape < 6; ++shape) {
                 for (int clip = 0; clip < 4; ++clip) {
                     std::vector<uint8_t> pixels(stride * height, 0xA5);
                     const SkImageInfo info = SkImageInfo::MakeN32Premul(width, height);
