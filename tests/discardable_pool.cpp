@@ -81,6 +81,13 @@ bool policy() {
     (*pool).resetCacheHitsAndMisses();
     if ((*pool).getCacheHits() != 0 || (*pool).getCacheMisses() != 0) return false;
 #endif
+    sk_sp<SkDiscardableMemoryPool> zeroBudget = SkDiscardableMemoryPool::Make(0);
+    {
+        Block initiallyLocked(*zeroBudget, 8);
+        if (!initiallyLocked.exists() || (*zeroBudget).getRAMUsed() != 8) return false;
+        initiallyLocked.unlock();
+        if ((*zeroBudget).getRAMUsed() != 0 || initiallyLocked.lock()) return false;
+    }
     // The block's reference keeps the pool alive after the caller drops its owner.
     sk_sp<SkDiscardableMemoryPool> transient = SkDiscardableMemoryPool::Make(8);
     Block survivor(*transient, 8);
@@ -175,7 +182,7 @@ bool measure(const char* name) {
     Block second(*pool, 64);
     if (!first.exists() || !second.exists()) return false;
     first.unlock(); second.unlock();
-    constexpr int iterations = 100000;
+    constexpr int iterations = 1000000;
     uint64_t digest = 0;
     const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     for (int index = 0; index < iterations; ++index) {

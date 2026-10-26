@@ -542,6 +542,22 @@ used by polygon triangulation and the discardable-memory pool. Its new fixtures
 exercise both consumers as well as permutation, insertion, traversal and transfer
 contracts. See ../results/2026-10-26/INTRUSIVE_LIST.md.
 
+## Discardable-memory pool
+
+SkDiscardableMemoryPool.cpp/.h, the SkDiscardableMemory interface and the default
+pool entry point now state block ownership, locked data borrows, non-owning pool
+membership, byte accounting, eviction and failure behavior. Each block retains
+its pool. Prepared empty records and pixel allocations are created outside the
+mutex; publication validates byte addition and installs membership under that
+existing mutex. The pool still may exceed its budget while blocks are locked.
+
+Usage/budget/statistics observations now take the same mutex as mutation; debug
+counters saturate. Zero-byte creation is rejected. These corrections precede the
+ownership conversion. A separate optimization skips removing/reinserting an
+already-most-recent block. Native object layouts are unchanged (64-byte pool,
+56-byte block in measured Release); synchronized getter cost is explicitly
+measured. See ../results/2026-10-26/DISCARDABLE_POOL.md and its timing/layout files.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

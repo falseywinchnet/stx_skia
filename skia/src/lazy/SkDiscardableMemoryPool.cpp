@@ -96,7 +96,7 @@ private:
  */
 class PoolDiscardableMemory : public SkDiscardableMemory {
 public:
-    PoolDiscardableMemory(sk_sp<DiscardableMemoryPool> pool, UniqueVoidPtr pointer, size_t bytes);
+    PoolDiscardableMemory(sk_sp<DiscardableMemoryPool> pool, size_t bytes);
     ~PoolDiscardableMemory() override;
     bool lock() override;
     void* data() override;
@@ -105,17 +105,15 @@ public:
 private:
     SK_DECLARE_INTERNAL_LLIST_INTERFACE(PoolDiscardableMemory);
     sk_sp<DiscardableMemoryPool> fPool;
-    bool fLocked = true;
-    UniqueVoidPtr fPointer;
+    bool fLocked = false;
+    UniqueVoidPtr fPointer{};
     const size_t fBytes;
 };
 
 PoolDiscardableMemory::PoolDiscardableMemory(sk_sp<DiscardableMemoryPool> pool,
-                                             UniqueVoidPtr pointer,
                                              size_t bytes)
-        : fPool(std::move(pool)), fPointer(std::move(pointer)), fBytes(bytes) {
+        : fPool(std::move(pool)), fBytes(bytes) {
     SkASSERT(fPool != nullptr);
-    SkASSERT(fPointer != nullptr);
     SkASSERT(fBytes > 0);
 }
 
@@ -185,24 +183,26 @@ std::unique_ptr<SkDiscardableMemory> DiscardableMemoryPool::make(size_t bytes) {
     if (allocation == nullptr) {
         return nullptr;
     }
-    std::unique_ptr<SkDiscardableMemory> result{};
+    // Prepare an empty, unlocked record outside the mutex too. Until publication
+    // it has no allocation or membership, just like a discarded block. Both owners
+    // precede the guard, so any rejection releases them only after unlocking.
+    std::unique_ptr<PoolDiscardableMemory> block(new (std::nothrow)
+        PoolDiscardableMemory(sk_ref_sp(this), bytes));
+    if (block == nullptr) {
+        return nullptr;
+    }
     {
         SkAutoMutexExclusive guard(fMutex);
         if (bytes > std::numeric_limits<size_t>::max() - fUsed) {
             return nullptr;
         }
-        // Construct the small control record only after admission is valid. An
-        // unpublished record must never run the registered-block destructor.
-        std::unique_ptr<PoolDiscardableMemory> block(new (std::nothrow)
-            PoolDiscardableMemory(sk_ref_sp(this), std::move(allocation), bytes));
-        if (block == nullptr) {
-            return nullptr;
-        }
+        (*block).fPointer = std::move(allocation);
+        (*block).fLocked = true;
         fList.addToHead(block.get());
         fUsed += bytes;
         dumpDownTo(fBudget);
-        result = std::move(block);
     }
+    std::unique_ptr<SkDiscardableMemory> result = std::move(block);
     return result;
 }
 
@@ -228,8 +228,10 @@ bool DiscardableMemoryPool::lock(PoolDiscardableMemory& block) {
         return false;
     }
     block.fLocked = true;
-    fList.remove(&block);
-    fList.addToHead(&block);
+    if (fList.head() != &block) {
+        fList.remove(&block);
+        fList.addToHead(&block);
+    }
 #if SK_LAZY_CACHE_STATS
     if (fCacheHits < std::numeric_limits<int>::max()) {
         ++fCacheHits;
