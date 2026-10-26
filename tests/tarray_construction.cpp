@@ -11,6 +11,17 @@
 using skia_private::STArray;
 using skia_private::TArray;
 
+#ifndef STX_SKIA_REFERENCE
+template <typename Array> concept BorrowFromTemporary = requires(Array&& owner) {
+    std::move(owner).data();
+};
+template <typename Array> concept ReferenceFromTemporary = requires(Array&& owner) {
+    std::move(owner).back();
+};
+static_assert(!BorrowFromTemporary<TArray<uint32_t>>);
+static_assert(!ReferenceFromTemporary<TArray<uint32_t>>);
+#endif
+
 namespace {
 struct ConstructionFailure {};
 struct TrivialNonCopy {
@@ -92,6 +103,9 @@ template <typename Array> bool successful_construction(size_t& total) {
         if (assigned.size() != count) return false;
         for (int index = 0; index < count; ++index) {
             if (assigned[index] != static_cast<uint32_t>(index + 9)) return false;
+            if (assigned.fromBack(count - 1 - index) != static_cast<uint32_t>(index + 9)) {
+                return false;
+            }
         }
         Array listed{2, 3, 5, 7};
         if (listed.size() != 4 || listed[2] != 5) return false;
@@ -460,6 +474,30 @@ bool append_construction_contract(size_t& total) {
         if (owner.size() != 12) return false;
         for (int index = 0; index < 4; ++index) {
             if (owner[index + 8].value != index + 73) return false;
+        }
+        ++total;
+    }
+    {
+        TArray<Element> owner;
+        owner.reserve_exact(16);
+        owner.reset(8);
+        const int beforeCopies = Element::attempts;
+        owner.push_back_n(4, owner[3]);
+        if (owner.size() != 12 || Element::attempts - beforeCopies != 4) return false;
+        for (int index = 8; index < 12; ++index) {
+            if (owner[index].value != 17) return false;
+        }
+        ++total;
+    }
+    {
+        TArray<Element> owner;
+        owner.reserve_exact(16);
+        owner.reset(8);
+        const int beforeCopies = Element::attempts;
+        owner.push_back_n(4, owner.data() + 2);
+        if (owner.size() != 12 || Element::attempts - beforeCopies != 4) return false;
+        for (int index = 8; index < 12; ++index) {
+            if (owner[index].value != 17) return false;
         }
         ++total;
     }

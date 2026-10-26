@@ -904,6 +904,11 @@ The 16-byte heap and 32-byte inline layouts are unchanged. See
 reference comparison and negative performance measurements. The remaining
 container interface and broader source conversion are still open.
 
+The array access pass validates reverse indexing before subtraction, prohibits
+borrows from a temporary owner, and avoids alias snapshots when append fits
+existing capacity. See ../results/2026-10-26/TARRAY_ACCESS.md. These fixes do
+not imply that every retained renderer header has been converted.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

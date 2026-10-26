@@ -233,16 +233,17 @@ public:
      * Adds one new default-initialized T value and returns it by reference. Note that the reference
      * only remains valid until the next call that adds or removes elements.
      */
-    T& push_back() {
+    T& push_back() & {
         T* element = push_back_n(1);
         return *element;
     }
+    T& push_back() && = delete;
 
     /**
      * Adds one new T value which is copy-constructed, returning it by reference. As always,
      * the reference only remains valid until the next call that adds or removes elements.
      */
-    T& push_back(const T& t) {
+    T& push_back(const T& t) & {
         UnpoisonedCapacity construction(*this);
         T* newT;
         if (this->capacity() > fSize) SK_LIKELY {
@@ -256,11 +257,12 @@ public:
         construction.release();
         return *newT;
     }
+    T& push_back(const T&) && = delete;
 
     /**
      * Adds one new T value which is copy-constructed, returning it by reference.
      */
-    T& push_back(T&& t) {
+    T& push_back(T&& t) & {
         UnpoisonedCapacity construction(*this);
         T* newT;
         if (this->capacity() > fSize) SK_LIKELY {
@@ -274,11 +276,12 @@ public:
         construction.release();
         return *newT;
     }
+    T& push_back(T&&) && = delete;
 
     /**
      *  Constructs a new T at the back of this array, returning it by reference.
      */
-    template <typename... Args> T& emplace_back(Args&&... args) {
+    template <typename... Args> T& emplace_back(Args&&... args) & {
         UnpoisonedCapacity construction(*this);
         T* newT;
         if (this->capacity() > fSize) SK_LIKELY {
@@ -292,6 +295,7 @@ public:
         construction.release();
         return *newT;
     }
+    template <typename... Args> T& emplace_back(Args&&...) && = delete;
 
     /**
      * Allocates n more default-initialized T values, and returns the address of
@@ -300,7 +304,7 @@ public:
      */
     // Failure destroys only the new prefix; the original live count is unchanged.
     // Capacity may have grown before element construction begins.
-    T* push_back_n(int count) {
+    T* push_back_n(int count) & {
         SkASSERT_RELEASE(count >= 0 && count <= kMaxCapacity - fSize);
         if (count == 0) {
             T* unchangedEnd = end();
@@ -315,17 +319,18 @@ public:
         construction.release();
         return appended;
     }
+    T* push_back_n(int) && = delete;
 
     /**
      * Version of above that uses a copy constructor to initialize all n items
      * to the same T.
      */
-    T* push_back_n(int n, const T& t) {
+    T* push_back_n(int n, const T& t) & {
         SkASSERT_RELEASE(n >= 0 && n <= kMaxCapacity - fSize);
         if (n == 0) return end();
         std::optional<T> aliasValue;
         const T* source = &t;
-        if (ownsLiveElement(source)) {
+        if (capacity() - fSize < n && ownsLiveElement(source)) {
             aliasValue.emplace(t);
             source = &*aliasValue;
         }
@@ -337,18 +342,19 @@ public:
         construction.release();
         return appended;
     }
+    T* push_back_n(int, const T&) && = delete;
 
     /**
      * Version of above that uses a copy constructor to initialize the n items
      * to separate T values.
      */
-    T* push_back_n(int n, const T t[]) {
+    T* push_back_n(int n, const T t[]) & {
         SkASSERT_RELEASE(n >= 0 && n <= kMaxCapacity - fSize);
         if (n == 0) return end();
         SkASSERT_RELEASE(t != nullptr);
         std::optional<TArray> aliasValues;
         const T* source = t;
-        if (ownsLiveElement(source)) {
+        if (capacity() - fSize < n && ownsLiveElement(source)) {
             const size_t byteOffset = reinterpret_cast<uintptr_t>(source) -
                                       reinterpret_cast<uintptr_t>(fData);
             SkASSERT_RELEASE(byteOffset % sizeof(T) == 0);
@@ -365,11 +371,12 @@ public:
         construction.release();
         return appended;
     }
+    T* push_back_n(int, const T[]) && = delete;
 
     /**
      * Version of above that uses the move constructor to set n items.
      */
-    T* move_back_n(int n, T* t) {
+    T* move_back_n(int n, T* t) & {
         SkASSERT_RELEASE(n >= 0 && n <= kMaxCapacity - fSize);
         if (n == 0) return end();
         SkASSERT_RELEASE(t != nullptr && !ownsLiveElement(t));
@@ -381,6 +388,7 @@ public:
         construction.release();
         return appended;
     }
+    T* move_back_n(int, T*) && = delete;
 
     /**
      * Removes the last element. Not safe to call when size() == 0.
@@ -469,29 +477,35 @@ public:
         that.changeSize(0);
     }
 
-    T* begin() {
+    T* begin() & {
         return fData;
     }
-    const T* begin() const {
+    const T* begin() const & {
         return fData;
     }
+    T* begin() && = delete;
+    const T* begin() const && = delete;
 
-    T* end() {
+    T* end() & {
         if (fData == nullptr) {
             SkASSERT(fSize == 0);
             return nullptr;
         }
         return fData + fSize;
     }
-    const T* end() const {
+    const T* end() const & {
         if (fData == nullptr) {
             SkASSERT(fSize == 0);
             return nullptr;
         }
         return fData + fSize;
     }
-    T* data() { return fData; }
-    const T* data() const { return fData; }
+    T* end() && = delete;
+    const T* end() const && = delete;
+    T* data() & { return fData; }
+    const T* data() const & { return fData; }
+    T* data() && = delete;
+    const T* data() const && = delete;
     int size() const { return fSize; }
     size_t size_bytes() const { return Bytes(fSize); }
     void resize(size_t count) {
@@ -522,53 +536,67 @@ public:
     /**
      * Get the i^th element.
      */
-    T& operator[] (int i) {
+    T& operator[] (int i) & {
         return fData[sk_collection_check_bounds(i, this->size())];
     }
 
-    const T& operator[] (int i) const {
+    const T& operator[] (int i) const & {
         return fData[sk_collection_check_bounds(i, this->size())];
     }
+    T& operator[](int) && = delete;
+    const T& operator[](int) const && = delete;
 
-    T& at(int i) { return (*this)[i]; }
-    const T& at(int i) const { return (*this)[i]; }
+    T& at(int i) & { return (*this)[i]; }
+    const T& at(int i) const & { return (*this)[i]; }
+    T& at(int) && = delete;
+    const T& at(int) const && = delete;
 
     /**
      * equivalent to operator[](0)
      */
-    T& front() {
+    T& front() & {
         sk_collection_not_empty(this->empty());
         return fData[0];
     }
 
-    const T& front() const {
+    const T& front() const & {
         sk_collection_not_empty(this->empty());
         return fData[0];
     }
+    T& front() && = delete;
+    const T& front() const && = delete;
 
     /**
      * equivalent to operator[](size() - 1)
      */
-    T& back() {
+    T& back() & {
         sk_collection_not_empty(this->empty());
         return fData[fSize - 1];
     }
 
-    const T& back() const {
+    const T& back() const & {
         sk_collection_not_empty(this->empty());
         return fData[fSize - 1];
     }
+    T& back() && = delete;
+    const T& back() const && = delete;
 
     /**
      * equivalent to operator[](size()-1-i)
      */
-    T& fromBack(int i) {
-        return (*this)[fSize - i - 1];
+    T& fromBack(int i) & {
+        SkASSERT_RELEASE(i >= 0 && i < fSize);
+        const int forwardIndex = fSize - 1 - i;
+        return fData[forwardIndex];
     }
 
-    const T& fromBack(int i) const {
-        return (*this)[fSize - i - 1];
+    const T& fromBack(int i) const & {
+        SkASSERT_RELEASE(i >= 0 && i < fSize);
+        const int forwardIndex = fSize - 1 - i;
+        return fData[forwardIndex];
     }
+    T& fromBack(int) && = delete;
+    const T& fromBack(int) const && = delete;
 
     bool operator==(const TArray<T, MEM_MOVE>& right) const {
         int leftCount = this->size();
