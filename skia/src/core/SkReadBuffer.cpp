@@ -22,7 +22,6 @@
 #include "include/core/SkSize.h"
 #include "include/core/SkString.h"
 #include "include/private/SkMalloc.h"
-#include "src/core/SkAutoMalloc.h"
 #include "src/core/SkMathPriv.h"
 #include "src/core/SkMatrixPriv.h"
 #include "src/core/SkMipmapBuilder.h"
@@ -329,12 +328,11 @@ const void* SkReadBuffer::skipByteArray(size_t* size) {
 }
 
 sk_sp<SkData> SkReadBuffer::readByteArrayAsData() {
-    const size_t bytes = getArrayCount();
-    if (!validate(isAvailable(bytes))) return nullptr;
-    SkAutoMalloc buffer(bytes);
-    if (!readByteArray(buffer.get(), bytes)) return nullptr;
-    void* allocation = buffer.release();
-    sk_sp<SkData> data = SkData::MakeFromMalloc(allocation, bytes);
+    const size_t bytes = readUInt();
+    const void* source = skip(bytes);
+    if (!isValid()) return nullptr;
+    // Validate the complete record before allocating its independently owned copy.
+    sk_sp<SkData> data = SkData::MakeWithCopy(source, bytes);
     return data;
 }
 

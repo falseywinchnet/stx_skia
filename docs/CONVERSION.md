@@ -672,6 +672,22 @@ The fixture also checks cursor preservation, plain paint round-trips and unsuppo
 effect rejection. This is scoped pruning, not a completed reader conversion or a
 rendering-speed claim. See ../results/2026-10-26/READER_FACTORY_PRUNE.md.
 
+## Retained binary reader
+
+SkReadBuffer.h/.cpp are converted with checked borrowed extents, defined empty
+state, sticky failure, typed byte copies and explicit callback/context lifetimes.
+No fields are added; the Release reader remains 64 bytes. Owned byte-array reads
+validate before allocation and use one combined SkData allocation instead of a
+separate payload allocation plus wrapper. The original guarded primitive path is
+retained after shorter variants regressed in measurements.
+
+Both 33-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass. Controlled
+current-dependency timings reduce owned-record costs about 20–49%; the final word
+loop median is about 5.5% slower with overlapping ranges. Earlier regressions are
+preserved. See ../results/2026-10-26/READ_BUFFER.md and raw timing files. This does
+not complete the writer or remaining private reconstruction implementations.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
