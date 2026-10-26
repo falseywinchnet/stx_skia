@@ -40,11 +40,6 @@ public:
         const bool valid = onIsValid(recorder);
         return valid;
     }
-    bool isProtected() const {
-        const bool protectedContent = onIsProtected();
-        return protectedContent;
-    }
-
     // The caller supplies writable pixels with the requested format/stride and
     // at least info.computeByteSize(rowBytes) bytes. Storage is borrowed for this
     // call only. Invalid shapes, formats, strides and overflowing byte extents are
@@ -64,7 +59,6 @@ protected:
     struct Options {};
     virtual bool onGetPixels(const SkImageInfo&, void*, size_t, const Options&) { return false; }
     virtual bool onIsValid(SkRecorder*) const { return true; }
-    virtual bool onIsProtected() const { return false; }
     const SkImageInfo fInfo;
 
 private:

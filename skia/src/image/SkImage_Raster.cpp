@@ -32,7 +32,6 @@
 #include <cstdint>
 #include <utility>
 
-class GrDirectContext;
 class SkSurfaceProps;
 
 // A subset must not reuse the parent pixel-ref identity: caches describe the
@@ -78,7 +77,7 @@ SkImage_Raster::SkImage_Raster(const SkBitmap& bitmap, sk_sp<SkMipmap> mips,
 
 SkImage_Raster::~SkImage_Raster() {}
 
-bool SkImage_Raster::onReadPixels(GrDirectContext*,
+bool SkImage_Raster::onReadPixels(
                                   const SkImageInfo& dstInfo,
                                   void* dstPixels,
                                   size_t dstRowBytes,
@@ -95,7 +94,7 @@ bool SkImage_Raster::onPeekPixels(SkPixmap* pm) const {
     return available;
 }
 
-bool SkImage_Raster::getROPixels(GrDirectContext*, SkBitmap* dst, CachingHint) const {
+bool SkImage_Raster::getROPixels( SkBitmap* dst, CachingHint) const {
     *dst = fBitmap;
     return true;
 }
@@ -231,7 +230,7 @@ sk_sp<SkImage_Raster> SkImage_Raster::MakeFromBitmap(const SkBitmap& bm,
     return image;
 }
 
-bool SkImage_Raster::onAsLegacyBitmap(GrDirectContext*, SkBitmap* bitmap) const {
+bool SkImage_Raster::onAsLegacyBitmap( SkBitmap* bitmap) const {
     // When we're a snapshot from a surface, our bitmap may not be marked immutable
     // even though logically always we are, but in that case we can't physically share our
     // pixelref since the caller might call setImmutable() themselves
@@ -243,7 +242,7 @@ bool SkImage_Raster::onAsLegacyBitmap(GrDirectContext*, SkBitmap* bitmap) const 
         (*bitmap).setPixelRef(std::move(pixels), origin.x(), origin.y());
         return true;
     }
-    const bool copied = SkImage_Base::onAsLegacyBitmap(nullptr, bitmap);
+    const bool copied = SkImage_Base::onAsLegacyBitmap(bitmap);
     return copied;
 }
 

@@ -19,6 +19,7 @@
 
 class SkArenaAlloc;
 class SkMatrix;
+class SkPaint;
 class SkReadBuffer;
 class SkShader;
 class SkWriteBuffer;

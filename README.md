@@ -35,6 +35,8 @@ The retained CPU pipeline has no font engine dependency. Surface APIs expose CPU
 pixel ownership, snapshots and reads; unsupported GPU texture/context/semaphore
 interfaces and CPU-unimplemented surface YUV reads are removed. Deferred CPU
 generators remain; unused planar YUV generation/cache and GPU listeners are removed.
+Image APIs exclude backend context pointers, texture/protected-content operations
+and unsupported YUV reads; existing null-context pixel reads remain compatible.
 
 On the initial recorded M4/macOS build, the candidate passed seven selected GUI.Forms
 renderer tests and produced byte-identical output across 24 baseline comparison

@@ -17,7 +17,6 @@
 #include "include/core/SkSurface.h"
 #include "include/core/SkSurfaceProps.h"
 #include "include/core/SkTileMode.h"
-#include "include/core/SkTypes.h"
 #include "src/core/SkColorSpacePriv.h"
 #include "src/core/SkImageInfoPriv.h"
 #include "src/core/SkMipmap.h"
@@ -27,311 +26,244 @@
 
 #include <utility>
 
-class SkShader;
-
 SkImage::SkImage(const SkImageInfo& info, uint32_t uniqueID)
-        : fInfo(info)
-        , fUniqueID(kNeedNewImageUniqueID == uniqueID ? SkNextID::ImageID() : uniqueID) {
+        : fInfo(info),
+          fUniqueID(uniqueID == kNeedNewImageUniqueID ? SkNextID::ImageID() : uniqueID) {
     SkASSERT(info.width() > 0);
     SkASSERT(info.height() > 0);
 }
 
-bool SkImage::peekPixels(SkPixmap* pm) const {
-    SkPixmap tmp;
-    if (!pm) {
-        pm = &tmp;
+bool SkImage::peekPixels(SkPixmap* pixels) const {
+    SkPixmap temporary;
+    if (!pixels) {
+        pixels = &temporary;
     }
-    return as_IB(this)->onPeekPixels(pm);
+    const SkImage_Base& base = *as_IB(this);
+    const bool available = base.onPeekPixels(pixels);
+    return available;
 }
 
-bool SkImage::readPixels(GrDirectContext* dContext, const SkImageInfo& dstInfo, void* dstPixels,
-                         size_t dstRowBytes, int srcX, int srcY, CachingHint chint) const {
-    return as_IB(this)->onReadPixels(dContext, dstInfo, dstPixels, dstRowBytes, srcX, srcY, chint);
+bool SkImage::readPixels(const SkImageInfo& info, void* pixels, size_t rowBytes,
+                         int sourceX, int sourceY, CachingHint hint) const {
+    const SkImage_Base& base = *as_IB(this);
+    const bool copied = base.onReadPixels(info, pixels, rowBytes, sourceX, sourceY, hint);
+    return copied;
 }
 
-sk_sp<SkImage> SkImage::makeScaled(const SkImageInfo& newInfo,
-                                   const SkSamplingOptions& sampling) const {
-    return makeScaled(nullptr, newInfo, sampling, SkSurfaceProps{});
+bool SkImage::readPixels(std::nullptr_t, const SkImageInfo& info, void* pixels, size_t rowBytes,
+                         int sourceX, int sourceY, CachingHint hint) const {
+    const bool copied = readPixels(info, pixels, rowBytes, sourceX, sourceY, hint);
+    return copied;
 }
 
-sk_sp<SkImage> SkImage::makeScaled(SkRecorder* recorder,
-                                   const SkImageInfo& newInfo,
-                                   const SkSamplingOptions& sampling) const {
-    return makeScaled(recorder, newInfo, sampling, SkSurfaceProps{});
+bool SkImage::readPixels(const SkPixmap& pixels, int sourceX, int sourceY, CachingHint hint) const {
+    const bool copied = readPixels(pixels.info(), pixels.writable_addr(), pixels.rowBytes(),
+                                   sourceX, sourceY, hint);
+    return copied;
 }
 
-sk_sp<SkImage> SkImage::makeScaled(SkRecorder* recorder,
-                                   const SkImageInfo& newInfo,
-                                   const SkSamplingOptions& sampling,
-                                   const SkSurfaceProps& props) const {
-    if (!SkImageInfoIsValid(newInfo)) {
+bool SkImage::readPixels(std::nullptr_t, const SkPixmap& pixels, int sourceX, int sourceY,
+                         CachingHint hint) const {
+    const bool copied = readPixels(pixels, sourceX, sourceY, hint);
+    return copied;
+}
+
+sk_sp<SkImage> SkImage::makeScaled(const SkImageInfo& info, const SkSamplingOptions& sampling) const {
+    sk_sp<SkImage> image = makeScaled(nullptr, info, sampling);
+    return image;
+}
+
+sk_sp<SkImage> SkImage::makeScaled(SkRecorder* recorder, const SkImageInfo& info,
+                                  const SkSamplingOptions& sampling) const {
+    if (!SkImageInfoIsValid(info)) {
         return nullptr;
     }
-    if (newInfo == this->imageInfo()) {
-        return sk_ref_sp(this);
+    if (info == imageInfo()) {
+        sk_sp<SkImage> image = sk_ref_sp(this);
+        return image;
     }
-
-    auto surf = as_IB(this)->onMakeSurface(recorder, newInfo);
-    if (!surf) {
+    const SkImage_Base& base = *as_IB(this);
+    sk_sp<SkSurface> surface = base.onMakeSurface(recorder, info);
+    if (!surface) {
         return nullptr;
     }
-
     SkPaint paint;
     paint.setBlendMode(SkBlendMode::kSrc);
-    surf->getCanvas()->drawImageRect(this,
-                                     SkRect::MakeIWH(newInfo.width(), newInfo.height()),
-                                     sampling,
-                                     &paint);
-    return surf->makeImageSnapshot();
+    const SkRect destination = SkRect::MakeIWH(info.width(), info.height());
+    SkCanvas& canvas = *(*surface).getCanvas();
+    canvas.drawImageRect(this, destination, sampling, &paint);
+    sk_sp<SkImage> image = (*surface).makeImageSnapshot();
+    return image;
 }
 
-#ifndef SK_IMAGE_READ_PIXELS_DISABLE_LEGACY_API
-bool SkImage::readPixels(const SkImageInfo& dstInfo, void* dstPixels,
-                         size_t dstRowBytes, int srcX, int srcY, CachingHint chint) const {
-    auto dContext = as_IB(this)->directContext();
-    return this->readPixels(dContext, dstInfo, dstPixels, dstRowBytes, srcX, srcY, chint);
+sk_sp<SkImage> SkImage::makeScaled(SkRecorder* recorder, const SkImageInfo& info,
+                                  const SkSamplingOptions& sampling, const SkSurfaceProps&) const {
+    sk_sp<SkImage> image = makeScaled(recorder, info, sampling);
+    return image;
 }
-#endif
 
-void SkImage::asyncRescaleAndReadPixels(const SkImageInfo& info,
-                                        const SkIRect& srcRect,
-                                        RescaleGamma rescaleGamma,
-                                        RescaleMode rescaleMode,
-                                        ReadPixelsCallback callback,
-                                        ReadPixelsContext context) const {
-    if (!SkIRect::MakeWH(this->width(), this->height()).contains(srcRect) ||
-        !SkImageInfoIsValid(info)) {
+void SkImage::asyncRescaleAndReadPixels(const SkImageInfo& info, const SkIRect& sourceBounds,
+                                        RescaleGamma gamma, RescaleMode mode,
+                                        ReadPixelsCallback callback, ReadPixelsContext context) const {
+    const SkIRect imageBounds = bounds();
+    if (!imageBounds.contains(sourceBounds) || !SkImageInfoIsValid(info)) {
         callback(context, nullptr);
         return;
     }
-    as_IB(this)->onAsyncRescaleAndReadPixels(
-            info, srcRect, rescaleGamma, rescaleMode, callback, context);
+    const SkImage_Base& base = *as_IB(this);
+    base.onAsyncRescaleAndReadPixels(info, sourceBounds, gamma, mode, callback, context);
 }
 
-void SkImage::asyncRescaleAndReadPixelsYUV420(SkYUVColorSpace yuvColorSpace,
-                                              sk_sp<SkColorSpace> dstColorSpace,
-                                              const SkIRect& srcRect,
-                                              const SkISize& dstSize,
-                                              RescaleGamma rescaleGamma,
-                                              RescaleMode rescaleMode,
-                                              ReadPixelsCallback callback,
-                                              ReadPixelsContext context) const {
-    if (!SkIRect::MakeWH(this->width(), this->height()).contains(srcRect) || dstSize.isZero() ||
-        (dstSize.width() & 0b1) || (dstSize.height() & 0b1)) {
-        callback(context, nullptr);
-        return;
+bool SkImage::scalePixels(const SkPixmap& destination, const SkSamplingOptions& sampling,
+                          CachingHint hint) const {
+    if (width() == destination.width() && height() == destination.height()) {
+        const bool copied = readPixels(destination, 0, 0, hint);
+        return copied;
     }
-    as_IB(this)->onAsyncRescaleAndReadPixelsYUV420(yuvColorSpace,
-                                                   /*readAlpha=*/false,
-                                                   std::move(dstColorSpace),
-                                                   srcRect,
-                                                   dstSize,
-                                                   rescaleGamma,
-                                                   rescaleMode,
-                                                   callback,
-                                                   context);
-}
-
-void SkImage::asyncRescaleAndReadPixelsYUVA420(SkYUVColorSpace yuvColorSpace,
-                                               sk_sp<SkColorSpace> dstColorSpace,
-                                               const SkIRect& srcRect,
-                                               const SkISize& dstSize,
-                                               RescaleGamma rescaleGamma,
-                                               RescaleMode rescaleMode,
-                                               ReadPixelsCallback callback,
-                                               ReadPixelsContext context) const {
-    if (!SkIRect::MakeWH(this->width(), this->height()).contains(srcRect) || dstSize.isZero() ||
-        (dstSize.width() & 0b1) || (dstSize.height() & 0b1)) {
-        callback(context, nullptr);
-        return;
+    const SkImage_Base& base = *as_IB(this);
+    SkBitmap bitmap;
+    if (!base.getROPixels(&bitmap, hint)) {
+        return false;
     }
-    as_IB(this)->onAsyncRescaleAndReadPixelsYUV420(yuvColorSpace,
-                                                   /*readAlpha=*/true,
-                                                   std::move(dstColorSpace),
-                                                   srcRect,
-                                                   dstSize,
-                                                   rescaleGamma,
-                                                   rescaleMode,
-                                                   callback,
-                                                   context);
-}
-
-bool SkImage::scalePixels(const SkPixmap& dst, const SkSamplingOptions& sampling,
-                          CachingHint chint) const {
-    // Context TODO: Elevate GrDirectContext requirement to public API.
-    auto dContext = as_IB(this)->directContext();
-    if (this->width() == dst.width() && this->height() == dst.height()) {
-        return this->readPixels(dContext, dst, 0, 0, chint);
+    SkPixmap source;
+    if (!bitmap.peekPixels(&source)) {
+        return false;
     }
-
-    // Idea: If/when SkImageGenerator supports a native-scaling API (where the generator itself
-    //       can scale more efficiently) we should take advantage of it here.
-    //
-    SkBitmap bm;
-    if (as_IB(this)->getROPixels(dContext, &bm, chint)) {
-        SkPixmap pmap;
-        // Note: By calling the pixmap scaler, we never cache the final result, so the chint
-        //       is (currently) only being applied to the getROPixels. If we get a request to
-        //       also attempt to cache the final (scaled) result, we would add that logic here.
-        //
-        return bm.peekPixels(&pmap) && pmap.scalePixels(dst, sampling);
-    }
-    return false;
+    const bool scaled = source.scalePixels(destination, sampling);
+    return scaled;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-SkColorType SkImage::colorType() const { return fInfo.colorType(); }
-
-SkAlphaType SkImage::alphaType() const { return fInfo.alphaType(); }
-
-SkColorSpace* SkImage::colorSpace() const { return fInfo.colorSpace(); }
-
-sk_sp<SkColorSpace> SkImage::refColorSpace() const { return fInfo.refColorSpace(); }
-
-sk_sp<SkShader> SkImage::makeShader(const SkSamplingOptions& sampling, const SkMatrix& lm) const {
-    return SkImageShader::Make(sk_ref_sp(const_cast<SkImage*>(this)),
-                               SkTileMode::kClamp, SkTileMode::kClamp,
-                               sampling, &lm);
+SkColorType SkImage::colorType() const {
+    const SkColorType type = fInfo.colorType();
+    return type;
+}
+SkAlphaType SkImage::alphaType() const {
+    const SkAlphaType type = fInfo.alphaType();
+    return type;
+}
+SkColorSpace* SkImage::colorSpace() const {
+    SkColorSpace* space = fInfo.colorSpace();
+    return space;
+}
+sk_sp<SkColorSpace> SkImage::refColorSpace() const {
+    sk_sp<SkColorSpace> space = fInfo.refColorSpace();
+    return space;
+}
+bool SkImage::isAlphaOnly() const {
+    const bool alphaOnly = SkColorTypeIsAlphaOnly(fInfo.colorType());
+    return alphaOnly;
 }
 
-sk_sp<SkShader> SkImage::makeShader(const SkSamplingOptions& sampling, const SkMatrix* lm) const {
-    return SkImageShader::Make(sk_ref_sp(const_cast<SkImage*>(this)),
-                               SkTileMode::kClamp, SkTileMode::kClamp,
-                               sampling, lm);
+sk_sp<SkShader> SkImage::makeShader(const SkSamplingOptions& sampling, const SkMatrix& matrix) const {
+    sk_sp<SkShader> shader = makeShader(SkTileMode::kClamp, SkTileMode::kClamp, sampling, &matrix);
+    return shader;
 }
-
-sk_sp<SkShader> SkImage::makeShader(SkTileMode tmx, SkTileMode tmy,
-                                    const SkSamplingOptions& sampling,
-                                    const SkMatrix& lm) const {
-    return SkImageShader::Make(sk_ref_sp(const_cast<SkImage*>(this)), tmx, tmy,
-                               sampling, &lm);
+sk_sp<SkShader> SkImage::makeShader(const SkSamplingOptions& sampling, const SkMatrix* matrix) const {
+    sk_sp<SkShader> shader = makeShader(SkTileMode::kClamp, SkTileMode::kClamp, sampling, matrix);
+    return shader;
 }
-
-sk_sp<SkShader> SkImage::makeShader(SkTileMode tmx, SkTileMode tmy,
-                                    const SkSamplingOptions& sampling,
-                                    const SkMatrix* localMatrix) const {
-    return SkImageShader::Make(sk_ref_sp(const_cast<SkImage*>(this)), tmx, tmy,
-                               sampling, localMatrix);
+sk_sp<SkShader> SkImage::makeShader(SkTileMode x, SkTileMode y, const SkSamplingOptions& sampling,
+                                   const SkMatrix& matrix) const {
+    sk_sp<SkShader> shader = makeShader(x, y, sampling, &matrix);
+    return shader;
 }
-
-sk_sp<SkShader> SkImage::makeRawShader(SkTileMode tmx, SkTileMode tmy,
-                                       const SkSamplingOptions& sampling,
-                                       const SkMatrix& lm) const {
-    return SkImageShader::MakeRaw(sk_ref_sp(const_cast<SkImage*>(this)), tmx, tmy,
-                                  sampling, &lm);
+sk_sp<SkShader> SkImage::makeShader(SkTileMode x, SkTileMode y, const SkSamplingOptions& sampling,
+                                   const SkMatrix* matrix) const {
+    sk_sp<SkImage> image = sk_ref_sp(const_cast<SkImage*>(this));
+    sk_sp<SkShader> shader = SkImageShader::Make(std::move(image), x, y, sampling, matrix);
+    return shader;
 }
-
 sk_sp<SkShader> SkImage::makeRawShader(const SkSamplingOptions& sampling,
-                                       const SkMatrix& lm) const {
-    return SkImageShader::MakeRaw(sk_ref_sp(const_cast<SkImage*>(this)),
-                                  SkTileMode::kClamp, SkTileMode::kClamp,
-                                  sampling, &lm);
+                                      const SkMatrix& matrix) const {
+    sk_sp<SkShader> shader = makeRawShader(SkTileMode::kClamp, SkTileMode::kClamp, sampling, &matrix);
+    return shader;
 }
-
 sk_sp<SkShader> SkImage::makeRawShader(const SkSamplingOptions& sampling,
-                                       const SkMatrix* localMatrix) const {
-    return SkImageShader::MakeRaw(sk_ref_sp(const_cast<SkImage*>(this)),
-                                  SkTileMode::kClamp, SkTileMode::kClamp,
-                                  sampling, localMatrix);
+                                      const SkMatrix* matrix) const {
+    sk_sp<SkShader> shader = makeRawShader(SkTileMode::kClamp, SkTileMode::kClamp, sampling, matrix);
+    return shader;
+}
+sk_sp<SkShader> SkImage::makeRawShader(SkTileMode x, SkTileMode y, const SkSamplingOptions& sampling,
+                                      const SkMatrix& matrix) const {
+    sk_sp<SkShader> shader = makeRawShader(x, y, sampling, &matrix);
+    return shader;
+}
+sk_sp<SkShader> SkImage::makeRawShader(SkTileMode x, SkTileMode y, const SkSamplingOptions& sampling,
+                                      const SkMatrix* matrix) const {
+    sk_sp<SkImage> image = sk_ref_sp(const_cast<SkImage*>(this));
+    sk_sp<SkShader> shader = SkImageShader::MakeRaw(std::move(image), x, y, sampling, matrix);
+    return shader;
 }
 
-sk_sp<SkShader> SkImage::makeRawShader(SkTileMode tmx, SkTileMode tmy,
-                                       const SkSamplingOptions& sampling,
-                                       const SkMatrix* localMatrix) const {
-    return SkImageShader::MakeRaw(sk_ref_sp(const_cast<SkImage*>(this)), tmx, tmy,
-                                  sampling, localMatrix);
+sk_sp<const SkData> SkImage::refEncodedData() const {
+    const SkImage_Base& base = *as_IB(this);
+    sk_sp<const SkData> data = base.onRefEncoded();
+    return data;
 }
-
-sk_sp<const SkData> SkImage::refEncodedData() const { return as_IB(this)->onRefEncoded(); }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-bool SkImage::readPixels(GrDirectContext* dContext, const SkPixmap& pmap, int srcX, int srcY,
-                         CachingHint chint) const {
-    return this->readPixels(dContext, pmap.info(), pmap.writable_addr(), pmap.rowBytes(), srcX,
-                            srcY, chint);
+bool SkImage::asLegacyBitmap(SkBitmap* bitmap, LegacyBitmapMode) const {
+    const SkImage_Base& base = *as_IB(this);
+    const bool copied = base.onAsLegacyBitmap(bitmap);
+    return copied;
 }
-
-#ifndef SK_IMAGE_READ_PIXELS_DISABLE_LEGACY_API
-bool SkImage::readPixels(const SkPixmap& pmap, int srcX, int srcY, CachingHint chint) const {
-    auto dContext = as_IB(this)->directContext();
-    return this->readPixels(dContext, pmap, srcX, srcY, chint);
-}
-#endif
-
-bool SkImage::asLegacyBitmap(SkBitmap* bitmap, LegacyBitmapMode ) const {
-    // Context TODO: Elevate GrDirectContext requirement to public API.
-    auto dContext = as_IB(this)->directContext();
-    return as_IB(this)->onAsLegacyBitmap(dContext, bitmap);
-}
-
-bool SkImage::isAlphaOnly() const { return SkColorTypeIsAlphaOnly(fInfo.colorType()); }
 
 sk_sp<SkImage> SkImage::reinterpretColorSpace(sk_sp<SkColorSpace> target) const {
     if (!target) {
         return nullptr;
     }
-
-    // No need to create a new image if:
-    // (1) The color spaces are equal.
-    // (2) The color type is kAlpha8.
-    SkColorSpace* colorSpace = this->colorSpace();
-    if (!colorSpace) {
-        colorSpace = sk_srgb_singleton();
+    SkColorSpace* original = colorSpace();
+    if (!original) {
+        original = sk_srgb_singleton();
     }
-    if (SkColorSpace::Equals(colorSpace, target.get()) || this->isAlphaOnly()) {
-        return sk_ref_sp(const_cast<SkImage*>(this));
+    if (SkColorSpace::Equals(original, target.get()) || isAlphaOnly()) {
+        sk_sp<SkImage> image = sk_ref_sp(const_cast<SkImage*>(this));
+        return image;
     }
-
-    return as_IB(this)->onReinterpretColorSpace(std::move(target));
+    const SkImage_Base& base = *as_IB(this);
+    sk_sp<SkImage> image = base.onReinterpretColorSpace(std::move(target));
+    return image;
 }
 
-sk_sp<SkImage> SkImage::makeNonTextureImage(GrDirectContext* dContext) const {
-    if (!this->isTextureBacked()) {
-        return sk_ref_sp(const_cast<SkImage*>(this));
+sk_sp<SkImage> SkImage::makeRasterImage(CachingHint hint) const {
+    if (peekPixels(nullptr)) {
+        sk_sp<SkImage> image = sk_ref_sp(const_cast<SkImage*>(this));
+        return image;
     }
-    return this->makeRasterImage(dContext, kDisallow_CachingHint);
-}
-
-sk_sp<SkImage> SkImage::makeRasterImage(GrDirectContext* dContext, CachingHint chint) const {
-    SkPixmap pm;
-    if (this->peekPixels(&pm)) {
-        return sk_ref_sp(const_cast<SkImage*>(this));
-    }
-
     const size_t rowBytes = fInfo.minRowBytes();
-    size_t size = fInfo.computeByteSize(rowBytes);
+    const size_t size = fInfo.computeByteSize(rowBytes);
     if (SkImageInfo::ByteSizeOverflowed(size)) {
         return nullptr;
     }
-
-    if (!dContext) {
-        // Try to get the saved context if the client didn't pass it in (but they really should).
-        dContext = as_IB(this)->directContext();
-    }
     sk_sp<SkData> data = SkData::MakeUninitialized(size);
-    pm = {fInfo.makeColorSpace(nullptr), data->writable_data(), fInfo.minRowBytes()};
-    if (!this->readPixels(dContext, pm, 0, 0, chint)) {
+    // Suppress conversion here: the copied values keep the source's color label.
+    const SkImageInfo untagged = fInfo.makeColorSpace(nullptr);
+    const SkPixmap destination(untagged, (*data).writable_data(), rowBytes);
+    if (!readPixels(destination, 0, 0, hint)) {
         return nullptr;
     }
-
-    return SkImages::RasterFromData(fInfo, std::move(data), rowBytes);
+    sk_sp<SkImage> image = SkImages::RasterFromData(fInfo, std::move(data), rowBytes);
+    return image;
 }
-
-bool SkImage::hasMipmaps() const { return as_IB(this)->onHasMipmaps(); }
-
-bool SkImage::isProtected() const { return as_IB(this)->onIsProtected(); }
-
+sk_sp<SkImage> SkImage::makeRasterImage(std::nullptr_t, CachingHint hint) const {
+    sk_sp<SkImage> image = makeRasterImage(hint);
+    return image;
+}
+bool SkImage::hasMipmaps() const {
+    const SkImage_Base& base = *as_IB(this);
+    const bool present = base.onHasMipmaps();
+    return present;
+}
 sk_sp<SkImage> SkImage::withMipmaps(sk_sp<SkMipmap> mips) const {
-    if (mips == nullptr || mips->validForRootLevel(this->imageInfo())) {
-        if (auto result = as_IB(this)->onMakeWithMipmaps(std::move(mips))) {
-            return result;
+    if (!mips || (*mips).validForRootLevel(imageInfo())) {
+        const SkImage_Base& base = *as_IB(this);
+        sk_sp<SkImage> image = base.onMakeWithMipmaps(std::move(mips));
+        if (image) {
+            return image;
         }
     }
-    return sk_ref_sp((const_cast<SkImage*>(this)));
+    sk_sp<SkImage> image = sk_ref_sp(const_cast<SkImage*>(this));
+    return image;
 }
-
 sk_sp<SkImage> SkImage::withDefaultMipmaps() const {
-    return this->withMipmaps(nullptr);
+    sk_sp<SkImage> image = withMipmaps(nullptr);
+    return image;
 }

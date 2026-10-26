@@ -76,7 +76,7 @@ static void check_output_bitmap(const SkBitmap& bitmap) {
     (void)bitmap;
 }
 
-bool SkImage_Lazy::getROPixels(GrDirectContext*, SkBitmap* bitmap, CachingHint hint) const {
+bool SkImage_Lazy::getROPixels( SkBitmap* bitmap, CachingHint hint) const {
     const SkBitmapCacheDesc description = SkBitmapCacheDesc::Make(this);
     if (SkBitmapCache::Find(description, bitmap)) {
         check_output_bitmap(*bitmap);
@@ -121,19 +121,11 @@ bool SkImage_Lazy::getROPixels(GrDirectContext*, SkBitmap* bitmap, CachingHint h
     return true;
 }
 
-bool SkImage_Lazy::onIsProtected() const {
-    SharedGenerator& owner = *fSharedGenerator;
-    SkAutoMutexExclusive generatorLock(owner.fMutex);
-    const SkImageGenerator& generator = *owner.fGenerator;
-    const bool protectedContent = generator.isProtected();
-    return protectedContent;
-}
-
-bool SkImage_Lazy::onReadPixels(GrDirectContext* context, const SkImageInfo& destinationInfo,
+bool SkImage_Lazy::onReadPixels( const SkImageInfo& destinationInfo,
                                 void* destinationPixels, size_t destinationRowBytes,
                                 int sourceX, int sourceY, CachingHint hint) const {
     SkBitmap bitmap;
-    if (!getROPixels(context, &bitmap, hint)) {
+    if (!getROPixels(&bitmap, hint)) {
         return false;
     }
     const bool copied = bitmap.readPixels(destinationInfo, destinationPixels,

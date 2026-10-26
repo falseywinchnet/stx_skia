@@ -1,4 +1,11 @@
 #include "include/core/SkBitmap.h"
+#include "include/core/SkCanvas.h"
+#include "include/core/SkMatrix.h"
+#include "include/core/SkPaint.h"
+#include "include/core/SkSamplingOptions.h"
+#include "include/core/SkShader.h"
+#include "include/core/SkSurface.h"
+#include "include/core/SkTileMode.h"
 #include "include/core/SkCPURecorder.h"
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkData.h"
@@ -15,6 +22,29 @@
 #include <cstring>
 #include <memory>
 #include <utility>
+
+class GrDirectContext;
+template <typename T>
+concept HasTextureQuery = requires(const T& image) { image.isTextureBacked(); image.textureSize(); };
+template <typename T>
+concept HasProtectedQuery = requires(const T& image) { image.isProtected(); };
+template <typename T>
+concept HasYuvRead = requires { &T::asyncRescaleAndReadPixelsYUV420; };
+template <typename T>
+concept AcceptsGpuContext = requires(const T& image, GrDirectContext* context, const SkPixmap& dst) {
+    image.readPixels(context, dst, 0, 0);
+};
+#ifdef STX_SKIA_REFERENCE
+static_assert(HasTextureQuery<SkImage>);
+static_assert(HasProtectedQuery<SkImage>);
+static_assert(HasYuvRead<SkImage>);
+static_assert(AcceptsGpuContext<SkImage>);
+#else
+static_assert(!HasTextureQuery<SkImage>);
+static_assert(!HasProtectedQuery<SkImage>);
+static_assert(!HasYuvRead<SkImage>);
+static_assert(!AcceptsGpuContext<SkImage>);
+#endif
 
 namespace {
 constexpr int width = 9;
@@ -218,6 +248,113 @@ bool conversions_and_reads() {
     return true;
 }
 
+bool facade_scaling() {
+    Pixels pixels{};
+    fill_pixels(pixels);
+    const SkImageInfo info = image_info();
+    const SkPixmap source(info, pixels.data(), stride);
+    sk_sp<SkImage> image = SkImages::RasterFromPixmapCopy(source);
+    if (!image || !(*image).peekPixels(nullptr)) return false;
+    if ((*image).bounds() != SkIRect::MakeWH(width, height)) return false;
+    if ((*image).dimensions() != SkISize::Make(width, height)) return false;
+    if ((*image).isAlphaOnly() || (*image).isOpaque()) return false;
+    const SkSamplingOptions sampling;
+    if ((*image).makeScaled(info, sampling) != image) return false;
+    if ((*image).makeRasterImage() != image || (*image).makeRasterImage(nullptr) != image) return false;
+    const SkImageInfo reducedInfo = info.makeWH(3, height);
+    for (int variant = 0; variant < 3; ++variant) {
+        sk_sp<SkImage> scaled;
+        if (variant == 0) scaled = (*image).makeScaled(reducedInfo, sampling);
+        if (variant == 1) scaled = (*image).makeScaled(nullptr, reducedInfo, sampling);
+        if (variant == 2) scaled = (*image).makeScaled(nullptr, reducedInfo, sampling, SkSurfaceProps{});
+        if (!scaled || (*scaled).width() != 3 || (*scaled).height() != height) return false;
+        SkPixmap output;
+        if (!(*scaled).peekPixels(&output)) return false;
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < 3; ++x) {
+                const SkColor expected = SkColorSetARGB(255, (3 * x + 1) * 20, y * 30, 70);
+                if (output.getColor(x, y) != expected) return false;
+            }
+        }
+    }
+    if ((*image).makeScaled(info.makeWH(0, height), sampling)) return false;
+    std::array<uint8_t, stride * height> destination{};
+    destination.fill(0xdf);
+    const SkPixmap reduced(reducedInfo, destination.data(), stride);
+    if (!(*image).scalePixels(reduced, sampling)) return false;
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < 3; ++x) {
+            if (reduced.getColor(x, y) != SkColorSetARGB(255, (3 * x + 1) * 20, y * 30, 70)) return false;
+        }
+        for (std::size_t byte = 12; byte < stride; ++byte) {
+            if (destination[static_cast<std::size_t>(y) * stride + byte] != 0xdf) return false;
+        }
+    }
+    const SkPixmap full(info, destination.data(), stride);
+    if (!(*image).scalePixels(full, sampling)) return false;
+    for (int y = 0; y < height; ++y) {
+        if (std::memcmp(full.addr(0, y), source.addr(0, y), width * 4) != 0) return false;
+    }
+    return true;
+}
+
+bool facade_shaders() {
+    Pixels pixels{};
+    fill_pixels(pixels);
+    const SkImageInfo info = image_info();
+    const SkPixmap source(info, pixels.data(), stride);
+    sk_sp<SkImage> image = SkImages::RasterFromPixmapCopy(source);
+    if (!image) return false;
+    const SkMatrix matrix = SkMatrix::Translate(1.0f, 1.0f);
+    const SkSamplingOptions sampling;
+    const SkSamplingOptions cubic(SkCubicResampler::Mitchell());
+    if ((*image).makeRawShader(cubic)) return false;
+    for (int raw = 0; raw < 2; ++raw) {
+        for (int variant = 0; variant < 4; ++variant) {
+            sk_sp<SkShader> shader;
+            if (raw == 0) {
+                if (variant == 0) shader = (*image).makeShader(sampling, matrix);
+                if (variant == 1) shader = (*image).makeShader(sampling, &matrix);
+                if (variant == 2) shader = (*image).makeShader(SkTileMode::kRepeat, SkTileMode::kRepeat, sampling, matrix);
+                if (variant == 3) shader = (*image).makeShader(SkTileMode::kRepeat, SkTileMode::kRepeat, sampling, &matrix);
+            } else {
+                if (variant == 0) shader = (*image).makeRawShader(sampling, matrix);
+                if (variant == 1) shader = (*image).makeRawShader(sampling, &matrix);
+                if (variant == 2) shader = (*image).makeRawShader(SkTileMode::kRepeat, SkTileMode::kRepeat, sampling, matrix);
+                if (variant == 3) shader = (*image).makeRawShader(SkTileMode::kRepeat, SkTileMode::kRepeat, sampling, &matrix);
+            }
+            if (!shader) return false;
+            const SkImageInfo outputInfo = info.makeWH(width + 2, height + 2);
+            sk_sp<SkSurface> surface = SkSurfaces::Raster(outputInfo);
+            if (!surface) return false;
+            SkPaint paint;
+            paint.setShader(std::move(shader));
+            SkCanvas& canvas = *(*surface).getCanvas();
+            canvas.drawPaint(paint);
+            SkPixmap output;
+            if (!(*surface).peekPixels(&output)) return false;
+            for (int y = 0; y < height + 2; ++y) {
+                for (int x = 0; x < width + 2; ++x) {
+                    int sourceX = x - 1;
+                    int sourceY = y - 1;
+                    if (variant >= 2) {
+                        sourceX = (sourceX + width) % width;
+                        sourceY = (sourceY + height) % height;
+                    } else {
+                        if (sourceX < 0) sourceX = 0;
+                        if (sourceY < 0) sourceY = 0;
+                        if (sourceX >= width) sourceX = width - 1;
+                        if (sourceY >= height) sourceY = height - 1;
+                    }
+                    const SkColor expected = SkColorSetARGB(255, sourceX * 20, sourceY * 30, 70);
+                    if (output.getColor(x, y) != expected) return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 class SolidGenerator final : public SkImageGenerator {
 public:
     explicit SolidGenerator(bool succeed) : SkImageGenerator(image_info()), fSucceed(succeed) {}
@@ -275,6 +412,8 @@ int main() {
     if (!mipmaps_and_subsets()) return 3;
     if (!conversions_and_reads()) return 4;
     if (!generated_reads(false) || !generated_reads(true)) return 5;
+    if (!facade_scaling()) return 6;
+    if (!facade_shaders()) return 7;
     std::printf("raster images: ownership, subsets, mipmaps, conversion, reads; base %zu, raster %zu bytes; PASS\n",
                 sizeof(SkImage_Base), sizeof(SkImage_Raster));
     return 0;

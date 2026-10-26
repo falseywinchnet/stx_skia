@@ -56,9 +56,8 @@ void SkImage_Base::onAsyncRescaleAndReadPixels(const SkImageInfo& info,
             callback(context, nullptr);
             return;
         }
-        GrDirectContext* legacyContext = directContext();
         const SkPixmap pixels = source.pixmap();
-        const bool copied = readPixels(legacyContext, pixels, origSrcRect.x(), origSrcRect.y());
+        const bool copied = readPixels(pixels, origSrcRect.x(), origSrcRect.y());
         if (!copied) {
             callback(context, nullptr);
             return;
@@ -68,7 +67,7 @@ void SkImage_Base::onAsyncRescaleAndReadPixels(const SkImageInfo& info,
     SkRescaleAndReadPixels(source, info, sourceRect, rescaleGamma, rescaleMode, callback, context);
 }
 
-bool SkImage_Base::onAsLegacyBitmap(GrDirectContext* dContext, SkBitmap* bitmap) const {
+bool SkImage_Base::onAsLegacyBitmap( SkBitmap* bitmap) const {
     // As the base-class, all we can do is make a copy (regardless of mode).
     // Subclasses that want to be more optimal should override.
     const SkImageInfo colorInfo = fInfo.makeColorType(kN32_SkColorType);
@@ -78,7 +77,7 @@ bool SkImage_Base::onAsLegacyBitmap(GrDirectContext* dContext, SkBitmap* bitmap)
     }
 
     if (!readPixels(
-                dContext, (*bitmap).info(), (*bitmap).getPixels(), (*bitmap).rowBytes(), 0, 0)) {
+                (*bitmap).info(), (*bitmap).getPixels(), (*bitmap).rowBytes(), 0, 0)) {
         (*bitmap).reset();
         return false;
     }
@@ -101,19 +100,6 @@ sk_sp<SkImage> SkImage_Base::makeSubset(SkRecorder* recorder,
 
     sk_sp<SkImage> image = onMakeSubset(recorder, subset, requiredProps);
     return image;
-}
-
-void SkImage_Base::onAsyncRescaleAndReadPixelsYUV420(SkYUVColorSpace,
-                                                     bool readAlpha,
-                                                     sk_sp<SkColorSpace> dstColorSpace,
-                                                     SkIRect srcRect,
-                                                     SkISize dstSize,
-                                                     RescaleGamma,
-                                                     RescaleMode,
-                                                     ReadPixelsCallback callback,
-                                                     ReadPixelsContext context) const {
-    // The CPU implementation does not supply this conversion.
-    callback(context, nullptr);
 }
 
 sk_sp<SkImage> SkImage_Base::makeColorSpace(SkRecorder* recorder,

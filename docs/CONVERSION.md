@@ -382,6 +382,20 @@ sharing one provider. Nineteen tests and seven rendering artifacts preserve
 reference results. See ../results/2026-10-26/DEFERRED_IMAGES.md. The public image
 facade remains work.
 
+## CPU image facade
+
+SkImage.cpp/.h now use explicit execution and CPU ownership/callback contracts.
+Unsupported texture/protected/YUV operations, context lookup and backend image
+kinds are removed. Existing public null-context reads remain compatible through
+null-only overloads; private pixel reads and their cache/device callers carry no
+backend argument. Shader and scaling overloads share named implementations.
+
+The expanded image test covers compile-time API exclusion, scaling identities,
+independent nearest-neighbor expectations, all normal/raw shader overloads and
+translated clamp/repeat sampling. Image, surface, raster and deferred ownership
+boundaries are converted; surrounding imported cache, device and sampling code
+still requires conversion. See ../results/2026-10-26/IMAGE_FACADE.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

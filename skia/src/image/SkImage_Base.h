@@ -18,14 +18,11 @@
 #include <cstddef>
 #include <cstdint>
 
-class GrDirectContext;
-class GrImageContext;
 class SkBitmap;
 class SkColorSpace;
 class SkPixmap;
 class SkRecorder;
 class SkSurface;
-enum SkYUVColorSpace : int;
 struct SkIRect;
 struct SkISize;
 struct SkImageInfo;
@@ -44,14 +41,13 @@ public:
                                   RequiredProperties) const override;
 
     sk_sp<SkImage> makeSubset(SkRecorder*, const SkIRect&, RequiredProperties) const override;
-    size_t textureSize() const override { return 0; }
 
     // Methods that we want to use elsewhere in Skia, but not be a part of the public API.
     virtual bool onPeekPixels(SkPixmap*) const { return false; }
 
     virtual const SkBitmap* onPeekBitmap() const { return nullptr; }
 
-    virtual bool onReadPixels(GrDirectContext*,
+    virtual bool onReadPixels(
                               const SkImageInfo& dstInfo,
                               void* dstPixels,
                               size_t dstRowBytes,
@@ -59,12 +55,7 @@ public:
                               int srcY,
                               CachingHint) const = 0;
 
-    virtual bool readPixelsGraphite(SkRecorder*, const SkPixmap& dst, int srcX, int srcY) const {
-        return false;
-    }
-
     virtual bool onHasMipmaps() const = 0;
-    virtual bool onIsProtected() const = 0;
 
     virtual SkMipmap* onPeekMips() const { return nullptr; }
 
@@ -83,93 +74,29 @@ public:
                                              RescaleMode,
                                              ReadPixelsCallback,
                                              ReadPixelsContext) const;
-    /**
-     * Unsupported CPU YUV conversion reports one null-result callback.
-     */
-    virtual void onAsyncRescaleAndReadPixelsYUV420(SkYUVColorSpace,
-                                                   bool readAlpha,
-                                                   sk_sp<SkColorSpace> dstColorSpace,
-                                                   SkIRect srcRect,
-                                                   SkISize dstSize,
-                                                   RescaleGamma,
-                                                   RescaleMode,
-                                                   ReadPixelsCallback,
-                                                   ReadPixelsContext) const;
-
-    virtual GrImageContext* context() const { return nullptr; }
-
-    /** this->context() try-casted to GrDirectContext. Useful for migrations – avoid otherwise! */
-    virtual GrDirectContext* directContext() const { return nullptr; }
-
-    // If this image is the current cached image snapshot of a surface then this is called when the
-    // surface is destroyed to indicate no further writes may happen to surface backing store.
-    virtual void generatingSurfaceIsDeleted() {}
-
     // return a read-only copy of the pixels. We promise to not modify them,
     // but only inspect them (or encode them).
-    virtual bool getROPixels(GrDirectContext*, SkBitmap*,
+    virtual bool getROPixels( SkBitmap*,
                              CachingHint = kAllow_CachingHint) const = 0;
 
     virtual sk_sp<SkImage> onMakeSubset(SkRecorder*, const SkIRect&, RequiredProperties) const = 0;
 
     virtual sk_sp<const SkData> onRefEncoded() const { return nullptr; }
 
-    virtual bool onAsLegacyBitmap(GrDirectContext*, SkBitmap*) const;
+    virtual bool onAsLegacyBitmap( SkBitmap*) const;
 
     // Create the CPU surface used by makeScaled.
     virtual sk_sp<SkSurface> onMakeSurface(SkRecorder*, const SkImageInfo&) const = 0;
 
-    enum class Type {
-        kRaster,
-        kRasterPinnable,
-        kLazy,
-        kLazyPicture,
-        kLazyTexture,
-        kGanesh,
-        kGaneshYUVA,
-        kGraphite,
-        kGraphiteYUVA,
-    };
-
+    enum class Type { kRaster, kLazy };
     virtual Type type() const = 0;
-
-    // Deferred generator-backed images; compatibility kinds remain for now.
     bool isLazyGenerated() const override {
-        const Type kind = type();
-        const bool lazy = kind == Type::kLazy || kind == Type::kLazyPicture ||
-                          kind == Type::kLazyTexture;
+        const bool lazy = type() == Type::kLazy;
         return lazy;
     }
-
     bool isRasterBacked() const {
-        const Type kind = type();
-        const bool raster = kind == Type::kRaster || kind == Type::kRasterPinnable;
+        const bool raster = type() == Type::kRaster;
         return raster;
-    }
-
-    // True for images instantiated by Ganesh in GPU memory
-    bool isGaneshBacked() const {
-        const Type kind = type();
-        const bool ganesh = kind == Type::kGanesh || kind == Type::kGaneshYUVA;
-        return ganesh;
-    }
-
-    // True for images instantiated by Graphite in GPU memory
-    bool isGraphiteBacked() const {
-        const Type kind = type();
-        const bool graphite = kind == Type::kGraphite || kind == Type::kGraphiteYUVA;
-        return graphite;
-    }
-
-    bool isYUVA() const {
-        const Type kind = type();
-        const bool yuva = kind == Type::kGaneshYUVA || kind == Type::kGraphiteYUVA;
-        return yuva;
-    }
-
-    bool isTextureBacked() const override {
-        const bool texture = isGaneshBacked() || isGraphiteBacked();
-        return texture;
     }
 
     // Call when this image is part of the key to a resourcecache entry. This allows the cache

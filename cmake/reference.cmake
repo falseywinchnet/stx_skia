@@ -294,3 +294,11 @@ list(APPEND stx_sources baseline/skia/src/core/SkImageGenerator.cpp
 
 list(APPEND stx_sources baseline/skia/src/core/SkYUVAInfo.cpp
     baseline/skia/src/core/SkYUVAPixmaps.cpp)
+
+foreach(unit IN ITEMS src/image/SkImage.cpp src/core/SkMipmapAccessor.cpp src/core/SkSpecialImage.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkBitmapCache.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkBitmapCache.cpp)

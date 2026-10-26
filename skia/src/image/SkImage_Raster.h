@@ -21,9 +21,9 @@
 #include <cstdint>
 #include <utility>
 
-class GrDirectContext;
 class SkColorSpace;
 class SkData;
+class SkPaint;
 class SkPixmap;
 class SkSurface;
 class SkImageShader;
@@ -58,12 +58,12 @@ public:
                                               RequiredProperties) const override;
 
     // From SkImage_Base.h
-    bool onReadPixels(GrDirectContext*, const SkImageInfo&, void*, size_t, int srcX, int srcY,
+    bool onReadPixels( const SkImageInfo&, void*, size_t, int srcX, int srcY,
                       CachingHint) const override;
     bool onPeekPixels(SkPixmap*) const override;
     const SkBitmap* onPeekBitmap() const override { return &fBitmap; }
 
-    bool getROPixels(GrDirectContext*, SkBitmap*, CachingHint) const override;
+    bool getROPixels( SkBitmap*, CachingHint) const override;
 
     sk_sp<SkImage> onMakeSubset(SkRecorder*, const SkIRect&, RequiredProperties) const override;
 
@@ -74,7 +74,7 @@ public:
         return pixels;
     }
 
-    bool onAsLegacyBitmap(GrDirectContext*, SkBitmap*) const override;
+    bool onAsLegacyBitmap( SkBitmap*) const override;
 
     sk_sp<SkImage> onReinterpretColorSpace(sk_sp<SkColorSpace>) const override;
 
@@ -91,7 +91,6 @@ public:
         const bool present = fMips != nullptr;
         return present;
     }
-    bool onIsProtected() const override { return false; }
 
     SkMipmap* onPeekMips() const override {
         SkMipmap* mips = fMips.get();
