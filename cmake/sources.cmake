@@ -253,10 +253,7 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkWriteBuffer.cpp
     skia/src/core/SkWritePixelsRec.cpp
     skia/src/core/SkWriter32.cpp
-    skia/src/core/SkYUVAInfo.cpp
-    skia/src/core/SkYUVAPixmaps.cpp
     skia/src/core/SkYUVMath.cpp
-    skia/src/core/SkYUVPlanesCache.cpp
     skia/src/effects/Sk1DPathEffect.cpp
     skia/src/effects/Sk2DPathEffect.cpp
     skia/src/effects/SkBlenders.cpp

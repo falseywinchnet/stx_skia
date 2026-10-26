@@ -367,6 +367,21 @@ tests and seven rendering artifacts retain reference results. Public SkImage and
 lazy-generator conversion remain separate work. See
 ../results/2026-10-26/RASTER_IMAGE_OWNERSHIP.md.
 
+## Deferred CPU generation
+
+SkImage_Lazy.cpp/.h and SkImageGenerator.cpp/.h now expose ownership and generator
+lock scopes directly. Validated requests reach the provider; complete generated
+pixels enter the bitmap cache only after its lock is released. Color-conversion
+cache identity and generator lifetimes retain their original behavior.
+
+Unused YUV-plane generation/cache/layout implementations, GPU listeners and the
+always-false GPU pixel proxy are reference-only. Three candidate compilation
+units are removed. The new deterministic test covers cache admission/hits,
+provider failure and retry, conversion lifetime and four concurrent readers
+sharing one provider. Nineteen tests and seven rendering artifacts preserve
+reference results. See ../results/2026-10-26/DEFERRED_IMAGES.md. The public image
+facade remains work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

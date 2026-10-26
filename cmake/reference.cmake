@@ -287,3 +287,10 @@ foreach(unit IN ITEMS SkImage_Base SkImage_Raster SkImage_Lazy)
 endforeach()
 
 list(APPEND stx_sources baseline/skia/src/core/SkCompressedDataUtils.cpp)
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkImageGenerator.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkImageGenerator.cpp
+    baseline/skia/src/core/SkYUVPlanesCache.cpp)
+
+list(APPEND stx_sources baseline/skia/src/core/SkYUVAInfo.cpp
+    baseline/skia/src/core/SkYUVAPixmaps.cpp)
