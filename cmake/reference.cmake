@@ -310,3 +310,6 @@ endforeach()
 
 list(REMOVE_ITEM stx_sources skia/src/core/SkMipmapHQDownSampler.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkMipmapHQDownSampler.cpp)
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkMipmapDrawDownSampler.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkMipmapDrawDownSampler.cpp)

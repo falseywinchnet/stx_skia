@@ -23,49 +23,63 @@
 
 namespace {
 
-struct DrawDownSampler : SkMipmapDownSampler {
-    SkPaint fPaint;
-
+class DrawDownSampler final : public SkMipmapDownSampler {
+public:
     DrawDownSampler() {
-        // For efficiency, we want to be in src mode when building levels
-        // to avoid any extra trying to "blend".
+        // Each level replaces its destination; prior destination pixels do not
+        // participate in blending. Drawing remains synchronous and CPU-only.
         fPaint.setBlendMode(SkBlendMode::kSrc);
     }
-
-    void buildLevel(const SkPixmap& dst, const SkPixmap& src) override;
+    void buildLevel(const SkPixmap& destination, const SkPixmap& source) override;
+private:
+    SkPaint fPaint{};
 };
 
-static SkSamplingOptions choose_options(const SkPixmap& dst, const SkPixmap& src) {
-    // if we're a perfect 2x2 downscale, just use bilerp
-    if (dst.width() * 2 == src.width() && dst.height() * 2 == src.height()) {
-        return SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone);
+SkSamplingOptions choose_options(const SkPixmap& destination, const SkPixmap& source) {
+    const bool exactHalf = destination.width() * 2 == source.width() &&
+                           destination.height() * 2 == source.height();
+    if (exactHalf) {
+        const SkSamplingOptions sampling(SkFilterMode::kLinear, SkMipmapMode::kNone);
+        return sampling;
     }
-    // general case -- might experiment with different cubic parameter values
-    const auto cubic = SkCubicResampler::CatmullRom();
-    return SkSamplingOptions(cubic);
+    const SkCubicResampler cubic = SkCubicResampler::CatmullRom();
+    const SkSamplingOptions sampling(cubic);
+    return sampling;
 }
 
-void DrawDownSampler::buildLevel(const SkPixmap& dst, const SkPixmap& src) {
-    const SkRasterClip rclip(dst.bounds());
-    const SkMatrix mx = SkMatrix::Scale(SkIntToScalar(dst.width())  / src.width(),
-                                        SkIntToScalar(dst.height()) / src.height());
-    const auto sampling = choose_options(dst, src);
+void DrawDownSampler::buildLevel(const SkPixmap& destination, const SkPixmap& source) {
+    // The caller supplies disjoint complete buffers and a valid halved shape.
+    // Reject an empty view before forming scale ratios. Failed bitmap wrapping
+    // leaves destination pixels unchanged; no pixel ownership is transferred.
+    if (source.width() <= 0 || source.height() <= 0 || source.addr() == nullptr ||
+        destination.width() <= 0 || destination.height() <= 0 || destination.addr() == nullptr) {
+        return;
+    }
+    SkBitmap bitmap{};
+    if (!bitmap.installPixels(source)) {
+        return;
+    }
+    const SkIRect bounds = destination.bounds();
+    const SkRasterClip clip(bounds);
+    const SkScalar scaleX = SkIntToScalar(destination.width()) / source.width();
+    const SkScalar scaleY = SkIntToScalar(destination.height()) / source.height();
+    const SkMatrix matrix = SkMatrix::Scale(scaleX, scaleY);
+    const SkSamplingOptions sampling = choose_options(destination, source);
+    const SkMatrix identity = SkMatrix::I();
 
-    SkDraw draw;
-    draw.fDst = dst;
-    draw.fCTM = &mx;
-    draw.fRC = &rclip;
-
-    SkBitmap bitmap;
-    bitmap.installPixels(src.info(), const_cast<void*>(src.addr()), src.rowBytes());
-
-    draw.drawBitmap(bitmap, SkMatrix::I(), nullptr, sampling, fPaint);
+    // Draw only borrows these views/state; every owner precedes it in scope.
+    skcpu::Draw draw{};
+    draw.fDst = destination;
+    draw.fCTM = &matrix;
+    draw.fRC = &clip;
+    draw.drawBitmap(bitmap, identity, nullptr, sampling, fPaint, nullptr);
 }
 
 } // namespace
 
-std::unique_ptr<SkMipmapDownSampler> SkMipmap::MakeDownSampler(const SkPixmap& root) {
-    return std::make_unique<DrawDownSampler>();
+std::unique_ptr<SkMipmapDownSampler> SkMipmap::MakeDownSampler(const SkPixmap&) {
+    std::unique_ptr<SkMipmapDownSampler> sampler = std::make_unique<DrawDownSampler>();
+    return sampler;
 }
 
 #endif

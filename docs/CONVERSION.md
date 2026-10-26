@@ -450,9 +450,24 @@ relocks balance references before cache removal.
 
 The new cache contract suite checks pinned duplicates, unpinned replacement,
 lookup into an occupied output, stale IDs, purge retention, local/global mipmap
-clients and actual discardable allocation loss. The general resource cache and
-optional drawing downsampler remain separate work. See
+clients and actual discardable allocation loss. The general resource cache remains separate work. See
 ../results/2026-10-26/BITMAP_CACHE.md.
+
+## Optional drawing mipmap implementation
+
+SkMipmapDrawDownSampler.cpp now uses named sampling selection, explicit draw
+state, synchronous borrowed buffers and owners preceding their views. Empty
+views are rejected before ratios; failed bitmap wrapping leaves output unchanged.
+Its exact-half bilinear and other-shape Catmull–Rom choices remain unchanged.
+The default HQ implementation remains selected in the production package.
+
+The optional upstream source had stale draw interfaces at the pinned revision.
+The candidate uses the current CPU draw type/signature; the reference includes
+its unchanged original through an interface-only adapter. A factory-selection
+fixture distinguishes this implementation from HQ, then 2,304 cases compare
+whole chains, padded output, constant preservation and unchanged source bytes.
+All nine rendering/mipmap artifacts match. See
+../results/2026-10-26/MIPMAP_DRAW.md.
 
 ## Still required
 
