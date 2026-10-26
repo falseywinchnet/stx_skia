@@ -438,6 +438,22 @@ kernels compile to common-width native/SSE2 code, with M4 timing evidence and
 limits recorded in ../results/2026-10-26/MIPMAP_KERNELS.md. The optional drawing
 mipmap implementation remains separate conversion work.
 
+## Bitmap and mipmap cache entries
+
+SkBitmapCache.cpp/.h now use explicit block owners, immutable record identity,
+mutable state under the record mutex and named local/global cache dispatch.
+Installation reserves an external pixel pin under the mutex, then releases that
+mutex before creating/publishing the bitmap. Replacing a bitmap that already pins
+the same entry can therefore run its release callback without recursively locking
+the record. Mipmap finder acquisition uses a scoped client owner so failed
+relocks balance references before cache removal.
+
+The new cache contract suite checks pinned duplicates, unpinned replacement,
+lookup into an occupied output, stale IDs, purge retention, local/global mipmap
+clients and actual discardable allocation loss. The general resource cache and
+optional drawing downsampler remain separate work. See
+../results/2026-10-26/BITMAP_CACHE.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
