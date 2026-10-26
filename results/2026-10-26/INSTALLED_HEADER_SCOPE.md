@@ -17,6 +17,13 @@ candidate and pinned-reference release suites each passed 49/49 tests; the
 candidate sanitizer runner reported `PASS`. Rendering artifacts matched in
 `tools/measure.py` (`PASS`).
 
+Every installed Skia header under `include/core`, `include/effects`,
+`include/utils`, `include/pathops`, `include/config`, and `include/private` was
+then compiled as its own C++20 translation unit against the fresh prefix:
+91 public and 45 private headers, zero compile failures. This checks include
+closure and parseability, not whether every declaration links or behaves as
+specified.
+
 This removes misleading installed declarations. It does not establish that
 every remaining public header has a complete implementation; that is part of
 the continuing production-header review.
