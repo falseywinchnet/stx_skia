@@ -78,3 +78,18 @@ any null handle an empty range. `core_bounds_contract` checks the invalid
 stream, its read, end/length results and duplicate. The candidate Release
 suite passed 50/50, the reference suite passed 49/49, the instrumented suite
 returned `PASS`, and the recorded rendering hashes remained identical.
+
+Filtered alpha extraction had two more boundary cases. The metadata pass
+aligned a filter-supplied width before checking whether it fit in signed
+`int`; a near-maximum width could overflow that alignment. The pixel pass
+could return failure after allocating a destination mask, while the previous
+cleanup owner was constructed only on success. The extraction path now owns
+every returned mask image before interpreting the filter result and checks
+the filtered width before alignment or bitmap setup. A candidate-only custom
+filter supplies oversized bounds in either pass; the existing failing filter
+also exercises the allocation-then-failure fallback through `extractAlpha`.
+The candidate Release suite passed 50/50, the reference suite passed 49/49,
+the instrumented suite returned `PASS`, and the recorded rendering hashes
+remained identical. The reference build shares this imported bitmap path, so
+its result is a compatibility comparison, not an unfixed control for this
+specific repair.

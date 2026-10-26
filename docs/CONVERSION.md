@@ -1039,6 +1039,8 @@ Base64 decoder, the public stream-copy helper and filtered alpha extraction.
 The repaired paths and deterministic checks are recorded in
 ../results/2026-10-26/CORE_BOUNDS_REVIEW.md. That scan covered selected core
 files and does not clear the remaining retained implementation.
+The same record includes a follow-up repair for oversized mask-filter bounds
+and allocation ownership on failed filtered-alpha extraction.
 
 AA clip scanline scratch now follows the active draw width, with checked size
 arithmetic and reusable ownership. The original private header is retained for

@@ -571,10 +571,16 @@ bool SkBitmap::extractAlpha(SkBitmap* dst, const SkPaint* paint,
     // compute our (larger?) dst bounds if we have a filter
     if (filter) {
         identity.reset();
-        if (!as_MFB(filter)->filterMask(&dstM, srcM, identity, nullptr)) {
+        const bool boundsReady = (*as_MFB(filter)).filterMask(&dstM, srcM, identity, nullptr);
+        SkAutoMaskFreeImage boundsPixels(dstM.image());
+        if (!boundsReady) {
             goto NO_FILTER_CASE;
         }
-        dstM.rowBytes() = SkAlign4(dstM.fBounds.width());
+        if (dstM.image() != nullptr || dstM.bounds().isEmpty() ||
+            dstM.bounds().width64() > std::numeric_limits<int>::max() - 3) {
+            return false;
+        }
+        dstM.rowBytes() = SkAlign4(dstM.bounds().width());
     } else {
     NO_FILTER_CASE:
         tmpBitmap.setInfo(SkImageInfo::MakeA8(this->width(), this->height()), srcM.fRowBytes);
@@ -599,10 +605,15 @@ bool SkBitmap::extractAlpha(SkBitmap* dst, const SkPaint* paint,
     SkAutoMaskFreeImage srcCleanup(srcM.image());
 
     GetBitmapAlpha(*this, srcM.image(), srcM.fRowBytes);
-    if (!as_MFB(filter)->filterMask(&dstM, srcM, identity, nullptr)) {
+    const bool filtered = (*as_MFB(filter)).filterMask(&dstM, srcM, identity, nullptr);
+    SkAutoMaskFreeImage dstCleanup(dstM.image());
+    if (!filtered) {
         goto NO_FILTER_CASE;
     }
-    SkAutoMaskFreeImage dstCleanup(dstM.image());
+    if (dstM.bounds().isEmpty() ||
+        dstM.bounds().width64() > std::numeric_limits<int>::max() - 3) {
+        return false;
+    }
 
     const size_t sourceSize = dstM.computeImageSize();
     if (dstM.image() == nullptr || sourceSize == 0) return false;

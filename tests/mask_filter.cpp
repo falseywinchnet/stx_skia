@@ -20,6 +20,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -86,6 +87,32 @@ private:
     int& fAttempts;
 };
 
+class OversizedFilter final : public SkMaskFilterBase {
+public:
+    explicit OversizedFilter(bool afterPixels) : fAfterPixels(afterPixels) {}
+    SkMask::Format getFormat() const override { return SkMask::kA8_Format; }
+    Type type() const override { return Type::kShader; }
+    Factory getFactory() const override { return nullptr; }
+    const char* getTypeName() const override { return "test-oversized-bounds"; }
+    bool filterMask(SkMaskBuilder* dst, const SkMask& src, const SkMatrix&,
+                    SkIPoint*) const override {
+        if (src.fImage == nullptr && fAfterPixels) {
+            *dst = SkMaskBuilder(nullptr, src.fBounds, src.fRowBytes, SkMask::kA8_Format);
+            return true;
+        }
+        uint8_t* pixels = nullptr;
+        if (src.fImage != nullptr) {
+            pixels = SkMaskBuilder::AllocImage(1);
+            pixels[0] = 0;
+        }
+        const SkIRect bounds = SkIRect::MakeLTRB(0, 0, std::numeric_limits<int>::max() - 1, 1);
+        *dst = SkMaskBuilder(pixels, bounds, 1, SkMask::kA8_Format);
+        return true;
+    }
+private:
+    bool fAfterPixels;
+};
+
 class PaddedAlphaFilter final : public SkMaskFilterBase {
 public:
     SkMask::Format getFormat() const override { return SkMask::kA8_Format; }
@@ -137,6 +164,21 @@ bool padded_alpha_extent() {
     return true;
 }
 
+bool oversized_filter_bounds() {
+    SkBitmap source;
+    if (!source.tryAllocPixels(SkImageInfo::MakeA8(1, 1))) return false;
+    *source.getAddr8(0, 0) = 42;
+    for (const bool afterPixels : {false, true}) {
+        SkPaint paint;
+        paint.setMaskFilter(sk_sp<SkMaskFilter>(new OversizedFilter(afterPixels)));
+        SkBitmap output;
+        if (source.extractAlpha(&output, &paint, nullptr, nullptr) || !output.isNull()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool failed_filter_cleanup() {
     int attempts = 0;
     std::array<uint8_t, 32 * 32> pixels{};
@@ -151,8 +193,14 @@ bool failed_filter_cleanup() {
     triangle.close();
     SkCanvas& canvas = *(*surface).getCanvas();
     canvas.drawPath(triangle.detach(), paint);
-    const bool exercised = attempts == 1;
-    return exercised;
+    if (attempts != 1) return false;
+
+    SkBitmap source;
+    if (!source.tryAllocPixels(SkImageInfo::MakeA8(2, 2))) return false;
+    source.eraseColor(SK_ColorWHITE);
+    SkBitmap extracted;
+    if (!source.extractAlpha(&extracted, &paint, nullptr, nullptr)) return false;
+    return attempts == 2 && extracted.width() == 2 && extracted.height() == 2;
 }
 #endif
 
@@ -394,6 +442,7 @@ int main(int argc, char** argv) {
 #ifndef STX_SKIA_REFERENCE
     if (!failed_filter_cleanup()) return 6;
     if (!padded_alpha_extent()) return 7;
+    if (!oversized_filter_bounds()) return 8;
     for (const int width : {32766, 32767, 32768, 50000}) {
         if (!patch_pixels(width, false) || !patch_pixels(width, true)) return 4;
     }
