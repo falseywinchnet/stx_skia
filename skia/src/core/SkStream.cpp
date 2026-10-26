@@ -637,9 +637,11 @@ void SkDynamicMemoryWStream::prependToAndReset(SkDynamicMemoryWStream* dst) {
 
 
 bool SkDynamicMemoryWStream::read(void* buffer, size_t offset, size_t count) {
-    if (offset + count > this->bytesWritten()) {
+    const size_t length = this->bytesWritten();
+    if (offset > length || count > length - offset) {
         return false; // test does not partially modify
     }
+    if (count == 0) return true;
     Block* block = fHead;
     while (block != nullptr) {
         size_t size = block->written();
@@ -803,10 +805,9 @@ public:
         , fSize(size) , fOffset(0), fCurrentOffset(0) { }
 
     size_t read(void* buffer, size_t rawCount) override {
-        size_t count = rawCount;
-        if (fOffset + count > fSize) {
-            count = fSize - fOffset;
-        }
+        const size_t remaining = fSize - fOffset;
+        const size_t count = std::min(rawCount, remaining);
+        if (count == 0) return 0;
         size_t bytesLeftToRead = count;
         while (fCurrent != nullptr) {
             size_t bytesLeftInCurrent = fCurrent->written() - fCurrentOffset;
@@ -869,6 +870,7 @@ public:
     }
 
     bool seek(size_t position) override {
+        position = std::min(position, fSize);
         // If possible, skip forward.
         if (position >= fOffset) {
             size_t skipAmount = position - fOffset;
@@ -886,7 +888,24 @@ public:
     }
 
     bool move(long offset) override {
-        return seek(fOffset + offset);
+        if (offset < 0) {
+            if (offset == std::numeric_limits<long>::min()) {
+                return seek(0);
+            }
+            const size_t backward = static_cast<size_t>(-offset);
+            if (backward >= fOffset) {
+                return seek(0);
+            }
+            const size_t destination = fOffset - backward;
+            return seek(destination);
+        }
+        const size_t forward = static_cast<size_t>(offset);
+        const size_t remaining = fSize - fOffset;
+        if (forward >= remaining) {
+            return seek(fSize);
+        }
+        const size_t destination = fOffset + forward;
+        return seek(destination);
     }
 
     SkBlockMemoryStream* onFork() const override {

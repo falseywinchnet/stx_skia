@@ -49,3 +49,16 @@ checks those cases for candidate and reference builds.
 An empty `SkMemoryStream` now returns zero from `read` before forming an
 address from its null byte pointer, and `getAtPos` returns null directly.
 `data_contract` checks the empty-stream result and unchanged output byte.
+
+The block-backed stream returned by `SkDynamicMemoryWStream::detachAsStream`
+had the same signed/unsigned move error. It now clamps backward and forward
+moves within the stream, including the minimum `long` offset. Its read count
+is limited by subtraction from the remaining length, so a huge request cannot
+wrap `position + count`; a zero-byte read returns immediately. Absolute seeks
+past the end clamp to the end as the public stream contract specifies.
+`SkDynamicMemoryWStream::read` now validates `offset` and `count` separately
+against its written length before copying, preserving the documented
+no-partial-write failure result. Candidate-only `data_contract` cases check
+these boundaries. The M4 candidate Release suite passed 50/50 tests, the
+candidate sanitizer runner returned `PASS`, and ten candidate/reference render
+and serialization artifacts matched byte for byte.

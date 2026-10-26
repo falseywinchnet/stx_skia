@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <memory>
 
 namespace {
 #ifndef STX_SKIA_REFERENCE
@@ -135,10 +136,53 @@ bool memory_stream_move() {
     if (!stream.move(1) || stream.getPosition() != bytes.size()) return false;
     return true;
 }
+
+#ifndef STX_SKIA_REFERENCE
+bool block_stream_bounds() {
+    const std::array<std::uint8_t, 7> bytes = {3, 5, 7, 11, 13, 17, 19};
+    SkDynamicMemoryWStream writer;
+    if (!writer.write(bytes.data(), bytes.size())) return false;
+
+    std::array<std::uint8_t, 7> untouched{};
+    untouched.fill(0xa5);
+    if (writer.read(untouched.data(), 1, std::numeric_limits<std::size_t>::max())) {
+        return false;
+    }
+    for (std::uint8_t value : untouched) {
+        if (value != 0xa5) return false;
+    }
+
+    std::unique_ptr<SkStreamAsset> reader = writer.detachAsStream();
+    if (!reader || writer.bytesWritten() != 0) return false;
+    std::array<std::uint8_t, 7> output{};
+    if ((*reader).read(output.data(), std::numeric_limits<std::size_t>::max()) != bytes.size()) {
+        return false;
+    }
+    if (output != bytes || (*reader).getPosition() != bytes.size()) return false;
+    if ((*reader).read(output.data(), 1) != 0 || (*reader).read(output.data(), 0) != 0) {
+        return false;
+    }
+    if (!(*reader).move(-2) || (*reader).getPosition() != bytes.size() - 2) return false;
+    if (!(*reader).move(-std::numeric_limits<long>::max()) || (*reader).getPosition() != 0) {
+        return false;
+    }
+    if (!(*reader).move(std::numeric_limits<long>::min()) || (*reader).getPosition() != 0) {
+        return false;
+    }
+    if (!(*reader).move(std::numeric_limits<long>::max()) ||
+        (*reader).getPosition() != bytes.size()) return false;
+    if (!(*reader).seek(std::numeric_limits<std::size_t>::max()) ||
+        (*reader).getPosition() != bytes.size()) return false;
+    return true;
+}
+#endif
 }
 
 int main() {
     if (!subsets() || !ownership_and_streams() || !memory_stream_move()) return 1;
+#ifndef STX_SKIA_REFERENCE
+    if (!block_stream_bounds()) return 1;
+#endif
     std::puts("data subsets, ranges, ownership and streams: PASS");
     return 0;
 }
