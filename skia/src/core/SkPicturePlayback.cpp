@@ -679,51 +679,19 @@ void SkPicturePlayback::handleOp(SkReadBuffer* reader,
             SkCanvasPriv::SaveBehind(canvas, subset);
         } break;
         case SAVE_LAYER_SAVELAYERREC: {
-            SkCanvas::SaveLayerRec rec(nullptr, nullptr, nullptr, 0);
-            const uint32_t flatFlags = reader->readInt();
-            SkRect bounds;
-            skia_private::AutoSTArray<2, sk_sp<SkImageFilter>> filters;
-            if (flatFlags & SAVELAYERREC_HAS_BOUNDS) {
-                reader->readRect(&bounds);
+            SkRect bounds{};
+            SkCanvas::SaveLayerRec rec;
+            const uint32_t flags = (*reader).readInt();
+            constexpr uint32_t supported = SAVELAYERREC_HAS_BOUNDS | SAVELAYERREC_HAS_PAINT |
+                                           SAVELAYERREC_HAS_FLAGS;
+            (*reader).validate((flags & ~supported) == 0);
+            BREAK_ON_READ_ERROR(reader);
+            if (flags & SAVELAYERREC_HAS_BOUNDS) {
+                (*reader).readRect(&bounds);
                 rec.fBounds = &bounds;
             }
-            if (flatFlags & SAVELAYERREC_HAS_PAINT) {
-                rec.fPaint = &fPictureData->requiredPaint(reader);
-            }
-            if (flatFlags & SAVELAYERREC_HAS_BACKDROP) {
-                const SkPaint& paint = fPictureData->requiredPaint(reader);
-                rec.fBackdrop = paint.getImageFilter();
-            }
-            if (flatFlags & SAVELAYERREC_HAS_FLAGS) {
-                rec.fSaveLayerFlags = reader->readInt();
-            }
-            if (flatFlags & SAVELAYERREC_HAS_CLIPMASK_OBSOLETE) {
-                (void)fPictureData->getImage(reader);
-            }
-            if (flatFlags & SAVELAYERREC_HAS_CLIPMATRIX_OBSOLETE) {
-                SkMatrix clipMatrix_ignored;
-                reader->readMatrix(&clipMatrix_ignored);
-            }
-            if (!reader->isVersionLT(SkPicturePriv::Version::kBackdropScaleFactor) &&
-                (flatFlags & SAVELAYERREC_HAS_BACKDROP_SCALE)) {
-                SkCanvasPriv::SetBackdropScaleFactor(&rec, reader->readScalar());
-            }
-            if (!reader->isVersionLT(SkPicturePriv::Version::kMultipleFiltersOnSaveLayer) &&
-                (flatFlags & SAVELAYERREC_HAS_MULTIPLE_FILTERS)) {
-                int filterCount = reader->readUInt();
-                reader->validate(filterCount > 0 && filterCount <= SkCanvas::kMaxFiltersPerLayer);
-                BREAK_ON_READ_ERROR(reader);
-                filters.reset(filterCount);
-                for (int i = 0; i < filterCount; ++i) {
-                    const SkPaint& paint = fPictureData->requiredPaint(reader);
-                    filters[i] = paint.refImageFilter();
-                }
-                rec.fFilters = filters;
-            }
-            if (!reader->isVersionLT(SkPicturePriv::Version::kSaveLayerBackdropTileMode) &&
-                (flatFlags & SAVELAYERREC_HAS_BACKDROP_TILEMODE)) {
-                rec.fBackdropTileMode = reader->read32LE(SkTileMode::kLastTileMode);
-            }
+            if (flags & SAVELAYERREC_HAS_PAINT) rec.fPaint = &(*fPictureData).requiredPaint(reader);
+            if (flags & SAVELAYERREC_HAS_FLAGS) rec.fSaveLayerFlags = (*reader).readInt();
             BREAK_ON_READ_ERROR(reader);
 
             canvas->saveLayer(rec);

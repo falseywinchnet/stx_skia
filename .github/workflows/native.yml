@@ -19,6 +19,7 @@ jobs:
         run: |
           sh tools/build_native.sh baseline
           sh tools/build_native.sh candidate
+          cmake -E compare_files build/baseline/layers.raw build/candidate/layers.raw
           cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
           cmake -E compare_files build/baseline/conversions.raw build/candidate/conversions.raw
           cmake -E compare_files build/baseline/pixmap.raw build/candidate/pixmap.raw
@@ -43,6 +44,7 @@ jobs:
         run: |
           sh tools/build_native.sh baseline
           sh tools/build_native.sh candidate
+          cmake -E compare_files build/baseline/layers.raw build/candidate/layers.raw
           cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
           cmake -E compare_files build/baseline/conversions.raw build/candidate/conversions.raw
           cmake -E compare_files build/baseline/pixmap.raw build/candidate/pixmap.raw

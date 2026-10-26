@@ -98,16 +98,7 @@ template <> void Draw::draw(const NoOp&) {}
 #define DRAW(T, call) template <> void Draw::draw(const T& r) { fCanvas->call; }
 DRAW(Restore, restore())
 DRAW(Save, save())
-DRAW(SaveLayer,
-     saveLayer(SkCanvasPriv::ScaledBackdropLayer(
-               r.bounds,
-               r.paint,
-               r.backdrop.get(),
-               r.backdropScale,
-               r.backdropTileMode,
-               r.saveLayerFlags,
-               SkCanvas::FilterSpan{const_cast<sk_sp<SkImageFilter>*>(r.filters.data()),
-                                    r.filters.size()})))
+DRAW(SaveLayer, saveLayer(SkCanvas::SaveLayerRec(r.bounds, r.paint, r.saveLayerFlags)))
 
 template <> void Draw::draw(const SaveBehind& r) {
     SkCanvasPriv::SaveBehind(fCanvas, r.subset);
@@ -297,7 +288,7 @@ private:
         this->pushSaveBlock(nullptr, /*hasBackdropFilter=*/false);
     }
     void trackBounds(const SaveLayer& op) {
-        this->pushSaveBlock(op.paint, /*hasBackdropFilter=*/op.backdrop != nullptr);
+        this->pushSaveBlock(op.paint, /*hasBackdropFilter=*/false);
     }
     void trackBounds(const SaveBehind&) {
         this->pushSaveBlock(nullptr, /*hasBackdropFilter=*/false);

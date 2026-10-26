@@ -46,7 +46,7 @@
 #define SK_SUPPORT_LEGACY_GETTOTALMATRIX
 #endif
 
-class AutoLayerForImageFilter;
+struct PreparedDraw;
 class GrRecordingContext;
 
 class SkBitmap;
@@ -690,160 +690,20 @@ public:
     };
 
     using SaveLayerFlags = uint32_t;
-    using FilterSpan = SkSpan<sk_sp<SkImageFilter>>;
-    static constexpr int kMaxFiltersPerLayer = 16;
-
-    /** \struct SkCanvas::SaveLayerRec
-        SaveLayerRec contains the state used to create the layer.
-    */
+    // Bounds and paint borrow caller state for saveLayer(). Pixel storage belongs
+    // to the canvas layer. Image and backdrop filtering are outside this API.
     struct SaveLayerRec {
-        /** Sets fBounds, fPaint, and fBackdrop to nullptr. Clears fSaveLayerFlags.
-
-            @return  empty SaveLayerRec
-        */
         SaveLayerRec() {}
+        SaveLayerRec(const SkRect* bounds, const SkPaint* paint, SaveLayerFlags flags = 0)
+            : fBounds(bounds), fPaint(paint), fSaveLayerFlags(flags) {}
+        SaveLayerRec(const SkRect* bounds, const SkPaint* paint,
+                     const SkColorSpace* colorSpace, SaveLayerFlags flags)
+            : fBounds(bounds), fPaint(paint), fColorSpace(colorSpace), fSaveLayerFlags(flags) {}
 
-        /** Sets fBounds, fPaint, and fSaveLayerFlags; sets fBackdrop to nullptr.
-
-            @param bounds          layer dimensions; may be nullptr
-            @param paint           applied to layer when overlaying prior layer; may be nullptr
-            @param saveLayerFlags  SaveLayerRec options to modify layer
-            @return                SaveLayerRec with empty fBackdrop
-        */
-        SaveLayerRec(const SkRect* bounds, const SkPaint* paint, SaveLayerFlags saveLayerFlags = 0)
-            : SaveLayerRec(bounds, paint, nullptr, nullptr, 1.f, SkTileMode::kClamp,
-                           saveLayerFlags, /*filters=*/{}) {}
-
-        /** Sets fBounds, fPaint, fBackdrop, and fSaveLayerFlags.
-
-            @param bounds          layer dimensions; may be nullptr
-            @param paint           applied to layer when overlaying prior layer;
-                                   may be nullptr
-            @param backdrop        If not null, this causes the current layer to be filtered by
-                                   backdrop, and then drawn into the new layer
-                                   (respecting the current clip).
-                                   If null, the new layer is initialized with transparent-black.
-            @param saveLayerFlags  SaveLayerRec options to modify layer
-            @return                SaveLayerRec fully specified
-        */
-        SaveLayerRec(const SkRect* bounds, const SkPaint* paint, const SkImageFilter* backdrop,
-                     SaveLayerFlags saveLayerFlags)
-            : SaveLayerRec(bounds, paint, backdrop, nullptr, 1.f, SkTileMode::kClamp,
-                           saveLayerFlags, /*filters=*/{}) {}
-
-        /** Sets fBounds, fBackdrop, fColorSpace, and fSaveLayerFlags.
-
-            @param bounds          layer dimensions; may be nullptr
-            @param paint           applied to layer when overlaying prior layer;
-                                   may be nullptr
-            @param backdrop        If not null, this causes the current layer to be filtered by
-                                   backdrop, and then drawn into the new layer
-                                   (respecting the current clip).
-                                   If null, the new layer is initialized with transparent-black.
-            @param colorSpace      If not null, when the layer is restored, a color space
-                                   conversion will be applied from this color space to the
-                                   parent's color space. The restore paint and backdrop filters will
-                                   be applied in this color space.
-                                   If null, the new layer will inherit the color space from its
-                                   parent.
-            @param saveLayerFlags  SaveLayerRec options to modify layer
-            @return                SaveLayerRec fully specified
-        */
-        SaveLayerRec(const SkRect* bounds, const SkPaint* paint, const SkImageFilter* backdrop,
-                     const SkColorSpace* colorSpace, SaveLayerFlags saveLayerFlags)
-            : SaveLayerRec(bounds, paint, backdrop, colorSpace, 1.f, SkTileMode::kClamp,
-                           saveLayerFlags, /*filters=*/{}) {}
-
-
-        /** Sets fBounds, fBackdrop, fBackdropTileMode, fColorSpace, and fSaveLayerFlags.
-
-            @param bounds           layer dimensions; may be nullptr
-            @param paint            applied to layer when overlaying prior layer;
-                                    may be nullptr
-            @param backdrop         If not null, this causes the current layer to be filtered by
-                                    backdrop, and then drawn into the new layer
-                                    (respecting the current clip).
-                                    If null, the new layer is initialized with transparent-black.
-            @param backdropTileMode If the 'backdrop' is not null, or 'saveLayerFlags' has
-                                    kInitWithPrevious set, this tile mode is used when the new layer
-                                    would read outside the backdrop image's available content.
-            @param colorSpace       If not null, when the layer is restored, a color space
-                                    conversion will be applied from this color space to the parent's
-                                    color space. The restore paint and backdrop filters will be
-                                    applied in this color space.
-                                    If null, the new layer will inherit the color space from its
-                                    parent.
-            @param saveLayerFlags   SaveLayerRec options to modify layer
-            @return                 SaveLayerRec fully specified
-        */
-        SaveLayerRec(const SkRect* bounds, const SkPaint* paint, const SkImageFilter* backdrop,
-                     SkTileMode backdropTileMode, const SkColorSpace* colorSpace,
-                     SaveLayerFlags saveLayerFlags)
-            : SaveLayerRec(bounds, paint, backdrop, colorSpace, 1.f, backdropTileMode,
-                           saveLayerFlags, /*filters=*/{}) {}
-
-        /** hints at layer size limit */
         const SkRect* fBounds = nullptr;
-
-        /** modifies overlay */
         const SkPaint* fPaint = nullptr;
-
-        FilterSpan fFilters = {};
-
-        /**
-         *  If not null, this triggers the same initialization behavior as setting
-         *  kInitWithPrevious_SaveLayerFlag on fSaveLayerFlags: the current layer is copied into
-         *  the new layer, rather than initializing the new layer with transparent-black.
-         *  This is then filtered by fBackdrop (respecting the current clip).
-         */
-        const SkImageFilter* fBackdrop = nullptr;
-
-        /**
-         * If the layer is initialized with prior content (and/or with a backdrop filter) and this
-         * would require sampling outside of the available backdrop, this is the tilemode applied
-         * to the boundary of the prior layer's image.
-         */
-        SkTileMode fBackdropTileMode = SkTileMode::kClamp;
-
-        /**
-         * If not null, this triggers a color space conversion when the layer is restored. It
-         * will be as if the layer's contents are drawn in this color space. Filters from
-         * fBackdrop and fPaint will be applied in this color space.
-         */
         const SkColorSpace* fColorSpace = nullptr;
-
-        /** preserves LCD text, creates with prior layer contents */
         SaveLayerFlags fSaveLayerFlags = 0;
-
-    private:
-        friend class SkCanvas;
-        friend class SkCanvasPriv;
-
-        SaveLayerRec(const SkRect* bounds,
-                     const SkPaint* paint,
-                     const SkImageFilter* backdrop,
-                     const SkColorSpace* colorSpace,
-                     SkScalar backdropScale,
-                     SkTileMode backdropTileMode,
-                     SaveLayerFlags saveLayerFlags,
-                     FilterSpan filters)
-                : fBounds(bounds)
-                , fPaint(paint)
-                , fFilters(filters)
-                , fBackdrop(backdrop)
-                , fBackdropTileMode(backdropTileMode)
-                , fColorSpace(colorSpace)
-                , fSaveLayerFlags(saveLayerFlags)
-                , fExperimentalBackdropScale(backdropScale) {
-            // We only allow the paint's image filter or the side-car list of filters -- not both.
-            SkASSERT(fFilters.empty() || !paint || !paint->getImageFilter());
-            // To keep things reasonable (during deserialization), we limit filter list size.
-            SkASSERT(fFilters.size() <= kMaxFiltersPerLayer);
-        }
-
-        // Relative scale factor that the image content used to initialize the layer when the
-        // kInitFromPrevious flag or a backdrop filter is used.
-        SkScalar             fExperimentalBackdropScale = 1.f;
     };
 
     /** Saves SkMatrix and clip, and allocates SkSurface for subsequent drawing.
@@ -2415,7 +2275,6 @@ private:
         kOpaqueShaderOverride    = 1, // The paint's shader is overridden with an opaque image
         kNonOpaqueShaderOverride = 2, // The paint's shader is overridden but is not opaque
         kCheckForOverwrite       = 4, // Check if the draw would overwrite the entire surface
-        kSkipMaskFilterAutoLayer = 8, // Do not apply mask filters in the AutoLayer
     };
     SK_DECL_BITMASK_OPS_FRIENDS(PredrawFlags)
 
@@ -2426,11 +2285,11 @@ private:
     [[nodiscard]] bool predrawNotify(const SkRect*, const SkPaint*, SkEnumBitMask<PredrawFlags>);
 
     // call the appropriate predrawNotify and create a layer if needed.
-    std::optional<AutoLayerForImageFilter> aboutToDraw(
+    std::optional<PreparedDraw> aboutToDraw(
             const SkPaint& paint,
             const SkRect* rawBounds,
             SkEnumBitMask<PredrawFlags> flags);
-    std::optional<AutoLayerForImageFilter> aboutToDraw(
+    std::optional<PreparedDraw> aboutToDraw(
             const SkPaint& paint,
             const SkRect* rawBounds = nullptr);
 
@@ -2449,21 +2308,10 @@ private:
     // clip, and matrix commands. There is a layer per call to saveLayer() using the
     // kFullLayer_SaveLayerStrategy.
     struct Layer {
-        sk_sp<SkDevice>                                fDevice;
-        skia_private::STArray<1, sk_sp<SkImageFilter>> fImageFilters;
-        SkPaint                                        fPaint;
-        bool                                           fIsCoverage;
-        bool                                           fDiscard;
-
-        // If true, the layer image is sized to include a 1px buffer that remains transparent
-        // to allow for faster linear filtering under complex transforms.
-        bool                                           fIncludesPadding;
-
-        Layer(sk_sp<SkDevice> device,
-              FilterSpan imageFilters,
-              const SkPaint& paint,
-              bool isCoverage,
-              bool includesPadding);
+        sk_sp<SkDevice> fDevice;
+        SkPaint fPaint;
+        bool fDiscard = false;
+        Layer(sk_sp<SkDevice> device, const SkPaint& paint);
     };
 
     // Encapsulate state needed to restore from saveBehind()
@@ -2498,11 +2346,7 @@ private:
         MCRec(const MCRec* prev);
         ~MCRec();
 
-        void newLayer(sk_sp<SkDevice> layerDevice,
-                      FilterSpan filters,
-                      const SkPaint& restorePaint,
-                      bool layerIsCoverage,
-                      bool includesPadding);
+        void newLayer(sk_sp<SkDevice> layerDevice, const SkPaint& restorePaint);
 
         void reset(SkDevice* device);
     };
@@ -2548,7 +2392,6 @@ private:
 
     friend class SkAndroidFrameworkUtils;
     friend class SkCanvasPriv;      // needs to expose android functions for testing outside android
-    friend class AutoLayerForImageFilter;
     friend class SkSurface_Raster;  // needs getDevice()
     friend class SkNoDrawCanvas;    // needs resetForNextPicture()
     friend class SkNWayCanvas;
@@ -2617,7 +2460,7 @@ private:
                              const SkMatrix* matrix = nullptr);
 
     void internalDrawPaint(const SkPaint& paint);
-    void internalSaveLayer(const SaveLayerRec&, SaveLayerStrategy, bool coverageOnly=false);
+    void internalSaveLayer(const SaveLayerRec&, SaveLayerStrategy);
     void internalSaveBehind(const SkRect*);
 
     void internalConcat44(const SkM44&);
@@ -2625,39 +2468,6 @@ private:
     // shared by save() and saveLayer()
     void internalSave();
     void internalRestore();
-
-    enum class DeviceCompatibleWithFilter : int {
-        // Check the src device's local-to-device matrix for compatibility with the filter, and if
-        // it is not compatible, introduce an intermediate image and transformation that allows the
-        // filter to be evaluated on the modified src content.
-        kUnknown,
-        // Assume that the src device's local-to-device matrix is compatible with the filter.
-        kYes,
-        // Assume that the src device's local-to-device matrix is compatible with the filter,
-        // *and* the source image has a 1px buffer of padding.
-        kYesWithPadding
-    };
-    /**
-     * Filters the contents of 'src' and draws the result into 'dst'. The filter is evaluated
-     * relative to the current canvas matrix, and src is drawn to dst using their relative transform
-     * 'paint' is applied after the filter and must not have a mask or image filter of its own.
-     * A null 'filter' behaves as if the identity filter were used.
-     *
-     * 'scaleFactor' is an extra uniform scale transform applied to downscale the 'src' image
-     * before any filtering, or as part of the copy, and is then drawn with 1/scaleFactor to 'dst'.
-     * Must be 1.0 if 'compat' is kYes (i.e. any scale factor has already been baked into the
-     * relative transforms between the devices).
-     *
-     * 'srcTileMode' is the tile mode to apply to the boundary of the 'src' image when insufficient
-     * content is available. It defaults to kDecal for the regular saveLayer() case.
-     */
-    void internalDrawDeviceWithFilter(SkDevice* src, SkDevice* dst,
-                                      FilterSpan filters, const SkPaint& paint,
-                                      DeviceCompatibleWithFilter compat,
-                                      const SkColorInfo& filterColorInfo,
-                                      SkScalar scaleFactor = 1.f,
-                                      SkTileMode srcTileMode = SkTileMode::kDecal,
-                                      bool srcIsCoverageLayer = false);
 
     /*
      *  Returns true if drawing the specified rect (or all if it is null) with the specified
@@ -2696,7 +2506,7 @@ private:
 
     // Attempt to draw a rrect with an analytic blur. If the draw succeeds or predrawNotify fails,
     // nullopt is returned indicating that nothing further should be drawn.
-    std::optional<AutoLayerForImageFilter> attemptBlurredRRectDraw(const SkRRect&,
+    std::optional<PreparedDraw> attemptBlurredRRectDraw(const SkRRect&,
                                                                    const SkBlurMaskFilterImpl*,
                                                                    const SkPaint&,
                                                                    SkEnumBitMask<PredrawFlags>);

@@ -213,6 +213,20 @@ removal, and removal of Skia's text/font internals, remain explicit next work.
 SkCanvas and SkCanvasPriv receive narrow dependency edits, not full house-style
 conversion. See IMAGE_FILTER_PRUNING.md for the exact scope.
 
+## CPU layer reduction
+
+SaveLayerRec and Layer storage no longer contain backdrop/filter graph state.
+SkCanvas's layer setup, initialization, restore and image draw path no longer
+evaluate image filters. PreparedDraw captures paint without automatic offscreen
+filter layers. Nested opacity, affine clipping, color-matrix restores, F16 and
+initialization from previous pixels are covered by 256 new differential scenes.
+The established 0.001-pixel layer-bound rounding tolerance is preserved.
+
+This converts the rewritten layer path, not the entire canvas or recording
+implementation. SkPaint's remaining image-filter interface is explicitly rejected
+by the reduced canvas pending removal. Device/image filtering interfaces,
+SkImageFilter cache/types and SkSL remain removal work. See CPU_LAYERS.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

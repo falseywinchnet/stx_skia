@@ -107,74 +107,17 @@ bool SkPictureRecord::onDoSaveBehind(const SkRect* subset) {
 }
 
 void SkPictureRecord::recordSaveLayer(const SaveLayerRec& rec) {
-    // op + flatflags
     size_t size = 2 * kUInt32Size;
-    uint32_t flatFlags = 0;
-    uint32_t filterCount = SkToU32(rec.fFilters.size());
-
-    if (rec.fBounds) {
-        flatFlags |= SAVELAYERREC_HAS_BOUNDS;
-        size += sizeof(*rec.fBounds);
-    }
-    if (rec.fPaint) {
-        flatFlags |= SAVELAYERREC_HAS_PAINT;
-        size += sizeof(uint32_t); // index
-    }
-    if (rec.fBackdrop) {
-        flatFlags |= SAVELAYERREC_HAS_BACKDROP;
-        size += sizeof(uint32_t); // (paint) index
-    }
-    if (rec.fSaveLayerFlags) {
-        flatFlags |= SAVELAYERREC_HAS_FLAGS;
-        size += sizeof(uint32_t);
-    }
-    if (SkCanvasPriv::GetBackdropScaleFactor(rec) != 1.f) {
-        flatFlags |= SAVELAYERREC_HAS_BACKDROP_SCALE;
-        size += sizeof(SkScalar);
-    }
-    if (filterCount) {
-        flatFlags |= SAVELAYERREC_HAS_MULTIPLE_FILTERS;
-        size += sizeof(uint32_t);  // count
-        size += sizeof(uint32_t) * filterCount;  // N (paint) indices
-    }
-    if (rec.fBackdropTileMode != SkTileMode::kClamp) {
-        flatFlags |= SAVELAYERREC_HAS_BACKDROP_TILEMODE;
-        size += sizeof(uint32_t); // SkTileMode
-    }
-
-    const size_t initialOffset = this->addDraw(SAVE_LAYER_SAVELAYERREC, &size);
-    this->addInt(flatFlags);
-    if (flatFlags & SAVELAYERREC_HAS_BOUNDS) {
-        this->addRect(*rec.fBounds);
-    }
-    if (flatFlags & SAVELAYERREC_HAS_PAINT) {
-        this->addPaintPtr(rec.fPaint);
-    }
-    if (flatFlags & SAVELAYERREC_HAS_BACKDROP) {
-        // overkill, but we didn't already track single flattenables, so using a paint for that
-        SkPaint paint;
-        paint.setImageFilter(sk_ref_sp(const_cast<SkImageFilter*>(rec.fBackdrop)));
-        this->addPaint(paint);
-    }
-    if (flatFlags & SAVELAYERREC_HAS_FLAGS) {
-        this->addInt(rec.fSaveLayerFlags);
-    }
-    if (flatFlags & SAVELAYERREC_HAS_BACKDROP_SCALE) {
-        this->addScalar(SkCanvasPriv::GetBackdropScaleFactor(rec));
-    }
-    if (flatFlags & SAVELAYERREC_HAS_MULTIPLE_FILTERS) {
-        this->addInt(filterCount);
-        for (uint32_t i = 0; i < filterCount; ++i) {
-            // overkill to store a paint, oh well.
-            SkPaint paint;
-            paint.setImageFilter(rec.fFilters[i]);
-            this->addPaint(paint);
-        }
-    }
-    if (rec.fBackdropTileMode != SkTileMode::kClamp) {
-        this->addInt((int) rec.fBackdropTileMode);
-    }
-    this->validate(initialOffset, size);
+    uint32_t flags = 0;
+    if (rec.fBounds != nullptr) { flags |= SAVELAYERREC_HAS_BOUNDS; size += sizeof(SkRect); }
+    if (rec.fPaint != nullptr) { flags |= SAVELAYERREC_HAS_PAINT; size += sizeof(uint32_t); }
+    if (rec.fSaveLayerFlags != 0) { flags |= SAVELAYERREC_HAS_FLAGS; size += sizeof(uint32_t); }
+    const size_t initialOffset = addDraw(SAVE_LAYER_SAVELAYERREC, &size);
+    addInt(flags);
+    if (rec.fBounds != nullptr) addRect(*rec.fBounds);
+    if (rec.fPaint != nullptr) addPaintPtr(rec.fPaint);
+    if (rec.fSaveLayerFlags != 0) addInt(rec.fSaveLayerFlags);
+    validate(initialOffset, size);
 }
 
 #ifdef SK_DEBUG

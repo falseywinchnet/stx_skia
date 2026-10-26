@@ -376,18 +376,9 @@ void SkRecordCanvas::onDrawEdgeAAImageSet2(const ImageSetEntry set[],
 void SkRecordCanvas::willSave() { this->append<SkRecords::Save>(); }
 
 SkCanvas::SaveLayerStrategy SkRecordCanvas::getSaveLayerStrategy(const SaveLayerRec& rec) {
-    AutoTArray<sk_sp<SkImageFilter>> filters(rec.fFilters.size());
-    for (size_t i = 0; i < rec.fFilters.size(); ++i) {
-        filters[i] = rec.fFilters[i];
-    }
-
     this->append<SkRecords::SaveLayer>(this->copy(rec.fBounds),
                                        this->copy(rec.fPaint),
-                                       sk_ref_sp(rec.fBackdrop),
-                                       rec.fSaveLayerFlags,
-                                       SkCanvasPriv::GetBackdropScaleFactor(rec),
-                                       rec.fBackdropTileMode,
-                                       std::move(filters));
+                                       rec.fSaveLayerFlags);
     return SkCanvas::kNoLayer_SaveLayerStrategy;
 }
 

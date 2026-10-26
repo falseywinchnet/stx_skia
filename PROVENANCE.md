@@ -184,3 +184,14 @@ Mask-to-image-filter adapters are removed from the candidate. Both render profil
 omit the withdrawn backdrop scene and compare the same remaining behavior. This
 is dependency pruning, not a claim that Canvas or core image-filter plumbing has
 been fully converted or removed.
+
+
+## CPU layer reduction
+
+SkCanvas.h, SkRecords.h and the affected picture/record implementations retain
+original copies under baseline/skia. Existing baseline copies cover SkCanvas.cpp
+and SkCanvasPriv. The candidate removes filter graph/backdrop fields from layer
+records and evaluation from canvas drawing, retaining direct device composition.
+The remaining serialization code rejects withdrawn layer filter flags. New
+original tests/layers.cpp checks complete output against the unchanged reference
+implementations and independent group-alpha/empty-layer expectations.

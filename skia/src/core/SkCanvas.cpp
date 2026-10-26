@@ -16,7 +16,6 @@
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkColorType.h"
 #include "include/core/SkImage.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPath.h"
 #include "include/core/SkPathEffect.h"
@@ -46,8 +45,6 @@
 #include "src/core/SkBlurMaskFilterImpl.h"
 #include "src/core/SkCanvasPriv.h"
 #include "src/core/SkDevice.h"
-#include "src/core/SkImageFilterTypes.h"
-#include "src/core/SkImageFilter_Base.h"
 #include "src/core/SkLatticeIter.h"
 #include "src/core/SkMSAN.h"
 #include "src/core/SkMaskFilterBase.h"
@@ -175,21 +172,9 @@ bool SkCanvas::predrawNotify(const SkRect* rect, const SkPaint* paint,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-SkCanvas::Layer::Layer(sk_sp<SkDevice> device,
-                       FilterSpan imageFilters,
-                       const SkPaint& paint,
-                       bool isCoverage,
-                       bool includesPadding)
-        : fDevice(std::move(device))
-        , fImageFilters(imageFilters.data(), imageFilters.size())
-        , fPaint(paint)
-        , fIsCoverage(isCoverage)
-        , fDiscard(false)
-        , fIncludesPadding(includesPadding) {
+SkCanvas::Layer::Layer(sk_sp<SkDevice> device, const SkPaint& paint)
+    : fDevice(std::move(device)), fPaint(paint) {
     SkASSERT(fDevice);
-    // Any image filter should have been pulled out and stored in 'imageFilter' so that 'paint'
-    // can be used as-is to draw the result of the filter to the dst device.
-    SkASSERT(!fPaint.getImageFilter());
 }
 
 SkCanvas::BackImage::BackImage(sk_sp<SkSpecialImage> img, SkIPoint loc)
@@ -209,18 +194,10 @@ SkCanvas::MCRec::MCRec(const MCRec* prev) : fDevice(prev->fDevice), fMatrix(prev
 
 SkCanvas::MCRec::~MCRec() {}
 
-void SkCanvas::MCRec::newLayer(sk_sp<SkDevice> layerDevice,
-                               FilterSpan filters,
-                               const SkPaint& restorePaint,
-                               bool layerIsCoverage,
-                               bool includesPadding) {
+void SkCanvas::MCRec::newLayer(sk_sp<SkDevice> layerDevice, const SkPaint& restorePaint) {
     SkASSERT(!fBackImage);
-    fLayer = std::make_unique<Layer>(std::move(layerDevice),
-                                     filters,
-                                     restorePaint,
-                                     layerIsCoverage,
-                                     includesPadding);
-    fDevice = fLayer->fDevice.get();
+    fLayer = std::make_unique<Layer>(std::move(layerDevice), restorePaint);
+    fDevice = (*fLayer).fDevice.get();
 }
 
 void SkCanvas::MCRec::reset(SkDevice* device) {
@@ -255,7 +232,7 @@ private:
 
 /////////////////////////////////////////////////////////////////////////////
 
-std::optional<AutoLayerForImageFilter> SkCanvas::aboutToDraw(
+std::optional<PreparedDraw> SkCanvas::aboutToDraw(
         const SkPaint& paint,
         const SkRect* rawBounds,
         SkEnumBitMask<PredrawFlags> flags) {
@@ -269,14 +246,12 @@ std::optional<AutoLayerForImageFilter> SkCanvas::aboutToDraw(
         }
     }
 
-    // TODO: Eventually all devices will use this code path and this will just test 'flags'.
-    const bool skipMaskFilterLayer = (flags & PredrawFlags::kSkipMaskFilterAutoLayer) ||
-                                     !this->topDevice()->useDrawCoverageMaskForMaskFilters();
-    return std::optional<AutoLayerForImageFilter>(
-            std::in_place, this, paint, rawBounds, skipMaskFilterLayer);
+    SkASSERT_RELEASE(paint.getImageFilter() == nullptr);
+    std::optional<PreparedDraw> prepared(std::in_place, paint);
+    return prepared;
 }
 
-std::optional<AutoLayerForImageFilter> SkCanvas::aboutToDraw(
+std::optional<PreparedDraw> SkCanvas::aboutToDraw(
         const SkPaint& paint,
         const SkRect* rawBounds) {
     return this->aboutToDraw(paint, rawBounds, PredrawFlags::kNone);
@@ -527,566 +502,85 @@ int SkCanvas::only_axis_aligned_saveBehind(const SkRect* bounds) {
     return this->getSaveCount() - 1;
 }
 
-// Helper function to compute the center reference point used for scale decomposition under
-// non-linear transformations.
-static skif::ParameterSpace<SkPoint> compute_decomposition_center(
-        const SkM44& dstToLocal,
-        std::optional<skif::ParameterSpace<SkRect>> contentBounds,
-        const skif::DeviceSpace<SkIRect>& targetOutput) {
-    // Will use the inverse and center of the device bounds if the content bounds aren't provided.
-    SkRect rect = contentBounds ? SkRect(*contentBounds) : SkRect::Make(SkIRect(targetOutput));
-    SkPoint center = {rect.centerX(), rect.centerY()};
-    if (!contentBounds) {
-        // Theoretically, the inverse transform could put center's homogeneous coord behind W = 0,
-        // but that case is handled automatically in Mapping::decomposeCTM later.
-        SkV4 mappedCenter = dstToLocal.map(center.fX, center.fY, 0.f, 1.f);
-        center = {sk_ieee_float_divide(mappedCenter.x, mappedCenter.w),
-                  sk_ieee_float_divide(mappedCenter.y, mappedCenter.w)};
-    }
-
-    return skif::ParameterSpace<SkPoint>(center);
+// Preserve the established layer precision for low-alpha source formats.
+static SkColorType layer_color_type(const SkColorInfo& info) {
+    if (info.bytesPerPixel() <= 4 && info.colorType() != kRGBA_8888_SkColorType &&
+        info.colorType() != kBGRA_8888_SkColorType) return kN32_SkColorType;
+    return info.colorType();
 }
 
-// Helper when we need to upgrade a single filter to a FilterSpan
-struct FilterToSpan {
-    FilterToSpan(const SkImageFilter* filter) : fFilter(sk_ref_sp(filter)) {}
+void SkCanvas::internalSaveLayer(const SaveLayerRec& rec, SaveLayerStrategy strategy) {
+    internalSave();
+    if (isClipEmpty()) return;
 
-    operator SkCanvas::FilterSpan() {
-        return fFilter ? SkCanvas::FilterSpan{&fFilter, 1} : SkCanvas::FilterSpan{};
-    }
-
-    sk_sp<SkImageFilter> fFilter;
-};
-
-// Compute suitable transformations and layer bounds for a new layer that will be used as the source
-// input into 'filter' before being drawn into 'dst' via the returned skif::Mapping.
-// Null filters are permitted and act as the identity. The returned mapping will be compatible with
-// the image filter.
-//
-// An empty optional is returned if the layer mapping and bounds couldn't be determined, in which
-// case the layer should be skipped. An instantiated optional can have an empty layer bounds rect
-// if the image filter doesn't require an input image to produce a valid output.
-static std::optional<std::pair<skif::Mapping, skif::LayerSpace<SkIRect>>>
-get_layer_mapping_and_bounds(
-        SkCanvas::FilterSpan filters,
-        const SkM44& localToDst,
-        const skif::DeviceSpace<SkIRect>& targetOutput,
-        std::optional<skif::ParameterSpace<SkRect>> contentBounds = {},
-        SkScalar scaleFactor = 1.0f) {
-    SkM44 dstToLocal;
-    if (!localToDst.isFinite() ||
-        !localToDst.invert(&dstToLocal)) {
-        return {};
-    }
-
-    skif::ParameterSpace<SkPoint> center =
-            compute_decomposition_center(dstToLocal, contentBounds, targetOutput);
-
-    // Determine initial mapping and a reasonable maximum dimension to prevent layer-to-device
-    // transforms with perspective and skew from triggering excessive buffer allocations.
-    skif::Mapping mapping;
-    skif::MatrixCapability capability = skif::MatrixCapability::kComplex;
-    for (const sk_sp<SkImageFilter>& filter : filters) {
-        if (filter) {
-            capability = std::min(capability, as_IFB(filter)->getCTMCapability());
-        }
-    }
-    if (!mapping.decomposeCTM(localToDst, capability, center)) {
-        return {};
-    }
-    // Push scale factor into layer matrix and device matrix (net no change, but the layer will have
-    // its resolution adjusted in comparison to the final device).
-    if (scaleFactor != 1.0f &&
-        !mapping.adjustLayerSpace(SkM44::Scale(scaleFactor, scaleFactor))) {
-        return {};
-    }
-
-    // Perspective and skew could exceed this since mapping.deviceToLayer(targetOutput) is
-    // theoretically unbounded under those conditions. Under a 45 degree rotation, a layer needs to
-    // be 2X larger per side of the prior device in order to fully cover it. We use the max of that
-    // and 2048 for a reasonable upper limit (this allows small layers under extreme transforms to
-    // use more relative resolution than a larger layer).
-    static const int kMinDimThreshold = 2048;
-    int maxLayerDim = std::max(Sk64_pin_to_s32(2 * std::max(SkIRect(targetOutput).width64(),
-                                                            SkIRect(targetOutput).height64())),
-                               kMinDimThreshold);
-
-    auto baseLayerBounds = mapping.deviceToLayer(targetOutput);
-    if (contentBounds) {
-        // For better or for worse, user bounds currently act as a hard clip on the layer's
-        // extent (i.e., they implement the CSS filter-effects 'filter region' feature).
-        skif::LayerSpace<SkIRect> knownBounds = mapping.paramToLayer(*contentBounds).roundOut();
-        if (!baseLayerBounds.intersect(knownBounds)) {
-            baseLayerBounds = skif::LayerSpace<SkIRect>::Empty();
-        }
-    }
-
-    skif::LayerSpace<SkIRect> layerBounds;
-    if (!filters.empty()) {
-        layerBounds = skif::LayerSpace<SkIRect>::Union(filters.size(), [&](int i) {
-            return filters[i] ? as_IFB(filters[i])
-                                        ->getInputBounds(mapping, targetOutput, contentBounds)
-                              : baseLayerBounds;
-        });
-        // When a filter is involved, the layer size may be larger than the default maxLayerDim due
-        // to required inputs for filters (e.g. a displacement map with a large radius).
-        if (layerBounds.width() > maxLayerDim || layerBounds.height() > maxLayerDim) {
-            skif::Mapping idealMapping{mapping.layerMatrix()};
-            for (const sk_sp<SkImageFilter>& filter : filters) {
-                if (filter) {
-                    auto idealLayerBounds = as_IFB(filter)->getInputBounds(
-                            idealMapping, targetOutput, contentBounds);
-                    maxLayerDim = std::max(std::max(idealLayerBounds.width(),
-                                                    idealLayerBounds.height()),
-                                                    maxLayerDim);
-                }
-            }
-        }
-    } else {
-        if (baseLayerBounds.isEmpty()) {
-            return {};
-        }
-        layerBounds = baseLayerBounds;
-    }
-
-    if (layerBounds.width() > maxLayerDim || layerBounds.height() > maxLayerDim) {
-        skif::LayerSpace<SkIRect> newLayerBounds(
-                SkIRect::MakeWH(std::min(layerBounds.width(), maxLayerDim),
-                                std::min(layerBounds.height(), maxLayerDim)));
-        SkM44 adjust = SkM44::RectToRect(SkRect::Make(SkIRect(layerBounds)),
-                                         SkRect::Make(SkIRect(newLayerBounds)));
-        if (!mapping.adjustLayerSpace(adjust)) {
-            return {};
-        } else {
-            layerBounds = newLayerBounds;
-        }
-    }
-
-    return std::make_pair(mapping, layerBounds);
-}
-
-// Ideally image filters operate in the dst color type, but if there is insufficient alpha bits
-// we move some bits from color channels into the alpha channel since that can greatly improve
-// the quality of blurs and other filters.
-static SkColorType image_filter_color_type(const SkColorInfo& dstInfo) {
-    if (dstInfo.bytesPerPixel() <= 4 &&
-        dstInfo.colorType() != kRGBA_8888_SkColorType &&
-        dstInfo.colorType() != kBGRA_8888_SkColorType) {
-        // "Upgrade" A8, G8, 565, 4444, 1010102, 101010x, and 888x to 8888
-        return kN32_SkColorType;
-    } else {
-        return dstInfo.colorType();
-    }
-}
-
-static skif::FilterResult apply_alpha_and_colorfilter(const skif::Context& ctx,
-                                                      const skif::FilterResult& image,
-                                                      const SkPaint& paint) {
-    // The only effects that apply to layers (other than the SkImageFilter that made this image in
-    // the first place) are transparency and color filters.
-    skif::FilterResult result = image;
-    if (paint.getAlphaf() < 1.f) {
-        result = result.applyColorFilter(ctx, SkColorFilters::Blend(paint.getColor4f(),
-                                                                    /*colorSpace=*/nullptr,
-                                                                    SkBlendMode::kDstIn));
-    }
-    if (paint.getColorFilter()) {
-        result = result.applyColorFilter(ctx, paint.refColorFilter());
-    }
-    return result;
-}
-
-void SkCanvas::internalDrawDeviceWithFilter(SkDevice* src,
-                                            SkDevice* dst,
-                                            FilterSpan filters,
-                                            const SkPaint& paint,
-                                            DeviceCompatibleWithFilter compat,
-                                            const SkColorInfo& filterColorInfo,
-                                            SkScalar scaleFactor,
-                                            SkTileMode srcTileMode,
-                                            bool srcIsCoverageLayer) {
-    // The dst is always required, the src can be null if 'filter' is non-null and does not require
-    // a source image. For regular filters, 'src' is the layer and 'dst' is the parent device. For
-    // backdrop filters, 'src' is the parent device and 'dst' is the layer.
-    SkASSERT(dst);
-
-    sk_sp<SkColorSpace> filterColorSpace = filterColorInfo.refColorSpace();
-
-    const SkColorType filterColorType =
-            srcIsCoverageLayer ? kAlpha_8_SkColorType : image_filter_color_type(filterColorInfo);
-
-    // 'filter' sees the src device's buffer as the implicit input image, and processes the image
-    // in this device space (referred to as the "layer" space). However, the filter
-    // parameters need to respect the current matrix, which is not necessarily the local matrix that
-    // was set on 'src' (e.g. because we've popped src off the stack already).
-    SkM44 localToSrc = src ? (src->globalToDevice() * fMCRec->fMatrix) : SkM44();
-    SkISize srcDims = src ? src->imageInfo().dimensions() : SkISize::Make(0, 0);
-
-    // Whether or not we need to make a transformed tmp image from 'src', and what that transform is
-    skif::LayerSpace<SkMatrix> srcToLayer;
-
-    skif::Mapping mapping;
-    skif::LayerSpace<SkIRect> requiredInput;
-    skif::DeviceSpace<SkIRect> outputBounds{dst->devClipBounds()};
-    if (compat != DeviceCompatibleWithFilter::kUnknown) {
-        // Just use the relative transform from src to dst and the src's whole image, since
-        // internalSaveLayer should have already determined what was necessary. We explicitly
-        // construct the inverse (dst->src) to avoid the case where src's and dst's coord transforms
-        // were individually invertible by SkM44::invert() but their product is considered not
-        // invertible by SkMatrix::invert(). When this happens the matrices are already poorly
-        // conditioned so getRelativeTransform() gives us something reasonable.
-        SkASSERT(src);
-        SkASSERT(scaleFactor == 1.0f);
-        SkASSERT(!srcDims.isEmpty());
-
-        mapping = skif::Mapping(src->getRelativeTransform(*dst),
-                                dst->getRelativeTransform(*src),
-                                localToSrc);
-        requiredInput = skif::LayerSpace<SkIRect>(SkIRect::MakeSize(srcDims));
-        srcToLayer = skif::LayerSpace<SkMatrix>(SkMatrix::I());
-    } else {
-        // Compute the image filter mapping by decomposing the local->device matrix of dst and
-        // re-determining the required input.
-        auto mappingAndBounds = get_layer_mapping_and_bounds(
-                filters, dst->localToDevice44(), outputBounds, {}, SkTPin(scaleFactor, 0.f, 1.f));
-        if (!mappingAndBounds) {
-            return;
-        }
-
-        std::tie(mapping, requiredInput) = *mappingAndBounds;
-        if (src) {
-            if (!requiredInput.isEmpty()) {
-                // The above mapping transforms from local to dst's device space, where the layer
-                // space represents the intermediate buffer. Now we need to determine the transform
-                // from src to intermediate to prepare the input to the filter.
-                SkM44 srcToLocal;
-                if (!localToSrc.invert(&srcToLocal)) {
-                    return;
-                }
-                srcToLayer = skif::LayerSpace<SkMatrix>((mapping.layerMatrix()*srcToLocal).asM33());
-            } // Else no input is needed which can happen if a backdrop filter that doesn't use src
-        } else {
-            // Trust the caller that no input was required, but keep the calculated mapping
-            requiredInput = skif::LayerSpace<SkIRect>::Empty();
-        }
-    }
-
-    // Start out with an empty source image, to be replaced with the snapped 'src' device.
-    auto backend = dst->createImageFilteringBackend(src ? src->surfaceProps() : dst->surfaceProps(),
-                                                    filterColorType);
-    skif::Stats stats;
-    skif::Context ctx{std::move(backend),
-                      mapping,
-                      requiredInput,
-                      skif::FilterResult{},
-                      filterColorSpace.get(),
-                      &stats};
-
-    skif::FilterResult source;
-    if (src && !requiredInput.isEmpty()) {
-        skif::LayerSpace<SkIRect> srcSubset;
-        if (!srcToLayer.inverseMapRect(requiredInput, &srcSubset)) {
-            return;
-        }
-
-        // Include the layer in the offscreen count
-        ctx.markNewSurface();
-
-        auto availSrc = skif::LayerSpace<SkIRect>(src->size()).relevantSubset(
-                srcSubset, srcTileMode);
-
-        if (SkMatrix(srcToLayer).isScaleTranslate()) {
-            // Apply the srcToLayer transformation directly while snapping an image from the src
-            // device. Calculate the subset of requiredInput that corresponds to srcSubset that was
-            // restricted to the actual src dimensions.
-            auto requiredSubset = srcToLayer.mapRect(availSrc);
-            if (requiredSubset.width() == availSrc.width() &&
-                requiredSubset.height() == availSrc.height()) {
-                // Unlike snapSpecialScaled(), snapSpecial() can avoid a copy when the underlying
-                // representation permits it.
-                source = {src->snapSpecial(SkIRect(availSrc)), requiredSubset.topLeft()};
-            } else {
-                SkASSERT(compat == DeviceCompatibleWithFilter::kUnknown);
-                source = {src->snapSpecialScaled(SkIRect(availSrc),
-                                                 SkISize(requiredSubset.size())),
-                          requiredSubset.topLeft()};
-                ctx.markNewSurface();
-            }
-        }
-
-        if (compat == DeviceCompatibleWithFilter::kYesWithPadding) {
-            // Padding was added to the source image when the 'src' SkDevice was created, so inset
-            // to allow bounds tracking to skip shader-based tiling when possible.
-            SkASSERT(!filters.empty());
-            source = source.insetForSaveLayer();
-        } else if (compat == DeviceCompatibleWithFilter::kYes) {
-            // Do nothing, leave `source` as-is; FilterResult will automatically augment the image
-            // sampling as needed to be visually equivalent to the more optimal kYesWithPadding case
-        } else if (source) {
-            // A backdrop filter that succeeded in snapSpecial() or snapSpecialScaled(), but since
-            // the 'src' device wasn't prepared with 'requiredInput' in mind, add clamping.
-            source = source.applyCrop(ctx, source.layerBounds(), srcTileMode);
-        } else if (!requiredInput.isEmpty()) {
-            // Otherwise snapSpecialScaled() failed or the transform was complex, so snap the source
-            // image at its original resolution and then apply srcToLayer to map to the effective
-            // layer coordinate space.
-            source = {src->snapSpecial(SkIRect(availSrc)), availSrc.topLeft()};
-            // We adjust the desired output of the applyCrop() because ctx was original set to
-            // fulfill 'requiredInput', which is valid *after* we apply srcToLayer. Use the original
-            // 'srcSubset' for the desired output so that the tilemode applied to the available
-            // subset is not discarded as a no-op.
-            source = source.applyCrop(ctx.withNewDesiredOutput(srcSubset),
-                                      source.layerBounds(),
-                                      srcTileMode)
-                           .applyTransform(ctx, srcToLayer, SkFilterMode::kLinear);
-        }
-    } // else leave 'source' as the empty image
-
-    // Evaluate the image filter, with a context pointing to the source snapped from 'src' and
-    // possibly transformed into the intermediate layer coordinate space.
-    ctx = ctx.withNewDesiredOutput(mapping.deviceToLayer(outputBounds))
-             .withNewSource(source);
-
-    // Here, we allow a single-element FilterSpan with a null entry, to simplify the loop:
-    sk_sp<SkImageFilter> nullFilter;
-    FilterSpan filtersOrNull = filters.empty() ? FilterSpan{&nullFilter, 1} : filters;
-
-    for (const sk_sp<SkImageFilter>& filter : filtersOrNull) {
-        auto result = filter ? as_IFB(filter)->filterImage(ctx) : source;
-
-        if (srcIsCoverageLayer) {
-            SkASSERT(dst->useDrawCoverageMaskForMaskFilters());
-            // TODO: Can FilterResult optimize this in any meaningful way if it still has to go
-            // through drawCoverageMask that requires an image (vs a coverage shader)?
-            auto [coverageMask, origin] = result.imageAndOffset(ctx);
-            if (coverageMask) {
-                SkM44 deviceMatrixWithOffset = mapping.layerToDevice();
-                deviceMatrixWithOffset.preTranslate(origin.x(), origin.y());
-                dst->drawCoverageMask(
-                        coverageMask.get(), deviceMatrixWithOffset.asM33(),
-                        result.sampling(), paint);
-            }
-        } else {
-            result = apply_alpha_and_colorfilter(ctx, result, paint);
-            result.draw(ctx, dst, paint.getBlender());
-        }
-    }
-
-    stats.reportStats();
-}
-
-void SkCanvas::internalSaveLayer(const SaveLayerRec& rec,
-                                 SaveLayerStrategy strategy,
-                                 bool coverageOnly) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    // Do this before we create the layer. We don't call the public save() since that would invoke a
-    // possibly overridden virtual.
-    this->internalSave();
-
-    if (this->isClipEmpty()) {
-        // Early out if the layer wouldn't draw anything
-        return;
-    }
-
-    // Build up the paint for restoring the layer, taking only the pieces of rec.fPaint that are
-    // relevant. Filtering is automatically chosen in internalDrawDeviceWithFilter based on the
-    // device's coordinate space.
-    SkPaint restorePaint(rec.fPaint ? *rec.fPaint : SkPaint());
-    restorePaint.setStyle(SkPaint::kFill_Style); // a layer is filled out "infinitely"
-    restorePaint.setPathEffect(nullptr);         // path effects are ignored for saved layers
-    restorePaint.setMaskFilter(nullptr);         // mask filters are ignored for saved layers
-    restorePaint.setImageFilter(nullptr);        // the image filter is held separately
-    // Smooth non-axis-aligned layer edges; this automatically downgrades to non-AA for aligned
-    // layer restores. This is done to match legacy behavior where the post-applied MatrixTransform
-    // bilerp also smoothed cropped edges. See skbug.com/40042614
+    SkPaint restorePaint;
+    if (rec.fPaint != nullptr) restorePaint = *rec.fPaint;
+    // Until the remaining paint serialization surface is removed, reject its
+    // unsupported image-filter state explicitly instead of dropping an effect.
+    SkASSERT_RELEASE(restorePaint.getImageFilter() == nullptr);
+    restorePaint.setStyle(SkPaint::kFill_Style);
+    restorePaint.setPathEffect(nullptr);
+    restorePaint.setMaskFilter(nullptr);
     restorePaint.setAntiAlias(true);
 
-    sk_sp<SkImageFilter> paintFilter = rec.fPaint ? rec.fPaint->refImageFilter() : nullptr;
-    FilterSpan filters = paintFilter ? FilterSpan{&paintFilter, 1} : rec.fFilters;
-    if (filters.size() > kMaxFiltersPerLayer) {
-        filters = filters.first(kMaxFiltersPerLayer);
-    }
-    const SkColorFilter* cf = restorePaint.getColorFilter();
+    SkDevice& parent = *topDevice();
+    const SkM44 matrix = parent.localToDevice44();
+    SkM44 inverse;
+    SkIRect bounds = parent.devClipBounds();
+    bool valid = matrix.isFinite() && matrix.invert(&inverse);
+    const SkColorFilter* colorFilter = restorePaint.getColorFilter();
     const SkBlender* blender = restorePaint.getBlender();
-
-    // When this is false, restoring the layer filled with unmodified prior contents should be
-    // identical to the prior contents, so we can restrict the layer even more than just the
-    // clip bounds.
-    bool filtersPriorDevice = rec.fBackdrop;
+    const bool initialized = (rec.fSaveLayerFlags & kInitWithPrevious_SaveLayerFlag) != 0;
+    bool needsFullClip = (colorFilter != nullptr && (*as_CFB(colorFilter)).affectsTransparentBlack()) ||
+                         (blender != nullptr && (*as_BB(blender)).affectsTransparentBlack());
 #if !defined(SK_LEGACY_INITWITHPREV_LAYER_SIZING)
-    // A regular filter applied to a layer initialized with prior contents is somewhat
-    // analogous to a backdrop filter so they are treated the same.
-    // TODO(b/314968012): Chrome needs to be updated to clip saveAlphaLayer bounds explicitly when
-    // it uses kInitWithPrevious and LCD text.
-    filtersPriorDevice |= ((rec.fSaveLayerFlags & kInitWithPrevious_SaveLayerFlag) &&
-             (!filters.empty() || cf || blender || restorePaint.getAlphaf() < 1.f));
+    needsFullClip = needsFullClip || (initialized && (colorFilter != nullptr ||
+                   blender != nullptr || restorePaint.getAlphaf() < 1.f));
 #endif
-    // If the restorePaint has a transparency-affecting colorfilter or blender, the output is
-    // unbounded during restore(). `internalDrawDeviceWithFilter` automatically applies these
-    // effects. When there's no image filter, SkDevice::drawDevice is used, which does
-    // not apply effects beyond the layer's image so we mark `trivialRestore` as false too.
-    // TODO: drawDevice() could be updated to apply transparency-affecting effects to a content-
-    // clipped image, but this is the simplest solution when considering document-based SkDevices.
-    const bool drawDeviceMustFillClip = filters.empty() &&
-            ((cf && as_CFB(cf)->affectsTransparentBlack()) ||
-                (blender && as_BB(blender)->affectsTransparentBlack()));
-    const bool trivialRestore = !filtersPriorDevice && !drawDeviceMustFillClip;
-
-    // Size the new layer relative to the prior device, which may already be aligned for filters.
-    SkDevice* priorDevice = this->topDevice();
-    skif::Mapping newLayerMapping;
-    skif::LayerSpace<SkIRect> layerBounds;
-    skif::DeviceSpace<SkIRect> outputBounds{priorDevice->devClipBounds()};
-
-    std::optional<skif::ParameterSpace<SkRect>> contentBounds;
-    // Set the bounds hint if provided and there's no further effects on prior device content
-    if (rec.fBounds && trivialRestore) {
-        contentBounds = skif::ParameterSpace<SkRect>(*rec.fBounds);
+    if (valid && rec.fBounds != nullptr && !needsFullClip && (*rec.fBounds).isEmpty()) valid = false;
+    if (valid && rec.fBounds != nullptr && !needsFullClip) {
+        const SkMatrix plane = matrix.asM33();
+        const SkRect mapped = plane.mapRect(*rec.fBounds);
+        // Preserve the original layer-bound tolerance at near-integral edges.
+        // Floating transform error must not create an extra row or column.
+        const SkRect adjusted = mapped.makeInset(1e-3f, 1e-3f);
+        const SkIRect content = adjusted.roundOut();
+        valid = bounds.intersect(content);
     }
-
-    auto mappingAndBounds = get_layer_mapping_and_bounds(
-            filters, priorDevice->localToDevice44(), outputBounds, contentBounds);
-
-    auto abortLayer = [this]() {
-        // The filtered content would not draw anything, or the new device space has an invalid
-        // coordinate system, in which case we mark the current top device as empty so that nothing
-        // draws until the canvas is restored past this saveLayer.
-        AutoUpdateQRBounds aqr(this);
-        this->topDevice()->clipRect(SkRect::MakeEmpty(), SkClipOp::kIntersect, /* aa */ false);
-    };
-
-    if (!mappingAndBounds) {
-        abortLayer();
+    if (!valid || bounds.isEmpty()) {
+        AutoUpdateQRBounds update(this);
+        parent.clipRect(SkRect::MakeEmpty(), SkClipOp::kIntersect, false);
         return;
     }
 
-    std::tie(newLayerMapping, layerBounds) = *mappingAndBounds;
-
-    bool paddedLayer = false;
-    if (layerBounds.isEmpty()) {
-        // The image filter graph does not require any input, so we don't need to actually render
-        // a new layer for the source image. This could be because the image filter itself will not
-        // produce output, or that the filter DAG has no references to the dynamic source image.
-        // In this case it still has an output that we need to render, but do so now since there is
-        // no new layer pushed on the stack and the paired restore() will be a no-op.
-        if (!filters.empty() && !priorDevice->isNoPixelsDevice()) {
-            SkColorInfo filterColorInfo = priorDevice->imageInfo().colorInfo();
-            if (rec.fColorSpace) {
-                filterColorInfo = filterColorInfo.makeColorSpace(sk_ref_sp(rec.fColorSpace));
-            }
-            this->internalDrawDeviceWithFilter(/*src=*/nullptr, priorDevice, filters, restorePaint,
-                                               DeviceCompatibleWithFilter::kUnknown,
-                                               filterColorInfo);
-        }
-
-        // Regardless of if we drew the "restored" image filter or not, mark the layer as empty
-        // until the restore() since we don't care about any of its content.
-        abortLayer();
-        return;
-    } else {
-        // TODO(b/329700315): Once dithers can be anchored more flexibly, we can return to
-        // universally adding padding even for layers w/o filters. This change would simplify layer
-        // prep and restore logic and allow us to flexibly switch the sampling to linear if NN has
-        // issues on certain hardware.
-        if (!filters.empty()) {
-            // Add a buffer of padding so that image filtering can avoid accessing unitialized data
-            // and switch from shader-decal'ing to clamping.
-            auto paddedLayerBounds = layerBounds;
-            paddedLayerBounds.outset(skif::LayerSpace<SkISize>({1, 1}));
-            if (paddedLayerBounds.left() < layerBounds.left() &&
-                paddedLayerBounds.top() < layerBounds.top() &&
-                paddedLayerBounds.right() > layerBounds.right() &&
-                paddedLayerBounds.bottom() > layerBounds.bottom()) {
-                // The outset was not saturated to INT_MAX, so the transparent pixels can be
-                // preserved.
-                layerBounds = paddedLayerBounds;
-                paddedLayer = true;
-            }
-        }
-    }
-
-    sk_sp<SkDevice> newDevice;
+    sk_sp<SkDevice> device;
     if (strategy == kFullLayer_SaveLayerStrategy) {
-        SkASSERT(!layerBounds.isEmpty());
-
-        SkColorType layerColorType;
-        if (coverageOnly) {
-            layerColorType = kAlpha_8_SkColorType;
-        } else {
-            layerColorType = SkToBool(rec.fSaveLayerFlags & kF16ColorType)
-                                    ? kRGBA_F16_SkColorType
-                                    : image_filter_color_type(priorDevice->imageInfo().colorInfo());
-        }
-        SkImageInfo info =
-                SkImageInfo::Make(layerBounds.width(),
-                                  layerBounds.height(),
-                                  layerColorType,
-                                  kPremul_SkAlphaType,
-                                  rec.fColorSpace ? sk_ref_sp(rec.fColorSpace)
-                                                  : priorDevice->imageInfo().refColorSpace());
-
-        SkPixelGeometry geo = rec.fSaveLayerFlags & kPreserveLCDText_SaveLayerFlag
-                                      ? fProps.pixelGeometry()
-                                      : kUnknown_SkPixelGeometry;
-        const auto createInfo = SkDevice::CreateInfo(info, geo, fAllocator.get());
-        // Use the original paint as a hint so that it includes the image filter
-        newDevice = priorDevice->createDevice(createInfo, rec.fPaint);
+        const SkColorType colorType = (rec.fSaveLayerFlags & kF16ColorType) != 0
+            ? kRGBA_F16_SkColorType : layer_color_type(parent.imageInfo().colorInfo());
+        sk_sp<SkColorSpace> colorSpace = parent.imageInfo().refColorSpace();
+        if (rec.fColorSpace != nullptr) colorSpace = sk_ref_sp(rec.fColorSpace);
+        const SkImageInfo info = SkImageInfo::Make(bounds.width(), bounds.height(), colorType,
+                                                 kPremul_SkAlphaType, std::move(colorSpace));
+        const SkPixelGeometry geometry = (rec.fSaveLayerFlags & kPreserveLCDText_SaveLayerFlag) != 0
+            ? fProps.pixelGeometry() : kUnknown_SkPixelGeometry;
+        const SkDevice::CreateInfo createInfo(info, geometry, fAllocator.get());
+        device = parent.createDevice(createInfo, rec.fPaint);
     }
-
-    bool initBackdrop = (rec.fSaveLayerFlags & kInitWithPrevious_SaveLayerFlag) || rec.fBackdrop;
-    if (!newDevice) {
-        // Either we weren't meant to allocate a full layer, or the full layer creation failed.
-        // Using an explicit NoPixelsDevice lets us reflect what the layer state would have been
-        // on success (or kFull_LayerStrategy) while squashing draw calls that target something that
-        // doesn't exist.
-        newDevice = sk_make_sp<SkNoPixelsDevice>(SkIRect::MakeWH(layerBounds.width(),
-                                                                 layerBounds.height()),
-                                                 fProps, this->imageInfo().refColorSpace());
-        initBackdrop = false;
+    bool copyPrevious = initialized;
+    if (!device) {
+        const SkIRect localBounds = SkIRect::MakeWH(bounds.width(), bounds.height());
+        device = sk_make_sp<SkNoPixelsDevice>(localBounds, fProps, imageInfo().refColorSpace());
+        copyPrevious = false;
     }
-
-    // Clip while the device coordinate space is the identity so it's easy to define the rect that
-    // excludes the added padding pixels. This ensures they remain cleared to transparent black.
-    if (paddedLayer) {
-        newDevice->clipRect(SkRect::Make(newDevice->devClipBounds().makeInset(1, 1)),
-                            SkClipOp::kIntersect, /*aa=*/false);
+    (*device).setDeviceCoordinateSystem(parent.deviceToGlobal(), parent.globalToDevice(), matrix,
+                                       bounds.left(), bounds.top());
+    if (copyPrevious) {
+        const SkPaint copyPaint;
+        const SkSamplingOptions sampling;
+        (*device).drawDevice(&parent, sampling, copyPaint);
     }
-
-    // Configure device to match determined mapping for any image filters.
-    // The setDeviceCoordinateSystem applies the prior device's global transform since
-    // 'newLayerMapping' only defines the transforms between the two devices and it must be updated
-    // to the global coordinate system.
-    newDevice->setDeviceCoordinateSystem(
-            priorDevice->deviceToGlobal() * newLayerMapping.layerToDevice(),
-            newLayerMapping.deviceToLayer() * priorDevice->globalToDevice(),
-            newLayerMapping.layerMatrix(),
-            layerBounds.left(),
-            layerBounds.top());
-
-    if (initBackdrop) {
-        SkASSERT(!coverageOnly);
-        SkPaint backdropPaint;
-        FilterToSpan backdropAsSpan(rec.fBackdrop);
-        // The new device was constructed to be compatible with 'filter', not necessarily
-        // 'rec.fBackdrop', so allow DrawDeviceWithFilter to transform the prior device contents
-        // if necessary to evaluate the backdrop filter. If no filters are involved, then the
-        // devices differ by integer translations and are always compatible.
-        bool scaleBackdrop = rec.fExperimentalBackdropScale != 1.0f;
-        auto compat = (!filters.empty() || rec.fBackdrop || scaleBackdrop)
-                ? DeviceCompatibleWithFilter::kUnknown : DeviceCompatibleWithFilter::kYes;
-        // Using the color info of 'newDevice' is equivalent to using 'rec.fColorSpace'.
-        this->internalDrawDeviceWithFilter(priorDevice,     // src
-                                           newDevice.get(), // dst
-                                           backdropAsSpan,
-                                           backdropPaint,
-                                           compat,
-                                           newDevice->imageInfo().colorInfo(),
-                                           rec.fExperimentalBackdropScale,
-                                           rec.fBackdropTileMode);
-    }
-
-    fMCRec->newLayer(std::move(newDevice), filters, restorePaint, coverageOnly, paddedLayer);
-    fQuickRejectBounds = this->computeDeviceClipBounds();
+    (*fMCRec).newLayer(std::move(device), restorePaint);
+    fQuickRejectBounds = computeDeviceClipBounds();
 }
 
 int SkCanvas::saveLayerAlphaf(const SkRect* bounds, float alpha) {
@@ -1172,30 +666,12 @@ void SkCanvas::internalRestore() {
     if (layer && !layer->fDevice->isNoPixelsDevice() && !layer->fDiscard) {
         layer->fDevice->setImmutable();
 
-        // Don't go through AutoLayerForImageFilter since device draws are so closely tied to
+        // Don't go through PreparedDraw since device draws are so closely tied to
         // internalSaveLayer and internalRestore.
         if (this->predrawNotify()) {
             SkDevice* dstDev = this->topDevice();
-            if (!layer->fImageFilters.empty()) {
-                auto compat = layer->fIncludesPadding ? DeviceCompatibleWithFilter::kYesWithPadding
-                                                      : DeviceCompatibleWithFilter::kYes;
-                this->internalDrawDeviceWithFilter(layer->fDevice.get(), // src
-                                                   dstDev,               // dst
-                                                   layer->fImageFilters,
-                                                   layer->fPaint,
-                                                   compat,
-                                                   layer->fDevice->imageInfo().colorInfo(),
-                                                   /*scaleFactor=*/1.0f,
-                                                   /*srcTileMode=*/SkTileMode::kDecal,
-                                                   layer->fIsCoverage);
-            } else {
-                // NOTE: We don't just call internalDrawDeviceWithFilter with a null filter
-                // because we want to take advantage of overridden drawDevice functions for
-                // document-based devices.
-                SkASSERT(!layer->fIsCoverage && !layer->fIncludesPadding);
-                SkSamplingOptions sampling;
-                dstDev->drawDevice(layer->fDevice.get(), sampling, layer->fPaint);
-            }
+            const SkSamplingOptions sampling;
+            (*dstDev).drawDevice((*layer).fDevice.get(), sampling, (*layer).fPaint);
         }
     }
 
@@ -1932,7 +1408,7 @@ void SkCanvas::internalDrawPaint(const SkPaint& paint) {
 
     auto layer = this->aboutToDraw(paint, nullptr, PredrawFlags::kCheckForOverwrite);
     if (layer) {
-        this->topDevice()->drawPaint(layer->paint());
+        this->topDevice()->drawPaint(layer->paint);
     }
 }
 
@@ -1972,7 +1448,7 @@ void SkCanvas::onDrawPoints(PointMode mode, size_t count, const SkPoint pts[],
 
     auto layer = this->aboutToDraw(strokePaint, boundsPtr);
     if (layer) {
-        this->topDevice()->drawPoints(mode, {pts, count}, layer->paint());
+        this->topDevice()->drawPoints(mode, {pts, count}, layer->paint);
     }
 }
 
@@ -2012,23 +1488,22 @@ const SkBlurMaskFilterImpl* SkCanvas::canAttemptBlurredRRectDraw(const SkPaint& 
     return blurMaskFilter;
 }
 
-std::optional<AutoLayerForImageFilter> SkCanvas::attemptBlurredRRectDraw(
+std::optional<PreparedDraw> SkCanvas::attemptBlurredRRectDraw(
         const SkRRect& rrect,
         const SkBlurMaskFilterImpl* blurMaskFilter,
         const SkPaint& paint,
         SkEnumBitMask<PredrawFlags> flags) {
-    SkASSERT(blurMaskFilter && blurMaskFilter == this->canAttemptBlurredRRectDraw(paint) &&
-             !(flags & PredrawFlags::kSkipMaskFilterAutoLayer));
+    SkASSERT(blurMaskFilter && blurMaskFilter == this->canAttemptBlurredRRectDraw(paint));
     const SkRect& bounds = rrect.getBounds();
 
-    auto layer = this->aboutToDraw(paint, &bounds, flags | PredrawFlags::kSkipMaskFilterAutoLayer);
+    auto layer = this->aboutToDraw(paint, &bounds, flags);
     if (!layer) {
         // predrawNotify failed.
         return std::nullopt;
     }
 
     const float deviceSigma = blurMaskFilter->computeXformedSigma(this->getTotalMatrix());
-    if (this->topDevice()->drawBlurredRRect(rrect, layer->paint(), deviceSigma)) {
+    if (this->topDevice()->drawBlurredRRect(rrect, layer->paint, deviceSigma)) {
         // Analytic draw was successful.
         return std::nullopt;
     }
@@ -2043,7 +1518,7 @@ void SkCanvas::onDrawRect(const SkRect& r, const SkPaint& paint) {
         return;
     }
 
-    std::optional<AutoLayerForImageFilter> layer;
+    std::optional<PreparedDraw> layer;
     constexpr PredrawFlags kPredrawFlags = PredrawFlags::kCheckForOverwrite;
 
     if (const SkBlurMaskFilterImpl* blurMaskFilter = this->canAttemptBlurredRRectDraw(paint)) {
@@ -2055,7 +1530,7 @@ void SkCanvas::onDrawRect(const SkRect& r, const SkPaint& paint) {
     }
 
     if (layer) {
-        this->topDevice()->drawRect(r, layer->paint());
+        this->topDevice()->drawRect(r, layer->paint);
     }
 }
 
@@ -2067,7 +1542,7 @@ void SkCanvas::onDrawRegion(const SkRegion& region, const SkPaint& paint) {
 
     auto layer = this->aboutToDraw(paint, &bounds);
     if (layer) {
-        this->topDevice()->drawRegion(region, layer->paint());
+        this->topDevice()->drawRegion(region, layer->paint);
     }
 }
 
@@ -2109,7 +1584,7 @@ void SkCanvas::onDrawBehind(const SkPaint& paint) {
 
     auto layer = this->aboutToDraw(paint);
     if (layer) {
-        this->topDevice()->drawPaint(layer->paint());
+        this->topDevice()->drawPaint(layer->paint);
     }
 
     dev->popClipStack();
@@ -2121,7 +1596,7 @@ void SkCanvas::onDrawOval(const SkRect& oval, const SkPaint& paint) {
         return;
     }
 
-    std::optional<AutoLayerForImageFilter> layer;
+    std::optional<PreparedDraw> layer;
 
     if (const SkBlurMaskFilterImpl* blurMaskFilter = this->canAttemptBlurredRRectDraw(paint)) {
         // Returns a layer if a blurred draw was unsuccessful.
@@ -2132,7 +1607,7 @@ void SkCanvas::onDrawOval(const SkRect& oval, const SkPaint& paint) {
     }
 
     if (layer) {
-        this->topDevice()->drawOval(oval, layer->paint());
+        this->topDevice()->drawOval(oval, layer->paint);
     }
 }
 
@@ -2144,7 +1619,7 @@ void SkCanvas::onDrawArc(const SkRect& oval, SkScalar startAngle,
         return;
     }
 
-    std::optional<AutoLayerForImageFilter> layer;
+    std::optional<PreparedDraw> layer;
 
     // Arcs with sweeps >= 360° are ovals. In this case, attempt a specialized blurred draw.
     if (const SkBlurMaskFilterImpl* blurMaskFilter = this->canAttemptBlurredRRectDraw(paint);
@@ -2158,7 +1633,7 @@ void SkCanvas::onDrawArc(const SkRect& oval, SkScalar startAngle,
 
     if (layer) {
         this->topDevice()->drawArc(SkArc::Make(oval, startAngle, sweepAngle, useCenter),
-                                   layer->paint());
+                                   layer->paint);
     }
 }
 
@@ -2180,7 +1655,7 @@ void SkCanvas::onDrawRRect(const SkRRect& rrect, const SkPaint& paint) {
         return;
     }
 
-    std::optional<AutoLayerForImageFilter> layer;
+    std::optional<PreparedDraw> layer;
 
     if (const SkBlurMaskFilterImpl* blurMaskFilter = this->canAttemptBlurredRRectDraw(paint)) {
         // Returns a layer if a blurred draw was unsuccessful.
@@ -2190,7 +1665,7 @@ void SkCanvas::onDrawRRect(const SkRRect& rrect, const SkPaint& paint) {
     }
 
     if (layer) {
-        this->topDevice()->drawRRect(rrect, layer->paint());
+        this->topDevice()->drawRRect(rrect, layer->paint);
     }
 }
 
@@ -2202,7 +1677,7 @@ void SkCanvas::onDrawDRRect(const SkRRect& outer, const SkRRect& inner, const Sk
 
     auto layer = this->aboutToDraw(paint, &bounds);
     if (layer) {
-        this->topDevice()->drawDRRect(outer, inner, layer->paint());
+        this->topDevice()->drawDRRect(outer, inner, layer->paint);
     }
 }
 
@@ -2222,7 +1697,7 @@ void SkCanvas::onDrawPath(const SkPath& path, const SkPaint& paint) {
 
     auto layer = this->aboutToDraw(paint, path.isInverseFillType() ? nullptr : &pathBounds);
     if (layer) {
-        this->topDevice()->drawPath(path, layer->paint());
+        this->topDevice()->drawPath(path, layer->paint);
     }
 }
 
@@ -2283,66 +1758,6 @@ void SkCanvas::onDrawImageRect2(const SkImage* image, const SkRect& src, const S
         }
     }
 
-    // drawImageRect()'s behavior is modified by the presence of an image filter, a mask filter, a
-    // color filter, the paint's alpha, the paint's blender, and--when it's an alpha-only image--
-    // the paint's color or shader. When there's an image filter, the paint's blender is applied to
-    // the result of the image filter function, but every other aspect would influence the source
-    // image that's then rendered with src-over blending into a transparent temporary layer.
-    //
-    // However, skif::FilterResult can apply the paint alpha and any color filter often without
-    // requiring a layer, and src-over blending onto a transparent dst is a no-op, so we can use the
-    // input image directly as the source for filtering. When the image is alpha-only and must be
-    // colorized, or when a mask filter would change the coverage we skip this optimization for
-    // simplicity since *somehow* embedding colorization or mask blurring into the filter graph
-    // would likely be equivalent to using the existing AutoLayerForImageFilter functionality.
-    if (realPaint.getImageFilter() && !image->isAlphaOnly() && !realPaint.getMaskFilter()) {
-        SkDevice* device = this->topDevice();
-
-        skif::ParameterSpace<SkRect> imageBounds{dst};
-        skif::DeviceSpace<SkIRect> outputBounds{device->devClipBounds()};
-        FilterToSpan filterAsSpan(realPaint.getImageFilter());
-        auto mappingAndBounds = get_layer_mapping_and_bounds(filterAsSpan,
-                                                             device->localToDevice44(),
-                                                             outputBounds,
-                                                             imageBounds);
-        if (!mappingAndBounds) {
-            return;
-        }
-        if (!this->predrawNotify()) {
-            return;
-        }
-
-        // Start out with an empty source image, to be replaced with the converted 'image', and a
-        // desired output equal to the calculated initial source layer bounds, which accounts for
-        // how the image filters will access 'image' (possibly different than just 'outputBounds').
-        auto backend = device->createImageFilteringBackend(
-                device->surfaceProps(),
-                image_filter_color_type(device->imageInfo().colorInfo()));
-        auto [mapping, srcBounds] = *mappingAndBounds;
-        skif::Stats stats;
-        skif::Context ctx{std::move(backend),
-                          mapping,
-                          srcBounds,
-                          skif::FilterResult{},
-                          device->imageInfo().colorSpace(),
-                          &stats};
-
-        auto source = skif::FilterResult::MakeFromImage(
-                ctx, sk_ref_sp(image), src, imageBounds, sampling);
-        // Apply effects that are normally processed on the draw *before* any layer/image filter.
-        source = apply_alpha_and_colorfilter(ctx, source, realPaint);
-
-        // Evaluate the image filter, with a context pointing to the source created directly from
-        // 'image' (which will not require intermediate renderpasses when 'src' is integer aligned).
-        // and a desired output matching the device clip bounds.
-        ctx = ctx.withNewDesiredOutput(mapping.deviceToLayer(outputBounds))
-                 .withNewSource(source);
-        auto result = as_IFB(realPaint.getImageFilter())->filterImage(ctx);
-        result.draw(ctx, device, realPaint.getBlender());
-        stats.reportStats();
-        return;
-    }
-
     if (realPaint.getMaskFilter() && this->topDevice()->useDrawCoverageMaskForMaskFilters()) {
         // Route mask-filtered drawImages to drawRect() to use the auto-layer for mask filters,
         // which require all shading to be encoded in the paint.
@@ -2361,7 +1776,7 @@ void SkCanvas::onDrawImageRect2(const SkImage* image, const SkRect& src, const S
                                    (image->isOpaque() ? PredrawFlags::kOpaqueShaderOverride
                                                       : PredrawFlags::kNonOpaqueShaderOverride));
     if (layer) {
-        this->topDevice()->drawImageRect(image, &src, dst, realSampling, layer->paint(),
+        this->topDevice()->drawImageRect(image, &src, dst, realSampling, layer->paint,
                                          constraint);
     }
 }
@@ -2376,7 +1791,7 @@ void SkCanvas::onDrawImageLattice2(const SkImage* image, const Lattice& lattice,
 
     auto layer = this->aboutToDraw(realPaint, &dst);
     if (layer) {
-        this->topDevice()->drawImageLattice(image, lattice, dst, filter, layer->paint());
+        this->topDevice()->drawImageLattice(image, lattice, dst, filter, layer->paint);
     }
 }
 
@@ -2454,9 +1869,9 @@ void SkCanvas::onDrawGlyphRunList(const sktext::GlyphRunList& glyphRunList, cons
     // strike cache; if a glyph must be drawn as a path or drawable, SkDevice routes back to
     // this SkCanvas to retry, which will go through a function that does *not* skip the mask
     // filter layer.
-    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kSkipMaskFilterAutoLayer);
+    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kNone);
     if (layer) {
-        this->topDevice()->drawGlyphRunList(this, glyphRunList, layer->paint());
+        this->topDevice()->drawGlyphRunList(this, glyphRunList, layer->paint);
     }
 }
 
@@ -2475,9 +1890,9 @@ sk_sp<Slug> SkCanvas::onConvertGlyphRunListToSlug(const sktext::GlyphRunList& gl
         return nullptr;
     }
     // See comment in onDrawGlyphRunList()
-    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kSkipMaskFilterAutoLayer);
+    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kNone);
     if (layer) {
-        return this->topDevice()->convertGlyphRunListToSlug(glyphRunList, layer->paint());
+        return this->topDevice()->convertGlyphRunListToSlug(glyphRunList, layer->paint);
     }
     return nullptr;
 }
@@ -2495,9 +1910,9 @@ void SkCanvas::onDrawSlug(const Slug* slug, const SkPaint& paint) {
         return;
     }
     // See comment in onDrawGlyphRunList()
-    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kSkipMaskFilterAutoLayer);
+    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kNone);
     if (layer) {
-        this->topDevice()->drawSlug(this, slug, layer->paint());
+        this->topDevice()->drawSlug(this, slug, layer->paint);
     }
 }
 
@@ -2608,7 +2023,7 @@ void SkCanvas::onDrawVerticesObject(const SkVertices* vertices, SkBlendMode bmod
 
     auto layer = this->aboutToDraw(simplePaint, &bounds);
     if (layer) {
-        this->topDevice()->drawVertices(vertices, SkBlender::Mode(bmode), layer->paint());
+        this->topDevice()->drawVertices(vertices, SkBlender::Mode(bmode), layer->paint);
     }
 }
 
@@ -2652,7 +2067,7 @@ void SkCanvas::onDrawPatch(const SkPoint cubics[12], const SkColor colors[4],
     auto layer = this->aboutToDraw(simplePaint, &r);
     if (layer) {
         this->topDevice()->drawPatch(cubics, colors, texCoords, SkBlender::Mode(bmode),
-                                     layer->paint());
+                                     layer->paint);
     }
 }
 
@@ -2707,7 +2122,7 @@ void SkCanvas::onDrawAtlas2(const SkImage* atlas, const SkRSXform xform[], const
     if (layer) {
         size_t N = SkToSizeT(count);
         this->topDevice()->drawAtlas({xform, N}, {tex, N}, {colors, colors ? N : 0},
-                                     SkBlender::Mode(bmode), layer->paint());
+                                     SkBlender::Mode(bmode), layer->paint);
     }
 }
 
@@ -2807,7 +2222,7 @@ void SkCanvas::onDrawEdgeAAImageSet2(const ImageSetEntry imageSet[], int count,
                                                   imageSet[i].fHasClip ? dstClips + dstClipIndex
                                                                         : nullptr,
                                                   (QuadAAFlags)imageSet[i].fAAFlags,
-                                                  layer->paint().getColor4f(),
+                                                  layer->paint.getColor4f(),
                                                   SkBlendMode::kSrcOver);
             }
             dstClipIndex += 4 * imageSet[i].fHasClip;
@@ -2818,7 +2233,7 @@ void SkCanvas::onDrawEdgeAAImageSet2(const ImageSetEntry imageSet[], int count,
     auto layer = this->aboutToDraw(realPaint, setBoundsValid ? &setBounds : nullptr);
     if (layer) {
         this->topDevice()->drawEdgeAAImageSet(imageSet, count, dstClips, preViewMatrices,
-                                              realSampling, layer->paint(), constraint);
+                                              realSampling, layer->paint, constraint);
     }
 }
 
