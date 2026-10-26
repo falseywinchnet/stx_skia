@@ -319,6 +319,23 @@ typeface, picture or capture classes. Sixteen tests and seven rendering artifact
 retain their reference results; the A8 test also asserts picture/font-cache API
 absence. See ../results/2026-10-26/PICTURE_FONT_REMOVAL.md.
 
+## Base, raster and null surface ownership
+
+SkSurface_Base.cpp/.h, SkSurface_Raster.cpp/.h and SkSurface_Null.cpp now use
+explicit types, named handles/results and visible callback/transfer ordering.
+One unique canvas owner replaces the owner-plus-cached-pointer pair. The unused
+capture-era pixel-storage owner is removed, allowing old pixel refs to end when
+the last snapshot is released after copy-on-write. Snapshot/cache and canvas
+back-link lifetime rules are documented. Subset snapshot and fallback-read
+allocation failures return through the existing null-result mechanisms.
+
+The surface contract test checks owned/wrapped buffers, retain/discard,
+snapshot isolation and outliving, subset clipping, release timing, backing reuse,
+null surfaces and callback results. On arm64 the base object is 56 bytes versus
+72 in the reference. No rendering-speed gain is claimed. Public SkSurface.cpp/.h
+and GPU compatibility query stubs remain separate work. See
+../results/2026-10-26/SURFACE_OWNERSHIP.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
