@@ -124,3 +124,6 @@ list(REMOVE_ITEM stx_sources skia/src/utils/win/SkDWrite.cpp)
 list(REMOVE_ITEM stx_sources skia/src/core/SkMaskGamma.cpp)
 list(REMOVE_ITEM stx_sources skia/src/sfnt/SkOTUtils.cpp)
 list(REMOVE_ITEM stx_sources skia/src/sfnt/SkOTTable_name.cpp)
+
+# Owned broadcast invalidation replaces the unused generic message bus.
+list(APPEND stx_sources skia/src/core/SkResourceCacheInvalidation.cpp)

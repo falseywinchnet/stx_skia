@@ -12,10 +12,8 @@
 #include "include/core/SkTypes.h"
 #include "include/private/SkDebug.h"
 #include "include/private/SkMalloc.h"
-#include "include/private/SkTArray.h"
 #include "src/core/SkCachedData.h"
 #include "src/core/SkChecksum.h"
-#include "src/core/SkMessageBus.h"
 #include "src/core/SkSynchronizedResourceCache.h"
 #include "src/core/SkTHash.h"
 
@@ -28,15 +26,6 @@
 #include <memory>
 
 using namespace skia_private;
-
-DECLARE_SKMESSAGEBUS_MESSAGE(SkResourceCache::PurgeSharedIDMessage, uint32_t, true)
-
-static inline bool SkShouldPostMessageToBus(
-        const SkResourceCache::PurgeSharedIDMessage&, uint32_t) {
-    // SkResourceCache is typically used as a singleton and we don't label Inboxes so all messages
-    // go to all inboxes.
-    return true;
-}
 
 // This can be defined by the caller's build system
 //#define SK_USE_DISCARDABLE_SCALEDIMAGECACHE
@@ -95,14 +84,12 @@ class SkResourceCache::Hash :
 SkResourceCache::SkResourceCache(DiscardableFactory factory)
         : fHash(std::make_unique<Hash>())
         , fDiscardableFactory(factory)
-        , fTotalByteLimit(0)
-        , fPurgeSharedIDInbox(SK_InvalidUniqueID) {}
+        , fTotalByteLimit(0) {}
 
 SkResourceCache::SkResourceCache(size_t byteLimit)
         : fHash(std::make_unique<Hash>())
         , fDiscardableFactory(nullptr)
-        , fTotalByteLimit(byteLimit)
-        , fPurgeSharedIDInbox(SK_InvalidUniqueID) {}
+        , fTotalByteLimit(byteLimit) {}
 
 SkResourceCache::~SkResourceCache() {
     Rec* rec = fHead;
@@ -404,11 +391,11 @@ size_t SkResourceCache::getEffectiveSingleAllocationByteLimit() const {
 }
 
 void SkResourceCache::checkMessages() {
-    TArray<PurgeSharedIDMessage> msgs{};
-    fPurgeSharedIDInbox.poll(&msgs);
-    for (int i = 0; i < msgs.size(); ++i) {
-        SkResourceCache::purgeSharedID(msgs[i].fSharedID);
+    fPurgeSharedIDInbox.poll(fPurgeSharedIDs);
+    for (const uint64_t sharedID : fPurgeSharedIDs) {
+        SkResourceCache::purgeSharedID(sharedID);
     }
+    fPurgeSharedIDs.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -492,8 +479,7 @@ void SkResourceCache::VisitAll(Visitor visitor, void* context) {
 
 void SkResourceCache::PostPurgeSharedID(uint64_t sharedID) {
     if (sharedID) {
-        const PurgeSharedIDMessage message(sharedID);
-        SkMessageBus<PurgeSharedIDMessage, uint32_t>::Post(message);
+        SkResourceCacheInvalidationInbox::Post(sharedID);
     }
 }
 

@@ -9,7 +9,7 @@
 #define SkResourceCache_DEFINED
 
 #include "include/private/SkDebug.h"
-#include "src/core/SkMessageBus.h"
+#include "src/core/SkResourceCacheInvalidation.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -89,10 +89,6 @@ public:
         friend class SkResourceCache;
     };
 
-    struct PurgeSharedIDMessage {
-        explicit PurgeSharedIDMessage(uint64_t sharedID) : fSharedID(sharedID) {}
-        uint64_t fSharedID;
-    };
     using ID = const Rec*;
     // Visitors run synchronously under cache access authority. They may copy or
     // acquire record-owned data, but must not retain an unpinned record borrow,
@@ -172,7 +168,10 @@ private:
     size_t fTotalByteLimit;
     size_t fSingleAllocationByteLimit = 0;
     int fCount = 0;
-    SkMessageBus<PurgeSharedIDMessage, uint32_t>::Inbox fPurgeSharedIDInbox;
+    // Both drain and inbox buffers retain capacity between checks. The cache's
+    // access authority serializes use of this drain buffer and record mutation.
+    std::vector<uint64_t> fPurgeSharedIDs{};
+    SkResourceCacheInvalidationInbox fPurgeSharedIDInbox{};
 
     void purgeAsNeeded(bool forcePurge = false);
     void moveToHead(Rec* record);

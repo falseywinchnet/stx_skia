@@ -3,6 +3,9 @@
 #include "src/core/SkCachedData.h"
 
 #include <array>
+#include <chrono>
+#include <cstring>
+#include <memory>
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
@@ -253,8 +256,50 @@ bool synchronized() {
     if (stats.installed != 4000 || stats.destroyed != 4000) return false;
     return true;
 }
+bool measure() {
+    struct Case { int caches; int messages; int iterations; };
+    constexpr std::array<Case, 6> cases{{{1, 0, 500000}, {1, 1, 100000},
+        {1, 16, 10000}, {1, 256, 1000}, {4, 1, 50000}, {4, 16, 5000}}};
+    for (const Case& work : cases) {
+        std::vector<std::unique_ptr<SkResourceCache>> caches{};
+        for (int index = 0; index < work.caches; ++index) {
+            caches.push_back(std::make_unique<SkResourceCache>(static_cast<size_t>(1024)));
+        }
+        const TestKey missing(1);
+        Lookup found{};
+        // Warm allocation capacity before timing; messages target an empty cache
+        // so this measures invalidation administration, not record destruction.
+        for (int warm = 0; warm < 20; ++warm) {
+            for (int message = 0; message < work.messages; ++message) {
+                SkResourceCache::PostPurgeSharedID(static_cast<uint64_t>(message + 1));
+            }
+            for (const std::unique_ptr<SkResourceCache>& cache : caches) {
+                if ((*cache).find(missing, lookup, &found)) return false;
+            }
+        }
+        const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        for (int iteration = 0; iteration < work.iterations; ++iteration) {
+            for (int message = 0; message < work.messages; ++message) {
+                SkResourceCache::PostPurgeSharedID(static_cast<uint64_t>(message + 1));
+            }
+            for (const std::unique_ptr<SkResourceCache>& cache : caches) {
+                if ((*cache).find(missing, lookup, &found)) return false;
+            }
+        }
+        const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        const std::chrono::duration<double> elapsed = end - start;
+        std::printf("%d,%d,%d,%.9f,%zu\n", work.caches, work.messages,
+                    work.iterations, elapsed.count(), sizeof(SkResourceCache));
+    }
+    return true;
 }
-int main() {
+
+}
+int main(int argc, char** argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--benchmark") == 0) {
+        const bool passed = measure();
+        return passed ? 0 : 7;
+    }
     if (!keys()) return 1;
     if (!eviction()) return 2;
     if (!duplicates()) return 3;

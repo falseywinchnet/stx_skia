@@ -493,6 +493,20 @@ GUI.Forms' atomic batch pool is the owner's worker-execution reference; cache
 mutexes remain a separate shared-state synchronization boundary. See
 ../results/2026-10-26/SCHEDULER_PRUNE.md.
 
+## Owned cache invalidation
+
+The generic SkMessageBus is reference-only. The retained broadcast use is now
+SkResourceCacheInvalidationInbox.cpp/.h: explicit registry observers, inbox-owned
+IDs, unregister-before-destruction, fixed lock order and no generic routing or
+message-transfer modes. Resource caches recycle pending/drain allocations.
+
+The M4 Release cache object grows 112 to 136 bytes and retains two buffers'
+capacities; empty checks remain within timing spread and measured nonempty
+administration becomes cheaper. Concurrent delivery/registration tests and all
+nine reference render artifacts pass. See
+../results/2026-10-26/CACHE_INVALIDATION.md and its raw measurement JSON. The hash
+table and mutex/semaphore implementations remain separate conversion work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
