@@ -722,6 +722,21 @@ fourteen capacities, render/serialization comparisons, instrumented suites,
 relocated consumer and GUI.Forms gates pass. See ../results/2026-10-26/WRITER32.md
 and its raw measurements/native probe. This is not a rendering-speed claim.
 
+## Heap and inline allocation owners
+
+SkAutoMalloc.h is converted with explicit transfer and borrowed-storage contracts.
+Moving the heap owner now empties the source capacity as well as its pointer,
+correcting reuse at the former size. Temporary-owner borrows are rejected at compile
+time; inline storage remains nonmovable. Existing replacement/reuse policies and
+layouts remain: 16 bytes for the heap helper and 80/88 bytes for the tested inline
+variants. No additional tracking fields or allocation mechanisms are introduced.
+
+Both 35-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass. Fixtures
+cover release, move, self-move, moved-from reuse and 120 inline/heap transitions.
+No speed gain is claimed. See ../results/2026-10-26/AUTO_MALLOC.md. The typed allocation
+templates and other remaining memory/raster implementation still require conversion.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
