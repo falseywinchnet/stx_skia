@@ -329,6 +329,11 @@ foreach(unit IN ITEMS SkSemaphore SkThreadID SkSharedMutex)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
 
+foreach(unit IN ITEMS src/utils/SkPolyUtils.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()
+
 foreach(unit IN ITEMS src/lazy/SkDiscardableMemoryPool.cpp src/ports/SkDiscardableMemory_none.cpp)
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})

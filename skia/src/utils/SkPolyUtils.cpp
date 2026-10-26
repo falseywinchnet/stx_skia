@@ -22,6 +22,7 @@
 #include "src/core/SkVx.h"
 
 #include <algorithm>
+#include <memory>
 #include <cstdint>
 #include <limits>
 #include <new>
@@ -1544,10 +1545,11 @@ public:
             return false;
         }
 
-        fGrid.resize(fHCount*fVCount);
-        for (int i = 0; i < fGrid.size(); ++i) {
-            fGrid[i].reset();
-        }
+        // The grid contains live list objects, not raw memcpy-relocatable slots.
+        // fVCount = vertexCount / fHCount bounds this product by vertexCount.
+        const int cellCount = fHCount * fVCount;
+        fGrid = std::make_unique<SkTInternalLList<TriangulationVertex>[]>(
+            static_cast<size_t>(cellCount));
 
         return true;
     }
@@ -1610,7 +1612,7 @@ private:
     int fNumVerts;
     // converts distance from the origin to a grid location (when cast to int)
     SkVector fGridConversion;
-    SkTDArray<SkTInternalLList<TriangulationVertex>> fGrid;
+    std::unique_ptr<SkTInternalLList<TriangulationVertex>[]> fGrid{};
 };
 
 // Check to see if a reflex vertex has become a convex vertex after clipping an ear
