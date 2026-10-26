@@ -29,7 +29,6 @@ class SkMatrix;
 class SkPaint;
 class SkPath;
 class SkRegion;
-class SkStream;
 class SkWStream;
 struct SkIRect;
 struct SkPoint3;
@@ -78,7 +77,6 @@ public:
     virtual void writeRegion(const SkRegion& region) = 0;
     virtual void writeSampling(const SkSamplingOptions&) = 0;
     virtual void writePath(const SkPath& path) = 0;
-    virtual size_t writeStream(SkStream* stream, size_t length) = 0;
     virtual void writeImage(const SkImage*) = 0;
     virtual void writePaint(const SkPaint& paint) = 0;
 
@@ -138,7 +136,6 @@ public:
     void writeRegion(const SkRegion& region) override;
     void writeSampling(const SkSamplingOptions&) override;
     void writePath(const SkPath& path) override;
-    size_t writeStream(SkStream* stream, size_t length) override;
     void writeImage(const SkImage*) override;
     void writePaint(const SkPaint& paint) override;
 

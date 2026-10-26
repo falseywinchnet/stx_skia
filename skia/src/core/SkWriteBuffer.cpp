@@ -138,15 +138,6 @@ void SkBinaryWriteBuffer::writePath(const SkPath& path) {
     fWriter.writePath(path);
 }
 
-size_t SkBinaryWriteBuffer::writeStream(SkStream* stream, size_t length) {
-    fWriter.write32(SkToU32(length));
-    size_t bytesWritten = fWriter.readFromStream(stream, length);
-    if (bytesWritten < length) {
-        fWriter.reservePad(length - bytesWritten);
-    }
-    return bytesWritten;
-}
-
 bool SkBinaryWriteBuffer::writeToStream(SkWStream* stream) const {
     return fWriter.writeToStream(stream);
 }
