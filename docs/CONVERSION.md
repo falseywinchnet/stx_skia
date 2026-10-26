@@ -987,6 +987,23 @@ sources remain in the reference profile; see
 ../results/2026-10-26/CLIP_TRANSLATION_LIMITS.md. No inner-pixel throughput
 claim is made from this boundary fix.
 
+## Serialized region and wrapped surface input
+
+The region reader now checks the run count by division before multiplying it
+by the word size. It reads serialized words from byte storage, so a valid
+complex region need not start at a four-byte aligned address; internally owned
+run arrays retain direct typed reads. Serialized rectangles obey the same
+sentinel-edge restriction as `SkRegion::setRect`. Rejection leaves the receiving
+region unchanged.
+
+The wrapped-surface factory rejects the private ignored-stride marker before
+constructing a surface. Raster validation rejects strides outside the bitmap's
+signed 32-bit range and calculates the total extent with unsigned arithmetic.
+Invalid arguments return null without invoking the release callback. The
+candidate-only cases and verification are recorded in
+../results/2026-10-26/RASTER_REGION_INPUT_BOUNDS.md. Other region and surface
+implementation remains in the conversion programme.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

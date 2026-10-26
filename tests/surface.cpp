@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -224,6 +225,14 @@ bool invalid_and_null() {
     ReleaseState release;
     if (SkSurfaces::WrapPixels(info, nullptr, stride, record_release, &release)) return false;
     if (SkSurfaces::WrapPixels(info, storage.data(), 1, record_release, &release)) return false;
+#ifndef STX_SKIA_REFERENCE
+    const std::size_t ignoredStride = std::numeric_limits<std::size_t>::max();
+    if (SkSurfaces::WrapPixels(info, storage.data(), ignoredStride,
+                              record_release, &release)) return false;
+    const std::size_t excessiveStride = ignoredStride - 3;
+    if (SkSurfaces::WrapPixels(info, storage.data(), excessiveStride,
+                              record_release, &release)) return false;
+#endif
     if (SkSurfaces::Raster(info, 1, nullptr)) return false;
     if (release.calls != 0) return false;
     if (SkSurfaces::Null(0, height)) return false;

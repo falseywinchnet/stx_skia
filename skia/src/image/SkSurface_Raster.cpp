@@ -43,11 +43,15 @@ bool SkSurfaceValidateRasterInfo(const SkImageInfo& info, size_t rowBytes) {
         return true;
     }
 
-    if (!info.validRowBytes(rowBytes)) {
+    // SkBitmap stores the stride in a signed 32-bit field. Reject larger
+    // caller strides before converting or multiplying them.
+    if (rowBytes > SK_MaxS32 || !info.validRowBytes(rowBytes)) {
         return false;
     }
 
-    const uint64_t size = sk_64_mul(info.height(), rowBytes);
+    const uint64_t height = static_cast<uint64_t>(info.height());
+    const uint64_t stride = static_cast<uint64_t>(rowBytes);
+    const uint64_t size = height * stride;
     constexpr size_t kMaxTotalSize = SK_MaxS32;
     if (size > kMaxTotalSize) {
         return false;
@@ -208,7 +212,9 @@ sk_sp<SkSurface> WrapPixels(const SkImageInfo& info,
     if (nullptr == releaseProc) {
         context = nullptr;
     }
-    if (!SkSurfaceValidateRasterInfo(info, rowBytes)) {
+    // The ignored-stride marker is private to callers that allocate pixels.
+    // A wrapped surface must validate the stride it was actually given.
+    if (rowBytes == kIgnoreRowBytesValue || !SkSurfaceValidateRasterInfo(info, rowBytes)) {
         return nullptr;
     }
     if (nullptr == pixels) {

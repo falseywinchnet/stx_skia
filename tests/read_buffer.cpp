@@ -140,6 +140,33 @@ bool structures() {
     return true;
 }
 
+bool region_input_bounds() {
+#ifndef STX_SKIA_REFERENCE
+    SkRegion source(SkIRect::MakeXYWH(2, 3, 5, 7));
+    source.op(SkIRect::MakeXYWH(20, 3, 4, 7), SkRegion::kUnion_Op);
+    if (!source.isComplex()) return false;
+    const size_t bytes = source.writeToMemory(nullptr);
+    std::vector<uint8_t> unaligned(bytes + 1);
+    if (source.writeToMemory(unaligned.data() + 1) != bytes) return false;
+    SkRegion decoded;
+    if (decoded.readFromMemory(unaligned.data() + 1, bytes) != bytes) return false;
+    if (decoded != source) return false;
+
+    const SkRegion retained(SkIRect::MakeXYWH(4, 5, 6, 7));
+    decoded = retained;
+    const std::array<int32_t, 5> sentinelRect{0, 0, 0,
+                                              std::numeric_limits<int32_t>::max(), 1};
+    if (decoded.readFromMemory(sentinelRect.data(), sizeof(sentinelRect)) != 0) return false;
+    if (decoded != retained) return false;
+
+    const std::array<int32_t, 7> wrappedCount{
+        0x40000007, 0, 0, 10, 10, 1, 536870913};
+    if (decoded.readFromMemory(wrappedCount.data(), sizeof(wrappedCount)) != 0) return false;
+    if (decoded != retained) return false;
+#endif
+    return true;
+}
+
 struct ImageContext {
     int calls = 0;
     bool alpha = false;
@@ -320,6 +347,7 @@ int main(int argc, char** argv) {
     if (!primitives()) { std::puts("primitive mismatch"); return 1; }
     if (!arrays_and_strings()) { std::puts("array/string mismatch"); return 1; }
     if (!structures()) { std::puts("structure mismatch"); return 1; }
+    if (!region_input_bounds()) { std::puts("region input mismatch"); return 1; }
     if (!images()) { std::puts("image callback mismatch"); return 1; }
     if (!boundaries()) { std::puts("boundary mismatch"); return 1; }
     std::printf("read buffer: primitives, 258 byte arrays, structures, callbacks, boundaries PASS; size=%zu\n",

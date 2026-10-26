@@ -1231,10 +1231,22 @@ static bool validate_run_count(int ySpanCount, int intervalCount, int runCount) 
     return safeMath && sum == runCount;
 }
 
-// Validate that a memory sequence is a valid region.
-// Try to check all possible errors.
-// never read beyond &runs[runCount-1].
-static bool validate_run(const int32_t* runs,
+// Validate a region without reading outside the declared run count.
+// The serialized payload is a byte sequence, not an array of live int32_t
+// objects. A fixed-size copy admits unaligned caller storage without scratch.
+static int32_t read_run_word(const char* runs, int index) {
+    const size_t byteOffset = static_cast<size_t>(index) * sizeof(int32_t);
+    int32_t value = 0;
+    std::memcpy(&value, runs + byteOffset, sizeof(value));
+    return value;
+}
+
+static int32_t read_run_word(const int32_t* runs, int index) {
+    return runs[index];
+}
+
+template <typename RunStorage>
+static bool validate_run(const RunStorage* runs,
                          int runCount,
                          const SkIRect& givenBounds,
                          int32_t ySpanCount,
@@ -1246,15 +1258,15 @@ static bool validate_run(const int32_t* runs,
     }
     SkASSERT(runCount >= 7);  // 7==SkRegion::kRectRegionRuns
     // quick safety check:
-    if (runs[runCount - 1] != SkRegion_kRunTypeSentinel ||
-        runs[runCount - 2] != SkRegion_kRunTypeSentinel) {
+    if (read_run_word(runs, runCount - 1) != SkRegion_kRunTypeSentinel ||
+        read_run_word(runs, runCount - 2) != SkRegion_kRunTypeSentinel) {
         return false;
     }
-    const int32_t* const end = runs + runCount;
+    int index = 0;
     SkIRect bounds = {0, 0, 0 ,0};  // calulated bounds
     SkIRect rect = {0, 0, 0, 0};    // current rect
     bool prevWasEmpty = true;       // If we start with an empty slice, that's corrupted data.
-    rect.fTop = *runs++;
+    rect.fTop = read_run_word(runs, index++);
     if (rect.fTop == SkRegion_kRunTypeSentinel) {
         return false;  // no rect can contain SkRegion_kRunTypeSentinel
     }
@@ -1266,7 +1278,10 @@ static bool validate_run(const int32_t* runs,
         if (ySpanCount < 0) {
             return false;  // too many yspans
         }
-        rect.fBottom = *runs++;
+        if (index > runCount - 4) {
+            return false;  // bottom, interval count, and both sentinels must remain
+        }
+        rect.fBottom = read_run_word(runs, index++);
         if (rect.fBottom == SkRegion_kRunTypeSentinel) {
             return false;
         }
@@ -1277,9 +1292,9 @@ static bool validate_run(const int32_t* runs,
             return false;  // y-intervals must be ordered; rects must be non-empty.
         }
 
-        int32_t xIntervals = *runs++;
-        SkASSERT(runs < end);
-        if (xIntervals < 0 || xIntervals > intervalCount || runs + 1 + 2 * xIntervals > end) {
+        int32_t xIntervals = read_run_word(runs, index++);
+        if (xIntervals < 0 || xIntervals > intervalCount ||
+            xIntervals > (runCount - index - 2) / 2) {
             return false;
         }
         if (xIntervals == 0) {
@@ -1295,8 +1310,8 @@ static bool validate_run(const int32_t* runs,
         bool firstInterval = true;
         int32_t lastRight = 0;  // check that x-intervals are distinct and ordered.
         while (xIntervals-- > 0) {
-            rect.fLeft = *runs++;
-            rect.fRight = *runs++;
+            rect.fLeft = read_run_word(runs, index++);
+            rect.fRight = read_run_word(runs, index++);
             if (rect.fLeft == SkRegion_kRunTypeSentinel ||
                 rect.fRight == SkRegion_kRunTypeSentinel ||
                 rect.fLeft >= rect.fRight ||  // check non-empty rect
@@ -1307,17 +1322,18 @@ static bool validate_run(const int32_t* runs,
             firstInterval = false;
             bounds.join(rect);
         }
-        if (*runs++ != SkRegion_kRunTypeSentinel) {
+        if (read_run_word(runs, index++) != SkRegion_kRunTypeSentinel) {
             return false;  // required check sentinel.
         }
         rect.fTop = rect.fBottom;
-        SkASSERT(runs < end);
-    } while (*runs != SkRegion_kRunTypeSentinel);
-    ++runs;
-    if (ySpanCount != 0 || intervalCount != 0 || givenBounds != bounds) {
+        if (index >= runCount) {
+            return false;
+        }
+    } while (read_run_word(runs, index) != SkRegion_kRunTypeSentinel);
+    ++index;
+    if (index != runCount || ySpanCount != 0 || intervalCount != 0 || givenBounds != bounds) {
         return false;
     }
-    SkASSERT(runs == end);  // if ySpanCount && intervalCount are right, must be correct length.
     return true;
 }
 size_t SkRegion::readFromMemory(const void* storage, size_t length) {
@@ -1340,21 +1356,26 @@ size_t SkRegion::readFromMemory(const void* storage, size_t length) {
             return 0;  // Short buffer or bad bounds for non-empty region; report failure.
         }
         if (count == 0) {
+            if (tmp.fBounds.right() == SkRegion_kRunTypeSentinel ||
+                tmp.fBounds.bottom() == SkRegion_kRunTypeSentinel) {
+                return 0;
+            }
             tmp.fRunHead = SkRegion_gRectRunHeadPtr;
         } else {
             int32_t ySpanCount, intervalCount;
             if (!buffer.readS32(&ySpanCount) ||
                 !buffer.readS32(&intervalCount) ||
-                buffer.available() < count * sizeof(int32_t)) {
+                static_cast<size_t>(count) > buffer.available() / sizeof(int32_t)) {
                 return 0;
             }
-            if (!validate_run((const int32_t*)((const char*)storage + buffer.pos()), count,
-                              tmp.fBounds, ySpanCount, intervalCount)) {
+            const size_t runBytes = static_cast<size_t>(count) * sizeof(int32_t);
+            const char* source = static_cast<const char*>(storage) + buffer.pos();
+            if (!validate_run(source, count, tmp.fBounds, ySpanCount, intervalCount)) {
                 return 0;  // invalid runs, don't even allocate
             }
             tmp.allocateRuns(count, ySpanCount, intervalCount);
             SkASSERT(tmp.isComplex());
-            SkAssertResult(buffer.read(tmp.fRunHead->writable_runs(), count * sizeof(int32_t)));
+            SkAssertResult(buffer.read(tmp.fRunHead->writable_runs(), runBytes));
         }
     }
     SkASSERT(tmp.isValid());
