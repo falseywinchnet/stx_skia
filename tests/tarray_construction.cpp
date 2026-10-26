@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <utility>
 
 using skia_private::STArray;
@@ -123,9 +124,99 @@ bool successful_objects(size_t& total) {
     return true;
 }
 
+bool successful_relocation(size_t& total) {
+    {
+        TArray<Element, false> owner;
+        owner.reset(6);
+        for (int index = 0; index < owner.size(); ++index) owner[index].value = index + 41;
+        owner.reserve_exact(64);
+        owner.shrink_to_fit();
+        TArray<Element, false> moved(std::move(owner));
+        if (!owner.empty() || moved.size() != 6) return false;
+        for (int index = 0; index < moved.size(); ++index) {
+            if (moved[index].value != index + 41) return false;
+        }
+        ++total;
+    }
+    if (Element::live != 0) return false;
+    {
+        STArray<4, Element, false> inlineOwner;
+        inlineOwner.reset(4);
+        for (int index = 0; index < inlineOwner.size(); ++index) {
+            inlineOwner[index].value = index + 61;
+        }
+        TArray<Element, false>& source = inlineOwner;
+        TArray<Element, false> moved(std::move(source));
+        if (!inlineOwner.empty() || moved.size() != 4) return false;
+        for (int index = 0; index < moved.size(); ++index) {
+            if (moved[index].value != index + 61) return false;
+        }
+        ++total;
+    }
+    if (Element::live != 0) return false;
+    {
+        TArray<Element, false> target;
+        target.reset(2);
+        STArray<4, Element, false> inlineSource;
+        inlineSource.reset(4);
+        for (int index = 0; index < inlineSource.size(); ++index) {
+            inlineSource[index].value = index + 81;
+        }
+        TArray<Element, false>& source = inlineSource;
+        target = std::move(source);
+        if (!inlineSource.empty() || target.size() != 4) return false;
+        for (int index = 0; index < target.size(); ++index) {
+            if (target[index].value != index + 81) return false;
+        }
+        TArray<Element, false> tail;
+        tail.reset(7);
+        for (int index = 0; index < tail.size(); ++index) tail[index].value = index + 101;
+        target.move_back(tail);
+        if (!tail.empty() || target.size() != 11) return false;
+        for (int index = 0; index < 4; ++index) {
+            if (target[index].value != index + 81) return false;
+        }
+        for (int index = 0; index < 7; ++index) {
+            if (target[index + 4].value != index + 101) return false;
+        }
+        target.removeShuffle(3);
+        if (target.size() != 10 || target[3].value != 107) return false;
+        ++total;
+    }
+    if (Element::live != 0) return false;
+    {
+        TArray<std::unique_ptr<int>> owner;
+        owner.push_back(std::make_unique<int>(19));
+        owner.push_back(std::make_unique<int>(23));
+        owner.reserve_exact(64);
+        owner.shrink_to_fit();
+        TArray<std::unique_ptr<int>> moved(std::move(owner));
+        if (!owner.empty() || moved.size() != 2) return false;
+        if (*moved[0] != 19 || *moved[1] != 23) return false;
+        TArray<std::unique_ptr<int>> tail;
+        tail.push_back(std::make_unique<int>(29));
+        moved.move_back(tail);
+        if (!tail.empty() || moved.size() != 3 || *moved[2] != 29) return false;
+        ++total;
+    }
+    return true;
+}
+
 #ifndef STX_SKIA_REFERENCE
 // The original publishes live counts before construction; do not ask it to
 // clean up failed construction. These cases exercise only the corrected paths.
+template <typename Array> bool unused_capacity_guarded(const Array& owner) {
+#ifdef SK_SANITIZE_ADDRESS
+    if (owner.capacity() > owner.size()) {
+        using Item = typename Array::value_type;
+        const std::byte* bytes = reinterpret_cast<const std::byte*>(owner.data());
+        const std::byte* firstUnused = bytes + sizeof(Item) * static_cast<size_t>(owner.size());
+        if (sk_asan_address_is_poisoned(firstUnused) == 0) return false;
+    }
+#endif
+    return true;
+}
+
 template <typename Array> bool failed_construction(size_t& total) {
     for (const int count : {3, 19}) {
         for (int failure = 1; failure <= count; ++failure) {
@@ -151,7 +242,8 @@ template <typename Array> bool failed_construction(size_t& total) {
                 caught = true;
             }
             Element::failAt = 0;
-            if (!caught || !target.empty() || Element::live != sourceLive) return false;
+            if (!caught || !target.empty() || Element::live != sourceLive ||
+                !unused_capacity_guarded(target)) return false;
             target.reset(2);
             Element::failAt = Element::attempts + failure;
             caught = false;
@@ -172,7 +264,8 @@ template <typename Array> bool failed_construction(size_t& total) {
                 caught = true;
             }
             Element::failAt = 0;
-            if (!caught || target.size() != 2 || Element::live != beforeAppend) return false;
+            if (!caught || target.size() != 2 || Element::live != beforeAppend ||
+                !unused_capacity_guarded(target)) return false;
             if (target[0].value != 17 || target[1].value != 17) return false;
             target.clear();
             Array copiedSource(source.data(), count);
@@ -199,6 +292,205 @@ template <typename Array> bool failed_construction(size_t& total) {
         }
     }
     return true;
+}
+
+struct MovingElement {
+    inline static int live = 0;
+    inline static int moves = 0;
+    inline static int failAt = 0;
+    int value = 23;
+    MovingElement() { ++live; }
+    MovingElement(const MovingElement&) = delete;
+    MovingElement(MovingElement&& source) : value(source.value) {
+        ++moves;
+        if (moves == failAt) throw ConstructionFailure{};
+        source.value = -1;
+        ++live;
+    }
+    ~MovingElement() { --live; }
+};
+
+bool failed_move_relocation(size_t& total) {
+    for (int failure = 1; failure <= 4; ++failure) {
+        {
+            TArray<MovingElement, false> owner;
+            owner.reset(4);
+            MovingElement::failAt = MovingElement::moves + failure;
+            bool caught = false;
+            try { owner.reserve_exact(64); }
+            catch (const ConstructionFailure&) { caught = true; }
+            MovingElement::failAt = 0;
+            if (!caught || owner.size() != 4 || MovingElement::live != 4) return false;
+            ++total;
+        }
+        if (MovingElement::live != 0) return false;
+        {
+            STArray<4, MovingElement, false> source;
+            source.reset(4);
+            TArray<MovingElement, false>& sourceBase = source;
+            MovingElement::failAt = MovingElement::moves + failure;
+            bool caught = false;
+            try { TArray<MovingElement, false> moved(std::move(sourceBase)); }
+            catch (const ConstructionFailure&) { caught = true; }
+            MovingElement::failAt = 0;
+            if (!caught || source.size() != 4 || MovingElement::live != 4) return false;
+            ++total;
+        }
+        if (MovingElement::live != 0) return false;
+        {
+            STArray<4, MovingElement, false> source;
+            source.reset(4);
+            TArray<MovingElement, false> target;
+            target.reset(2);
+            TArray<MovingElement, false>& sourceBase = source;
+            MovingElement::failAt = MovingElement::moves + failure;
+            bool caught = false;
+            try { target = std::move(sourceBase); }
+            catch (const ConstructionFailure&) { caught = true; }
+            MovingElement::failAt = 0;
+            if (!caught || !target.empty() || source.size() != 4 ||
+                MovingElement::live != 4) return false;
+            ++total;
+        }
+        if (MovingElement::live != 0) return false;
+        {
+            TArray<MovingElement, false> owner;
+            owner.reserve_exact(64);
+            owner.reset(4);
+            MovingElement::failAt = MovingElement::moves + failure;
+            bool caught = false;
+            try { owner.shrink_to_fit(); }
+            catch (const ConstructionFailure&) { caught = true; }
+            MovingElement::failAt = 0;
+            if (!caught || owner.size() != 4 || MovingElement::live != 4) return false;
+            ++total;
+        }
+        if (MovingElement::live != 0) return false;
+        {
+            TArray<MovingElement, false> owner;
+            owner.reset(8);
+            const int fullCount = owner.capacity();
+            owner.resize(static_cast<size_t>(fullCount));
+            MovingElement::failAt = MovingElement::moves + failure;
+            bool caught = false;
+            try { owner.emplace_back(); }
+            catch (const ConstructionFailure&) { caught = true; }
+            MovingElement::failAt = 0;
+            if (!caught || owner.size() != fullCount ||
+                MovingElement::live != fullCount || !unused_capacity_guarded(owner)) return false;
+            ++total;
+        }
+        if (MovingElement::live != 0) return false;
+        {
+            TArray<MovingElement, false> target;
+            target.reset(2);
+            TArray<MovingElement, false> source;
+            source.reset(4);
+            MovingElement::failAt = MovingElement::moves + failure;
+            bool caught = false;
+            try { target.move_back(source); }
+            catch (const ConstructionFailure&) { caught = true; }
+            MovingElement::failAt = 0;
+            if (!caught || target.size() != 2 || source.size() != 4 ||
+                MovingElement::live != 6) return false;
+            ++total;
+        }
+        if (MovingElement::live != 0) return false;
+    }
+    return true;
+}
+
+bool append_construction_contract(size_t& total) {
+    for (int failure = 1; failure <= 4; ++failure) {
+        TArray<Element> source;
+        source.reset(4);
+        TArray<Element> target;
+        target.reset(2);
+        const int liveBefore = Element::live;
+        Element::failAt = Element::attempts + failure;
+        bool caught = false;
+        try { target.push_back_n(4, source[0]); }
+        catch (const ConstructionFailure&) { caught = true; }
+        Element::failAt = 0;
+        if (!caught || target.size() != 2 || Element::live != liveBefore ||
+            !unused_capacity_guarded(target)) return false;
+        ++total;
+
+        Element::failAt = Element::attempts + failure;
+        caught = false;
+        try { target.push_back_n(4, source.data()); }
+        catch (const ConstructionFailure&) { caught = true; }
+        Element::failAt = 0;
+        if (!caught || target.size() != 2 || Element::live != liveBefore ||
+            !unused_capacity_guarded(target)) return false;
+        ++total;
+    }
+    if (Element::live != 0) return false;
+    for (int failure = 1; failure <= 4; ++failure) {
+        TArray<MovingElement, false> source;
+        source.reset(4);
+        TArray<MovingElement, false> target;
+        target.reset(2);
+        MovingElement::failAt = MovingElement::moves + failure;
+        bool caught = false;
+        try { target.move_back_n(4, source.data()); }
+        catch (const ConstructionFailure&) { caught = true; }
+        MovingElement::failAt = 0;
+        if (!caught || target.size() != 2 || source.size() != 4 ||
+            MovingElement::live != 6) return false;
+        ++total;
+    }
+    if (MovingElement::live != 0) return false;
+    {
+        TArray<Element> owner;
+        owner.reset(8);
+        for (int index = 0; index < 8; ++index) owner[index].value = index + 51;
+        owner.push_back_n(4, owner[3]);
+        if (owner.size() != 12) return false;
+        for (int index = 0; index < 4; ++index) {
+            if (owner[index + 8].value != 54) return false;
+        }
+        ++total;
+    }
+    {
+        TArray<Element> owner;
+        owner.reset(8);
+        for (int index = 0; index < 8; ++index) owner[index].value = index + 71;
+        owner.push_back_n(4, owner.data() + 2);
+        if (owner.size() != 12) return false;
+        for (int index = 0; index < 4; ++index) {
+            if (owner[index + 8].value != index + 73) return false;
+        }
+        ++total;
+    }
+    const bool valid = Element::live == 0 && MovingElement::live == 0;
+    return valid;
+}
+
+bool move_and_swap_contract() {
+    {
+        TArray<uint32_t> source;
+        source.reserve_exact(64);
+        source.reset(4);
+        const int reserved = source.capacity();
+        TArray<uint32_t> moved(std::move(source));
+        if (!source.empty() || moved.size() != 4 || moved.capacity() != reserved) return false;
+        if (!unused_capacity_guarded(moved)) return false;
+    }
+    {
+        TArray<Element> spare;
+        spare.reset(1);
+        spare.reserve_exact(32);
+        TArray<Element> packed;
+        packed.reset(8);
+        spare.swap(packed);
+        if (spare.size() != 8 || packed.size() != 1) return false;
+        packed.push_back();
+        if (packed.size() != 2 || Element::live != 10) return false;
+        if (!unused_capacity_guarded(packed)) return false;
+    }
+    const bool valid = Element::live == 0;
+    return valid;
 }
 
 template <typename Array> bool alias_reset(size_t& total) {
@@ -280,16 +572,23 @@ int main(int argc, char** argv) {
     valid = successful_construction<STArray<4, uint32_t>>(ordinary) && valid;
     valid = successful_construction<STArray<64, uint32_t>>(ordinary) && valid;
     valid = successful_objects(ordinary) && valid;
+    valid = successful_relocation(ordinary) && valid;
 #ifndef STX_SKIA_REFERENCE
     size_t failures = 0;
     size_t aliases = 0;
+    size_t interruptedMoves = 0;
+    size_t appendCases = 0;
     valid = failed_construction<TArray<Element>>(failures) && valid;
     valid = failed_construction<STArray<4, Element>>(failures) && valid;
+    valid = failed_move_relocation(interruptedMoves) && valid;
+    valid = append_construction_contract(appendCases) && valid;
+    valid = move_and_swap_contract() && valid;
     valid = alias_reset<TArray<Element>>(aliases) && valid;
     valid = alias_reset<STArray<4, Element>>(aliases) && valid;
     valid = trivial_alias_reset<TArray<uint32_t>>(aliases) && valid;
     valid = trivial_alias_reset<STArray<4, uint32_t>>(aliases) && valid;
-    if (valid) std::printf("candidate: %zu construction failures, %zu alias resets PASS\n", failures, aliases);
+    if (valid) std::printf("candidate: %zu construction failures, %zu interrupted moves, %zu append cases, %zu alias resets PASS\n",
+                           failures, interruptedMoves, appendCases, aliases);
 #endif
     if (!valid || Element::live != 0) {
         std::fputs("TArray construction: contract mismatch\n", stderr);

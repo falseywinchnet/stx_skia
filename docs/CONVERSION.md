@@ -892,6 +892,18 @@ check passes, a relocated installed consumer runs, and the seven selected
 GUI.Forms renderer tests pass. This establishes the current combined boundary;
 it does not complete the remaining TArray relocation or larger raster conversion.
 
+## TArray relocation and append failure states
+
+TArray now guards new allocations and incomplete ranges during growth, move
+and bulk append. It publishes live counts only after successful construction,
+retains source objects until relocation succeeds, handles self-alias bulk copy
+before growth, and restores unused-capacity sanitizer poisoning after an
+exception. Heap move retains capacity; heap swap carries its sanitizer state.
+The 16-byte heap and 32-byte inline layouts are unchanged. See
+../results/2026-10-26/TARRAY_RELOCATION.md for the interruption fixtures,
+reference comparison and negative performance measurements. The remaining
+container interface and broader source conversion are still open.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
