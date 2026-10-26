@@ -548,6 +548,47 @@ bool move_and_swap_contract() {
     return valid;
 }
 
+bool inline_swap_contract() {
+    Element::failAt = 0;
+    {
+        STArray<4, Element, false> left;
+        STArray<4, Element, false> right;
+        left.reset(2);
+        right.reset(3);
+        left[0].value = 11;
+        left[1].value = 13;
+        right[0].value = 17;
+        right[1].value = 19;
+        right[2].value = 23;
+        left.swap(right);
+        if (left.size() != 3 || right.size() != 2 || Element::live != 5) return false;
+        if (left[0].value != 17 || left[1].value != 19 || left[2].value != 23) return false;
+        if (right[0].value != 11 || right[1].value != 13) return false;
+        left.swap(left);
+        if (left.size() != 3 || left[2].value != 23 || Element::live != 5) return false;
+    }
+    if (Element::live != 0) return false;
+    {
+        TArray<Element, false> heap;
+        STArray<4, Element, false> inlineOwner;
+        heap.reset(7);
+        inlineOwner.reset(2);
+        for (int index = 0; index < 7; ++index) heap[index].value = index + 31;
+        inlineOwner[0].value = 47;
+        inlineOwner[1].value = 53;
+        heap.swap(inlineOwner);
+        if (heap.size() != 2 || inlineOwner.size() != 7 || Element::live != 9) return false;
+        if (heap[0].value != 47 || heap[1].value != 53) return false;
+        for (int index = 0; index < 7; ++index) {
+            if (inlineOwner[index].value != index + 31) return false;
+        }
+        heap.push_back();
+        inlineOwner.push_back();
+        if (Element::live != 11) return false;
+    }
+    return Element::live == 0;
+}
+
 template <typename Array> bool alias_reset(size_t& total) {
     for (int count = 1; count <= 32; ++count) {
         for (int offset = 0; offset < count; ++offset) {
@@ -639,6 +680,7 @@ int main(int argc, char** argv) {
     valid = failed_move_relocation(interruptedMoves) && valid;
     valid = append_construction_contract(appendCases) && valid;
     valid = move_and_swap_contract() && valid;
+    valid = inline_swap_contract() && valid;
     valid = alias_reset<TArray<Element>>(aliases) && valid;
     valid = alias_reset<STArray<4, Element>>(aliases) && valid;
     valid = trivial_alias_reset<TArray<uint32_t>>(aliases) && valid;

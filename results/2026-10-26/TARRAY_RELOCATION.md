@@ -61,3 +61,12 @@ The array still carries imported spelling and compatibility interfaces.
 Reference-returning accessors need complete rvalue-borrow qualification, and
 the inline `swap` path has only a basic failure guarantee. Work on those
 interfaces and the surrounding renderer remains open in `docs/CONVERSION.md`.
+
+## Additional inline swap check
+
+The candidate regression now exchanges two inline arrays and a heap array
+with an inline array, then checks element values, live object counts,
+self-swap, and subsequent append. Candidate Release passes 49/49 tests; the
+ASan/UBSan runner reports `PASS`. This verifies successful swaps for those
+storage combinations. It does not strengthen the documented failure guarantee
+when an element move throws.
