@@ -7,6 +7,7 @@
 #ifndef SkWorkingFormatColorFilter_DEFINED
 #define SkWorkingFormatColorFilter_DEFINED
 
+#include "include/core/SkAlphaType.h"
 #include "include/core/SkColor.h"
 #include "include/core/SkColorFilter.h"
 #include "include/core/SkFlattenable.h"
@@ -33,11 +34,11 @@ public:
     void flatten(SkWriteBuffer& buffer) const;
 
 private:
-    skcms_TransferFunction fTF;
+    skcms_TransferFunction fTF{};
     bool fUseDstTF = true;
-    skcms_Matrix3x3 fGamut;
+    skcms_Matrix3x3 fGamut{};
     bool fUseDstGamut = true;
-    SkAlphaType fAT;
+    SkAlphaType fAT = kPremul_SkAlphaType;
     bool fUseDstAT = true;
 };
 
@@ -68,9 +69,8 @@ private:
 
     void flatten(SkWriteBuffer& buffer) const override;
 
-    // We implement these so that callers can get this information, even after a filter is wrapped.
-    // That's important for Android, where *all* color filters work in sRGB. If the working format
-    // is ever important to a caller, we'll need to expand/alter the API. See: b/360020740
+    // Queries describe the child operation, without folding in the surrounding
+    // working-space conversions. Preserve that established query contract.
     bool onAsAColorMode(SkColor*, SkBlendMode*) const override;
     bool onAsAColorMatrix(float[20]) const override;
 

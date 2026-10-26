@@ -421,3 +421,10 @@ foreach(unit IN ITEMS src/core/SkColorTable.cpp src/effects/SkColorMatrix.cpp
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
+
+# Color-filter facade and scalar pipeline keep the original conversion path.
+foreach(unit IN ITEMS src/core/SkColorFilter.cpp src/effects/colorfilters/SkColorFilterBase.cpp
+                      src/shaders/SkColorFilterShader.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()

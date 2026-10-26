@@ -12,6 +12,8 @@
 #include "include/core/SkSurface.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkColorSpace.h"
+#include "include/core/SkColorFilter.h"
+#include "include/effects/SkColorMatrix.h"
 #include <vector>
 #include <cstddef>
 
@@ -64,5 +66,13 @@ int main() {
     SkCanvas& canvas = *(*surface).getCanvas();
     canvas.drawImage(image, 0, 0);
     if (!(*surface).notifyContentWillChange(SkSurface::kRetain_ContentChangeMode)) return 5;
+    SkColorMatrix matrix{};
+    matrix.setScale(0.5f, 0.25f, 0.75f, 1.0f);
+    const sk_sp<SkColorFilter> filter = SkColorFilters::Matrix(matrix);
+    if (!filter) return 6;
+    const sk_sp<SkColorFilter> composed = (*filter).makeComposed(filter);
+    const SkColor4f adjusted = (*composed).filterColor4f(SkColors::kWhite, nullptr, nullptr);
+    if (adjusted.fR != 0.25f || adjusted.fG != 0.0625f ||
+        adjusted.fB != 0.5625f || adjusted.fA != 1.0f) return 7;
     return 0;
 }

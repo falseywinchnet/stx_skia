@@ -1067,8 +1067,19 @@ preserved; table storage is copied once and retained explicitly. Temporary
 coefficient/table borrows are rejected. Both release suites pass, the complete
 instrumented suite returns PASS, and nine output artifacts match the reference
 byte for byte. See ../results/2026-10-26/COLOR_ADJUSTMENT_CONVERSION.md.
-Composition, working-space handling and the remaining color pipeline still need
-conversion.
+Composition and working-space handling are recorded below; blend-color filters,
+color conversion kernels and skcms remain in the conversion programme.
+
+## Color-filter composition and working spaces
+
+The color-filter facade, scalar pipeline, composition, working-format wrapper,
+color-space transform filter and filtered-shader wrapper now use named ownership
+transfers and explicit processing order. Base views reject temporary owners;
+the shader wrapper uses its existing base owner directly. Working-format wire
+coefficients are assembled as seven-element and nine-element arrays rather than
+traversing separate struct members or matrix rows as one array. The reference
+keeps the original implementation. See
+../results/2026-10-26/COLOR_COMPOSITION_CONVERSION.md for test scope and results.
 
 ## Still required
 

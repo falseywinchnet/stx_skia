@@ -23,20 +23,21 @@
 #include "src/core/SkWriteBuffer.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 
+#include <array>
 #include <utility>
 
 SkWorkingFormatColorFilter::SkWorkingFormatColorFilter(sk_sp<SkColorFilter> child,
                                                        const skcms_TransferFunction* tf,
                                                        const skcms_Matrix3x3* gamut,
                                                        const SkAlphaType* at)
-        : fWorkingFormatCalculator(tf, gamut, at) {
-    SkASSERT(child);
-    fChild = std::move(child);
+        : fChild(std::move(child)), fWorkingFormatCalculator(tf, gamut, at) {
+    SkASSERT(fChild);
 }
 
 sk_sp<SkColorSpace> SkWorkingFormatColorFilter::workingFormat(const sk_sp<SkColorSpace>& dstCS,
                                                               SkAlphaType* outAT) const {
-    return fWorkingFormatCalculator.workingFormat(dstCS, outAT);
+    sk_sp<SkColorSpace> colorSpace = fWorkingFormatCalculator.workingFormat(dstCS, outAT);
+    return colorSpace;
 }
 
 bool SkWorkingFormatColorFilter::appendStages(const SkStageRec& rec, bool shaderIsOpaque) const {
@@ -46,22 +47,22 @@ bool SkWorkingFormatColorFilter::appendStages(const SkStageRec& rec, bool shader
         dstCS = SkColorSpace::MakeSRGB();
     }
 
-    SkAlphaType workingAT;
-    sk_sp<SkColorSpace> workingCS = this->workingFormat(dstCS, &workingAT);
+    SkAlphaType workingAT = kPremul_SkAlphaType;
+    sk_sp<SkColorSpace> workingCS = workingFormat(dstCS, &workingAT);
 
-    SkColorInfo dst = {rec.fDstColorType, kPremul_SkAlphaType, dstCS},
-                working = {rec.fDstColorType, workingAT, workingCS};
+    const SkColorInfo dst = {rec.fDstColorType, kPremul_SkAlphaType, dstCS};
+    const SkColorInfo working = {rec.fDstColorType, workingAT, workingCS};
 
-    const auto* dstToWorking = rec.fAlloc->make<SkColorSpaceXformSteps>(dst, working);
-    const auto* workingToDst = rec.fAlloc->make<SkColorSpaceXformSteps>(working, dst);
+    // Stages borrow conversion coefficients, so their owners live in the arena
+    // through execution. Color-space owners are needed only to build the steps.
+    SkArenaAlloc& arena = *rec.fAlloc;
+    const SkColorSpaceXformSteps* dstToWorking = arena.make<SkColorSpaceXformSteps>(dst, working);
+    const SkColorSpaceXformSteps* workingToDst = arena.make<SkColorSpaceXformSteps>(working, dst);
 
-    // The paint color is in the destination color space, so *should* be coverted to working space.
-    // That's not necessary, though:
-    //   - Tinting alpha-only image shaders is the only effect that uses paint-color
-    //   - Alpha-only image shaders can't be reached from color-filters without SkSL
-    //   - SkSL disables paint-color tinting of alpha-only image shaders
+    // Retained color filters do not reach alpha-only image tinting. Its paint
+    // color therefore stays in the destination space and is not consumed here.
 
-    SkStageRec workingRec = {rec.fPipeline,
+    const SkStageRec workingRec = {rec.fPipeline,
                              rec.fAlloc,
                              rec.fDstColorType,
                              workingCS.get(),
@@ -69,11 +70,12 @@ bool SkWorkingFormatColorFilter::appendStages(const SkStageRec& rec, bool shader
                              rec.fSurfaceProps,
                              rec.fDstBounds};
 
-    dstToWorking->apply(rec.fPipeline);
-    if (!as_CFB(fChild)->appendStages(workingRec, shaderIsOpaque)) {
+    (*dstToWorking).apply(rec.fPipeline);
+    const SkColorFilterBase& child = *as_CFB(fChild);
+    if (!child.appendStages(workingRec, shaderIsOpaque)) {
         return false;
     }
-    workingToDst->apply(rec.fPipeline);
+    (*workingToDst).apply(rec.fPipeline);
     return true;
 }
 
@@ -84,27 +86,34 @@ SkPMColor4f SkWorkingFormatColorFilter::onFilterColor4f(const SkPMColor4f& origC
         dstCS = SkColorSpace::MakeSRGB();
     }
 
-    SkAlphaType workingAT;
-    sk_sp<SkColorSpace> workingCS = this->workingFormat(dstCS, &workingAT);
+    SkAlphaType workingAT = kPremul_SkAlphaType;
+    sk_sp<SkColorSpace> workingCS = workingFormat(dstCS, &workingAT);
 
-    SkColorInfo dst = {kUnknown_SkColorType, kPremul_SkAlphaType, dstCS},
-                working = {kUnknown_SkColorType, workingAT, workingCS};
-
+    const SkColorInfo dst = {kUnknown_SkColorType, kPremul_SkAlphaType, dstCS};
+    const SkColorInfo working = {kUnknown_SkColorType, workingAT, workingCS};
+    const SkColorSpaceXformSteps dstToWorking(dst, working);
+    const SkColorSpaceXformSteps workingToDst(working, dst);
+    const SkColorFilterBase& child = *as_CFB(fChild);
     SkPMColor4f color = origColor;
-    SkColorSpaceXformSteps{dst, working}.apply(color.vec());
-    color = as_CFB(fChild)->onFilterColor4f(color, working.colorSpace());
-    SkColorSpaceXformSteps{working, dst}.apply(color.vec());
+    dstToWorking.apply(color.vec());
+    color = child.onFilterColor4f(color, working.colorSpace());
+    workingToDst.apply(color.vec());
     return color;
 }
 
-bool SkWorkingFormatColorFilter::onIsAlphaUnchanged() const { return fChild->isAlphaUnchanged(); }
+bool SkWorkingFormatColorFilter::onIsAlphaUnchanged() const {
+    const bool unchanged = (*fChild).isAlphaUnchanged();
+    return unchanged;
+}
 
 bool SkWorkingFormatColorFilter::onAsAColorMode(SkColor* color, SkBlendMode* mode) const {
-    return fChild->asAColorMode(color, mode);
+    const bool represented = (*fChild).asAColorMode(color, mode);
+    return represented;
 }
 
 bool SkWorkingFormatColorFilter::onAsAColorMatrix(float matrix[20]) const {
-    return fChild->asAColorMatrix(matrix);
+    const bool represented = (*fChild).asAColorMatrix(matrix);
+    return represented;
 }
 
 void SkWorkingFormatColorFilter::flatten(SkWriteBuffer& buffer) const {
@@ -114,27 +123,39 @@ void SkWorkingFormatColorFilter::flatten(SkWriteBuffer& buffer) const {
 
 sk_sp<SkFlattenable> SkWorkingFormatColorFilter::CreateProc(SkReadBuffer& buffer) {
     sk_sp<SkColorFilter> child = buffer.readColorFilter();
-    bool useDstTF = buffer.readBool(), useDstGamut = buffer.readBool(),
-         useDstAT = buffer.readBool();
+    const bool useDstTF = buffer.readBool();
+    const bool useDstGamut = buffer.readBool();
+    const bool useDstAT = buffer.readBool();
+    skcms_TransferFunction tf{};
+    skcms_Matrix3x3 gamut{};
+    SkAlphaType at = kPremul_SkAlphaType;
 
-    skcms_TransferFunction tf;
-    skcms_Matrix3x3 gamut;
-    SkAlphaType at;
-
+    // The wire arrays contain seven named transfer coefficients and a row-major
+    // 3x3 gamut. Do not traverse struct members or separate rows as one C array.
     if (!useDstTF) {
-        buffer.readScalarArray({&tf.g, sizeof(skcms_TransferFunction) / sizeof(SkScalar)});
+        std::array<SkScalar, 7> coefficients{};
+        if (!buffer.readScalarArray(coefficients)) return nullptr;
+        tf = {coefficients[0], coefficients[1], coefficients[2], coefficients[3],
+              coefficients[4], coefficients[5], coefficients[6]};
     }
     if (!useDstGamut) {
-        buffer.readScalarArray({&gamut.vals[0][0], sizeof(skcms_Matrix3x3) / sizeof(SkScalar)});
+        std::array<SkScalar, 9> coefficients{};
+        if (!buffer.readScalarArray(coefficients)) return nullptr;
+        for (size_t row = 0; row < 3; ++row) {
+            for (size_t column = 0; column < 3; ++column) {
+                gamut.vals[row][column] = coefficients[row * 3 + column];
+            }
+        }
     }
     if (!useDstAT) {
         at = buffer.read32LE(kLastEnum_SkAlphaType);
     }
 
-    return SkColorFilterPriv::WithWorkingFormat(std::move(child),
-                                                useDstTF ? nullptr : &tf,
-                                                useDstGamut ? nullptr : &gamut,
-                                                useDstAT ? nullptr : &at);
+    if (!buffer.isValid()) return nullptr;
+    sk_sp<SkFlattenable> filter = SkColorFilterPriv::WithWorkingFormat(
+            std::move(child), useDstTF ? nullptr : &tf,
+            useDstGamut ? nullptr : &gamut, useDstAT ? nullptr : &at);
+    return filter;
 }
 
 sk_sp<SkColorFilter> SkColorFilterPriv::WithWorkingFormat(sk_sp<SkColorFilter> child,
@@ -148,7 +169,8 @@ sk_sp<SkColorFilter> SkColorFilterPriv::WithWorkingFormat(sk_sp<SkColorFilter> c
         // is also the identity.
         return nullptr;
     }
-    return sk_make_sp<SkWorkingFormatColorFilter>(std::move(child), tf, gamut, at);
+    sk_sp<SkColorFilter> filter = sk_make_sp<SkWorkingFormatColorFilter>(std::move(child), tf, gamut, at);
+    return filter;
 }
 
 
@@ -171,22 +193,23 @@ SkWorkingFormatCalculator::SkWorkingFormatCalculator(const skcms_TransferFunctio
 
 sk_sp<SkColorSpace> SkWorkingFormatCalculator::workingFormat(const sk_sp<SkColorSpace>& dstCS,
                                                              SkAlphaType* outAT) const {
-    skcms_TransferFunction tf;
-    skcms_Matrix3x3 gamut;
+    skcms_TransferFunction tf{};
+    skcms_Matrix3x3 gamut{};
 
     if (fUseDstTF) {
-        SkAssertResult(dstCS->isNumericalTransferFn(&tf));
+        SkAssertResult((*dstCS).isNumericalTransferFn(&tf));
     } else {
         tf = fTF;
     }
     if (fUseDstGamut) {
-        SkAssertResult(dstCS->toXYZD50(&gamut));
+        SkAssertResult((*dstCS).toXYZD50(&gamut));
     } else {
         gamut = fGamut;
     }
     *outAT = fUseDstAT ? kPremul_SkAlphaType : fAT;
 
-    return SkColorSpace::MakeRGB(tf, gamut);
+    sk_sp<SkColorSpace> colorSpace = SkColorSpace::MakeRGB(tf, gamut);
+    return colorSpace;
 }
 
 void SkWorkingFormatCalculator::flatten(SkWriteBuffer& buffer) const {
@@ -194,10 +217,18 @@ void SkWorkingFormatCalculator::flatten(SkWriteBuffer& buffer) const {
     buffer.writeBool(fUseDstGamut);
     buffer.writeBool(fUseDstAT);
     if (!fUseDstTF) {
-        buffer.writeScalarArray({&fTF.g, sizeof(skcms_TransferFunction) / sizeof(SkScalar)});
+        const std::array<SkScalar, 7> coefficients{
+            fTF.g, fTF.a, fTF.b, fTF.c, fTF.d, fTF.e, fTF.f};
+        buffer.writeScalarArray(coefficients);
     }
     if (!fUseDstGamut) {
-        buffer.writeScalarArray({&fGamut.vals[0][0], sizeof(skcms_Matrix3x3) / sizeof(SkScalar)});
+        std::array<SkScalar, 9> coefficients{};
+        for (size_t row = 0; row < 3; ++row) {
+            for (size_t column = 0; column < 3; ++column) {
+                coefficients[row * 3 + column] = fGamut.vals[row][column];
+            }
+        }
+        buffer.writeScalarArray(coefficients);
     }
     if (!fUseDstAT) {
         buffer.writeInt(fAT);
