@@ -20,6 +20,7 @@ public:
     /**
      *  Factory method that creates, initializes and locks an SkDiscardableMemory
      *  object. If either of these steps fails, a nullptr pointer will be returned.
+     *  Success transfers ownership; the caller unlocks before deleting it.
      */
     static SkDiscardableMemory* Create(size_t bytes);
 
@@ -30,13 +31,11 @@ public:
     class Factory : public SkRefCnt {
     public:
         virtual SkDiscardableMemory* create(size_t bytes) = 0;
-    private:
-        using INHERITED = SkRefCnt;
     };
 
     /** Must not be called while locked.
      */
-    virtual ~SkDiscardableMemory() {}
+    virtual ~SkDiscardableMemory() = default;
 
     /**
      * Locks the memory, prevent it from being discarded. Once locked. you may
@@ -51,7 +50,9 @@ public:
 
     /**
      * Returns the current pointer for the discardable memory. This call is ONLY
-     * valid when the discardable memory object is locked.
+     * valid when the discardable memory object is locked. The borrow expires on
+     * unlock or destruction. Each block requires serialized caller access;
+     * pool synchronization does not permit concurrent writes through this borrow.
      */
     virtual void* data() = 0;
 

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <thread>
 
@@ -19,7 +20,10 @@ public:
     ~Block() { unlock(); }
     Block(const Block&) = delete;
     Block& operator=(const Block&) = delete;
-    bool exists() const { return memory != nullptr; }
+    bool exists() const {
+        const bool present = memory != nullptr;
+        return present;
+    }
     bool lock() {
         assert(memory != nullptr && !locked);
         locked = (*memory).lock();
@@ -163,7 +167,9 @@ bool concurrent() {
     return true;
 }
 
-bool measure(const char* name, int mode) {
+enum class Workload { Allocate, Head, Alternating, Snapshots };
+template <Workload Mode>
+bool measure(const char* name) {
     sk_sp<SkDiscardableMemoryPool> pool = SkDiscardableMemoryPool::Make(4096);
     Block first(*pool, 64);
     Block second(*pool, 64);
@@ -173,12 +179,12 @@ bool measure(const char* name, int mode) {
     uint64_t digest = 0;
     const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     for (int index = 0; index < iterations; ++index) {
-        if (mode == 0) {
+        if constexpr (Mode == Workload::Allocate) {
             Block block(*pool, 64);
             if (!block.exists()) return false;
             ++digest;
-        } else if (mode == 1 || mode == 2) {
-            Block& block = mode == 1 || index % 2 == 0 ? first : second;
+        } else if constexpr (Mode == Workload::Head || Mode == Workload::Alternating) {
+            Block& block = Mode == Workload::Head || index % 2 == 0 ? first : second;
             if (!block.lock()) return false;
             block.unlock();
             ++digest;
@@ -197,10 +203,10 @@ bool measure(const char* name, int mode) {
 
 int main(int argc, char** argv) {
     if (argc == 2 && std::strcmp(argv[1], "--benchmark") == 0) {
-        if (!measure("allocate_unlock_destroy", 0)) return 10;
-        if (!measure("reacquire_head", 1)) return 11;
-        if (!measure("reacquire_alternating", 2)) return 12;
-        if (!measure("usage_and_budget", 3)) return 13;
+        if (!measure<Workload::Allocate>("allocate_unlock_destroy")) return 10;
+        if (!measure<Workload::Head>("reacquire_head")) return 11;
+        if (!measure<Workload::Alternating>("reacquire_alternating")) return 12;
+        if (!measure<Workload::Snapshots>("usage_and_budget")) return 13;
         return 0;
     }
     if (!policy()) return 1;

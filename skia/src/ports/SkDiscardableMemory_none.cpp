@@ -10,5 +10,7 @@
 #include "src/lazy/SkDiscardableMemoryPool.h"
 
 SkDiscardableMemory* SkDiscardableMemory::Create(size_t bytes) {
-    return SkGetGlobalDiscardableMemoryPool()->create(bytes);
+    SkDiscardableMemoryPool& pool = *SkGetGlobalDiscardableMemoryPool();
+    SkDiscardableMemory* block = pool.create(bytes);
+    return block;
 }
