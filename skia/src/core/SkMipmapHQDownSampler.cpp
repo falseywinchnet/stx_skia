@@ -146,15 +146,15 @@ struct ColorTypeFilter_1010102 {
     typedef uint32_t Type;
     static uint64_t Expand(uint64_t x) {
         return (((x      ) & 0x3ff)      ) |
-        (((x >> 10) & 0x3ff) << 20) |
-        (((x >> 20) & 0x3ff) << 40) |
-        (((x >> 30) & 0x3  ) << 60);
+        (((x >> 10) & 0x3ff) << 16) |
+        (((x >> 20) & 0x3ff) << 32) |
+        (((x >> 30) & 0x3  ) << 48);
     }
     static uint32_t Compact(uint64_t x) {
         return (((x      ) & 0x3ff)      ) |
-        (((x >> 20) & 0x3ff) << 10) |
-        (((x >> 40) & 0x3ff) << 20) |
-        (((x >> 60) & 0x3  ) << 30);
+        (((x >> 16) & 0x3ff) << 10) |
+        (((x >> 32) & 0x3ff) << 20) |
+        (((x >> 48) & 0x3  ) << 30);
     }
 };
 

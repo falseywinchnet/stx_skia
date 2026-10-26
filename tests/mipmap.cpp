@@ -157,6 +157,68 @@ bool rg16_average() {
     return true;
 }
 
+bool rgba10_average() {
+    for (const SkColorType format : {kRGBA_1010102_SkColorType, kBGRA_1010102_SkColorType}) {
+        for (int height = 1; height <= 17; ++height) {
+            for (int width = 1; width <= 17; ++width) {
+                if (width == 1 && height == 1) continue;
+                const int outputWidth = width > 1 ? width / 2 : 1;
+                const int outputHeight = height > 1 ? height / 2 : 1;
+                std::vector<uint32_t> input(static_cast<size_t>(width) * height, 0);
+                std::vector<uint32_t> output(static_cast<size_t>(outputWidth) * outputHeight, 0);
+                for (int y = 0; y < height; ++y) {
+                    for (int x = 0; x < width; ++x) {
+                        const uint32_t c0 = static_cast<uint32_t>((x * 193 + y * 101) & 1023);
+                        const uint32_t c1 = static_cast<uint32_t>((x * 317 + y * 293) & 1023);
+                        const uint32_t c2 = static_cast<uint32_t>((x * 727 + y * 163) & 1023);
+                        const uint32_t alpha = static_cast<uint32_t>((x + 2 * y + 3) & 3);
+                        input[static_cast<size_t>(y) * width + x] = c0 | (c1 << 10) |
+                                                                  (c2 << 20) | (alpha << 30);
+                    }
+                }
+                const SkImageInfo info = SkImageInfo::Make(width, height, format, kPremul_SkAlphaType);
+                const SkPixmap source(info, input.data(), static_cast<size_t>(width) * 4);
+                const SkImageInfo destinationInfo = info.makeWH(outputWidth, outputHeight);
+                const SkPixmap destination(destinationInfo, output.data(),
+                                            static_cast<size_t>(outputWidth) * 4);
+                std::unique_ptr<SkMipmapDownSampler> sampler = SkMipmap::MakeDownSampler(source);
+                if (!sampler) return false;
+                (*sampler).buildLevel(destination, source);
+                const int columns = width == 1 ? 1 : 2 + (width & 1);
+                const int rows = height == 1 ? 1 : 2 + (height & 1);
+                const unsigned divisor = (columns == 3 ? 4U : columns) * (rows == 3 ? 4U : rows);
+                for (int y = 0; y < outputHeight; ++y) {
+                    for (int x = 0; x < outputWidth; ++x) {
+                        uint32_t expected = 0;
+                        for (int channel = 0; channel < 4; ++channel) {
+                            const unsigned shift = static_cast<unsigned>(channel) * 10;
+                            const uint32_t mask = channel == 3 ? 3U : 1023U;
+                            uint32_t sum = 0;
+                            for (int row = 0; row < rows; ++row) {
+                                for (int column = 0; column < columns; ++column) {
+                                    const unsigned wx = columns == 3 && column == 1 ? 2U : 1U;
+                                    const unsigned wy = rows == 3 && row == 1 ? 2U : 1U;
+                                    const size_t index = static_cast<size_t>(2 * y + row) * width +
+                                                         2 * x + column;
+                                    sum += ((input[index] >> shift) & mask) * wx * wy;
+                                }
+                            }
+#ifdef STX_SKIA_REFERENCE
+                            // The pinned filter reserves only four bits for the
+                            // weighted alpha sum. Large triangle sums wrap there.
+                            if (channel == 3) sum &= 15U;
+#endif
+                            expected |= (sum / divisor) << shift;
+                        }
+                        if (output[static_cast<size_t>(y) * outputWidth + x] != expected) return false;
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+
 bool independent_average() {
     alignas(8) std::array<uint8_t, 64> storage{};
     const SkImageInfo info = SkImageInfo::Make(4, 4, kRGBA_8888_SkColorType, kPremul_SkAlphaType);
@@ -343,6 +405,7 @@ bool invalid_inputs() {
 
 int main(int argc, char** argv) {
     if (!rg16_average()) return 7;
+    if (!rgba10_average()) return 8;
     if (!independent_average()) return 1;
     if (!builder()) return 2;
     if (!discardable(false) || !discardable(true)) return 3;
