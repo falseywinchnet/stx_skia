@@ -18,10 +18,36 @@ Initial intake: 2026-10-25.
 
 No external dependency checkout, generated executable, downloaded tool, private
 asset, credential, local .claude material or GUI.Forms working-tree content is
-included. The unchanged upstream snapshot contains its own data and notices.
+included. The imported upstream snapshot contains its own data and notices.
 Build tools/dependencies referenced by upstream are not automatically fetched.
 
 Skia copyright and license notices, including third-party notices distributed
 inside its snapshot, remain in force. Derivation and house-style conversion do
 not make that code originally authored here. The separate Git repository starts
 with this attributed snapshot; upstream history remains available at the pin.
+
+
+## First CMake implementation
+
+`cmake/sources.cmake` records the dependency closure of the original macOS CPU
+GN target (491 source units including skcms). CMake applies explicit platform
+port selection; `cmake/prune.cmake` describes candidate exclusions. The retained
+baseline uses `baseline/SkData.cpp`, copied unchanged from the original import.
+
+Changes to imported implementation:
+
+- `skia/src/core/SkData.cpp`: explicit ownership, named release procedures,
+  bounds/allocation arithmetic, house-style spelling. Original BSD notice kept.
+- `SkOpts.cpp`, `SkBitmapProcState_opts.cpp`, `SkBlitMask_opts.cpp`,
+  `SkBlitRow_opts.cpp`, `SkMemset_opts.cpp`, `SkSwizzler_opts.cpp`, under
+  `skia/src/core/`: candidate-only conditional to omit higher-ISA dispatch.
+  The low-precision raster pipeline remains enabled.
+- 2,016 files (63,499,658 source bytes) removed as listed in
+  `baseline/pruned-source-files.json`: GPU implementation, unused modules,
+  platform demo/tool infrastructure and website. They remain recoverable from
+  initial repository commit `490c9bd4a97884d268a5b3f9924748ebf31954bb`.
+
+New `src/`, `include/stx_skia/`, tests and tools are original project additions.
+`integration/gui_forms_8d1f2be0.patch` is derived from the pinned GUI.Forms sources
+and retains their license. Its generated fixture and dependency checkouts are
+excluded from version control. Benchmark archives/binaries are not distributed.

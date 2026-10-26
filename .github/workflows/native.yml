@@ -1,0 +1,42 @@
+name: Native CPU package
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure and test
+        run: |
+          sh tools/build_native.sh baseline
+          sh tools/build_native.sh candidate
+          cmp build/baseline/render.raw build/candidate/render.raw
+          sh tools/verify_installed.sh
+      - name: Instrumented deterministic suite
+        run: sh tools/build_native.sh candidate-sanitize
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja
+      - name: Configure and test
+        run: |
+          sh tools/build_native.sh baseline
+          sh tools/build_native.sh candidate
+          cmp build/baseline/render.raw build/candidate/render.raw
+          sh tools/verify_installed.sh

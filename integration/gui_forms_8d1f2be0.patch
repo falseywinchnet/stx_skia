@@ -1,0 +1,150 @@
+--- a/src/render/skia/raster/skia_raster.cpp
++++ b/src/render/skia/raster/skia_raster.cpp
+@@ -1,4 +1,5 @@
+ #include "skia_raster.hpp"
++#include "stx_skia/pixel_storage.hpp"
+ #include "gui_forms/engine/part_raster/part_raster.hpp"
+ #include "gui_forms/paint_framebuffer.hpp"
+ 
+@@ -89,15 +90,14 @@
+     std::vector<float> positions;
+ };
+ 
+-SkGradientData to_sk_gradient(std::span<const GradientStop> stops) {
+-    SkGradientData result;
+-    result.colors.reserve(stops.size());
+-    result.positions.reserve(stops.size());
+-    for (const GradientStop& stop : stops) {
+-        result.colors.push_back(SkColor4f::FromColor(to_sk_color(stop.color)));
+-        result.positions.push_back(static_cast<float>(stop.offset));
+-    }
+-    return result;
++// Shader construction copies these values before the next draw reuses storage.
++void fill_sk_gradient(std::span<const GradientStop> stops, SkGradientData& result) {
++    result.colors.resize(stops.size());
++    result.positions.resize(stops.size());
++    for (std::size_t i = 0; i < stops.size(); ++i) {
++        result.colors[i] = SkColor4f::FromColor(to_sk_color(stops[i].color));
++        result.positions[i] = static_cast<float>(stops[i].offset);
++    }
+ }
+ 
+ SkTileMode to_sk_tile_mode(GradientSpreadMode spread) noexcept {
+@@ -153,6 +153,7 @@
+     bool prepared_mode{false};
+ #endif
+     ImageMap images;
++    SkGradientData gradient_scratch;
+     text::HarfBuzzFontEngine text_engine;
+     // Identity of text_engine for shaped-text memos. A memo holding an
+     // expired or different identity was shaped by another raster.
+@@ -623,7 +624,7 @@
+             }
+         }
+         if (!pixel_data) {
+-            pixel_data = SkData::MakeWithCopy(pixels.data(), pixels.size());
++            pixel_data = stx_skia::take_pixel_data(pixels);
+         }
+         sk_sp<SkImage> image =
+             SkImages::RasterFromData(output_info, std::move(pixel_data), row_bytes);
+@@ -810,7 +811,8 @@
+          spread != GradientSpreadMode::reflect)) {
+         return;
+     }
+-    const SkGradientData data = to_sk_gradient(stops);
++    SkGradientData& data = (*impl_).gradient_scratch;
++    fill_sk_gradient(stops, data);
+     const SkPoint points[2]{{static_cast<SkScalar>(start.x),
+                              static_cast<SkScalar>(start.y)},
+                             {static_cast<SkScalar>(end.x),
+@@ -832,7 +834,8 @@
+         radii.height <= 0.0 || !valid_gradient_stops(stops)) {
+         return;
+     }
+-    const SkGradientData data = to_sk_gradient(stops);
++    SkGradientData& data = (*impl_).gradient_scratch;
++    fill_sk_gradient(stops, data);
+     sk_sp<SkShader> shader = SkShaders::RadialGradient(
+         {0.0F, 0.0F}, 1.0F, make_sk_gradient(data));
+     if (!shader) return;
+--- a/src/render/skia/executor/skia_executor.cpp
++++ b/src/render/skia/executor/skia_executor.cpp
+@@ -1,4 +1,5 @@
+ #include "skia_executor.hpp"
++#include "stx_skia/pixel_storage.hpp"
+ 
+ #include "include/core/SkBlendMode.h"
+ #include "include/core/SkCanvas.h"
+@@ -1031,10 +1032,9 @@
+                 const SkImageInfo source_info = image_info(
+                     command.image.width, command.image.height,
+                     command.image.pixel_format);
+-                const std::vector<std::byte> pixels = remapped_pixels(
++                std::vector<std::byte> pixels = remapped_pixels(
+                     command.image, command.image_attributes);
+-                sk_sp<SkData> data = SkData::MakeWithCopy(
+-                    pixels.data(), pixels.size());
++                sk_sp<SkData> data = stx_skia::take_pixel_data(pixels);
+                 sk_sp<SkImage> image = SkImages::RasterFromData(
+                     source_info, std::move(data), command.image.row_bytes());
+                 if (!image) return {RasterError::missing_image_pixels, executed};
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -887,48 +887,15 @@
+ endif()
+ 
+ if(GUI_FORMS_ENABLE_SKIA)
+-    set(GUI_FORMS_SKIA_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia)
+-    set(GUI_FORMS_SKIA_OUT
+-        "${GUI_FORMS_SKIA_ROOT}/out/gui_forms-cpu-release"
+-        CACHE PATH "Directory containing the pinned CPU-only Skia archives")
+-    option(GUI_FORMS_SKIA_PREBUILT
+-           "Use already-built Skia archives instead of invoking the host build"
+-           OFF)
+-    set(GUI_FORMS_SKIA_ARCHIVES
+-        ${GUI_FORMS_SKIA_OUT}/libskia.a
+-        ${GUI_FORMS_SKIA_OUT}/libskcms.a
+-    )
+-
+-    if(GUI_FORMS_SKIA_PREBUILT)
+-        foreach(archive_path IN LISTS GUI_FORMS_SKIA_ARCHIVES)
+-            if(NOT EXISTS "${archive_path}")
+-                message(FATAL_ERROR "Missing prebuilt Skia archive: ${archive_path}")
+-            endif()
+-        endforeach()
+-    else()
+-        add_custom_command(
+-            OUTPUT ${GUI_FORMS_SKIA_ARCHIVES}
+-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
+-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh ${GUI_FORMS_SKIA_OUT}
+-            DEPENDS
+-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
+-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh
+-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_cpu_args.gn
+-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_png_only.patch
+-            COMMENT "Building pinned CPU-only, codec-free Skia"
+-            VERBATIM
+-        )
+-    endif()
+-    add_custom_target(gui_forms_skia_dependency DEPENDS ${GUI_FORMS_SKIA_ARCHIVES})
+-
+-    foreach(archive IN ITEMS skia skcms)
+-        add_library(gui_forms_${archive}_archive STATIC IMPORTED GLOBAL)
+-        set_target_properties(gui_forms_${archive}_archive PROPERTIES
+-            IMPORTED_LOCATION ${GUI_FORMS_SKIA_OUT}/lib${archive}.a
+-        )
+-        add_dependencies(gui_forms_${archive}_archive gui_forms_skia_dependency)
+-    endforeach()
+-
++    if(NOT DEFINED STX_SKIA_SOURCE_ROOT)
++        message(FATAL_ERROR "This verification fixture requires STX_SKIA_SOURCE_ROOT")
++    endif()
++    add_subdirectory("${STX_SKIA_SOURCE_ROOT}" "${CMAKE_CURRENT_BINARY_DIR}/stx-skia")
++    set(GUI_FORMS_SKIA_ROOT "${STX_SKIA_SOURCE_ROOT}/skia")
++    add_custom_target(gui_forms_skia_dependency)
++    add_library(gui_forms_skia_archive INTERFACE)
++    target_link_libraries(gui_forms_skia_archive INTERFACE stx_skia::stx_skia)
++    add_library(gui_forms_skcms_archive INTERFACE)
+     add_library(gui_forms_skia STATIC
+         src/render/skia/raster/skia_raster.cpp
+     )

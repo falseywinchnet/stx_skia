@@ -18,7 +18,7 @@ composition. Looking only at control rendering would omit real GUI.Drawing work.
 |---|---|---|
 | CPU surfaces and pixel views | Raster frame setup; executor `WrapPixels`; prepared frame | Owned and borrowed buffers, row strides, RGBA/BGRA premultiplied pixels, A8 masks, snapshots and pixel access |
 | Canvas state and transforms | Both consumers | Save/restore, translations, scaling and GUI.Drawing affine matrices |
-| Clipping | Damage regions, rectangle and rounded clipping; inset shadows | Integer region clipping and antialiased rounded clips; intersection and difference semantics |
+| Clipping | Damage regions, rectangle and rounded clipping; inset shadows | Integer region clipping and antialiased rounded clips; intersection; inset shadows use an even-odd complement path |
 | Shape rasterization | Both consumers | Rectangles, rounded rectangles, lines, ellipses, polygon and Bézier paths, fill rules, antialiasing and strokes |
 | Dash path effect | GUI.Drawing `configure_pen` | Preset and custom dash sequences |
 | Gradients | Both consumers | Linear/radial gradients, stops, opacity, clamp/repeat/mirror; preserve interpolation and rounding |
@@ -60,9 +60,10 @@ library stays codec-neutral in either case.
 | SkSL/runtime-effect compilation | No direct runtime-effect creation found; core SkSL groups remain in BUILD.gn | Image filters use known runtime effects internally; remove their dependencies before claiming SkSL is unnecessary |
 | Unused effects, formats, sampling and blend specializations | Direct use is narrower than upstream API | Prove internal closure and future material requirements; do not delete by enum grep |
 
-The imported upstream tree includes tests and excluded modules to preserve a
-reproducible starting point. Future source pruning should follow the measured
-build/link closure, not directory names alone.
+The initial commit preserves the full upstream snapshot. The first CMake candidate
+removes excluded implementation/infrastructure sources listed in
+`baseline/pruned-source-files.json`; relevant upstream test sources remain.
+Source pruning follows the measured compile closure and the coordinator contract.
 
 ## Optimization leads from consumer inspection
 
@@ -92,3 +93,22 @@ work without improving drawing speed.
 
 The next measurement must count compiled source, linked code, allocations and
 peak workspace as well as draw time. Preserve image differences and regressions.
+
+
+## First implementation findings
+
+The original macOS closure still compiled `SkImageGeneratorCG.cpp`, despite the
+intended external codec policy. The candidate removes this ImageIO entry path,
+generic codec/encoder infrastructure and Android codec adapters. Encoded input
+is rejected at the retained compatibility entry point.
+
+The coordinator requires layers, full affine transforms, sweep gradients,
+additional blends, arbitrary paths, cubic/mipmap sampling and per-corner radii.
+These remain. Backdrop blur is retained as the optional future capability, so
+its general image-filter and SkSL dependencies are not cut speculatively.
+
+The new ownership helper is used in an isolated consumer patch for decoded and
+remapped pixel vectors. Gradient buffers are reused by the raster instance;
+shader construction copies the stop values synchronously. Borrowed texture
+snapshots still copy. Measurements and remaining gates are recorded under
+`results/2026-10-25/`.

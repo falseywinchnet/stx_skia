@@ -1,0 +1,8066 @@
+[
+  {
+    "path": "skia/infra/BUILD.bazel",
+    "bytes": 323
+  },
+  {
+    "path": "skia/infra/README.md",
+    "bytes": 349
+  },
+  {
+    "path": "skia/infra/bots/BUILD.bazel",
+    "bytes": 2910
+  },
+  {
+    "path": "skia/infra/bots/Makefile",
+    "bytes": 58
+  },
+  {
+    "path": "skia/infra/bots/README.md",
+    "bytes": 4102
+  },
+  {
+    "path": "skia/infra/bots/README.recipes.md",
+    "bytes": 40030
+  },
+  {
+    "path": "skia/infra/bots/analysis/Makefile",
+    "bytes": 161
+  },
+  {
+    "path": "skia/infra/bots/analysis/README.md",
+    "bytes": 593
+  },
+  {
+    "path": "skia/infra/bots/analysis/axis.sh",
+    "bytes": 426
+  },
+  {
+    "path": "skia/infra/bots/analysis/create-alljobs.sh",
+    "bytes": 869
+  },
+  {
+    "path": "skia/infra/bots/analysis/missing.sh",
+    "bytes": 1358
+  },
+  {
+    "path": "skia/infra/bots/assets/README.md",
+    "bytes": 1691
+  },
+  {
+    "path": "skia/infra/bots/assets/android_ndk_darwin/VERSION",
+    "bytes": 3
+  },
+  {
+    "path": "skia/infra/bots/assets/android_ndk_darwin/create.py",
+    "bytes": 1983
+  },
+  {
+    "path": "skia/infra/bots/assets/android_ndk_linux/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/android_ndk_linux/create.py",
+    "bytes": 900
+  },
+  {
+    "path": "skia/infra/bots/assets/android_ndk_windows/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/android_ndk_windows/create.py",
+    "bytes": 902
+  },
+  {
+    "path": "skia/infra/bots/assets/android_sdk_linux/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/android_sdk_linux/__init__.py",
+    "bytes": 132
+  },
+  {
+    "path": "skia/infra/bots/assets/android_sdk_linux/create.py",
+    "bytes": 926
+  },
+  {
+    "path": "skia/infra/bots/assets/android_sdk_linux/create_and_upload.py",
+    "bytes": 1296
+  },
+  {
+    "path": "skia/infra/bots/assets/arm64_sysroot/Dockerfile",
+    "bytes": 1238
+  },
+  {
+    "path": "skia/infra/bots/assets/arm64_sysroot/README.md",
+    "bytes": 163
+  },
+  {
+    "path": "skia/infra/bots/assets/arm64_sysroot/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/arm64_sysroot/create.py",
+    "bytes": 1619
+  },
+  {
+    "path": "skia/infra/bots/assets/armhf_sysroot/README.md",
+    "bytes": 288
+  },
+  {
+    "path": "skia/infra/bots/assets/armhf_sysroot/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/armhf_sysroot/create.py",
+    "bytes": 2196
+  },
+  {
+    "path": "skia/infra/bots/assets/bazel/README.md",
+    "bytes": 53
+  },
+  {
+    "path": "skia/infra/bots/assets/bazel/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bazel_build_task_driver/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bazel_build_task_driver/create.py",
+    "bytes": 1460
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk/README.md",
+    "bytes": 61
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_linux_amd64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_linux_amd64/create.py",
+    "bytes": 1106
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_linux_arm64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_linux_arm64/create.py",
+    "bytes": 1106
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_mac_amd64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_mac_amd64/create.py",
+    "bytes": 1107
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_mac_arm64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_mac_arm64/create.py",
+    "bytes": 1107
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_win_amd64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bazelisk_win_amd64/create.py",
+    "bytes": 1116
+  },
+  {
+    "path": "skia/infra/bots/assets/binutils_linux_x64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/binutils_linux_x64/create.py",
+    "bytes": 1933
+  },
+  {
+    "path": "skia/infra/bots/assets/bloaty/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/bloaty/create.py",
+    "bytes": 1090
+  },
+  {
+    "path": "skia/infra/bots/assets/cabe/README.md",
+    "bytes": 223
+  },
+  {
+    "path": "skia/infra/bots/assets/cabe/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/cast_toolchain/README.md",
+    "bytes": 88
+  },
+  {
+    "path": "skia/infra/bots/assets/cast_toolchain/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/ccache_linux/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/ccache_linux/create.py",
+    "bytes": 1380
+  },
+  {
+    "path": "skia/infra/bots/assets/ccache_mac/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/ccache_mac/create.py",
+    "bytes": 1385
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm64_gles/README.md",
+    "bytes": 535
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm64_gles/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm64_gles/__init__.py",
+    "bytes": 132
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm64_gles/create.py",
+    "bytes": 2338
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm64_gles/create_and_upload.py",
+    "bytes": 1194
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm_gles/README.md",
+    "bytes": 509
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm_gles/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm_gles/__init__.py",
+    "bytes": 132
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm_gles/create.py",
+    "bytes": 1917
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_arm_gles/create_and_upload.py",
+    "bytes": 1194
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_x86_64_gles/README.md",
+    "bytes": 519
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_x86_64_gles/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_x86_64_gles/__init__.py",
+    "bytes": 132
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_x86_64_gles/create.py",
+    "bytes": 1918
+  },
+  {
+    "path": "skia/infra/bots/assets/chromebook_x86_64_gles/create_and_upload.py",
+    "bytes": 1193
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_linux/Dockerfile",
+    "bytes": 5080
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_linux/README.md",
+    "bytes": 993
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_linux/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_linux/create.py",
+    "bytes": 1461
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_mac_arm/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_mac_arm/create.py",
+    "bytes": 1408
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_mac_intel/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_mac_intel/create.py",
+    "bytes": 1382
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_ubuntu_noble/Dockerfile",
+    "bytes": 4061
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_ubuntu_noble/README.md",
+    "bytes": 993
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_ubuntu_noble/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_ubuntu_noble/create.py",
+    "bytes": 1501
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_win/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/clang_win/create.py",
+    "bytes": 1298
+  },
+  {
+    "path": "skia/infra/bots/assets/cmake_linux/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/cmake_linux/create.py",
+    "bytes": 1283
+  },
+  {
+    "path": "skia/infra/bots/assets/cmake_mac/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/cmake_mac/create.py",
+    "bytes": 1357
+  },
+  {
+    "path": "skia/infra/bots/assets/cmake_win/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/cmake_win/create.py",
+    "bytes": 1345
+  },
+  {
+    "path": "skia/infra/bots/assets/cockroachdb/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/cockroachdb/create.py",
+    "bytes": 1112
+  },
+  {
+    "path": "skia/infra/bots/assets/dwritecore/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/dwritecore/create.py",
+    "bytes": 2604
+  },
+  {
+    "path": "skia/infra/bots/assets/gcloud_linux/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/gcloud_linux/create.py",
+    "bytes": 2502
+  },
+  {
+    "path": "skia/infra/bots/assets/go/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/go/asset.json",
+    "bytes": 27
+  },
+  {
+    "path": "skia/infra/bots/assets/go/create.py",
+    "bytes": 1033
+  },
+  {
+    "path": "skia/infra/bots/assets/go_win/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/go_win/create.py",
+    "bytes": 1019
+  },
+  {
+    "path": "skia/infra/bots/assets/gsutil/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/gsutil/create.py",
+    "bytes": 1268
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-11.4/README.md",
+    "bytes": 222
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-11.4/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-13.3/README.md",
+    "bytes": 223
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-13.3/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-13.4/README.md",
+    "bytes": 217
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-13.4/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-13.5/README.md",
+    "bytes": 217
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-13.5/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-13.6/README.md",
+    "bytes": 217
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-13.6/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-14.4/README.md",
+    "bytes": 217
+  },
+  {
+    "path": "skia/infra/bots/assets/ios-dev-image-14.4/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/jq/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/jq/create.py",
+    "bytes": 1085
+  },
+  {
+    "path": "skia/infra/bots/assets/jq_mac_arm64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/jq_mac_arm64/create.py",
+    "bytes": 1085
+  },
+  {
+    "path": "skia/infra/bots/assets/kubectl/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/kubectl/create.py",
+    "bytes": 1220
+  },
+  {
+    "path": "skia/infra/bots/assets/kubeval/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/kubeval/create.py",
+    "bytes": 1262
+  },
+  {
+    "path": "skia/infra/bots/assets/kubeval_mac_amd64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/kubeval_mac_amd64/create.py",
+    "bytes": 1263
+  },
+  {
+    "path": "skia/infra/bots/assets/linux_vulkan_sdk/README.md",
+    "bytes": 115
+  },
+  {
+    "path": "skia/infra/bots/assets/linux_vulkan_sdk/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/linux_vulkan_sdk/create.py",
+    "bytes": 1817
+  },
+  {
+    "path": "skia/infra/bots/assets/lottie-samples/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/lottie-samples/create.py",
+    "bytes": 512
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux/README.md",
+    "bytes": 2912
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux/create.py",
+    "bytes": 1183
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux/mesa-driver-builder/Dockerfile",
+    "bytes": 1369
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux/mesa-driver-builder/build_mesa.sh",
+    "bytes": 812
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux_22/README.md",
+    "bytes": 2769
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux_22/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux_22/create.py",
+    "bytes": 920
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux_22/mesa-driver-builder/Dockerfile",
+    "bytes": 704
+  },
+  {
+    "path": "skia/infra/bots/assets/mesa_intel_driver_linux_22/mesa-driver-builder/build_mesa.sh",
+    "bytes": 1088
+  },
+  {
+    "path": "skia/infra/bots/assets/mockery/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/mockery/create.py",
+    "bytes": 2509
+  },
+  {
+    "path": "skia/infra/bots/assets/mskp/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/node/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/node/create.py",
+    "bytes": 962
+  },
+  {
+    "path": "skia/infra/bots/assets/patch_linux_amd64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/patch_linux_amd64/create.py",
+    "bytes": 1221
+  },
+  {
+    "path": "skia/infra/bots/assets/protoc/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/protoc/create.py",
+    "bytes": 767
+  },
+  {
+    "path": "skia/infra/bots/assets/scripts/common.py",
+    "bytes": 588
+  },
+  {
+    "path": "skia/infra/bots/assets/scripts/create.py",
+    "bytes": 552
+  },
+  {
+    "path": "skia/infra/bots/assets/scripts/create_and_upload.py",
+    "bytes": 1094
+  },
+  {
+    "path": "skia/infra/bots/assets/scripts/download.py",
+    "bytes": 277
+  },
+  {
+    "path": "skia/infra/bots/assets/scripts/upload.py",
+    "bytes": 267
+  },
+  {
+    "path": "skia/infra/bots/assets/skimage/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/skimage/create_and_upload.py",
+    "bytes": 1315
+  },
+  {
+    "path": "skia/infra/bots/assets/skp/README.md",
+    "bytes": 119
+  },
+  {
+    "path": "skia/infra/bots/assets/skp/VERSION",
+    "bytes": 4
+  },
+  {
+    "path": "skia/infra/bots/assets/skp/__init__.py",
+    "bytes": 132
+  },
+  {
+    "path": "skia/infra/bots/assets/skp/create.py",
+    "bytes": 7461
+  },
+  {
+    "path": "skia/infra/bots/assets/skp/create_and_upload.py",
+    "bytes": 2020
+  },
+  {
+    "path": "skia/infra/bots/assets/skparagraph/README.md",
+    "bytes": 140
+  },
+  {
+    "path": "skia/infra/bots/assets/skparagraph/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/skparagraph/create.py",
+    "bytes": 3029
+  },
+  {
+    "path": "skia/infra/bots/assets/svg/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/svg/create.py",
+    "bytes": 2420
+  },
+  {
+    "path": "skia/infra/bots/assets/text_blob_traces/README.md",
+    "bytes": 1046
+  },
+  {
+    "path": "skia/infra/bots/assets/text_blob_traces/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/win_ninja/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/win_ninja/create.py",
+    "bytes": 783
+  },
+  {
+    "path": "skia/infra/bots/assets/win_toolchain/VERSION",
+    "bytes": 2
+  },
+  {
+    "path": "skia/infra/bots/assets/win_toolchain/__init__.py",
+    "bytes": 132
+  },
+  {
+    "path": "skia/infra/bots/assets/win_toolchain/create.py",
+    "bytes": 2211
+  },
+  {
+    "path": "skia/infra/bots/assets/win_toolchain/create_and_upload.py",
+    "bytes": 1079
+  },
+  {
+    "path": "skia/infra/bots/assets/xcode-11.4.1/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/yq/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/yq/create.py",
+    "bytes": 1087
+  },
+  {
+    "path": "skia/infra/bots/assets/yq_mac_arm64/VERSION",
+    "bytes": 1
+  },
+  {
+    "path": "skia/infra/bots/assets/yq_mac_arm64/create.py",
+    "bytes": 1088
+  },
+  {
+    "path": "skia/infra/bots/build_task_drivers.sh",
+    "bytes": 1053
+  },
+  {
+    "path": "skia/infra/bots/buildstats/buildstats_cpp.py",
+    "bytes": 2601
+  },
+  {
+    "path": "skia/infra/bots/buildstats/buildstats_flutter.py",
+    "bytes": 5260
+  },
+  {
+    "path": "skia/infra/bots/buildstats/buildstats_wasm.py",
+    "bytes": 2335
+  },
+  {
+    "path": "skia/infra/bots/buildstats/buildstats_web.py",
+    "bytes": 1640
+  },
+  {
+    "path": "skia/infra/bots/buildstats/make_treemap.py",
+    "bytes": 1460
+  },
+  {
+    "path": "skia/infra/bots/bundle_recipes.sh",
+    "bytes": 319
+  },
+  {
+    "path": "skia/infra/bots/cfg.json",
+    "bytes": 1087
+  },
+  {
+    "path": "skia/infra/bots/check_deps.py",
+    "bytes": 1984
+  },
+  {
+    "path": "skia/infra/bots/deps/deps.go",
+    "bytes": 783
+  },
+  {
+    "path": "skia/infra/bots/deps/deps_gen.go",
+    "bytes": 12666
+  },
+  {
+    "path": "skia/infra/bots/deps/generate.go",
+    "bytes": 302
+  },
+  {
+    "path": "skia/infra/bots/find_tasks.py",
+    "bytes": 1496
+  },
+  {
+    "path": "skia/infra/bots/format_jobs_json/format_jobs_json.go",
+    "bytes": 2405
+  },
+  {
+    "path": "skia/infra/bots/gen_tasks.go",
+    "bytes": 359
+  },
+  {
+    "path": "skia/infra/bots/gen_tasks_logic/compile_cas.go",
+    "bytes": 6267
+  },
+  {
+    "path": "skia/infra/bots/gen_tasks_logic/dm_flags.go",
+    "bytes": 68928
+  },
+  {
+    "path": "skia/infra/bots/gen_tasks_logic/gen_tasks_logic.go",
+    "bytes": 80221
+  },
+  {
+    "path": "skia/infra/bots/gen_tasks_logic/job_builder.go",
+    "bytes": 5012
+  },
+  {
+    "path": "skia/infra/bots/gen_tasks_logic/nano_flags.go",
+    "bytes": 13615
+  },
+  {
+    "path": "skia/infra/bots/gen_tasks_logic/schema.go",
+    "bytes": 13067
+  },
+  {
+    "path": "skia/infra/bots/gen_tasks_logic/task_builder.go",
+    "bytes": 16392
+  },
+  {
+    "path": "skia/infra/bots/git_utils.py",
+    "bytes": 5954
+  },
+  {
+    "path": "skia/infra/bots/infra_tests.py",
+    "bytes": 1996
+  },
+  {
+    "path": "skia/infra/bots/jobs.json",
+    "bytes": 70706
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/README.md",
+    "bytes": 1415
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/__init__.py",
+    "bytes": 539
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/android.py",
+    "bytes": 4457
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/api.py",
+    "bytes": 1542
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/canvaskit.py",
+    "bytes": 3571
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/chromebook.py",
+    "bytes": 5265
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/cmake.py",
+    "bytes": 2370
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/default.py",
+    "bytes": 17672
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/docker.py",
+    "bytes": 2083
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm-OptimizeForSize-Android_NoPatch.json",
+    "bytes": 2617
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm-Release-Android_API26.json",
+    "bytes": 2409
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm-Release-Android_ASAN.json",
+    "bytes": 2413
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm-Release-Chromebook_GLES.json",
+    "bytes": 3615
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm64-Debug-Android_FrameworkWorkarounds.json",
+    "bytes": 2481
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm64-Debug-Android_Graphite_Native_Vulkan.json",
+    "bytes": 2551
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm64-Debug-Android_HWASAN.json",
+    "bytes": 2409
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm64-Debug-Chromebook_GLES.json",
+    "bytes": 3734
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm64-Release-Android_Graphite_Dawn_GLES.json",
+    "bytes": 2818
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm64-Release-Android_Graphite_Dawn_Vulkan.json",
+    "bytes": 2824
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-arm64-Release-Android_Wuffs.json",
+    "bytes": 2426
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-ASAN_Graphite_Native_Vulkan.json",
+    "bytes": 4253
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-AVIF.json",
+    "bytes": 4009
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-Chromebook_GLES.json",
+    "bytes": 2785
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-Coverage.json",
+    "bytes": 4107
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-Fontations.json",
+    "bytes": 4623
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-FreeType.json",
+    "bytes": 4086
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-ICU4X.json",
+    "bytes": 4010
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-MSAN.json",
+    "bytes": 4067
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-SK_CPU_LIMIT_SSE41.json",
+    "bytes": 4077
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-SwiftShader_Graphite.json",
+    "bytes": 6529
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-SwiftShader_MSAN.json",
+    "bytes": 7054
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-TSAN.json",
+    "bytes": 4006
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-Tidy.json",
+    "bytes": 3010
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-Vulkan_TSAN.json",
+    "bytes": 4102
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Debug-Wuffs.json",
+    "bytes": 4010
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-OptimizeForSize.json",
+    "bytes": 4516
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-ANGLE.json",
+    "bytes": 4030
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-ASAN.json",
+    "bytes": 4102
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-AVIF.json",
+    "bytes": 4029
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-CMake.json",
+    "bytes": 1349
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-Fast.json",
+    "bytes": 4084
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-NoDEPS.json",
+    "bytes": 4434
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-RustALL.json",
+    "bytes": 4212
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-RustBMP.json",
+    "bytes": 4046
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-RustPNG.json",
+    "bytes": 4105
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-SK_USE_PADDED_BLUR_UPSCALE.json",
+    "bytes": 4107
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-Static.json",
+    "bytes": 4056
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-SwiftShader.json",
+    "bytes": 6471
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-Clang-x86_64-Release-Vulkan.json",
+    "bytes": 4089
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-EMCC-wasm-Debug-CanvasKit.json",
+    "bytes": 1453
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-EMCC-wasm-Debug-StandaloneWasm.json",
+    "bytes": 3280
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-EMCC-wasm-Release-CanvasKit_CPU.json",
+    "bytes": 1453
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-EMCC-wasm-Release-CanvasKit_WebGPU.json",
+    "bytes": 1456
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian10-EMCC-wasm-Release-StandaloneWasm.json",
+    "bytes": 3286
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian11-GCC-x86-Debug-Docker.json",
+    "bytes": 3346
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian11-GCC-x86_64-Debug-Docker.json",
+    "bytes": 3356
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian11-GCC-x86_64-Release-NoGPU_Docker.json",
+    "bytes": 3439
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Debian11-GCC-x86_64-Release-Shared_Docker.json",
+    "bytes": 3443
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Debug-Android_Vulkan.json",
+    "bytes": 2465
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Debug-Graphite_Dawn_Metal.json",
+    "bytes": 6430
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Debug-Graphite_Dawn_Metal_NoGPU.json",
+    "bytes": 6473
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Debug-Graphite_Dawn_Metal_NoPrecompile.json",
+    "bytes": 6498
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Debug-Graphite_Native_Metal.json",
+    "bytes": 6138
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Debug-Graphite_Native_Metal_NoGPU.json",
+    "bytes": 6181
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Debug-Graphite_Native_Metal_NoPrecompile.json",
+    "bytes": 6206
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Debug-iOS.json",
+    "bytes": 6758
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Release-Graphite_Native_Dawn_Metal.json",
+    "bytes": 6471
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Release-Graphite_Native_Metal.json",
+    "bytes": 6158
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-arm64-Release-iOS18_Metal.json",
+    "bytes": 6840
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-x86_64-Debug-ASAN.json",
+    "bytes": 9106
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Mac-Clang-x86_64-Debug-Metal.json",
+    "bytes": 6068
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Ubuntu24.04-Clang-x86_64-Release-Fuzz.json",
+    "bytes": 3984
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Ubuntu24.04-Clang-x86_64-Release-SKVX_DISABLE_SIMD.json",
+    "bytes": 4080
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-Clang-arm64-Release-Android.json",
+    "bytes": 2438
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-Clang-x86-Debug-Exceptions.json",
+    "bytes": 2741
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-Clang-x86_64-Debug-ANGLE.json",
+    "bytes": 2763
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-Clang-x86_64-Release-Direct3D.json",
+    "bytes": 2813
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-Clang-x86_64-Release-Graphite_Native_Vulkan.json",
+    "bytes": 2916
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-Clang-x86_64-Release-Shared.json",
+    "bytes": 2790
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-Clang-x86_64-Release-Vulkan.json",
+    "bytes": 2842
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-MSVC-x86_64-Release-Graphite_Dawn_D3D11.json",
+    "bytes": 2587
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/Build-Win-MSVC-x86_64-Release-Graphite_Dawn_D3D12.json",
+    "bytes": 2587
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.expected/unknown-docker-image.json",
+    "bytes": 1965
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/examples/full.py",
+    "bytes": 5206
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/resources/cleanup_win_processes.py",
+    "bytes": 464
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/resources/copy_build_products.py",
+    "bytes": 697
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/resources/copy_build_products_no_delete.py",
+    "bytes": 890
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/resources/docker-chromeos-compile.sh",
+    "bytes": 457
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/resources/docker-compile.sh",
+    "bytes": 545
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/resources/docker-flutter-compile.sh",
+    "bytes": 1009
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/resources/ios.ensure",
+    "bytes": 133
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/build/util.py",
+    "bytes": 2410
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/builder_name_schema/__init__.py",
+    "bytes": 235
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/builder_name_schema/api.py",
+    "bytes": 1233
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/builder_name_schema/builder_name_schema.json",
+    "bytes": 1905
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/builder_name_schema/builder_name_schema.py",
+    "bytes": 5265
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/builder_name_schema/examples/full.expected/test.json",
+    "bytes": 33
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/builder_name_schema/examples/full.py",
+    "bytes": 2096
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/checkout/__init__.py",
+    "bytes": 475
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/checkout/api.py",
+    "bytes": 4408
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/checkout/examples/full.expected/Build-Debian10-Clang-x86_64-Release-NoDEPS.json",
+    "bytes": 2207
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/checkout/examples/full.expected/cross_repo_trybot.json",
+    "bytes": 4938
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/checkout/examples/full.expected/trybot.json",
+    "bytes": 4868
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/checkout/examples/full.py",
+    "bytes": 2501
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/checkout/resources/assert_git_cipd.py",
+    "bytes": 428
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/docker/__init__.py",
+    "bytes": 310
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/docker/api.py",
+    "bytes": 3731
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/docker/examples/full.expected/test.json",
+    "bytes": 3204
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/docker/examples/full.py",
+    "bytes": 1220
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/docker/resources/get_uid_gid.py",
+    "bytes": 188
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/doxygen/__init__.py",
+    "bytes": 285
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/doxygen/api.py",
+    "bytes": 517
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/doxygen/examples/full.expected/doxygen.json",
+    "bytes": 297
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/doxygen/examples/full.py",
+    "bytes": 679
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/doxygen/resources/generate_and_upload_doxygen.py",
+    "bytes": 2414
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/env/__init__.py",
+    "bytes": 249
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/env/api.py",
+    "bytes": 680
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/env/examples/full.expected/test.json",
+    "bytes": 466
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/env/examples/full.py",
+    "bytes": 608
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/__init__.py",
+    "bytes": 444
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/android.py",
+    "bytes": 16459
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/api.py",
+    "bytes": 3877
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/chromebook.py",
+    "bytes": 1999
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/default.py",
+    "bytes": 11356
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Android-Clang-AndroidOne-GPU-Mali400MP2-arm-Release-All-Android_SkottieTracing.json",
+    "bytes": 9787
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Android-Clang-GalaxyS20-GPU-MaliG77-arm64-Release-All-Android_Vulkan.json",
+    "bytes": 10588
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Android-Clang-GalaxyS7_G930FD-GPU-MaliT880-arm64-Debug-All-Android.json",
+    "bytes": 10195
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Android-Clang-MokeyGo32-CPU-Cortex-arm-Release-All-Android.json",
+    "bytes": 11305
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Android-Clang-MotoG73-GPU-BXM_8_256-arm64-Release-All-Android.json",
+    "bytes": 10195
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Android-Clang-Nexus5x-GPU-Adreno418-arm64-Debug-All-Android.json",
+    "bytes": 12539
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Android-Clang-Pixel6-GPU-Adreno620-arm64-Release-All-Android.json",
+    "bytes": 11856
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Debian10-Clang-GCE-CPU-AVX2-x86_64-Debug-All-MSAN.json",
+    "bytes": 2345
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Debian10-Clang-GCE-CPU-AVX2-x86_64-Release-All-ASAN.json",
+    "bytes": 2397
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Perf-Win2019-Clang-GCE-CPU-AVX2-x86_64-Debug-All-ASAN.json",
+    "bytes": 2482
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Android-Clang-AndroidOne-GPU-Mali400MP2-arm-Release-All-Android.json",
+    "bytes": 10474
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Android-Clang-GalaxyS7_G930FD-GPU-MaliT880-arm64-Debug-All-Android.json",
+    "bytes": 10117
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Android-Clang-Nexus5x-GPU-Adreno418-arm64-Debug-All-Android.json",
+    "bytes": 12131
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Android-Clang-Nexus5x-GPU-Adreno418-arm64-Release-All-Android_ASAN.json",
+    "bytes": 13256
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Android-Clang-Pixel3a-GPU-Adreno615-arm64-Debug-All-Android_Vulkan.json",
+    "bytes": 10482
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-ChromeOS-Clang-Cherry-GPU-MaliG57-arm-Debug-All.json",
+    "bytes": 12568
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Debian10-Clang-GCE-CPU-AVX2-x86_64-Debug-All-Coverage.json",
+    "bytes": 2252
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Debian10-Clang-GCE-CPU-AVX2-x86_64-Release-All-Lottie.json",
+    "bytes": 2182
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Debian10-Clang-GCE-CPU-AVX2-x86_64-Release-All-TSAN.json",
+    "bytes": 2600
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Debian10-Clang-GCE-GPU-SwiftShader-x86_64-Debug-All-SwiftShader.json",
+    "bytes": 2244
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Debian10-Clang-NUC7i5BNK-GPU-IntelIris640-x86_64-Debug-All-ASAN_Vulkan.json",
+    "bytes": 2739
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Debian10-Clang-NUC7i5BNK-GPU-IntelIris640-x86_64-Debug-All-Vulkan.json",
+    "bytes": 2601
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Debian11-Clang-NUC11TZi5-GPU-IntelIrisXe-x86_64-Debug-All.json",
+    "bytes": 2409
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Mac10.13-Clang-MacBookPro11.5-CPU-AVX2-x86_64-Debug-All-ASAN.json",
+    "bytes": 2291
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-Win10-Clang-NUC7i5BNK-CPU-AVX2-x86_64-Debug-All-NativeFonts_DWriteCore.json",
+    "bytes": 2231
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-iOS-Clang-iPhone8-GPU-AppleA11-arm64-Release-All-RPI.json",
+    "bytes": 7357
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/Test-iOS-Clang-iPhone8-GPU-AppleA11-arm64-Release-All.json",
+    "bytes": 12680
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/cpu_scale_failed.json",
+    "bytes": 14203
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/cpu_scale_failed_golo.json",
+    "bytes": 14619
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/cpu_scale_failed_once.json",
+    "bytes": 15379
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/exceptions.json",
+    "bytes": 33
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/failed_infra_step.json",
+    "bytes": 12535
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/internal_hardware_label.json",
+    "bytes": 10231
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/ios_rerun_with_debug.json",
+    "bytes": 7506
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/retry_adb_command.json",
+    "bytes": 16053
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/retry_adb_command_retries_exhausted.json",
+    "bytes": 15104
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/retry_ios_install.json",
+    "bytes": 8109
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.expected/retry_ios_install_retries_exhausted.json",
+    "bytes": 6288
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/examples/full.py",
+    "bytes": 9932
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/ios.py",
+    "bytes": 6760
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/dump_adb_log.py",
+    "bytes": 782
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/ios_debug_cmd.py",
+    "bytes": 1030
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/ios_xcode_run.py",
+    "bytes": 1782
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/remove_file_on_device.py",
+    "bytes": 825
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/run_sh.py",
+    "bytes": 487
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/scale_cpu.py",
+    "bytes": 2010
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/set_cpu_online.py",
+    "bytes": 1161
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/set_cpu_scaling_governor.py",
+    "bytes": 853
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/set_gpu_scaling.py",
+    "bytes": 1664
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/setup_device_for_asan.py",
+    "bytes": 2460
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/symbolize_stack_trace.py",
+    "bytes": 3908
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/wait_for_device.py",
+    "bytes": 1209
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/win_run_and_check_log.ps1",
+    "bytes": 1360
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/resources/win_ssh_cmd.py",
+    "bytes": 1695
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/flavor/ssh.py",
+    "bytes": 3659
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/git/__init__.py",
+    "bytes": 255
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/git/api.py",
+    "bytes": 596
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/git/examples/full.expected/test-win.json",
+    "bytes": 261
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/git/examples/full.expected/test.json",
+    "bytes": 258
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/git/examples/full.py",
+    "bytes": 460
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gold_upload/__init__.py",
+    "bytes": 452
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gold_upload/api.py",
+    "bytes": 2418
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gold_upload/examples/full.expected/upload_mac.json",
+    "bytes": 1016
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gold_upload/examples/full.expected/upload_tests.json",
+    "bytes": 1294
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gold_upload/examples/full.py",
+    "bytes": 1598
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gold_upload/resources/get_uninteresting_hashes.py",
+    "bytes": 833
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gsutil/__init__.py",
+    "bytes": 294
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gsutil/api.py",
+    "bytes": 1948
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gsutil/examples/full.expected/failed_all_uploads.json",
+    "bytes": 1404
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gsutil/examples/full.expected/failed_one_upload.json",
+    "bytes": 462
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gsutil/examples/full.expected/gsutil_tests.json",
+    "bytes": 209
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gsutil/examples/full.expected/gsutil_win_tests.json",
+    "bytes": 209
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/gsutil/examples/full.py",
+    "bytes": 2257
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/infra/__init__.py",
+    "bytes": 367
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/infra/api.py",
+    "bytes": 2317
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/infra/examples/full.expected/infra_tests.json",
+    "bytes": 736
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/infra/examples/full.py",
+    "bytes": 925
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/infra/resources/copytree.py",
+    "bytes": 252
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/infra/resources/parse_lottieweb_trace.py",
+    "bytes": 4733
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/infra/resources/parse_skottie_trace.py",
+    "bytes": 1734
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/run/__init__.py",
+    "bytes": 347
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/run/api.py",
+    "bytes": 3519
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/run/examples/full.expected/test.json",
+    "bytes": 5982
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/run/examples/full.py",
+    "bytes": 2587
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/vars/__init__.py",
+    "bytes": 434
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/vars/api.py",
+    "bytes": 3904
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/vars/examples/full.expected/Build-Debian10-Clang-x86_64-Release-SKVX_DISABLE_SIMD.json",
+    "bytes": 1398
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/vars/examples/full.expected/Housekeeper-Weekly-RecreateSKPs.json",
+    "bytes": 1377
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/vars/examples/full.expected/integer_issue.json",
+    "bytes": 1399
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/vars/examples/full.expected/win_test.json",
+    "bytes": 1395
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/vars/examples/full.py",
+    "bytes": 2433
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/vars/resources/get_env_var.py",
+    "bytes": 190
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/xcode/__init__.py",
+    "bytes": 303
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/xcode/api.py",
+    "bytes": 2735
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/xcode/examples/full.expected/xcode-test.json",
+    "bytes": 3904
+  },
+  {
+    "path": "skia/infra/bots/recipe_modules/xcode/examples/full.py",
+    "bytes": 544
+  },
+  {
+    "path": "skia/infra/bots/recipes.py",
+    "bytes": 9078
+  },
+  {
+    "path": "skia/infra/bots/recipes/README.md",
+    "bytes": 822
+  },
+  {
+    "path": "skia/infra/bots/recipes/compile.expected/Build-Win-Clang-x86-Debug.json",
+    "bytes": 3012
+  },
+  {
+    "path": "skia/infra/bots/recipes/compile.py",
+    "bytes": 2299
+  },
+  {
+    "path": "skia/infra/bots/recipes/compute_buildstats.expected/normal_bot.json",
+    "bytes": 8862
+  },
+  {
+    "path": "skia/infra/bots/recipes/compute_buildstats.expected/trybot.json",
+    "bytes": 10596
+  },
+  {
+    "path": "skia/infra/bots/recipes/compute_buildstats.py",
+    "bytes": 5915
+  },
+  {
+    "path": "skia/infra/bots/recipes/housekeeper.expected/Housekeeper-PerCommit-Trybot.json",
+    "bytes": 4868
+  },
+  {
+    "path": "skia/infra/bots/recipes/housekeeper.expected/Housekeeper-PerCommit.json",
+    "bytes": 5072
+  },
+  {
+    "path": "skia/infra/bots/recipes/housekeeper.py",
+    "bytes": 1801
+  },
+  {
+    "path": "skia/infra/bots/recipes/infra.expected/infra_tests.json",
+    "bytes": 2095
+  },
+  {
+    "path": "skia/infra/bots/recipes/infra.expected/infra_tests_lottie_ci.json",
+    "bytes": 3353
+  },
+  {
+    "path": "skia/infra/bots/recipes/infra.py",
+    "bytes": 2553
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf.expected/Perf-Android-Clang-Nexus7-CPU-Tegra3-arm-Debug-All-Android.json",
+    "bytes": 8390
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf.expected/Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-ANGLE.json",
+    "bytes": 2365
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf.py",
+    "bytes": 4763
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottietrace.expected/Perf-Android-Clang-AndroidOne-GPU-Mali400MP2-arm-Release-All-Android_SkottieTracing.json",
+    "bytes": 27634
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottietrace.expected/Perf-Debian10-Clang-GCE-CPU-AVX2-x86_64-Release-All-SkottieTracing.json",
+    "bytes": 16715
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottietrace.expected/Perf-Debian10-Clang-NUC7i5BNK-GPU-IntelIris640-x86_64-Release-All-SkottieTracing.json",
+    "bytes": 17397
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottietrace.expected/skottietracing_parse_trace_error.json",
+    "bytes": 11626
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottietrace.expected/skottietracing_trybot.json",
+    "bytes": 27962
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottietrace.py",
+    "bytes": 13673
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.expected/lottie_web_canvas_perf.json",
+    "bytes": 10377
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.expected/lottie_web_canvas_perf_trybot.json",
+    "bytes": 10705
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.expected/lottie_web_perf.json",
+    "bytes": 10354
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.expected/lottie_web_perf_trybot.json",
+    "bytes": 10682
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.expected/skottie_wasm_perf.json",
+    "bytes": 10678
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.expected/skottie_wasm_perf_gpu.json",
+    "bytes": 10763
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.expected/skottie_wasm_perf_trybot.json",
+    "bytes": 11006
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.expected/unrecognized_builder.json",
+    "bytes": 2395
+  },
+  {
+    "path": "skia/infra/bots/recipes/perf_skottiewasm_lottieweb.py",
+    "bytes": 15857
+  },
+  {
+    "path": "skia/infra/bots/recipes/sync_and_compile.expected/Build-Debian10-Clang-arm-Release-NoPatch (tryjob).json",
+    "bytes": 9017
+  },
+  {
+    "path": "skia/infra/bots/recipes/sync_and_compile.expected/Build-Debian10-Clang-arm-Release-NoPatch.json",
+    "bytes": 16610
+  },
+  {
+    "path": "skia/infra/bots/recipes/sync_and_compile.expected/Build-Win10-Clang-x86_64-Release-NoDEPS.json",
+    "bytes": 4836
+  },
+  {
+    "path": "skia/infra/bots/recipes/sync_and_compile.py",
+    "bytes": 6802
+  },
+  {
+    "path": "skia/infra/bots/recipes/test.expected/Test-Android12-Clang-Pixel5-GPU-Adreno620-arm64-Release-All-Android_Vulkan.json",
+    "bytes": 12596
+  },
+  {
+    "path": "skia/infra/bots/recipes/test.expected/Test-Debian10-Clang-GCE-CPU-AVX2-x86_64-Debug-All-Fontations.json",
+    "bytes": 3495
+  },
+  {
+    "path": "skia/infra/bots/recipes/test.expected/Test-Debian10-Clang-GCE-CPU-AVX2-x86_64-Release-All-Lottie.json",
+    "bytes": 3318
+  },
+  {
+    "path": "skia/infra/bots/recipes/test.expected/Test-Win11-Clang-Dell3930-GPU-GTX1660-x86_64-Debug-All.json",
+    "bytes": 2542
+  },
+  {
+    "path": "skia/infra/bots/recipes/test.py",
+    "bytes": 6595
+  },
+  {
+    "path": "skia/infra/bots/recipes/test_canvaskit.expected/Test-Debian10-EMCC-GCE-GPU-WEBGL1-wasm-Debug-All-CanvasKit.json",
+    "bytes": 6353
+  },
+  {
+    "path": "skia/infra/bots/recipes/test_canvaskit.expected/canvaskit_trybot.json",
+    "bytes": 6418
+  },
+  {
+    "path": "skia/infra/bots/recipes/test_canvaskit.py",
+    "bytes": 3490
+  },
+  {
+    "path": "skia/infra/bots/recipes/test_lottie_web.expected/Test-Debian10-none-GCE-CPU-AVX2-x86_64-Debug-All-LottieWeb.json",
+    "bytes": 5235
+  },
+  {
+    "path": "skia/infra/bots/recipes/test_lottie_web.expected/lottie_web_trybot.json",
+    "bytes": 5345
+  },
+  {
+    "path": "skia/infra/bots/recipes/test_lottie_web.py",
+    "bytes": 4221
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_buildstats_results.expected/normal_bot.json",
+    "bytes": 1281
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_buildstats_results.expected/trybot.json",
+    "bytes": 1315
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_buildstats_results.py",
+    "bytes": 2143
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_dm_results.expected/alternate_bucket.json",
+    "bytes": 2095
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_dm_results.expected/failed_all.json",
+    "bytes": 1815
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_dm_results.expected/failed_once.json",
+    "bytes": 2334
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_dm_results.expected/normal_bot.json",
+    "bytes": 2083
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_dm_results.expected/trybot.json",
+    "bytes": 2117
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_dm_results.py",
+    "bytes": 4171
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_nano_results.expected/normal_bot.json",
+    "bytes": 1150
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_nano_results.expected/trybot.json",
+    "bytes": 1167
+  },
+  {
+    "path": "skia/infra/bots/recipes/upload_nano_results.py",
+    "bytes": 2275
+  },
+  {
+    "path": "skia/infra/bots/run_recipe.py",
+    "bytes": 1229
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/bazel_build/BUILD.bazel",
+    "bytes": 797
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/bazel_build/bazel_build.go",
+    "bytes": 6261
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/canvaskit_gold/BUILD.bazel",
+    "bytes": 647
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/canvaskit_gold/canvaskit_gold.go",
+    "bytes": 9156
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/check_generated_files/BUILD.bazel",
+    "bytes": 682
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/check_generated_files/check_generated_files.go",
+    "bytes": 8408
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/codesize/BUILD.bazel",
+    "bytes": 2458
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/codesize/codesize.go",
+    "bytes": 20362
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/codesize/codesize_test.go",
+    "bytes": 19256
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/common/BUILD.bazel",
+    "bytes": 1484
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/common/bazel_clean_step.go",
+    "bytes": 7494
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/common/bazel_clean_step_test.go",
+    "bytes": 3296
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/common/bazel_flags.go",
+    "bytes": 2905
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/common/bazel_utils.go",
+    "bytes": 3711
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/common/bazel_utils_test.go",
+    "bytes": 3786
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/common/perf_steps.go",
+    "bytes": 3966
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/common/perf_steps_test.go",
+    "bytes": 11838
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/compile_wasm_gm_tests/BUILD.bazel",
+    "bytes": 874
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/compile_wasm_gm_tests/compile_wasm_gm_tests.go",
+    "bytes": 3458
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/cpu_tests/BUILD.bazel",
+    "bytes": 622
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/cpu_tests/cpu_tests.go",
+    "bytes": 3332
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/external_client/BUILD.bazel",
+    "bytes": 596
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/external_client/bazel_build_with_docker.sh",
+    "bytes": 891
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/external_client/external_client.go",
+    "bytes": 2598
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/g3_canary/BUILD.bazel",
+    "bytes": 1021
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/g3_canary/PROD.md",
+    "bytes": 588
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/g3_canary/g3_canary.go",
+    "bytes": 8409
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/go_linters/BUILD.bazel",
+    "bytes": 627
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/go_linters/go_linters.go",
+    "bytes": 5348
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_canvas/BUILD.bazel",
+    "bytes": 1109
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_canvas/perf_puppeteer_canvas.go",
+    "bytes": 11009
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_canvas/perf_puppeteer_canvas_test.go",
+    "bytes": 8756
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_render_skps/BUILD.bazel",
+    "bytes": 1228
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_render_skps/perf_puppeteer_render_skps.go",
+    "bytes": 13384
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_render_skps/perf_puppeteer_render_skps_test.go",
+    "bytes": 10023
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_skottie_frames/BUILD.bazel",
+    "bytes": 1252
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_skottie_frames/make_lotties_with_assets/BUILD.bazel",
+    "bytes": 544
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_skottie_frames/make_lotties_with_assets/make_lotties_with_assets.go",
+    "bytes": 1988
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_skottie_frames/perf_puppeteer_skottie_frames.go",
+    "bytes": 14659
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/perf_puppeteer_skottie_frames/perf_puppeteer_skottie_frames_test.go",
+    "bytes": 13333
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/recreate_skps/BUILD.bazel",
+    "bytes": 1034
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/recreate_skps/recreate_skps.go",
+    "bytes": 9073
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/run_gn_to_bp/BUILD.bazel",
+    "bytes": 602
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/run_gn_to_bp/run_gn_to_bp.go",
+    "bytes": 1616
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/run_wasm_gm_tests/BUILD.bazel",
+    "bytes": 771
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/run_wasm_gm_tests/run_wasm_gm_tests.go",
+    "bytes": 11336
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/testutils/BUILD.bazel",
+    "bytes": 412
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/testutils/testutils.go",
+    "bytes": 2584
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/toolchain_layering_check/BUILD.bazel",
+    "bytes": 697
+  },
+  {
+    "path": "skia/infra/bots/task_drivers/toolchain_layering_check/toolchain_layering_check.go",
+    "bytes": 4605
+  },
+  {
+    "path": "skia/infra/bots/tasks.json",
+    "bytes": 4730203
+  },
+  {
+    "path": "skia/infra/bots/test_utils.py",
+    "bytes": 2025
+  },
+  {
+    "path": "skia/infra/bots/tools/luci-go/README.md",
+    "bytes": 427
+  },
+  {
+    "path": "skia/infra/bots/tools/luci-go/linux64/isolate.sha1",
+    "bytes": 41
+  },
+  {
+    "path": "skia/infra/bots/tools/luci-go/mac64/isolate.sha1",
+    "bytes": 41
+  },
+  {
+    "path": "skia/infra/bots/tools/luci-go/win64/isolate.exe.sha1",
+    "bytes": 41
+  },
+  {
+    "path": "skia/infra/bots/utils.py",
+    "bytes": 6787
+  },
+  {
+    "path": "skia/infra/bots/zip_utils.py",
+    "bytes": 2524
+  },
+  {
+    "path": "skia/infra/bots/zip_utils_test.py",
+    "bytes": 1990
+  },
+  {
+    "path": "skia/infra/canvaskit/build_canvaskit.sh",
+    "bytes": 852
+  },
+  {
+    "path": "skia/infra/canvaskit/build_gmtests.sh",
+    "bytes": 770
+  },
+  {
+    "path": "skia/infra/canvaskit/docker/Makefile",
+    "bytes": 247
+  },
+  {
+    "path": "skia/infra/canvaskit/docker/canvaskit-emsdk/Dockerfile",
+    "bytes": 236
+  },
+  {
+    "path": "skia/infra/canvaskit/test_canvaskit.sh",
+    "bytes": 1156
+  },
+  {
+    "path": "skia/infra/cmake/build_skia.sh",
+    "bytes": 1153
+  },
+  {
+    "path": "skia/infra/config/recipes.cfg",
+    "bytes": 741
+  },
+  {
+    "path": "skia/infra/cross-compile/docker/cross-linux-arm64/Dockerfile",
+    "bytes": 377
+  },
+  {
+    "path": "skia/infra/debugger-app/Dockerfile",
+    "bytes": 397
+  },
+  {
+    "path": "skia/infra/debugger-app/README.md",
+    "bytes": 454
+  },
+  {
+    "path": "skia/infra/debugger-app/build.sh",
+    "bytes": 1041
+  },
+  {
+    "path": "skia/infra/docker/Makefile",
+    "bytes": 142
+  },
+  {
+    "path": "skia/infra/docker/README.md",
+    "bytes": 1406
+  },
+  {
+    "path": "skia/infra/docker/binary-size/Dockerfile",
+    "bytes": 730
+  },
+  {
+    "path": "skia/infra/docker/binary-size/build.sh",
+    "bytes": 383
+  },
+  {
+    "path": "skia/infra/docker/cmake-release/Dockerfile",
+    "bytes": 1313
+  },
+  {
+    "path": "skia/infra/docker/cmake-release/build.sh",
+    "bytes": 385
+  },
+  {
+    "path": "skia/infra/docker/debian9/Dockerfile",
+    "bytes": 620
+  },
+  {
+    "path": "skia/infra/docker/docker_build.sh",
+    "bytes": 395
+  },
+  {
+    "path": "skia/infra/docker/make_image_tag.sh",
+    "bytes": 265
+  },
+  {
+    "path": "skia/infra/fiddler-backend/Dockerfile",
+    "bytes": 3997
+  },
+  {
+    "path": "skia/infra/fiddler-backend/create_docker_image.sh",
+    "bytes": 608
+  },
+  {
+    "path": "skia/infra/fiddler-backend/release_tag.sh",
+    "bytes": 343
+  },
+  {
+    "path": "skia/infra/gcc/Debian11-x86/Dockerfile",
+    "bytes": 315
+  },
+  {
+    "path": "skia/infra/gcc/Debian11/Dockerfile",
+    "bytes": 287
+  },
+  {
+    "path": "skia/infra/gcc/Makefile",
+    "bytes": 512
+  },
+  {
+    "path": "skia/infra/gcc/README.md",
+    "bytes": 222
+  },
+  {
+    "path": "skia/infra/gcc/Ubuntu18/Dockerfile",
+    "bytes": 389
+  },
+  {
+    "path": "skia/infra/jsfiddle/Dockerfile",
+    "bytes": 397
+  },
+  {
+    "path": "skia/infra/jsfiddle/README.md",
+    "bytes": 438
+  },
+  {
+    "path": "skia/infra/jsfiddle/build.sh",
+    "bytes": 1075
+  },
+  {
+    "path": "skia/infra/lottiecap/.gitignore",
+    "bytes": 3
+  },
+  {
+    "path": "skia/infra/lottiecap/Makefile",
+    "bytes": 329
+  },
+  {
+    "path": "skia/infra/lottiecap/docker/README.md",
+    "bytes": 3216
+  },
+  {
+    "path": "skia/infra/lottiecap/docker/gold-lottie-web-puppeteer/Dockerfile",
+    "bytes": 366
+  },
+  {
+    "path": "skia/infra/lottiecap/docker/lottie-web-puppeteer/Dockerfile",
+    "bytes": 1616
+  },
+  {
+    "path": "skia/infra/lottiecap/docker/lottiecap_gold.sh",
+    "bytes": 1584
+  },
+  {
+    "path": "skia/infra/lottiecap/gold/lottie-web-aggregator.go",
+    "bytes": 6771
+  },
+  {
+    "path": "skia/infra/project-config/README.md",
+    "bytes": 79
+  },
+  {
+    "path": "skia/infra/project-config/cr-buildbucket.cfg",
+    "bytes": 1532
+  },
+  {
+    "path": "skia/infra/project-config/project.cfg",
+    "bytes": 202
+  },
+  {
+    "path": "skia/infra/project-config/refs.cfg",
+    "bytes": 211
+  },
+  {
+    "path": "skia/infra/shaders/Dockerfile",
+    "bytes": 334
+  },
+  {
+    "path": "skia/infra/shaders/README.md",
+    "bytes": 447
+  },
+  {
+    "path": "skia/infra/shaders/build.sh",
+    "bytes": 971
+  },
+  {
+    "path": "skia/infra/skcq.json",
+    "bytes": 272
+  },
+  {
+    "path": "skia/infra/skottie/Dockerfile",
+    "bytes": 319
+  },
+  {
+    "path": "skia/infra/skottie/README.md",
+    "bytes": 447
+  },
+  {
+    "path": "skia/infra/skottie/build.sh",
+    "bytes": 971
+  },
+  {
+    "path": "skia/infra/wasm-common/.gitignore",
+    "bytes": 3
+  },
+  {
+    "path": "skia/infra/wasm-common/Makefile",
+    "bytes": 1222
+  },
+  {
+    "path": "skia/infra/wasm-common/README.md",
+    "bytes": 164
+  },
+  {
+    "path": "skia/infra/wasm-common/docker/Makefile",
+    "bytes": 725
+  },
+  {
+    "path": "skia/infra/wasm-common/docker/README.md",
+    "bytes": 4256
+  },
+  {
+    "path": "skia/infra/wasm-common/docker/emsdk-base/Dockerfile",
+    "bytes": 440
+  },
+  {
+    "path": "skia/infra/wasm-common/docker/emsdk-base/build.sh",
+    "bytes": 382
+  },
+  {
+    "path": "skia/infra/wasm-common/docker/gold-karma-chrome-tests/Dockerfile",
+    "bytes": 392
+  },
+  {
+    "path": "skia/infra/wasm-common/docker/karma-chrome-tests/Dockerfile",
+    "bytes": 1200
+  },
+  {
+    "path": "skia/infra/wasm-common/docker/perf-karma-chrome-tests/Dockerfile",
+    "bytes": 369
+  },
+  {
+    "path": "skia/infra/wasm-common/gold/wasm_gold_aggregator.go",
+    "bytes": 7067
+  },
+  {
+    "path": "skia/infra/wasm-common/perf/wasm_perf_aggregator.go",
+    "bytes": 6722
+  },
+  {
+    "path": "skia/modules/audioplayer/BUILD.bazel",
+    "bytes": 1038
+  },
+  {
+    "path": "skia/modules/audioplayer/BUILD.gn",
+    "bytes": 739
+  },
+  {
+    "path": "skia/modules/audioplayer/SkAudioPlayer.cpp",
+    "bytes": 1229
+  },
+  {
+    "path": "skia/modules/audioplayer/SkAudioPlayer.h",
+    "bytes": 1994
+  },
+  {
+    "path": "skia/modules/audioplayer/SkAudioPlayer_mac.mm",
+    "bytes": 2322
+  },
+  {
+    "path": "skia/modules/audioplayer/SkAudioPlayer_none.cpp",
+    "bytes": 314
+  },
+  {
+    "path": "skia/modules/audioplayer/SkAudioPlayer_oboe.cpp",
+    "bytes": 4337
+  },
+  {
+    "path": "skia/modules/audioplayer/SkAudioPlayer_sfml.cpp",
+    "bytes": 1650
+  },
+  {
+    "path": "skia/modules/bentleyottmann/BUILD.bazel",
+    "bytes": 367
+  },
+  {
+    "path": "skia/modules/bentleyottmann/BUILD.gn",
+    "bytes": 683
+  },
+  {
+    "path": "skia/modules/bentleyottmann/bentleyottmann.gni",
+    "bytes": 2086
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/BUILD.bazel",
+    "bytes": 487
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/BentleyOttmann1.h",
+    "bytes": 786
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/BruteForceCrossings.h",
+    "bytes": 654
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/Contour.h",
+    "bytes": 2978
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/EventQueue.h",
+    "bytes": 2453
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/EventQueueInterface.h",
+    "bytes": 2462
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/Int96.h",
+    "bytes": 626
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/Myers.h",
+    "bytes": 3966
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/Point.h",
+    "bytes": 1118
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/Segment.h",
+    "bytes": 2826
+  },
+  {
+    "path": "skia/modules/bentleyottmann/include/SweepLine.h",
+    "bytes": 970
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/BUILD.bazel",
+    "bytes": 472
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/BentleyOttmann1.cpp",
+    "bytes": 891
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/BruteForceCrossings.cpp",
+    "bytes": 851
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/Contour.cpp",
+    "bytes": 2931
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/EventQueue.cpp",
+    "bytes": 4308
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/Int96.cpp",
+    "bytes": 2103
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/Myers.cpp",
+    "bytes": 24105
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/Point.cpp",
+    "bytes": 1503
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/Segment.cpp",
+    "bytes": 13437
+  },
+  {
+    "path": "skia/modules/bentleyottmann/src/SweepLine.cpp",
+    "bytes": 4091
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/BUILD.bazel",
+    "bytes": 454
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/BentleyOttmann1Test.cpp",
+    "bytes": 2293
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/BruteForceCrossingsTest.cpp",
+    "bytes": 2311
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/ContourTest.cpp",
+    "bytes": 3861
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/EventQueueTest.cpp",
+    "bytes": 9044
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/Int96Test.cpp",
+    "bytes": 5277
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/MyersTest.cpp",
+    "bytes": 14550
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/PointTest.cpp",
+    "bytes": 1757
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/SegmentTest.cpp",
+    "bytes": 13707
+  },
+  {
+    "path": "skia/modules/bentleyottmann/tests/SweepLineTest.cpp",
+    "bytes": 8306
+  },
+  {
+    "path": "skia/modules/canvaskit/.gitignore",
+    "bytes": 131
+  },
+  {
+    "path": "skia/modules/canvaskit/BUILD.bazel",
+    "bytes": 12984
+  },
+  {
+    "path": "skia/modules/canvaskit/BUILD.gn",
+    "bytes": 10644
+  },
+  {
+    "path": "skia/modules/canvaskit/CHANGELOG.md",
+    "bytes": 55404
+  },
+  {
+    "path": "skia/modules/canvaskit/Makefile",
+    "bytes": 7339
+  },
+  {
+    "path": "skia/modules/canvaskit/README.md",
+    "bytes": 7681
+  },
+  {
+    "path": "skia/modules/canvaskit/WasmCommon.h",
+    "bytes": 4463
+  },
+  {
+    "path": "skia/modules/canvaskit/bidi.js",
+    "bytes": 2335
+  },
+  {
+    "path": "skia/modules/canvaskit/bidi_bindings.cpp",
+    "bytes": 4223
+  },
+  {
+    "path": "skia/modules/canvaskit/bidi_bindings_gen.cpp",
+    "bytes": 844
+  },
+  {
+    "path": "skia/modules/canvaskit/canvaskit.gni",
+    "bytes": 1466
+  },
+  {
+    "path": "skia/modules/canvaskit/canvaskit_bindings.cpp",
+    "bytes": 160057
+  },
+  {
+    "path": "skia/modules/canvaskit/catchExceptionNop.js",
+    "bytes": 474
+  },
+  {
+    "path": "skia/modules/canvaskit/color.js",
+    "bytes": 7081
+  },
+  {
+    "path": "skia/modules/canvaskit/compile.sh",
+    "bytes": 8106
+  },
+  {
+    "path": "skia/modules/canvaskit/compile_gm.sh",
+    "bytes": 7055
+  },
+  {
+    "path": "skia/modules/canvaskit/cpu.js",
+    "bytes": 5125
+  },
+  {
+    "path": "skia/modules/canvaskit/debug.js",
+    "bytes": 79
+  },
+  {
+    "path": "skia/modules/canvaskit/debugger.js",
+    "bytes": 1039
+  },
+  {
+    "path": "skia/modules/canvaskit/debugger_bindings.cpp",
+    "bytes": 23575
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/.gitignore",
+    "bytes": 4
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/Makefile",
+    "bytes": 148
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser/index.html",
+    "bytes": 393
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser/module_uses_ck.ts",
+    "bytes": 524
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser/package-lock.json",
+    "bytes": 1570
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser/package.json",
+    "bytes": 365
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser/tsconfig.json",
+    "bytes": 145
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser_es6/index.html",
+    "bytes": 382
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser_es6/module_uses_ck.ts",
+    "bytes": 290
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser_es6/package-lock.json",
+    "bytes": 1570
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser_es6/package.json",
+    "bytes": 365
+  },
+  {
+    "path": "skia/modules/canvaskit/external_test/typescript_browser_es6/tsconfig.json",
+    "bytes": 113
+  },
+  {
+    "path": "skia/modules/canvaskit/externs.js",
+    "bytes": 34722
+  },
+  {
+    "path": "skia/modules/canvaskit/font.js",
+    "bytes": 12913
+  },
+  {
+    "path": "skia/modules/canvaskit/fonts/NotoMono-Regular.ttf",
+    "bytes": 107848
+  },
+  {
+    "path": "skia/modules/canvaskit/fonts/README.md",
+    "bytes": 221
+  },
+  {
+    "path": "skia/modules/canvaskit/future_apis/ImageDecoder.md",
+    "bytes": 2625
+  },
+  {
+    "path": "skia/modules/canvaskit/future_apis/WebGPU.md",
+    "bytes": 767
+  },
+  {
+    "path": "skia/modules/canvaskit/gm.js",
+    "bytes": 1559
+  },
+  {
+    "path": "skia/modules/canvaskit/gm_bindings.cpp",
+    "bytes": 13056
+  },
+  {
+    "path": "skia/modules/canvaskit/go/gold_test_env/BUILD.bazel",
+    "bytes": 456
+  },
+  {
+    "path": "skia/modules/canvaskit/go/gold_test_env/gold_test_env.go",
+    "bytes": 6925
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/_namedcolors.js",
+    "bytes": 7632
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/canvas2dcontext.js",
+    "bytes": 36953
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/color.js",
+    "bytes": 11818
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/font.js",
+    "bytes": 3247
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/htmlcanvas.js",
+    "bytes": 2076
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/htmlimage.js",
+    "bytes": 322
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/imagedata.js",
+    "bytes": 1569
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/lineargradient.js",
+    "bytes": 2096
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/path2d.js",
+    "bytes": 5981
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/pattern.js",
+    "bytes": 2043
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/postamble.js",
+    "bytes": 54
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/preamble.js",
+    "bytes": 769
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/radialgradient.js",
+    "bytes": 2483
+  },
+  {
+    "path": "skia/modules/canvaskit/htmlcanvas/util.js",
+    "bytes": 957
+  },
+  {
+    "path": "skia/modules/canvaskit/interface.js",
+    "bytes": 54601
+  },
+  {
+    "path": "skia/modules/canvaskit/karma.bazel.js",
+    "bytes": 1635
+  },
+  {
+    "path": "skia/modules/canvaskit/karma.conf.js",
+    "bytes": 3163
+  },
+  {
+    "path": "skia/modules/canvaskit/make_version.sh",
+    "bytes": 750
+  },
+  {
+    "path": "skia/modules/canvaskit/matrix.js",
+    "bytes": 17854
+  },
+  {
+    "path": "skia/modules/canvaskit/memory.js",
+    "bytes": 13590
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/.gitignore",
+    "bytes": 44
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/CODE_OF_CONDUCT.md",
+    "bytes": 4494
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/CONTRIBUTING.md",
+    "bytes": 887
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/LICENSE",
+    "bytes": 1635
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/README.md",
+    "bytes": 5249
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/bidi.html",
+    "bytes": 7048
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/example.html",
+    "bytes": 40961
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/extra.html",
+    "bytes": 31619
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/multicanvas.html",
+    "bytes": 3931
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/node.example.js",
+    "bytes": 3268
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/package-lock.json",
+    "bytes": 155327
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/package.json",
+    "bytes": 2359
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/paragraphs.html",
+    "bytes": 6700
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/shaping.html",
+    "bytes": 6823
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/textapi_utils.js",
+    "bytes": 21391
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/types/README.md",
+    "bytes": 167
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/types/canvaskit-wasm-tests.ts",
+    "bytes": 47037
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/types/index.d.ts",
+    "bytes": 174139
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/types/tsconfig.json",
+    "bytes": 417
+  },
+  {
+    "path": "skia/modules/canvaskit/npm_build/types/tslint.json",
+    "bytes": 341
+  },
+  {
+    "path": "skia/modules/canvaskit/package-lock.json",
+    "bytes": 158180
+  },
+  {
+    "path": "skia/modules/canvaskit/package.json",
+    "bytes": 459
+  },
+  {
+    "path": "skia/modules/canvaskit/paragraph.js",
+    "bytes": 16857
+  },
+  {
+    "path": "skia/modules/canvaskit/paragraph_bindings.cpp",
+    "bytes": 37239
+  },
+  {
+    "path": "skia/modules/canvaskit/paragraph_bindings_gen.cpp",
+    "bytes": 5272
+  },
+  {
+    "path": "skia/modules/canvaskit/pathops.js",
+    "bytes": 439
+  },
+  {
+    "path": "skia/modules/canvaskit/postamble.js",
+    "bytes": 127
+  },
+  {
+    "path": "skia/modules/canvaskit/preamble.js",
+    "bytes": 376
+  },
+  {
+    "path": "skia/modules/canvaskit/release.js",
+    "bytes": 205
+  },
+  {
+    "path": "skia/modules/canvaskit/rt_shader.js",
+    "bytes": 3489
+  },
+  {
+    "path": "skia/modules/canvaskit/skottie.js",
+    "bytes": 8256
+  },
+  {
+    "path": "skia/modules/canvaskit/skottie_bindings.cpp",
+    "bytes": 35668
+  },
+  {
+    "path": "skia/modules/canvaskit/skp.js",
+    "bytes": 594
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/BUILD.bazel",
+    "bytes": 1035
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/Bungee-Regular.ttf",
+    "bytes": 126736
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/NotoColorEmoji.ttf",
+    "bytes": 7253060
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/NotoSerif-BoldItalic.ttf",
+    "bytes": 313444
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/NotoSerif-Regular.ttf",
+    "bytes": 350668
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/Roboto-Regular.otf",
+    "bytes": 186664
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/Roboto-Regular.woff",
+    "bytes": 61736
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/Roboto-Regular.woff2",
+    "bytes": 49236
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/RobotoSlab-VariableFont_wght.ttf",
+    "bytes": 247036
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/animated_gif.json",
+    "bytes": 1115
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/audio_external.json",
+    "bytes": 2519162
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/brickwork-texture.jpg",
+    "bytes": 155023
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/color_wheel.gif",
+    "bytes": 5008
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/color_wheel.webp",
+    "bytes": 6810
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/exif_rotated_heart.jpg",
+    "bytes": 23758
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/flightAnim.gif",
+    "bytes": 999846
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/flutter_106433.png",
+    "bytes": 15464
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/mandrill_16.png",
+    "bytes": 3470
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/mandrill_512.png",
+    "bytes": 625834
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/mandrill_h1v1.jpg",
+    "bytes": 88253
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/map-shield.json",
+    "bytes": 21004
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/red_line.skp",
+    "bytes": 173
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/skottie_basic_slots.json",
+    "bytes": 25961
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/skottie_inline_font.json",
+    "bytes": 69614
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/test.ttc",
+    "bytes": 6076
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/test_glyphs-glyf_colr_1.ttf",
+    "bytes": 12372
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/assets/text_edit.json",
+    "bytes": 2216
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/bazel_test_reporter.js",
+    "bytes": 1588
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/bidi_test.js",
+    "bytes": 3500
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/canvas2d_test.js",
+    "bytes": 31571
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/canvas_test.js",
+    "bytes": 35738
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/core_test.js",
+    "bytes": 83522
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/font_test.js",
+    "bytes": 20719
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/init_with_gold_server.js",
+    "bytes": 1067
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/legacy_init.js",
+    "bytes": 637
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/legacy_test_reporter.js",
+    "bytes": 4605
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/matrix_test.js",
+    "bytes": 5444
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/paragraph_test.js",
+    "bytes": 50770
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/path_test.js",
+    "bytes": 20615
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/rtshader_test.js",
+    "bytes": 12852
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/skottie_test.js",
+    "bytes": 17495
+  },
+  {
+    "path": "skia/modules/canvaskit/tests/util.js",
+    "bytes": 10023
+  },
+  {
+    "path": "skia/modules/canvaskit/util.js",
+    "bytes": 872
+  },
+  {
+    "path": "skia/modules/canvaskit/viewer_bindings.cpp",
+    "bytes": 2754
+  },
+  {
+    "path": "skia/modules/canvaskit/wasm_tools/SIMD/.gitignore",
+    "bytes": 7
+  },
+  {
+    "path": "skia/modules/canvaskit/wasm_tools/SIMD/build_simd_test.sh",
+    "bytes": 1862
+  },
+  {
+    "path": "skia/modules/canvaskit/wasm_tools/SIMD/simd_float_capabilities.cpp",
+    "bytes": 4083
+  },
+  {
+    "path": "skia/modules/canvaskit/wasm_tools/SIMD/simd_int_capabilities.cpp",
+    "bytes": 3682
+  },
+  {
+    "path": "skia/modules/canvaskit/wasm_tools/SIMD/simd_test.sh",
+    "bytes": 1111
+  },
+  {
+    "path": "skia/modules/canvaskit/wasm_tools/SIMD/wasm_simd_types.txt",
+    "bytes": 64
+  },
+  {
+    "path": "skia/modules/canvaskit/wasm_tools/gms.html",
+    "bytes": 2348
+  },
+  {
+    "path": "skia/modules/canvaskit/wasm_tools/viewer.html",
+    "bytes": 7537
+  },
+  {
+    "path": "skia/modules/canvaskit/webgl.js",
+    "bytes": 17169
+  },
+  {
+    "path": "skia/modules/canvaskit/webgpu.js",
+    "bytes": 5695
+  },
+  {
+    "path": "skia/modules/jsonreader/BUILD.bazel",
+    "bytes": 471
+  },
+  {
+    "path": "skia/modules/jsonreader/BUILD.gn",
+    "bytes": 284
+  },
+  {
+    "path": "skia/modules/jsonreader/SkJSONReader.cpp",
+    "bytes": 33328
+  },
+  {
+    "path": "skia/modules/jsonreader/SkJSONReader.h",
+    "bytes": 11689
+  },
+  {
+    "path": "skia/modules/jsonreader/jsonreader.gni",
+    "bytes": 443
+  },
+  {
+    "path": "skia/modules/pathops/pathops.gni",
+    "bytes": 51
+  },
+  {
+    "path": "skia/modules/skottie/BUILD.bazel",
+    "bytes": 4284
+  },
+  {
+    "path": "skia/modules/skottie/BUILD.gn",
+    "bytes": 4983
+  },
+  {
+    "path": "skia/modules/skottie/fuzz/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/skottie/fuzz/FuzzSkottieJSON.cpp",
+    "bytes": 732
+  },
+  {
+    "path": "skia/modules/skottie/gm/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/skottie/gm/ExternalProperties.cpp",
+    "bytes": 4607
+  },
+  {
+    "path": "skia/modules/skottie/gm/SkottieGM.cpp",
+    "bytes": 7947
+  },
+  {
+    "path": "skia/modules/skottie/include/BUILD.bazel",
+    "bytes": 507
+  },
+  {
+    "path": "skia/modules/skottie/include/ExternalLayer.h",
+    "bytes": 1776
+  },
+  {
+    "path": "skia/modules/skottie/include/Skottie.h",
+    "bytes": 10560
+  },
+  {
+    "path": "skia/modules/skottie/include/SkottieProperty.h",
+    "bytes": 6978
+  },
+  {
+    "path": "skia/modules/skottie/include/SlotManager.h",
+    "bytes": 3878
+  },
+  {
+    "path": "skia/modules/skottie/include/TextShaper.h",
+    "bytes": 7182
+  },
+  {
+    "path": "skia/modules/skottie/skottie.gni",
+    "bytes": 5947
+  },
+  {
+    "path": "skia/modules/skottie/src/Adapter.h",
+    "bytes": 972
+  },
+  {
+    "path": "skia/modules/skottie/src/BUILD.bazel",
+    "bytes": 1207
+  },
+  {
+    "path": "skia/modules/skottie/src/BlendModes.cpp",
+    "bytes": 3496
+  },
+  {
+    "path": "skia/modules/skottie/src/Camera.cpp",
+    "bytes": 5223
+  },
+  {
+    "path": "skia/modules/skottie/src/Camera.h",
+    "bytes": 1487
+  },
+  {
+    "path": "skia/modules/skottie/src/Composition.cpp",
+    "bytes": 4935
+  },
+  {
+    "path": "skia/modules/skottie/src/Composition.h",
+    "bytes": 1443
+  },
+  {
+    "path": "skia/modules/skottie/src/Layer.cpp",
+    "bytes": 22853
+  },
+  {
+    "path": "skia/modules/skottie/src/Layer.h",
+    "bytes": 4059
+  },
+  {
+    "path": "skia/modules/skottie/src/Path.cpp",
+    "bytes": 1440
+  },
+  {
+    "path": "skia/modules/skottie/src/Skottie.cpp",
+    "bytes": 18088
+  },
+  {
+    "path": "skia/modules/skottie/src/SkottieJson.cpp",
+    "bytes": 3237
+  },
+  {
+    "path": "skia/modules/skottie/src/SkottieJson.h",
+    "bytes": 685
+  },
+  {
+    "path": "skia/modules/skottie/src/SkottiePriv.h",
+    "bytes": 11334
+  },
+  {
+    "path": "skia/modules/skottie/src/SkottieProperty.cpp",
+    "bytes": 5840
+  },
+  {
+    "path": "skia/modules/skottie/src/SkottieTool.cpp",
+    "bytes": 22550
+  },
+  {
+    "path": "skia/modules/skottie/src/SkottieValue.h",
+    "bytes": 1114
+  },
+  {
+    "path": "skia/modules/skottie/src/SlotManager.cpp",
+    "bytes": 7043
+  },
+  {
+    "path": "skia/modules/skottie/src/Transform.cpp",
+    "bytes": 7694
+  },
+  {
+    "path": "skia/modules/skottie/src/Transform.h",
+    "bytes": 3126
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/Animator.cpp",
+    "bytes": 4177
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/Animator.h",
+    "bytes": 2305
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/BUILD.bazel",
+    "bytes": 572
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/KeyframeAnimator.cpp",
+    "bytes": 6598
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/KeyframeAnimator.h",
+    "bytes": 4609
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/ScalarKeyframeAnimator.cpp",
+    "bytes": 4261
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/ShapeKeyframeAnimator.cpp",
+    "bytes": 5952
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/TextKeyframeAnimator.cpp",
+    "bytes": 4552
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/Vec2KeyframeAnimator.cpp",
+    "bytes": 11588
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/VectorKeyframeAnimator.cpp",
+    "bytes": 11239
+  },
+  {
+    "path": "skia/modules/skottie/src/animator/VectorKeyframeAnimator.h",
+    "bytes": 1952
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/BUILD.bazel",
+    "bytes": 1219
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/BlackAndWhiteEffect.cpp",
+    "bytes": 4576
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/BrightnessContrastEffect.cpp",
+    "bytes": 8717
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/BulgeEffect.cpp",
+    "bytes": 7860
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/CCTonerEffect.cpp",
+    "bytes": 5328
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/ColorOverlayStyles.cpp",
+    "bytes": 2554
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/CornerPinEffect.cpp",
+    "bytes": 3198
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/DirectionalBlur.cpp",
+    "bytes": 2680
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/DisplacementMapEffect.cpp",
+    "bytes": 16022
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/DropShadowEffect.cpp",
+    "bytes": 3859
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/Effects.cpp",
+    "bytes": 9513
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/Effects.h",
+    "bytes": 9106
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/FillEffect.cpp",
+    "bytes": 2744
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/FractalNoiseEffect.cpp",
+    "bytes": 19900
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/GaussianBlurEffect.cpp",
+    "bytes": 4115
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/GlowStyles.cpp",
+    "bytes": 6365
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/GradientEffect.cpp",
+    "bytes": 5467
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/HueSaturationEffect.cpp",
+    "bytes": 7511
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/InvertEffect.cpp",
+    "bytes": 5786
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/LevelsEffect.cpp",
+    "bytes": 12446
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/LinearWipeEffect.cpp",
+    "bytes": 5375
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/MotionTileEffect.cpp",
+    "bytes": 11009
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/RadialWipeEffect.cpp",
+    "bytes": 6248
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/ShadowStyles.cpp",
+    "bytes": 5587
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/SharpenEffect.cpp",
+    "bytes": 2679
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/ShiftChannelsEffect.cpp",
+    "bytes": 5586
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/SkSLEffect.cpp",
+    "bytes": 11634
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/SphereEffect.cpp",
+    "bytes": 15587
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/ThresholdEffect.cpp",
+    "bytes": 2711
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/TintEffect.cpp",
+    "bytes": 2737
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/TransformEffect.cpp",
+    "bytes": 4825
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/TritoneEffect.cpp",
+    "bytes": 2926
+  },
+  {
+    "path": "skia/modules/skottie/src/effects/VenetianBlindsEffect.cpp",
+    "bytes": 7444
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/AudioLayer.cpp",
+    "bytes": 2976
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/BUILD.bazel",
+    "bytes": 457
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/FootageLayer.cpp",
+    "bytes": 7989
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/NullLayer.cpp",
+    "bytes": 728
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/PrecompLayer.cpp",
+    "bytes": 7819
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/SolidLayer.cpp",
+    "bytes": 1844
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/TextLayer.cpp",
+    "bytes": 14767
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/BUILD.bazel",
+    "bytes": 579
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/Ellipse.cpp",
+    "bytes": 2095
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/FillStroke.cpp",
+    "bytes": 7189
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/Gradient.cpp",
+    "bytes": 11003
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/MergePaths.cpp",
+    "bytes": 1904
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/OffsetPaths.cpp",
+    "bytes": 2481
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/Polystar.cpp",
+    "bytes": 3892
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/PuckerBloat.cpp",
+    "bytes": 6467
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/Rectangle.cpp",
+    "bytes": 2215
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/Repeater.cpp",
+    "bytes": 7786
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/RoundCorners.cpp",
+    "bytes": 1876
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/ShapeLayer.cpp",
+    "bytes": 16856
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/ShapeLayer.h",
+    "bytes": 4346
+  },
+  {
+    "path": "skia/modules/skottie/src/layers/shapelayer/TrimPaths.cpp",
+    "bytes": 3586
+  },
+  {
+    "path": "skia/modules/skottie/src/text/BUILD.bazel",
+    "bytes": 1030
+  },
+  {
+    "path": "skia/modules/skottie/src/text/Font.cpp",
+    "bytes": 7913
+  },
+  {
+    "path": "skia/modules/skottie/src/text/Font.h",
+    "bytes": 2404
+  },
+  {
+    "path": "skia/modules/skottie/src/text/RangeSelector.cpp",
+    "bytes": 15038
+  },
+  {
+    "path": "skia/modules/skottie/src/text/RangeSelector.h",
+    "bytes": 2635
+  },
+  {
+    "path": "skia/modules/skottie/src/text/TextAdapter.cpp",
+    "bytes": 38319
+  },
+  {
+    "path": "skia/modules/skottie/src/text/TextAdapter.h",
+    "bytes": 4862
+  },
+  {
+    "path": "skia/modules/skottie/src/text/TextAnimator.cpp",
+    "bytes": 8718
+  },
+  {
+    "path": "skia/modules/skottie/src/text/TextAnimator.h",
+    "bytes": 4122
+  },
+  {
+    "path": "skia/modules/skottie/src/text/TextShaper.cpp",
+    "bytes": 28364
+  },
+  {
+    "path": "skia/modules/skottie/src/text/TextValue.cpp",
+    "bytes": 7937
+  },
+  {
+    "path": "skia/modules/skottie/src/text/TextValue.h",
+    "bytes": 641
+  },
+  {
+    "path": "skia/modules/skottie/src/text/Unicode.cpp",
+    "bytes": 7922
+  },
+  {
+    "path": "skia/modules/skottie/tests/AudioLayer.cpp",
+    "bytes": 3993
+  },
+  {
+    "path": "skia/modules/skottie/tests/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/skottie/tests/Expression.cpp",
+    "bytes": 11520
+  },
+  {
+    "path": "skia/modules/skottie/tests/Image.cpp",
+    "bytes": 4454
+  },
+  {
+    "path": "skia/modules/skottie/tests/Keyframe.cpp",
+    "bytes": 10290
+  },
+  {
+    "path": "skia/modules/skottie/tests/PropertyObserver.cpp",
+    "bytes": 16271
+  },
+  {
+    "path": "skia/modules/skottie/tests/Shaper.cpp",
+    "bytes": 21869
+  },
+  {
+    "path": "skia/modules/skottie/tests/SkottieTest.cpp",
+    "bytes": 12411
+  },
+  {
+    "path": "skia/modules/skottie/tests/Text.cpp",
+    "bytes": 11163
+  },
+  {
+    "path": "skia/modules/skottie/utils/BUILD.bazel",
+    "bytes": 2037
+  },
+  {
+    "path": "skia/modules/skottie/utils/PreshapeTool.cpp",
+    "bytes": 2719
+  },
+  {
+    "path": "skia/modules/skottie/utils/SkottieUtils.cpp",
+    "bytes": 9732
+  },
+  {
+    "path": "skia/modules/skottie/utils/SkottieUtils.h",
+    "bytes": 5398
+  },
+  {
+    "path": "skia/modules/skottie/utils/TextEditor.cpp",
+    "bytes": 10204
+  },
+  {
+    "path": "skia/modules/skottie/utils/TextEditor.h",
+    "bytes": 2567
+  },
+  {
+    "path": "skia/modules/skottie/utils/TextPreshape.cpp",
+    "bytes": 19399
+  },
+  {
+    "path": "skia/modules/skottie/utils/TextPreshape.h",
+    "bytes": 910
+  },
+  {
+    "path": "skia/modules/skparagraph/BUILD.bazel",
+    "bytes": 600
+  },
+  {
+    "path": "skia/modules/skparagraph/BUILD.gn",
+    "bytes": 2936
+  },
+  {
+    "path": "skia/modules/skparagraph/bench/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/skparagraph/bench/ParagraphBench.cpp",
+    "bytes": 2374
+  },
+  {
+    "path": "skia/modules/skparagraph/gm/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/skparagraph/gm/simple_gm.cpp",
+    "bytes": 8468
+  },
+  {
+    "path": "skia/modules/skparagraph/include/BUILD.bazel",
+    "bytes": 562
+  },
+  {
+    "path": "skia/modules/skparagraph/include/DartTypes.h",
+    "bytes": 3907
+  },
+  {
+    "path": "skia/modules/skparagraph/include/FontArguments.h",
+    "bytes": 1308
+  },
+  {
+    "path": "skia/modules/skparagraph/include/FontCollection.h",
+    "bytes": 2853
+  },
+  {
+    "path": "skia/modules/skparagraph/include/Metrics.h",
+    "bytes": 3693
+  },
+  {
+    "path": "skia/modules/skparagraph/include/Paragraph.h",
+    "bytes": 11023
+  },
+  {
+    "path": "skia/modules/skparagraph/include/ParagraphBuilder.h",
+    "bytes": 3638
+  },
+  {
+    "path": "skia/modules/skparagraph/include/ParagraphCache.h",
+    "bytes": 1188
+  },
+  {
+    "path": "skia/modules/skparagraph/include/ParagraphPainter.h",
+    "bytes": 2065
+  },
+  {
+    "path": "skia/modules/skparagraph/include/ParagraphStyle.h",
+    "bytes": 6118
+  },
+  {
+    "path": "skia/modules/skparagraph/include/TextShadow.h",
+    "bytes": 609
+  },
+  {
+    "path": "skia/modules/skparagraph/include/TextStyle.h",
+    "bytes": 14247
+  },
+  {
+    "path": "skia/modules/skparagraph/include/TypefaceFontProvider.h",
+    "bytes": 2686
+  },
+  {
+    "path": "skia/modules/skparagraph/skparagraph.gni",
+    "bytes": 5107
+  },
+  {
+    "path": "skia/modules/skparagraph/slides/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/skparagraph/slides/ParagraphSlide.cpp",
+    "bytes": 204871
+  },
+  {
+    "path": "skia/modules/skparagraph/src/BUILD.bazel",
+    "bytes": 910
+  },
+  {
+    "path": "skia/modules/skparagraph/src/Decorations.cpp",
+    "bytes": 9681
+  },
+  {
+    "path": "skia/modules/skparagraph/src/Decorations.h",
+    "bytes": 1086
+  },
+  {
+    "path": "skia/modules/skparagraph/src/FontArguments.cpp",
+    "bytes": 2733
+  },
+  {
+    "path": "skia/modules/skparagraph/src/FontCollection.cpp",
+    "bytes": 10628
+  },
+  {
+    "path": "skia/modules/skparagraph/src/Iterators.h",
+    "bytes": 1926
+  },
+  {
+    "path": "skia/modules/skparagraph/src/OneLineShaper.cpp",
+    "bytes": 35815
+  },
+  {
+    "path": "skia/modules/skparagraph/src/OneLineShaper.h",
+    "bytes": 5227
+  },
+  {
+    "path": "skia/modules/skparagraph/src/ParagraphBuilderImpl.cpp",
+    "bytes": 8957
+  },
+  {
+    "path": "skia/modules/skparagraph/src/ParagraphBuilderImpl.h",
+    "bytes": 4669
+  },
+  {
+    "path": "skia/modules/skparagraph/src/ParagraphCache.cpp",
+    "bytes": 13509
+  },
+  {
+    "path": "skia/modules/skparagraph/src/ParagraphImpl.cpp",
+    "bytes": 61221
+  },
+  {
+    "path": "skia/modules/skparagraph/src/ParagraphImpl.h",
+    "bytes": 12096
+  },
+  {
+    "path": "skia/modules/skparagraph/src/ParagraphPainterImpl.cpp",
+    "bytes": 3214
+  },
+  {
+    "path": "skia/modules/skparagraph/src/ParagraphPainterImpl.h",
+    "bytes": 1531
+  },
+  {
+    "path": "skia/modules/skparagraph/src/ParagraphStyle.cpp",
+    "bytes": 1235
+  },
+  {
+    "path": "skia/modules/skparagraph/src/Run.cpp",
+    "bytes": 13051
+  },
+  {
+    "path": "skia/modules/skparagraph/src/Run.h",
+    "bytes": 17939
+  },
+  {
+    "path": "skia/modules/skparagraph/src/TextLine.cpp",
+    "bytes": 67161
+  },
+  {
+    "path": "skia/modules/skparagraph/src/TextLine.h",
+    "bytes": 9413
+  },
+  {
+    "path": "skia/modules/skparagraph/src/TextShadow.cpp",
+    "bytes": 840
+  },
+  {
+    "path": "skia/modules/skparagraph/src/TextStyle.cpp",
+    "bytes": 6760
+  },
+  {
+    "path": "skia/modules/skparagraph/src/TextWrapper.cpp",
+    "bytes": 21380
+  },
+  {
+    "path": "skia/modules/skparagraph/src/TextWrapper.h",
+    "bytes": 7717
+  },
+  {
+    "path": "skia/modules/skparagraph/src/TypefaceFontProvider.cpp",
+    "bytes": 3800
+  },
+  {
+    "path": "skia/modules/skparagraph/test.html",
+    "bytes": 1397
+  },
+  {
+    "path": "skia/modules/skparagraph/tests/BUILD.bazel",
+    "bytes": 345
+  },
+  {
+    "path": "skia/modules/skparagraph/tests/SkParagraphTest.cpp",
+    "bytes": 405822
+  },
+  {
+    "path": "skia/modules/skparagraph/tests/SkShaperJSONWriter.cpp",
+    "bytes": 9194
+  },
+  {
+    "path": "skia/modules/skparagraph/tests/SkShaperJSONWriter.h",
+    "bytes": 2170
+  },
+  {
+    "path": "skia/modules/skparagraph/tests/SkShaperJSONWriterTest.cpp",
+    "bytes": 5689
+  },
+  {
+    "path": "skia/modules/skparagraph/utils/BUILD.bazel",
+    "bytes": 284
+  },
+  {
+    "path": "skia/modules/skparagraph/utils/TestFontCollection.cpp",
+    "bytes": 2387
+  },
+  {
+    "path": "skia/modules/skparagraph/utils/TestFontCollection.h",
+    "bytes": 847
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/BUILD.gn",
+    "bytes": 1296
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/README.md",
+    "bytes": 1125
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/app/editor_application.cpp",
+    "bytes": 17173
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/include/editor.h",
+    "bytes": 5231
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/include/stringslice.h",
+    "bytes": 1643
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/include/stringview.h",
+    "bytes": 413
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/src/editor.cpp",
+    "bytes": 20566
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/src/shape.cpp",
+    "bytes": 13925
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/src/shape.h",
+    "bytes": 731
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/src/stringslice.cpp",
+    "bytes": 2364
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/src/word_boundaries.cpp",
+    "bytes": 1685
+  },
+  {
+    "path": "skia/modules/skplaintexteditor/src/word_boundaries.h",
+    "bytes": 459
+  },
+  {
+    "path": "skia/modules/skresources/BUILD.bazel",
+    "bytes": 467
+  },
+  {
+    "path": "skia/modules/skresources/BUILD.gn",
+    "bytes": 549
+  },
+  {
+    "path": "skia/modules/skresources/include/BUILD.bazel",
+    "bytes": 253
+  },
+  {
+    "path": "skia/modules/skresources/include/SkResources.h",
+    "bytes": 10238
+  },
+  {
+    "path": "skia/modules/skresources/skresources.gni",
+    "bytes": 706
+  },
+  {
+    "path": "skia/modules/skresources/src/BUILD.bazel",
+    "bytes": 334
+  },
+  {
+    "path": "skia/modules/skresources/src/SkAnimCodecPlayer.cpp",
+    "bytes": 5424
+  },
+  {
+    "path": "skia/modules/skresources/src/SkAnimCodecPlayer.h",
+    "bytes": 1967
+  },
+  {
+    "path": "skia/modules/skresources/src/SkResources.cpp",
+    "bytes": 12178
+  },
+  {
+    "path": "skia/modules/sksg/BUILD.bazel",
+    "bytes": 715
+  },
+  {
+    "path": "skia/modules/sksg/BUILD.gn",
+    "bytes": 993
+  },
+  {
+    "path": "skia/modules/sksg/include/BUILD.bazel",
+    "bytes": 841
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGClipEffect.h",
+    "bytes": 1599
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGColorFilter.h",
+    "bytes": 3628
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGDraw.h",
+    "bytes": 1354
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGEffectNode.h",
+    "bytes": 1159
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGGeometryEffect.h",
+    "bytes": 6142
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGGeometryNode.h",
+    "bytes": 1086
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGGradient.h",
+    "bytes": 2799
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGGroup.h",
+    "bytes": 1562
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGImage.h",
+    "bytes": 1461
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGInvalidationController.h",
+    "bytes": 1062
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGMaskEffect.h",
+    "bytes": 1561
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGMerge.h",
+    "bytes": 1584
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGNode.h",
+    "bytes": 4828
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGOpacityEffect.h",
+    "bytes": 1298
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGPaint.h",
+    "bytes": 2758
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGPath.h",
+    "bytes": 1695
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGPlane.h",
+    "bytes": 1064
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGRect.h",
+    "bytes": 3716
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGRenderEffect.h",
+    "bytes": 6714
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGRenderNode.h",
+    "bytes": 5301
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGScene.h",
+    "bytes": 935
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGText.h",
+    "bytes": 2523
+  },
+  {
+    "path": "skia/modules/sksg/include/SkSGTransform.h",
+    "bytes": 3143
+  },
+  {
+    "path": "skia/modules/sksg/sksg.gni",
+    "bytes": 1376
+  },
+  {
+    "path": "skia/modules/sksg/slides/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/sksg/slides/SVGPongSlide.cpp",
+    "bytes": 11779
+  },
+  {
+    "path": "skia/modules/sksg/src/BUILD.bazel",
+    "bytes": 1152
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGClipEffect.cpp",
+    "bytes": 1885
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGColorFilter.cpp",
+    "bytes": 8338
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGDraw.cpp",
+    "bytes": 2259
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGEffectNode.cpp",
+    "bytes": 1017
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGGeometryEffect.cpp",
+    "bytes": 5889
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGGeometryNode.cpp",
+    "bytes": 1079
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGGradient.cpp",
+    "bytes": 2008
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGGroup.cpp",
+    "bytes": 3235
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGImage.cpp",
+    "bytes": 1417
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGInvalidationController.cpp",
+    "bytes": 659
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGMaskEffect.cpp",
+    "bytes": 3204
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGMerge.cpp",
+    "bytes": 2819
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGNode.cpp",
+    "bytes": 4381
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGNodePriv.h",
+    "bytes": 528
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGOpacityEffect.cpp",
+    "bytes": 1343
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGPaint.cpp",
+    "bytes": 2077
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGPath.cpp",
+    "bytes": 1272
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGPlane.cpp",
+    "bytes": 994
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGRect.cpp",
+    "bytes": 1661
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGRenderEffect.cpp",
+    "bytes": 8476
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGRenderNode.cpp",
+    "bytes": 8555
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGScene.cpp",
+    "bytes": 832
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGText.cpp",
+    "bytes": 2432
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGTransform.cpp",
+    "bytes": 5497
+  },
+  {
+    "path": "skia/modules/sksg/src/SkSGTransformPriv.h",
+    "bytes": 1058
+  },
+  {
+    "path": "skia/modules/sksg/tests/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/sksg/tests/SGTest.cpp",
+    "bytes": 20999
+  },
+  {
+    "path": "skia/modules/skshaper/BUILD.bazel",
+    "bytes": 3486
+  },
+  {
+    "path": "skia/modules/skshaper/BUILD.gn",
+    "bytes": 2000
+  },
+  {
+    "path": "skia/modules/skshaper/include/BUILD.bazel",
+    "bytes": 1008
+  },
+  {
+    "path": "skia/modules/skshaper/include/SkShaper.h",
+    "bytes": 11580
+  },
+  {
+    "path": "skia/modules/skshaper/include/SkShaper_coretext.h",
+    "bytes": 601
+  },
+  {
+    "path": "skia/modules/skshaper/include/SkShaper_factory.h",
+    "bytes": 1091
+  },
+  {
+    "path": "skia/modules/skshaper/include/SkShaper_harfbuzz.h",
+    "bytes": 1528
+  },
+  {
+    "path": "skia/modules/skshaper/include/SkShaper_skunicode.h",
+    "bytes": 818
+  },
+  {
+    "path": "skia/modules/skshaper/skshaper.gni",
+    "bytes": 1722
+  },
+  {
+    "path": "skia/modules/skshaper/src/BUILD.bazel",
+    "bytes": 956
+  },
+  {
+    "path": "skia/modules/skshaper/src/SkShaper.cpp",
+    "bytes": 9591
+  },
+  {
+    "path": "skia/modules/skshaper/src/SkShaper_coretext.cpp",
+    "bytes": 14724
+  },
+  {
+    "path": "skia/modules/skshaper/src/SkShaper_factory.cpp",
+    "bytes": 1332
+  },
+  {
+    "path": "skia/modules/skshaper/src/SkShaper_harfbuzz.cpp",
+    "bytes": 64714
+  },
+  {
+    "path": "skia/modules/skshaper/src/SkShaper_primitive.cpp",
+    "bytes": 9086
+  },
+  {
+    "path": "skia/modules/skshaper/src/SkShaper_skunicode.cpp",
+    "bytes": 5147
+  },
+  {
+    "path": "skia/modules/skshaper/tests/BUILD.bazel",
+    "bytes": 208
+  },
+  {
+    "path": "skia/modules/skshaper/tests/ShaperTest.cpp",
+    "bytes": 17739
+  },
+  {
+    "path": "skia/modules/skshaper/utils/BUILD.bazel",
+    "bytes": 334
+  },
+  {
+    "path": "skia/modules/skshaper/utils/FactoryHelpers.h",
+    "bytes": 5017
+  },
+  {
+    "path": "skia/modules/skunicode/BUILD.bazel",
+    "bytes": 1613
+  },
+  {
+    "path": "skia/modules/skunicode/BUILD.gn",
+    "bytes": 7136
+  },
+  {
+    "path": "skia/modules/skunicode/include/BUILD.bazel",
+    "bytes": 688
+  },
+  {
+    "path": "skia/modules/skunicode/include/SkUnicode.h",
+    "bytes": 12897
+  },
+  {
+    "path": "skia/modules/skunicode/include/SkUnicode_bidi.h",
+    "bytes": 436
+  },
+  {
+    "path": "skia/modules/skunicode/include/SkUnicode_client.h",
+    "bytes": 662
+  },
+  {
+    "path": "skia/modules/skunicode/include/SkUnicode_icu.h",
+    "bytes": 391
+  },
+  {
+    "path": "skia/modules/skunicode/include/SkUnicode_icu4x.h",
+    "bytes": 357
+  },
+  {
+    "path": "skia/modules/skunicode/include/SkUnicode_libgrapheme.h",
+    "bytes": 375
+  },
+  {
+    "path": "skia/modules/skunicode/skunicode.gni",
+    "bytes": 2852
+  },
+  {
+    "path": "skia/modules/skunicode/src/BUILD.bazel",
+    "bytes": 2517
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkBidiFactory_icu_full.cpp",
+    "bytes": 2204
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkBidiFactory_icu_full.h",
+    "bytes": 1471
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkBidiFactory_icu_subset.cpp",
+    "bytes": 2013
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkBidiFactory_icu_subset.h",
+    "bytes": 1480
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode.cpp",
+    "bytes": 2532
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_bidi.cpp",
+    "bytes": 5384
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_client.cpp",
+    "bytes": 11475
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_hardcoded.cpp",
+    "bytes": 4498
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_hardcoded.h",
+    "bytes": 988
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_icu.cpp",
+    "bytes": 26983
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_icu4x.cpp",
+    "bytes": 17083
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_icu_bidi.cpp",
+    "bytes": 5745
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_icu_bidi.h",
+    "bytes": 2447
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_icu_builtin.cpp",
+    "bytes": 2050
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_icu_runtime.cpp",
+    "bytes": 2571
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_icupriv.h",
+    "bytes": 2498
+  },
+  {
+    "path": "skia/modules/skunicode/src/SkUnicode_libgrapheme.cpp",
+    "bytes": 12312
+  },
+  {
+    "path": "skia/modules/skunicode/tests/BUILD.bazel",
+    "bytes": 206
+  },
+  {
+    "path": "skia/modules/skunicode/tests/SkUnicodeTest.cpp",
+    "bytes": 13448
+  },
+  {
+    "path": "skia/modules/svg/BUILD.bazel",
+    "bytes": 690
+  },
+  {
+    "path": "skia/modules/svg/BUILD.gn",
+    "bytes": 1478
+  },
+  {
+    "path": "skia/modules/svg/include/BUILD.bazel",
+    "bytes": 1651
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGAttribute.h",
+    "bytes": 3424
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGAttributeParser.h",
+    "bytes": 5115
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGCircle.h",
+    "bytes": 1527
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGClipPath.h",
+    "bytes": 1083
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGContainer.h",
+    "bytes": 1455
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGDOM.h",
+    "bytes": 3754
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGDefs.h",
+    "bytes": 532
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGEllipse.h",
+    "bytes": 1315
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFe.h",
+    "bytes": 3304
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeBlend.h",
+    "bytes": 1338
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeColorMatrix.h",
+    "bytes": 1607
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeComponentTransfer.h",
+    "bytes": 2573
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeComposite.h",
+    "bytes": 1628
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeDisplacementMap.h",
+    "bytes": 1727
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeFlood.h",
+    "bytes": 1114
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeGaussianBlur.h",
+    "bytes": 1324
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeImage.h",
+    "bytes": 1243
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeLightSource.h",
+    "bytes": 2651
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeLighting.h",
+    "bytes": 4643
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeMerge.h",
+    "bytes": 1700
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeMorphology.h",
+    "bytes": 1362
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeOffset.h",
+    "bytes": 1213
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFeTurbulence.h",
+    "bytes": 1498
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFilter.h",
+    "bytes": 1695
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGFilterContext.h",
+    "bytes": 2276
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGG.h",
+    "bytes": 488
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGGradient.h",
+    "bytes": 1988
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGHiddenContainer.h",
+    "bytes": 556
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGIDMapper.h",
+    "bytes": 413
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGImage.h",
+    "bytes": 2198
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGLine.h",
+    "bytes": 1389
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGLinearGradient.h",
+    "bytes": 1502
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGMask.h",
+    "bytes": 1620
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGNode.h",
+    "bytes": 10488
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGOpenTypeSVGDecoder.h",
+    "bytes": 1063
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGPath.h",
+    "bytes": 1165
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGPattern.h",
+    "bytes": 1725
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGPoly.h",
+    "bytes": 1533
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGRadialGradient.h",
+    "bytes": 1496
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGRect.h",
+    "bytes": 1521
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGRenderContext.h",
+    "bytes": 8555
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGSVG.h",
+    "bytes": 1784
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGShape.h",
+    "bytes": 960
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGStop.h",
+    "bytes": 885
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGText.h",
+    "bytes": 3802
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGTransformableNode.h",
+    "bytes": 1265
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGTypes.h",
+    "bytes": 19396
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGUse.h",
+    "bytes": 1417
+  },
+  {
+    "path": "skia/modules/svg/include/SkSVGValue.h",
+    "bytes": 2697
+  },
+  {
+    "path": "skia/modules/svg/src/BUILD.bazel",
+    "bytes": 1838
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGAttribute.cpp",
+    "bytes": 1932
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGAttributeParser.cpp",
+    "bytes": 34946
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGCircle.cpp",
+    "bytes": 1998
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGClipPath.cpp",
+    "bytes": 1040
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGContainer.cpp",
+    "bytes": 1446
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGDOM.cpp",
+    "bytes": 21911
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGEllipse.cpp",
+    "bytes": 2189
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFe.cpp",
+    "bytes": 6033
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeBlend.cpp",
+    "bytes": 2577
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeColorMatrix.cpp",
+    "bytes": 3766
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeComponentTransfer.cpp",
+    "bytes": 7013
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeComposite.cpp",
+    "bytes": 3536
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeDisplacementMap.cpp",
+    "bytes": 3510
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeFlood.cpp",
+    "bytes": 1347
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeGaussianBlur.cpp",
+    "bytes": 1655
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeImage.cpp",
+    "bytes": 2124
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeLightSource.cpp",
+    "bytes": 2623
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeLighting.cpp",
+    "bytes": 8843
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeMerge.cpp",
+    "bytes": 1727
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeMorphology.cpp",
+    "bytes": 2482
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeOffset.cpp",
+    "bytes": 1339
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFeTurbulence.cpp",
+    "bytes": 3001
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFilter.cpp",
+    "bytes": 3214
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGFilterContext.cpp",
+    "bytes": 6476
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGGradient.cpp",
+    "bytes": 5233
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGImage.cpp",
+    "bytes": 4376
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGLine.cpp",
+    "bytes": 1826
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGLinearGradient.cpp",
+    "bytes": 2251
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGMask.cpp",
+    "bytes": 3100
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGNode.cpp",
+    "bytes": 7834
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGOpenTypeSVGDecoder.cpp",
+    "bytes": 5945
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGPath.cpp",
+    "bytes": 1761
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGPattern.cpp",
+    "bytes": 5121
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGPoly.cpp",
+    "bytes": 1752
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGRadialGradient.cpp",
+    "bytes": 2787
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGRect.cpp",
+    "bytes": 4626
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGRectPriv.h",
+    "bytes": 599
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGRenderContext.cpp",
+    "bytes": 19808
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGSVG.cpp",
+    "bytes": 3803
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGShape.cpp",
+    "bytes": 1219
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGStop.cpp",
+    "bytes": 509
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGText.cpp",
+    "bytes": 28689
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGTextPriv.h",
+    "bytes": 8375
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGTransformableNode.cpp",
+    "bytes": 1857
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGUse.cpp",
+    "bytes": 2248
+  },
+  {
+    "path": "skia/modules/svg/src/SkSVGValue.cpp",
+    "bytes": 145
+  },
+  {
+    "path": "skia/modules/svg/svg.gni",
+    "bytes": 4566
+  },
+  {
+    "path": "skia/modules/svg/tests/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/svg/tests/Filters.cpp",
+    "bytes": 1130
+  },
+  {
+    "path": "skia/modules/svg/tests/Text.cpp",
+    "bytes": 5328
+  },
+  {
+    "path": "skia/modules/svg/utils/BUILD.bazel",
+    "bytes": 83
+  },
+  {
+    "path": "skia/modules/svg/utils/SvgTool.cpp",
+    "bytes": 3091
+  },
+  {
+    "path": "skia/platform_tools/android/.gitignore",
+    "bytes": 145
+  },
+  {
+    "path": "skia/platform_tools/android/apps/build.gradle",
+    "bytes": 3521
+  },
+  {
+    "path": "skia/platform_tools/android/apps/gradle.properties",
+    "bytes": 111
+  },
+  {
+    "path": "skia/platform_tools/android/apps/gradle/wrapper/gradle-wrapper.jar",
+    "bytes": 49896
+  },
+  {
+    "path": "skia/platform_tools/android/apps/gradle/wrapper/gradle-wrapper.properties",
+    "bytes": 512
+  },
+  {
+    "path": "skia/platform_tools/android/apps/gradlew",
+    "bytes": 5080
+  },
+  {
+    "path": "skia/platform_tools/android/apps/robotium.cfg",
+    "bytes": 170
+  },
+  {
+    "path": "skia/platform_tools/android/apps/settings.gradle",
+    "bytes": 82
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/build.gradle",
+    "bytes": 1383
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/collect.sh",
+    "bytes": 274
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/perfetto_config.pb",
+    "bytes": 243
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/run_perf.sh",
+    "bytes": 2188
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottie_metric.proto",
+    "bytes": 2929
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottie_metric.sql",
+    "bytes": 12939
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottielib/.gitignore",
+    "bytes": 7
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottielib/build.gradle",
+    "bytes": 1038
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottielib/src/main/AndroidManifest.xml",
+    "bytes": 106
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottielib/src/main/cpp/native-lib.cpp",
+    "bytes": 9191
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottielib/src/main/java/org/skia/skottie/SkottieAnimation.java",
+    "bytes": 16516
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottielib/src/main/java/org/skia/skottie/SkottieRunner.java",
+    "bytes": 9396
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottielib/src/main/java/org/skia/skottie/SkottieView.java",
+    "bytes": 7587
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/skottielib/src/main/res/values/attrs.xml",
+    "bytes": 421
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/AndroidManifest.xml",
+    "bytes": 801
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/java/org/skia/skottie/DemoActivity.java",
+    "bytes": 1623
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/java/org/skia/skottie/PerfActivity.java",
+    "bytes": 2905
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/java/org/skia/skottie/SkottieActivity.java",
+    "bytes": 9343
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/layout/demo_layout.xml",
+    "bytes": 2128
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/layout/main_layout.xml",
+    "bytes": 1165
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/asdasd.json",
+    "bytes": 70807
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/celebration.json",
+    "bytes": 100701
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/check.json",
+    "bytes": 2003
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/check_animation.json",
+    "bytes": 8868
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/confetti.json",
+    "bytes": 30454
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/gears.json",
+    "bytes": 9040
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/hand_sanitizer.json",
+    "bytes": 30388
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/heart_preloader.json",
+    "bytes": 3838
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/i_was_scared_after_that_brouhaha.json",
+    "bytes": 1199917
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/im_thirsty.json",
+    "bytes": 166951
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/movie_loading.json",
+    "bytes": 18170
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/ripple_loading_animation.json",
+    "bytes": 9020
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/signature.json",
+    "bytes": 14381
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/star.json",
+    "bytes": 22872
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/true_will.json",
+    "bytes": 80266
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/uk.json",
+    "bytes": 10154
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/white_material_wave_loading.json",
+    "bytes": 5944
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skottie/src/main/res/raw/workout_monkey_stay_healthy.json",
+    "bytes": 399832
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/build.gradle",
+    "bytes": 851
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/AndroidManifest.xml",
+    "bytes": 1430
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/AndroidTestTemplate.xml",
+    "bytes": 1145
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/assets/.gitignore",
+    "bytes": 17
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/java/org/skia/skqp/MainActivity.java",
+    "bytes": 555
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/java/org/skia/skqp/SkQP.java",
+    "bytes": 2214
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/java/org/skia/skqp/SkQPActivity.java",
+    "bytes": 3001
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/java/org/skia/skqp/SkQPException.java",
+    "bytes": 266
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/java/org/skia/skqp/SkQPFailure.java",
+    "bytes": 278
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/java/org/skia/skqp/SkQPRunner.java",
+    "bytes": 7078
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/res/layout/activity_main.xml",
+    "bytes": 1189
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/res/layout/activity_skqp.xml",
+    "bytes": 1025
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/res/layout/content_skqp.xml",
+    "bytes": 764
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/res/values/colors.xml",
+    "bytes": 208
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/res/values/strings.xml",
+    "bytes": 133
+  },
+  {
+    "path": "skia/platform_tools/android/apps/skqp/src/main/res/values/styles.xml",
+    "bytes": 708
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/build.gradle",
+    "bytes": 941
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/AndroidManifest.xml",
+    "bytes": 757
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/assets/.gitignore",
+    "bytes": 14
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/java/org/skia/viewer/OptionAdapter.java",
+    "bytes": 2082
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/java/org/skia/viewer/StateAdapter.java",
+    "bytes": 8893
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/java/org/skia/viewer/ViewerActivity.java",
+    "bytes": 5573
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/java/org/skia/viewer/ViewerApplication.java",
+    "bytes": 3877
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/res/layout-xlarge-land/activity_main.xml",
+    "bytes": 1463
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/res/layout/activity_main.xml",
+    "bytes": 1406
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/res/layout/state_item.xml",
+    "bytes": 1220
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/res/menu/title.xml",
+    "bytes": 361
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/res/values/integers.xml",
+    "bytes": 109
+  },
+  {
+    "path": "skia/platform_tools/android/apps/viewer/src/main/res/values/strings.xml",
+    "bytes": 192
+  },
+  {
+    "path": "skia/platform_tools/android/bin/adb_pull_if_needed",
+    "bytes": 263
+  },
+  {
+    "path": "skia/platform_tools/android/bin/adb_push_if_needed",
+    "bytes": 263
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_build_app",
+    "bytes": 2779
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_build_universal_viewer",
+    "bytes": 2182
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_gdb_app",
+    "bytes": 2005
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_gdb_native",
+    "bytes": 1522
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_gdbserver",
+    "bytes": 2326
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_install_app",
+    "bytes": 1206
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_launch_app",
+    "bytes": 568
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_perf",
+    "bytes": 3028
+  },
+  {
+    "path": "skia/platform_tools/android/bin/android_run_skia",
+    "bytes": 2477
+  },
+  {
+    "path": "skia/platform_tools/android/bin/linux/perfhost",
+    "bytes": 2219858
+  },
+  {
+    "path": "skia/platform_tools/android/bin/mac/perfhost",
+    "bytes": 639612
+  },
+  {
+    "path": "skia/platform_tools/android/bin/utils/android_setup.sh",
+    "bytes": 4565
+  },
+  {
+    "path": "skia/platform_tools/android/bin/utils/setup_adb.sh",
+    "bytes": 606
+  },
+  {
+    "path": "skia/platform_tools/android/gclient.config",
+    "bytes": 273
+  },
+  {
+    "path": "skia/platform_tools/android/skp_gen/android_skp_capture.py",
+    "bytes": 5221
+  },
+  {
+    "path": "skia/platform_tools/android/skp_gen/apps/geniewidget.json",
+    "bytes": 340
+  },
+  {
+    "path": "skia/platform_tools/android/tradefed/upload_dm_results.py",
+    "bytes": 2615
+  },
+  {
+    "path": "skia/platform_tools/android/vulkan/Skia_Vulkan_Android.h",
+    "bytes": 500
+  },
+  {
+    "path": "skia/platform_tools/android/whitespace.txt",
+    "bytes": 4
+  },
+  {
+    "path": "skia/platform_tools/debugging/lldb/skia.py",
+    "bytes": 7179
+  },
+  {
+    "path": "skia/platform_tools/debugging/lldb/skiavis.py",
+    "bytes": 1405
+  },
+  {
+    "path": "skia/platform_tools/debugging/vs/Skia.natvis",
+    "bytes": 15889
+  },
+  {
+    "path": "skia/platform_tools/ios/app/LaunchScreen.storyboard",
+    "bytes": 1681
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_cat_file",
+    "bytes": 673
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_mkdir",
+    "bytes": 487
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_path_exists",
+    "bytes": 591
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_pull_if_needed",
+    "bytes": 527
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_push_file",
+    "bytes": 530
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_push_if_needed",
+    "bytes": 646
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_restart",
+    "bytes": 479
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_rm",
+    "bytes": 499
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_setup.sh",
+    "bytes": 639
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_setup_idevicefs.sh",
+    "bytes": 1565
+  },
+  {
+    "path": "skia/platform_tools/ios/bin/ios_setup_ifuse.sh",
+    "bytes": 2688
+  },
+  {
+    "path": "skia/platform_tools/libraries/include/arcore_c_api.h",
+    "bytes": 95393
+  },
+  {
+    "path": "skia/site/_index.html",
+    "bytes": 632
+  },
+  {
+    "path": "skia/site/about/_index.html",
+    "bytes": 1306
+  },
+  {
+    "path": "skia/site/blog/_index.md",
+    "bytes": 40
+  },
+  {
+    "path": "skia/site/blog/news/_index.md",
+    "bytes": 62
+  },
+  {
+    "path": "skia/site/blog/news/first-post.md",
+    "bytes": 163
+  },
+  {
+    "path": "skia/site/config.toml",
+    "bytes": 6466
+  },
+  {
+    "path": "skia/site/docs/_index.md",
+    "bytes": 2701
+  },
+  {
+    "path": "skia/site/docs/dev/_index.md",
+    "bytes": 180
+  },
+  {
+    "path": "skia/site/docs/dev/chrome/_index.md",
+    "bytes": 1664
+  },
+  {
+    "path": "skia/site/docs/dev/chrome/blink.md",
+    "bytes": 6682
+  },
+  {
+    "path": "skia/site/docs/dev/chrome/changes.md",
+    "bytes": 1671
+  },
+  {
+    "path": "skia/site/docs/dev/chrome/multi_repo_trybots.md",
+    "bytes": 3460
+  },
+  {
+    "path": "skia/site/docs/dev/chrome/repo.md",
+    "bytes": 761
+  },
+  {
+    "path": "skia/site/docs/dev/contrib/SuggestedReviewers.png",
+    "bytes": 132082
+  },
+  {
+    "path": "skia/site/docs/dev/contrib/_index.md",
+    "bytes": 2567
+  },
+  {
+    "path": "skia/site/docs/dev/contrib/bazel.md",
+    "bytes": 5709
+  },
+  {
+    "path": "skia/site/docs/dev/contrib/cqkeywords.md",
+    "bytes": 2787
+  },
+  {
+    "path": "skia/site/docs/dev/contrib/directory.md",
+    "bytes": 1851
+  },
+  {
+    "path": "skia/site/docs/dev/contrib/revert.md",
+    "bytes": 691
+  },
+  {
+    "path": "skia/site/docs/dev/contrib/style.md",
+    "bytes": 12541
+  },
+  {
+    "path": "skia/site/docs/dev/contrib/submit.md",
+    "bytes": 9804
+  },
+  {
+    "path": "skia/site/docs/dev/design/PdfLogicalDocumentStructure.png",
+    "bytes": 49030
+  },
+  {
+    "path": "skia/site/docs/dev/design/_index.md",
+    "bytes": 130
+  },
+  {
+    "path": "skia/site/docs/dev/design/aaa.md",
+    "bytes": 340
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/_index.md",
+    "bytes": 15320
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/corollary2.2.1.svg",
+    "bytes": 21691
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/corollary2.2.2.svg",
+    "bytes": 19522
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/corollary2.3.1.svg",
+    "bytes": 21830
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/corollary2.3.2.svg",
+    "bytes": 23983
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/corollary2.3.3.svg",
+    "bytes": 26781
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/lemma1.svg",
+    "bytes": 30772
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/lemma3.1.svg",
+    "bytes": 38548
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/lemma3.2.svg",
+    "bytes": 39713
+  },
+  {
+    "path": "skia/site/docs/dev/design/conical/lemma4.svg",
+    "bytes": 38813
+  },
+  {
+    "path": "skia/site/docs/dev/design/dangling_pointer_detector.md",
+    "bytes": 2056
+  },
+  {
+    "path": "skia/site/docs/dev/design/pdftheory.md",
+    "bytes": 21684
+  },
+  {
+    "path": "skia/site/docs/dev/design/raster_tragedy/_index.md",
+    "bytes": 13900
+  },
+  {
+    "path": "skia/site/docs/dev/design/text_c2d.md",
+    "bytes": 4415
+  },
+  {
+    "path": "skia/site/docs/dev/design/text_overview.md",
+    "bytes": 4765
+  },
+  {
+    "path": "skia/site/docs/dev/design/text_shaper.md",
+    "bytes": 10352
+  },
+  {
+    "path": "skia/site/docs/dev/design/uni_characterize.md",
+    "bytes": 4467
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/_index.md",
+    "bytes": 13467
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/android.md",
+    "bytes": 4064
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/gpu.md",
+    "bytes": 3587
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/infra.md",
+    "bytes": 292
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/skia_perf_columns.png",
+    "bytes": 18985
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/skia_perf_graph.png",
+    "bytes": 584264
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/skia_perf_mini_graph.png",
+    "bytes": 72482
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/skia_perf_mini_graph_triaged.png",
+    "bytes": 72146
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/skia_perf_view.png",
+    "bytes": 57143
+  },
+  {
+    "path": "skia/site/docs/dev/gardening/skia_status_view.png",
+    "bytes": 148476
+  },
+  {
+    "path": "skia/site/docs/dev/internal/_index.md",
+    "bytes": 1433
+  },
+  {
+    "path": "skia/site/docs/dev/present/_index.md",
+    "bytes": 152
+  },
+  {
+    "path": "skia/site/docs/dev/present/pathops.md",
+    "bytes": 1150
+  },
+  {
+    "path": "skia/site/docs/dev/testing/BlameView.png",
+    "bytes": 192389
+  },
+  {
+    "path": "skia/site/docs/dev/testing/ByTest.png",
+    "bytes": 204022
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Cluster.png",
+    "bytes": 59525
+  },
+  {
+    "path": "skia/site/docs/dev/testing/ClusterConfig.png",
+    "bytes": 218419
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Digests.png",
+    "bytes": 417670
+  },
+  {
+    "path": "skia/site/docs/dev/testing/DotDiagram.png",
+    "bytes": 319870
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Grid.png",
+    "bytes": 328877
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Ignores.png",
+    "bytes": 259943
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Isolate.png",
+    "bytes": 30189
+  },
+  {
+    "path": "skia/site/docs/dev/testing/IssueHighlight.png",
+    "bytes": 193256
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Perf.png",
+    "bytes": 173158
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Regression.png",
+    "bytes": 65888
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Search.png",
+    "bytes": 210544
+  },
+  {
+    "path": "skia/site/docs/dev/testing/Status.png",
+    "bytes": 44431
+  },
+  {
+    "path": "skia/site/docs/dev/testing/_index.md",
+    "bytes": 758
+  },
+  {
+    "path": "skia/site/docs/dev/testing/automated_testing.md",
+    "bytes": 8516
+  },
+  {
+    "path": "skia/site/docs/dev/testing/download.md",
+    "bytes": 1010
+  },
+  {
+    "path": "skia/site/docs/dev/testing/fonts.md",
+    "bytes": 622
+  },
+  {
+    "path": "skia/site/docs/dev/testing/fuzz.md",
+    "bytes": 3639
+  },
+  {
+    "path": "skia/site/docs/dev/testing/ios.md",
+    "bytes": 1447
+  },
+  {
+    "path": "skia/site/docs/dev/testing/pprof_cpu_flame.png",
+    "bytes": 70608
+  },
+  {
+    "path": "skia/site/docs/dev/testing/pprof_cpu_web.png",
+    "bytes": 802850
+  },
+  {
+    "path": "skia/site/docs/dev/testing/pprof_cpu_weblist.png",
+    "bytes": 316633
+  },
+  {
+    "path": "skia/site/docs/dev/testing/pprof_mem_web.png",
+    "bytes": 478676
+  },
+  {
+    "path": "skia/site/docs/dev/testing/pprof_mem_weblist.png",
+    "bytes": 320159
+  },
+  {
+    "path": "skia/site/docs/dev/testing/pprof_webview.png",
+    "bytes": 86994
+  },
+  {
+    "path": "skia/site/docs/dev/testing/profiling.md",
+    "bytes": 6962
+  },
+  {
+    "path": "skia/site/docs/dev/testing/skiagold.md",
+    "bytes": 5913
+  },
+  {
+    "path": "skia/site/docs/dev/testing/skiaperf.md",
+    "bytes": 1483
+  },
+  {
+    "path": "skia/site/docs/dev/testing/skqp.md",
+    "bytes": 1687
+  },
+  {
+    "path": "skia/site/docs/dev/testing/swarmingbots.md",
+    "bytes": 5435
+  },
+  {
+    "path": "skia/site/docs/dev/testing/testing.md",
+    "bytes": 7898
+  },
+  {
+    "path": "skia/site/docs/dev/testing/tests.md",
+    "bytes": 2966
+  },
+  {
+    "path": "skia/site/docs/dev/testing/xsan.md",
+    "bytes": 3570
+  },
+  {
+    "path": "skia/site/docs/dev/tools/_index.md",
+    "bytes": 95
+  },
+  {
+    "path": "skia/site/docs/dev/tools/android-capture.md",
+    "bytes": 2860
+  },
+  {
+    "path": "skia/site/docs/dev/tools/android_gdb.md",
+    "bytes": 2223
+  },
+  {
+    "path": "skia/site/docs/dev/tools/android_gdb.png",
+    "bytes": 1051891
+  },
+  {
+    "path": "skia/site/docs/dev/tools/buttons.png",
+    "bytes": 1168
+  },
+  {
+    "path": "skia/site/docs/dev/tools/calendar.mskp",
+    "bytes": 16112838
+  },
+  {
+    "path": "skia/site/docs/dev/tools/codesearch.md",
+    "bytes": 2618
+  },
+  {
+    "path": "skia/site/docs/dev/tools/crosshair.png",
+    "bytes": 28661
+  },
+  {
+    "path": "skia/site/docs/dev/tools/debugger.md",
+    "bytes": 8399
+  },
+  {
+    "path": "skia/site/docs/dev/tools/debugger.png",
+    "bytes": 180768
+  },
+  {
+    "path": "skia/site/docs/dev/tools/debugvis.md",
+    "bytes": 599
+  },
+  {
+    "path": "skia/site/docs/dev/tools/end.png",
+    "bytes": 228
+  },
+  {
+    "path": "skia/site/docs/dev/tools/expand.png",
+    "bytes": 225
+  },
+  {
+    "path": "skia/site/docs/dev/tools/eye_icon.png",
+    "bytes": 22813
+  },
+  {
+    "path": "skia/site/docs/dev/tools/frameplayback.png",
+    "bytes": 1920
+  },
+  {
+    "path": "skia/site/docs/dev/tools/gpuop.png",
+    "bytes": 678
+  },
+  {
+    "path": "skia/site/docs/dev/tools/image.png",
+    "bytes": 346
+  },
+  {
+    "path": "skia/site/docs/dev/tools/layers.png",
+    "bytes": 24187
+  },
+  {
+    "path": "skia/site/docs/dev/tools/markdown.md",
+    "bytes": 2535
+  },
+  {
+    "path": "skia/site/docs/dev/tools/onlinedebugger.png",
+    "bytes": 455580
+  },
+  {
+    "path": "skia/site/docs/dev/tools/playcommands.png",
+    "bytes": 243
+  },
+  {
+    "path": "skia/site/docs/dev/tools/resources.png",
+    "bytes": 2763
+  },
+  {
+    "path": "skia/site/docs/dev/tools/settings.png",
+    "bytes": 7970
+  },
+  {
+    "path": "skia/site/docs/dev/tools/sk.md",
+    "bytes": 2602
+  },
+  {
+    "path": "skia/site/docs/dev/tools/tracing.md",
+    "bytes": 6508
+  },
+  {
+    "path": "skia/site/docs/dev/tools/tracing.png",
+    "bytes": 57763
+  },
+  {
+    "path": "skia/site/docs/dev/tools/tracing_load.png",
+    "bytes": 6116
+  },
+  {
+    "path": "skia/site/docs/roles.md",
+    "bytes": 1625
+  },
+  {
+    "path": "skia/site/docs/user/_index.md",
+    "bytes": 549
+  },
+  {
+    "path": "skia/site/docs/user/api/SkBlendMode_Overview.md",
+    "bytes": 7267
+  },
+  {
+    "path": "skia/site/docs/user/api/SkPath_Overview.md",
+    "bytes": 8274
+  },
+  {
+    "path": "skia/site/docs/user/api/_index.md",
+    "bytes": 3565
+  },
+  {
+    "path": "skia/site/docs/user/api/skcanvas_creation.md",
+    "bytes": 8868
+  },
+  {
+    "path": "skia/site/docs/user/api/skcanvas_overview.md",
+    "bytes": 2305
+  },
+  {
+    "path": "skia/site/docs/user/api/skpaint_overview.md",
+    "bytes": 5971
+  },
+  {
+    "path": "skia/site/docs/user/build.md",
+    "bytes": 16150
+  },
+  {
+    "path": "skia/site/docs/user/color.md",
+    "bytes": 4323
+  },
+  {
+    "path": "skia/site/docs/user/coordinates.md",
+    "bytes": 3491
+  },
+  {
+    "path": "skia/site/docs/user/download.md",
+    "bytes": 1741
+  },
+  {
+    "path": "skia/site/docs/user/issue-tracker.md",
+    "bytes": 1370
+  },
+  {
+    "path": "skia/site/docs/user/modules/PathKit_effects.png",
+    "bytes": 113813
+  },
+  {
+    "path": "skia/site/docs/user/modules/_index.md",
+    "bytes": 77
+  },
+  {
+    "path": "skia/site/docs/user/modules/canvaskit.md",
+    "bytes": 28063
+  },
+  {
+    "path": "skia/site/docs/user/modules/quickstart.md",
+    "bytes": 13069
+  },
+  {
+    "path": "skia/site/docs/user/modules/skottie.md",
+    "bytes": 3817
+  },
+  {
+    "path": "skia/site/docs/user/privacy.md",
+    "bytes": 192
+  },
+  {
+    "path": "skia/site/docs/user/release/_index.md",
+    "bytes": 1218
+  },
+  {
+    "path": "skia/site/docs/user/sample/_index.md",
+    "bytes": 89
+  },
+  {
+    "path": "skia/site/docs/user/sample/pdf.md",
+    "bytes": 2160
+  },
+  {
+    "path": "skia/site/docs/user/sample/viewer.md",
+    "bytes": 7527
+  },
+  {
+    "path": "skia/site/docs/user/sksl.md",
+    "bytes": 15000
+  },
+  {
+    "path": "skia/site/docs/user/special/_index.md",
+    "bytes": 84
+  },
+  {
+    "path": "skia/site/docs/user/special/angle.md",
+    "bytes": 650
+  },
+  {
+    "path": "skia/site/docs/user/special/vulkan.md",
+    "bytes": 3652
+  },
+  {
+    "path": "skia/site/docs/user/tips.md",
+    "bytes": 3540
+  },
+  {
+    "path": "skia/site/featured-background.png",
+    "bytes": 36167
+  },
+  {
+    "path": "skia/site/search.md",
+    "bytes": 47
+  },
+  {
+    "path": "skia/src/gpu/Blend.cpp",
+    "bytes": 9009
+  },
+  {
+    "path": "skia/src/gpu/BlendFormula.cpp",
+    "bytes": 12749
+  },
+  {
+    "path": "skia/src/gpu/BlurUtils.cpp",
+    "bytes": 14881
+  },
+  {
+    "path": "skia/src/gpu/DataUtils.cpp",
+    "bytes": 9515
+  },
+  {
+    "path": "skia/src/gpu/DitherUtils.cpp",
+    "bytes": 3210
+  },
+  {
+    "path": "skia/src/gpu/GlobalResourceStats.cpp",
+    "bytes": 4810
+  },
+  {
+    "path": "skia/src/gpu/GradientBitmap.cpp",
+    "bytes": 2386
+  },
+  {
+    "path": "skia/src/gpu/MutableTextureState.cpp",
+    "bytes": 1267
+  },
+  {
+    "path": "skia/src/gpu/RectanizerPow2.cpp",
+    "bytes": 2036
+  },
+  {
+    "path": "skia/src/gpu/RectanizerSkyline.cpp",
+    "bytes": 3620
+  },
+  {
+    "path": "skia/src/gpu/ResourceKey.cpp",
+    "bytes": 1080
+  },
+  {
+    "path": "skia/src/gpu/ShaderErrorHandler.cpp",
+    "bytes": 962
+  },
+  {
+    "path": "skia/src/gpu/SkBackingFit.cpp",
+    "bytes": 1124
+  },
+  {
+    "path": "skia/src/gpu/SkSLToBackend.cpp",
+    "bytes": 2755
+  },
+  {
+    "path": "skia/src/gpu/Swizzle.cpp",
+    "bytes": 1993
+  },
+  {
+    "path": "skia/src/gpu/TiledTextureUtils.cpp",
+    "bytes": 20748
+  },
+  {
+    "path": "skia/src/gpu/android/AHardwareBufferUtils.cpp",
+    "bytes": 1685
+  },
+  {
+    "path": "skia/src/gpu/android/AndroidVulkanMemoryAllocator.cpp",
+    "bytes": 686
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ClipStack.cpp",
+    "bytes": 73994
+  },
+  {
+    "path": "skia/src/gpu/ganesh/Device.cpp",
+    "bytes": 58830
+  },
+  {
+    "path": "skia/src/gpu/ganesh/Device_drawTexture.cpp",
+    "bytes": 36448
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrAHardwareBufferImageGenerator.cpp",
+    "bytes": 9756
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrAHardwareBufferUtils.cpp",
+    "bytes": 2833
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrAtlasTypes.cpp",
+    "bytes": 5065
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrAttachment.cpp",
+    "bytes": 6238
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrAuditTrail.cpp",
+    "bytes": 7468
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrBackendSemaphore.cpp",
+    "bytes": 1200
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrBackendSurface.cpp",
+    "bytes": 6618
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrBackendTextureImageGenerator.cpp",
+    "bytes": 12071
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrBackendUtils.cpp",
+    "bytes": 1522
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrBlurUtils.cpp",
+    "bytes": 113797
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrBufferAllocPool.cpp",
+    "bytes": 19875
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrBufferTransferRenderTask.cpp",
+    "bytes": 2118
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrBufferUpdateRenderTask.cpp",
+    "bytes": 1319
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrCanvas.cpp",
+    "bytes": 1676
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrCaps.cpp",
+    "bytes": 22125
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrClientMappedBufferManager.cpp",
+    "bytes": 651
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrColorInfo.cpp",
+    "bytes": 1821
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrColorSpaceXform.cpp",
+    "bytes": 6782
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrContextThreadSafeProxy.cpp",
+    "bytes": 7136
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrContext_Base.cpp",
+    "bytes": 2463
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrCopyRenderTask.cpp",
+    "bytes": 4256
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDDLContext.cpp",
+    "bytes": 4010
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDDLTask.cpp",
+    "bytes": 3917
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDataUtils.cpp",
+    "bytes": 24894
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDefaultGeoProcFactory.cpp",
+    "bytes": 15054
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDeferredDisplayList.cpp",
+    "bytes": 2368
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDeferredDisplayListRecorder.cpp",
+    "bytes": 7462
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDirectContext.cpp",
+    "bytes": 47089
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDirectContextPriv.cpp",
+    "bytes": 13483
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDistanceFieldGenFromVector.cpp",
+    "bytes": 32054
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDrawOpAtlas.cpp",
+    "bytes": 26919
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDrawOpTest.cpp",
+    "bytes": 1779
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDrawingManager.cpp",
+    "bytes": 42249
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDriverBugWorkarounds.cpp",
+    "bytes": 963
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrDynamicAtlas.cpp",
+    "bytes": 9002
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrEagerVertexAllocator.cpp",
+    "bytes": 1998
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrFixedClip.cpp",
+    "bytes": 1750
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrFragmentProcessor.cpp",
+    "bytes": 40188
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrFragmentProcessors.cpp",
+    "bytes": 53320
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrGeometryProcessor.cpp",
+    "bytes": 27728
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrGpu.cpp",
+    "bytes": 39179
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrGpuBuffer.cpp",
+    "bytes": 2853
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrGpuResource.cpp",
+    "bytes": 8081
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrImageContext.cpp",
+    "bytes": 875
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrImageInfo.cpp",
+    "bytes": 2193
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrManagedResource.cpp",
+    "bytes": 396
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrMemoryPool.cpp",
+    "bytes": 4954
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrMeshBuffers.cpp",
+    "bytes": 5018
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrMeshDrawTarget.cpp",
+    "bytes": 1475
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrOnFlushResourceProvider.cpp",
+    "bytes": 1434
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrOpFlushState.cpp",
+    "bytes": 11339
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrOpsRenderPass.cpp",
+    "bytes": 14838
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrPaint.cpp",
+    "bytes": 1792
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrPersistentCacheUtils.cpp",
+    "bytes": 5947
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrPipeline.cpp",
+    "bytes": 5999
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrProcessor.cpp",
+    "bytes": 1692
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrProcessorAnalysis.cpp",
+    "bytes": 2017
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrProcessorSet.cpp",
+    "bytes": 8647
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrProcessorUnitTest.cpp",
+    "bytes": 7933
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrProgramDesc.cpp",
+    "bytes": 7637
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrProgramInfo.cpp",
+    "bytes": 3590
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrPromiseImageTexture.cpp",
+    "bytes": 424
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrProxyProvider.cpp",
+    "bytes": 42582
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrRecordingContext.cpp",
+    "bytes": 9545
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrRecordingContextPriv.cpp",
+    "bytes": 16983
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrRenderTarget.cpp",
+    "bytes": 2011
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrRenderTargetProxy.cpp",
+    "bytes": 9271
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrRenderTask.cpp",
+    "bytes": 12278
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrRenderTaskCluster.cpp",
+    "bytes": 6909
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrResourceAllocator.cpp",
+    "bytes": 17479
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrResourceCache.cpp",
+    "bytes": 37206
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrResourceProvider.cpp",
+    "bytes": 40416
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrRingBuffer.cpp",
+    "bytes": 4438
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrSPIRVUniformHandler.cpp",
+    "bytes": 11056
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrSPIRVVaryingHandler.cpp",
+    "bytes": 3370
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrSWMaskHelper.cpp",
+    "bytes": 5363
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrShaderCaps.cpp",
+    "bytes": 6758
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrShaderVar.cpp",
+    "bytes": 1512
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrStagingBufferManager.cpp",
+    "bytes": 2413
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrStencilSettings.cpp",
+    "bytes": 11117
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrStyle.cpp",
+    "bytes": 8682
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrSurface.cpp",
+    "bytes": 3017
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrSurfaceCharacterization.cpp",
+    "bytes": 6855
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrSurfaceProxy.cpp",
+    "bytes": 19107
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrSurfaceProxyView.cpp",
+    "bytes": 3133
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrTestUtils.cpp",
+    "bytes": 16391
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrTexture.cpp",
+    "bytes": 5125
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrTextureProxy.cpp",
+    "bytes": 9635
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrTextureProxyCacheAccess.cpp",
+    "bytes": 483
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrTextureRenderTargetProxy.cpp",
+    "bytes": 11297
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrTextureResolveRenderTask.cpp",
+    "bytes": 6817
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrThreadSafeCache.cpp",
+    "bytes": 13130
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrThreadSafePipelineBuilder.cpp",
+    "bytes": 2362
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrTransferFromRenderTask.cpp",
+    "bytes": 1499
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrUniformDataManager.cpp",
+    "bytes": 9717
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrUtil.cpp",
+    "bytes": 2586
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrVertexChunkArray.cpp",
+    "bytes": 1800
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrWaitRenderTask.cpp",
+    "bytes": 1416
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrWritePixelsRenderTask.cpp",
+    "bytes": 3164
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrXferProcessor.cpp",
+    "bytes": 9086
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrYUVABackendTextures.cpp",
+    "bytes": 4622
+  },
+  {
+    "path": "skia/src/gpu/ganesh/GrYUVATextureProxies.cpp",
+    "bytes": 4967
+  },
+  {
+    "path": "skia/src/gpu/ganesh/PathRenderer.cpp",
+    "bytes": 3811
+  },
+  {
+    "path": "skia/src/gpu/ganesh/PathRendererChain.cpp",
+    "bytes": 4887
+  },
+  {
+    "path": "skia/src/gpu/ganesh/SkGr.cpp",
+    "bytes": 27317
+  },
+  {
+    "path": "skia/src/gpu/ganesh/StencilMaskHelper.cpp",
+    "bytes": 18533
+  },
+  {
+    "path": "skia/src/gpu/ganesh/SurfaceContext.cpp",
+    "bytes": 68354
+  },
+  {
+    "path": "skia/src/gpu/ganesh/SurfaceDrawContext.cpp",
+    "bytes": 101504
+  },
+  {
+    "path": "skia/src/gpu/ganesh/SurfaceFillContext.cpp",
+    "bytes": 11593
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DAMDMemoryAllocator.cpp",
+    "bytes": 2563
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DAttachment.cpp",
+    "bytes": 3956
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DBackendSemaphore.cpp",
+    "bytes": 1695
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DBackendSurface.cpp",
+    "bytes": 12941
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DBuffer.cpp",
+    "bytes": 10045
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DCaps.cpp",
+    "bytes": 49687
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DCommandList.cpp",
+    "bytes": 26807
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DCommandSignature.cpp",
+    "bytes": 1542
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DCpuDescriptorManager.cpp",
+    "bytes": 7924
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DDescriptorHeap.cpp",
+    "bytes": 2244
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DDescriptorTableManager.cpp",
+    "bytes": 5725
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DDirectContext.cpp",
+    "bytes": 1166
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DGpu.cpp",
+    "bytes": 75512
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DOpsRenderPass.cpp",
+    "bytes": 15085
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DPipelineState.cpp",
+    "bytes": 9108
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DPipelineStateBuilder.cpp",
+    "bytes": 27498
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DPipelineStateDataManager.cpp",
+    "bytes": 1553
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DRenderTarget.cpp",
+    "bytes": 10115
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DResourceProvider.cpp",
+    "bytes": 16149
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DRootSignature.cpp",
+    "bytes": 6480
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DSemaphore.cpp",
+    "bytes": 970
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DTexture.cpp",
+    "bytes": 8464
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DTextureRenderTarget.cpp",
+    "bytes": 11564
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DTextureResource.cpp",
+    "bytes": 4931
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DTypesMinimal.cpp",
+    "bytes": 2723
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DTypesPriv.cpp",
+    "bytes": 818
+  },
+  {
+    "path": "skia/src/gpu/ganesh/d3d/GrD3DUtil.cpp",
+    "bytes": 855
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrBezierEffect.cpp",
+    "bytes": 15145
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrBicubicEffect.cpp",
+    "bytes": 14188
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrBitmapTextGeoProc.cpp",
+    "bytes": 10737
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrBlendFragmentProcessor.cpp",
+    "bytes": 11822
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrColorTableEffect.cpp",
+    "bytes": 5100
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrConvexPolyEffect.cpp",
+    "bytes": 9227
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrCoverageSetOpXP.cpp",
+    "bytes": 7526
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrCustomXfermode.cpp",
+    "bytes": 17689
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrDisableColorXP.cpp",
+    "bytes": 2713
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrDistanceFieldGeoProc.cpp",
+    "bytes": 43432
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrMatrixEffect.cpp",
+    "bytes": 3147
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrModulateAtlasCoverageEffect.cpp",
+    "bytes": 4761
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrOvalEffect.cpp",
+    "bytes": 1200
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrPerlinNoise2Effect.cpp",
+    "bytes": 13496
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrPorterDuffXferProcessor.cpp",
+    "bytes": 24781
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrRRectEffect.cpp",
+    "bytes": 39168
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrShadowGeoProc.cpp",
+    "bytes": 3630
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrSkSLFP.cpp",
+    "bytes": 24274
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrTextureEffect.cpp",
+    "bytes": 40611
+  },
+  {
+    "path": "skia/src/gpu/ganesh/effects/GrYUVtoRGBEffect.cpp",
+    "bytes": 18552
+  },
+  {
+    "path": "skia/src/gpu/ganesh/geometry/GrAAConvexTessellator.cpp",
+    "bytes": 43693
+  },
+  {
+    "path": "skia/src/gpu/ganesh/geometry/GrAATriangulator.cpp",
+    "bytes": 29772
+  },
+  {
+    "path": "skia/src/gpu/ganesh/geometry/GrPathUtils.cpp",
+    "bytes": 20453
+  },
+  {
+    "path": "skia/src/gpu/ganesh/geometry/GrQuad.cpp",
+    "bytes": 5762
+  },
+  {
+    "path": "skia/src/gpu/ganesh/geometry/GrQuadUtils.cpp",
+    "bytes": 59369
+  },
+  {
+    "path": "skia/src/gpu/ganesh/geometry/GrShape.cpp",
+    "bytes": 17093
+  },
+  {
+    "path": "skia/src/gpu/ganesh/geometry/GrStyledShape.cpp",
+    "bytes": 31240
+  },
+  {
+    "path": "skia/src/gpu/ganesh/geometry/GrTriangulator.cpp",
+    "bytes": 70889
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/AHardwareBufferGL.cpp",
+    "bytes": 11797
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLAssembleGLESInterfaceAutogen.cpp",
+    "bytes": 16819
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLAssembleGLInterfaceAutogen.cpp",
+    "bytes": 16099
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLAssembleHelpers.cpp",
+    "bytes": 793
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLAssembleInterface.cpp",
+    "bytes": 1452
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLAssembleWebGLInterfaceAutogen.cpp",
+    "bytes": 9310
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLAttachment.cpp",
+    "bytes": 6654
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLBackendSurface.cpp",
+    "bytes": 11604
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLBuffer.cpp",
+    "bytes": 11462
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLCaps.cpp",
+    "bytes": 264776
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLContext.cpp",
+    "bytes": 3945
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLDirectContext.cpp",
+    "bytes": 3647
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLExtensions.cpp",
+    "bytes": 5401
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLFinishCallbacks.cpp",
+    "bytes": 2879
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLGLSL.cpp",
+    "bytes": 3094
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLGpu.cpp",
+    "bytes": 192596
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLGpuProgramCache.cpp",
+    "bytes": 5335
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLInterfaceAutogen.cpp",
+    "bytes": 27958
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLMakeNativeInterface_none.cpp",
+    "bytes": 268
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLOpsRenderPass.cpp",
+    "bytes": 21480
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLProgram.cpp",
+    "bytes": 8545
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLProgramDataManager.cpp",
+    "bytes": 11877
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLRenderTarget.cpp",
+    "bytes": 17787
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLSemaphore.cpp",
+    "bytes": 451
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLTexture.cpp",
+    "bytes": 8683
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLTextureRenderTarget.cpp",
+    "bytes": 4350
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLTypesPriv.cpp",
+    "bytes": 2304
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLUniformHandler.cpp",
+    "bytes": 6245
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLUtil.cpp",
+    "bytes": 34471
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/GrGLVertexArray.cpp",
+    "bytes": 9315
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/android/GrGLMakeNativeInterface_android.cpp",
+    "bytes": 267
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/builders/GrGLProgramBuilder.cpp",
+    "bytes": 24159
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/builders/GrGLShaderStringBuilder.cpp",
+    "bytes": 5099
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/egl/GrGLMakeEGLInterface.cpp",
+    "bytes": 1015
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/egl/GrGLMakeNativeInterface_egl.cpp",
+    "bytes": 406
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/epoxy/GrGLMakeEpoxyEGLInterface.cpp",
+    "bytes": 897
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/glx/GrGLMakeGLXInterface.cpp",
+    "bytes": 1341
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/glx/GrGLMakeNativeInterface_glx.cpp",
+    "bytes": 443
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/iOS/GrGLMakeNativeInterface_iOS.cpp",
+    "bytes": 1104
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/mac/GrGLMakeNativeInterface_mac.cpp",
+    "bytes": 1102
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/webgl/GrGLMakeNativeInterface_webgl.cpp",
+    "bytes": 1320
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/win/GrGLMakeNativeInterface_win.cpp",
+    "bytes": 846
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gl/win/GrGLMakeWinInterface.cpp",
+    "bytes": 1829
+  },
+  {
+    "path": "skia/src/gpu/ganesh/glsl/GrGLSLBlend.cpp",
+    "bytes": 3547
+  },
+  {
+    "path": "skia/src/gpu/ganesh/glsl/GrGLSLFragmentShaderBuilder.cpp",
+    "bytes": 3856
+  },
+  {
+    "path": "skia/src/gpu/ganesh/glsl/GrGLSLProgramBuilder.cpp",
+    "bytes": 22565
+  },
+  {
+    "path": "skia/src/gpu/ganesh/glsl/GrGLSLProgramDataManager.cpp",
+    "bytes": 3006
+  },
+  {
+    "path": "skia/src/gpu/ganesh/glsl/GrGLSLShaderBuilder.cpp",
+    "bytes": 14465
+  },
+  {
+    "path": "skia/src/gpu/ganesh/glsl/GrGLSLUniformHandler.cpp",
+    "bytes": 1319
+  },
+  {
+    "path": "skia/src/gpu/ganesh/glsl/GrGLSLVarying.cpp",
+    "bytes": 5405
+  },
+  {
+    "path": "skia/src/gpu/ganesh/glsl/GrGLSLVertexGeoBuilder.cpp",
+    "bytes": 1636
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gradients/GrGradientBitmapCache.cpp",
+    "bytes": 8653
+  },
+  {
+    "path": "skia/src/gpu/ganesh/gradients/GrGradientShader.cpp",
+    "bytes": 55110
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/GrImageUtils.cpp",
+    "bytes": 38322
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/GrMippedBitmap.cpp",
+    "bytes": 574
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/GrTextureGenerator.cpp",
+    "bytes": 3552
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/SkImage_Ganesh.cpp",
+    "bytes": 19596
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/SkImage_GaneshBase.cpp",
+    "bytes": 18127
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/SkImage_GaneshFactories.cpp",
+    "bytes": 28755
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/SkImage_GaneshFactories_Android.cpp",
+    "bytes": 7058
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/SkImage_GaneshYUVA.cpp",
+    "bytes": 11256
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/SkImage_LazyTexture.cpp",
+    "bytes": 2766
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/SkImage_RasterPinnable.cpp",
+    "bytes": 4643
+  },
+  {
+    "path": "skia/src/gpu/ganesh/image/SkSpecialImage_Ganesh.cpp",
+    "bytes": 4434
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mock/GrMockBackendSurface.cpp",
+    "bytes": 10357
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mock/GrMockCaps.cpp",
+    "bytes": 4512
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mock/GrMockGpu.cpp",
+    "bytes": 15203
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mock/GrMockTypes.cpp",
+    "bytes": 1484
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlAttachment.mm",
+    "bytes": 8056
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlBackendSemaphore.mm",
+    "bytes": 2001
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlBackendSurface.mm",
+    "bytes": 7699
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlBuffer.mm",
+    "bytes": 7111
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlCaps.mm",
+    "bytes": 53323
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlCommandBuffer.mm",
+    "bytes": 9931
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlDepthStencil.mm",
+    "bytes": 4882
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlDirectContext.mm",
+    "bytes": 1270
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlFramebuffer.mm",
+    "bytes": 1171
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlGpu.mm",
+    "bytes": 77887
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlOpsRenderPass.mm",
+    "bytes": 22983
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlPipelineState.mm",
+    "bytes": 10447
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlPipelineStateBuilder.mm",
+    "bytes": 35353
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlPipelineStateDataManager.mm",
+    "bytes": 5996
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlRenderTarget.mm",
+    "bytes": 7619
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlResourceProvider.mm",
+    "bytes": 10817
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlSampler.mm",
+    "bytes": 3723
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlSemaphore.mm",
+    "bytes": 1678
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlTexture.mm",
+    "bytes": 6531
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlTextureRenderTarget.mm",
+    "bytes": 8409
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlTrampoline.mm",
+    "bytes": 681
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlTypesPriv.mm",
+    "bytes": 789
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlUniformHandler.mm",
+    "bytes": 11089
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlUtil.mm",
+    "bytes": 12816
+  },
+  {
+    "path": "skia/src/gpu/ganesh/mtl/GrMtlVaryingHandler.mm",
+    "bytes": 1569
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/AAConvexPathRenderer.cpp",
+    "bytes": 37753
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/AAHairLinePathRenderer.cpp",
+    "bytes": 55916
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/AALinearizingConvexPathRenderer.cpp",
+    "bytes": 19725
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/AtlasInstancedHelper.cpp",
+    "bytes": 5068
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/AtlasPathRenderer.cpp",
+    "bytes": 22464
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/AtlasRenderTask.cpp",
+    "bytes": 9247
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/AtlasTextOp.cpp",
+    "bytes": 34615
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/ClearOp.cpp",
+    "bytes": 3429
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/DashLinePathRenderer.cpp",
+    "bytes": 2501
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/DashOp.cpp",
+    "bytes": 55232
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/DefaultPathRenderer.cpp",
+    "bytes": 32737
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/DrawAtlasOp.cpp",
+    "bytes": 16598
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/DrawAtlasPathOp.cpp",
+    "bytes": 11462
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/DrawMeshOp.cpp",
+    "bytes": 56751
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/DrawableOp.cpp",
+    "bytes": 1142
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/FillRRectOp.cpp",
+    "bytes": 46423
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/FillRectOp.cpp",
+    "bytes": 27435
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/GrMeshDrawOp.cpp",
+    "bytes": 6563
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/GrOp.cpp",
+    "bytes": 2717
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/GrOvalOpFactory.cpp",
+    "bytes": 156466
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/GrSimpleMeshDrawOpHelper.cpp",
+    "bytes": 12776
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/GrSimpleMeshDrawOpHelperWithStencil.cpp",
+    "bytes": 3733
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/LatticeOp.cpp",
+    "bytes": 25729
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/OpsTask.cpp",
+    "bytes": 50257
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/PathInnerTriangulateOp.cpp",
+    "bytes": 23850
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/PathStencilCoverOp.cpp",
+    "bytes": 18430
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/PathTessellateOp.cpp",
+    "bytes": 6325
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/QuadPerEdgeAA.cpp",
+    "bytes": 45437
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/RegionOp.cpp",
+    "bytes": 10240
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/ShadowRRectOp.cpp",
+    "bytes": 32714
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/SmallPathAtlasMgr.cpp",
+    "bytes": 5611
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/SmallPathRenderer.cpp",
+    "bytes": 33868
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/SmallPathShapeData.cpp",
+    "bytes": 2190
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/SoftwarePathRenderer.cpp",
+    "bytes": 20039
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/StrokeRectOp.cpp",
+    "bytes": 45858
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/StrokeTessellateOp.cpp",
+    "bytes": 11553
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/TessellationPathRenderer.cpp",
+    "bytes": 14755
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/TextureOp.cpp",
+    "bytes": 70387
+  },
+  {
+    "path": "skia/src/gpu/ganesh/ops/TriangulatingPathRenderer.cpp",
+    "bytes": 26449
+  },
+  {
+    "path": "skia/src/gpu/ganesh/surface/SkSurface_AndroidFactories.cpp",
+    "bytes": 5965
+  },
+  {
+    "path": "skia/src/gpu/ganesh/surface/SkSurface_Ganesh.cpp",
+    "bytes": 31234
+  },
+  {
+    "path": "skia/src/gpu/ganesh/surface/SkSurface_GaneshMtl.mm",
+    "bytes": 7647
+  },
+  {
+    "path": "skia/src/gpu/ganesh/tessellate/GrPathTessellationShader.cpp",
+    "bytes": 18317
+  },
+  {
+    "path": "skia/src/gpu/ganesh/tessellate/GrStrokeTessellationShader.cpp",
+    "bytes": 35636
+  },
+  {
+    "path": "skia/src/gpu/ganesh/tessellate/GrTessellationShader.cpp",
+    "bytes": 3596
+  },
+  {
+    "path": "skia/src/gpu/ganesh/tessellate/PathTessellator.cpp",
+    "bytes": 12386
+  },
+  {
+    "path": "skia/src/gpu/ganesh/tessellate/StrokeTessellator.cpp",
+    "bytes": 9432
+  },
+  {
+    "path": "skia/src/gpu/ganesh/text/GlyphData.cpp",
+    "bytes": 13558
+  },
+  {
+    "path": "skia/src/gpu/ganesh/text/GrAtlasManager.cpp",
+    "bytes": 12400
+  },
+  {
+    "path": "skia/src/gpu/ganesh/text/TextStrike.cpp",
+    "bytes": 1546
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/AHardwareBufferVk.cpp",
+    "bytes": 16424
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkBackendSemaphore.cpp",
+    "bytes": 1620
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkBackendSurface.cpp",
+    "bytes": 17115
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkBuffer.cpp",
+    "bytes": 16015
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkCaps.cpp",
+    "bytes": 98589
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkCommandBuffer.cpp",
+    "bytes": 48007
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkCommandPool.cpp",
+    "bytes": 5324
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkContextThreadSafeProxy.cpp",
+    "bytes": 1230
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkDescriptorPool.cpp",
+    "bytes": 2008
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkDescriptorSet.cpp",
+    "bytes": 876
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkDescriptorSetManager.cpp",
+    "bytes": 14818
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkDirectContext.cpp",
+    "bytes": 1301
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkFramebuffer.cpp",
+    "bytes": 5149
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkGpu.cpp",
+    "bytes": 119223
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkImage.cpp",
+    "bytes": 31881
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkImageView.cpp",
+    "bytes": 3006
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkMSAALoadManager.cpp",
+    "bytes": 10216
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkOpsRenderPass.cpp",
+    "bytes": 38201
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkPipeline.cpp",
+    "bytes": 30940
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkPipelineState.cpp",
+    "bytes": 13064
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkPipelineStateBuilder.cpp",
+    "bytes": 18096
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkPipelineStateCache.cpp",
+    "bytes": 4810
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkPipelineStateDataManager.cpp",
+    "bytes": 7139
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkRenderPass.cpp",
+    "bytes": 22346
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkRenderTarget.cpp",
+    "bytes": 22053
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkResourceProvider.cpp",
+    "bytes": 26469
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkSampler.cpp",
+    "bytes": 6660
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkSamplerYcbcrConversion.cpp",
+    "bytes": 4491
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkSecondaryCBDrawContext.cpp",
+    "bytes": 9074
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkSemaphore.cpp",
+    "bytes": 2779
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkTexture.cpp",
+    "bytes": 9305
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkTextureRenderTarget.cpp",
+    "bytes": 9760
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkTypesPriv.cpp",
+    "bytes": 1428
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkUniformHandler.cpp",
+    "bytes": 17009
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkUtil.cpp",
+    "bytes": 4658
+  },
+  {
+    "path": "skia/src/gpu/ganesh/vk/GrVkVaryingHandler.cpp",
+    "bytes": 3414
+  },
+  {
+    "path": "skia/src/gpu/graphite/AtlasProvider.cpp",
+    "bytes": 5932
+  },
+  {
+    "path": "skia/src/gpu/graphite/BackendSemaphore.cpp",
+    "bytes": 1280
+  },
+  {
+    "path": "skia/src/gpu/graphite/BackendTexture.cpp",
+    "bytes": 1680
+  },
+  {
+    "path": "skia/src/gpu/graphite/Buffer.cpp",
+    "bytes": 1252
+  },
+  {
+    "path": "skia/src/gpu/graphite/BufferManager.cpp",
+    "bytes": 33517
+  },
+  {
+    "path": "skia/src/gpu/graphite/Caps.cpp",
+    "bytes": 16898
+  },
+  {
+    "path": "skia/src/gpu/graphite/ClientMappedBufferManager.cpp",
+    "bytes": 684
+  },
+  {
+    "path": "skia/src/gpu/graphite/ClipAtlasManager.cpp",
+    "bytes": 15828
+  },
+  {
+    "path": "skia/src/gpu/graphite/ClipStack.cpp",
+    "bytes": 98115
+  },
+  {
+    "path": "skia/src/gpu/graphite/CommandBuffer.cpp",
+    "bytes": 11321
+  },
+  {
+    "path": "skia/src/gpu/graphite/ComputePathAtlas.cpp",
+    "bytes": 18584
+  },
+  {
+    "path": "skia/src/gpu/graphite/ComputePipeline.cpp",
+    "bytes": 481
+  },
+  {
+    "path": "skia/src/gpu/graphite/Context.cpp",
+    "bytes": 45690
+  },
+  {
+    "path": "skia/src/gpu/graphite/ContextUtils.cpp",
+    "bytes": 11407
+  },
+  {
+    "path": "skia/src/gpu/graphite/Device.cpp",
+    "bytes": 119430
+  },
+  {
+    "path": "skia/src/gpu/graphite/DrawAtlas.cpp",
+    "bytes": 33168
+  },
+  {
+    "path": "skia/src/gpu/graphite/DrawContext.cpp",
+    "bytes": 15854
+  },
+  {
+    "path": "skia/src/gpu/graphite/DrawList.cpp",
+    "bytes": 12845
+  },
+  {
+    "path": "skia/src/gpu/graphite/DrawListLayer.cpp",
+    "bytes": 22840
+  },
+  {
+    "path": "skia/src/gpu/graphite/DrawPass.cpp",
+    "bytes": 5261
+  },
+  {
+    "path": "skia/src/gpu/graphite/DrawWriter.cpp",
+    "bytes": 6524
+  },
+  {
+    "path": "skia/src/gpu/graphite/GlobalCache.cpp",
+    "bytes": 21451
+  },
+  {
+    "path": "skia/src/gpu/graphite/GpuWorkSubmission.cpp",
+    "bytes": 2091
+  },
+  {
+    "path": "skia/src/gpu/graphite/GraphicsPipeline.cpp",
+    "bytes": 2662
+  },
+  {
+    "path": "skia/src/gpu/graphite/GraphiteResourceKey.cpp",
+    "bytes": 611
+  },
+  {
+    "path": "skia/src/gpu/graphite/ImageFactories.cpp",
+    "bytes": 26616
+  },
+  {
+    "path": "skia/src/gpu/graphite/Image_Base_Graphite.cpp",
+    "bytes": 9184
+  },
+  {
+    "path": "skia/src/gpu/graphite/Image_Graphite.cpp",
+    "bytes": 8447
+  },
+  {
+    "path": "skia/src/gpu/graphite/Image_YUVA_Graphite.cpp",
+    "bytes": 10056
+  },
+  {
+    "path": "skia/src/gpu/graphite/KeyContext.cpp",
+    "bytes": 4309
+  },
+  {
+    "path": "skia/src/gpu/graphite/KeyHelpers.cpp",
+    "bytes": 127730
+  },
+  {
+    "path": "skia/src/gpu/graphite/PaintParams.cpp",
+    "bytes": 31336
+  },
+  {
+    "path": "skia/src/gpu/graphite/PaintParamsKey.cpp",
+    "bytes": 21372
+  },
+  {
+    "path": "skia/src/gpu/graphite/PathAtlas.cpp",
+    "bytes": 10461
+  },
+  {
+    "path": "skia/src/gpu/graphite/PipelineManager.cpp",
+    "bytes": 6217
+  },
+  {
+    "path": "skia/src/gpu/graphite/PrecompileContext.cpp",
+    "bytes": 5262
+  },
+  {
+    "path": "skia/src/gpu/graphite/ProxyCache.cpp",
+    "bytes": 10886
+  },
+  {
+    "path": "skia/src/gpu/graphite/PublicPrecompile.cpp",
+    "bytes": 14505
+  },
+  {
+    "path": "skia/src/gpu/graphite/QueueManager.cpp",
+    "bytes": 17362
+  },
+  {
+    "path": "skia/src/gpu/graphite/RasterPathAtlas.cpp",
+    "bytes": 6547
+  },
+  {
+    "path": "skia/src/gpu/graphite/RasterPathUtils.cpp",
+    "bytes": 11016
+  },
+  {
+    "path": "skia/src/gpu/graphite/Recorder.cpp",
+    "bytes": 29710
+  },
+  {
+    "path": "skia/src/gpu/graphite/Recording.cpp",
+    "bytes": 10329
+  },
+  {
+    "path": "skia/src/gpu/graphite/RenderPassDesc.cpp",
+    "bytes": 10501
+  },
+  {
+    "path": "skia/src/gpu/graphite/Renderer.cpp",
+    "bytes": 5260
+  },
+  {
+    "path": "skia/src/gpu/graphite/RendererProvider.cpp",
+    "bytes": 11896
+  },
+  {
+    "path": "skia/src/gpu/graphite/Resource.cpp",
+    "bytes": 5738
+  },
+  {
+    "path": "skia/src/gpu/graphite/ResourceCache.cpp",
+    "bytes": 42945
+  },
+  {
+    "path": "skia/src/gpu/graphite/ResourceProvider.cpp",
+    "bytes": 14651
+  },
+  {
+    "path": "skia/src/gpu/graphite/RuntimeEffectDictionary.cpp",
+    "bytes": 701
+  },
+  {
+    "path": "skia/src/gpu/graphite/Sampler.cpp",
+    "bytes": 444
+  },
+  {
+    "path": "skia/src/gpu/graphite/ScratchResourceManager.cpp",
+    "bytes": 3859
+  },
+  {
+    "path": "skia/src/gpu/graphite/SerializationUtils.cpp",
+    "bytes": 17154
+  },
+  {
+    "path": "skia/src/gpu/graphite/ShaderCodeDictionary.cpp",
+    "bytes": 80094
+  },
+  {
+    "path": "skia/src/gpu/graphite/ShaderInfo.cpp",
+    "bytes": 64287
+  },
+  {
+    "path": "skia/src/gpu/graphite/SharedContext.cpp",
+    "bytes": 7167
+  },
+  {
+    "path": "skia/src/gpu/graphite/SpecialImage_Graphite.cpp",
+    "bytes": 3042
+  },
+  {
+    "path": "skia/src/gpu/graphite/StorageBufferManager.cpp",
+    "bytes": 2305
+  },
+  {
+    "path": "skia/src/gpu/graphite/Surface_Graphite.cpp",
+    "bytes": 12801
+  },
+  {
+    "path": "skia/src/gpu/graphite/Texture.cpp",
+    "bytes": 2191
+  },
+  {
+    "path": "skia/src/gpu/graphite/TextureFormat.cpp",
+    "bytes": 26609
+  },
+  {
+    "path": "skia/src/gpu/graphite/TextureFormatXferFn.cpp",
+    "bytes": 18464
+  },
+  {
+    "path": "skia/src/gpu/graphite/TextureInfo.cpp",
+    "bytes": 2331
+  },
+  {
+    "path": "skia/src/gpu/graphite/TextureProxy.cpp",
+    "bytes": 8138
+  },
+  {
+    "path": "skia/src/gpu/graphite/TextureUtils.cpp",
+    "bytes": 36978
+  },
+  {
+    "path": "skia/src/gpu/graphite/ThreadSafeResourceProvider.cpp",
+    "bytes": 2392
+  },
+  {
+    "path": "skia/src/gpu/graphite/UniformManager.cpp",
+    "bytes": 12918
+  },
+  {
+    "path": "skia/src/gpu/graphite/UploadBufferManager.cpp",
+    "bytes": 5067
+  },
+  {
+    "path": "skia/src/gpu/graphite/YUVABackendTextures.cpp",
+    "bytes": 4265
+  },
+  {
+    "path": "skia/src/gpu/graphite/compute/ComputeStep.cpp",
+    "bytes": 3411
+  },
+  {
+    "path": "skia/src/gpu/graphite/compute/DispatchGroup.cpp",
+    "bytes": 17642
+  },
+  {
+    "path": "skia/src/gpu/graphite/compute/VelloComputeSteps.cpp",
+    "bytes": 12220
+  },
+  {
+    "path": "skia/src/gpu/graphite/compute/VelloRenderer.cpp",
+    "bytes": 20995
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnAsyncWait.cpp",
+    "bytes": 966
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnBackendTexture.cpp",
+    "bytes": 4233
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnBuffer.cpp",
+    "bytes": 12306
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnCaps.cpp",
+    "bytes": 36548
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnCommandBuffer.cpp",
+    "bytes": 59467
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnComputePipeline.cpp",
+    "bytes": 8747
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnErrorChecker.cpp",
+    "bytes": 5345
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnGraphicsPipeline.cpp",
+    "bytes": 36483
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnGraphiteUtils.cpp",
+    "bytes": 33182
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnQueueManager.cpp",
+    "bytes": 5497
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnResourceProvider.cpp",
+    "bytes": 31469
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnSampler.cpp",
+    "bytes": 6091
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnSharedContext.cpp",
+    "bytes": 7786
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnTexture.cpp",
+    "bytes": 10782
+  },
+  {
+    "path": "skia/src/gpu/graphite/dawn/DawnTextureInfo.cpp",
+    "bytes": 2595
+  },
+  {
+    "path": "skia/src/gpu/graphite/geom/AnalyticBlurMask.cpp",
+    "bytes": 20647
+  },
+  {
+    "path": "skia/src/gpu/graphite/geom/IntersectionTree.cpp",
+    "bytes": 8644
+  },
+  {
+    "path": "skia/src/gpu/graphite/geom/Shape.cpp",
+    "bytes": 12084
+  },
+  {
+    "path": "skia/src/gpu/graphite/geom/Transform.cpp",
+    "bytes": 13494
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlBackendSemaphore.mm",
+    "bytes": 2406
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlBackendTexture.mm",
+    "bytes": 2246
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlBuffer.mm",
+    "bytes": 2778
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlCaps.mm",
+    "bytes": 21185
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlCommandBuffer.mm",
+    "bytes": 41554
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlComputePipeline.mm",
+    "bytes": 4428
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlGraphicsPipeline.mm",
+    "bytes": 19960
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlGraphiteUtils.mm",
+    "bytes": 26154
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlQueueManager.mm",
+    "bytes": 3129
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlResourceProvider.mm",
+    "bytes": 4991
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlSampler.mm",
+    "bytes": 4551
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlSharedContext.mm",
+    "bytes": 9232
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlTexture.mm",
+    "bytes": 4908
+  },
+  {
+    "path": "skia/src/gpu/graphite/mtl/MtlTextureInfo.mm",
+    "bytes": 2220
+  },
+  {
+    "path": "skia/src/gpu/graphite/precompile/PaintOption.cpp",
+    "bytes": 13728
+  },
+  {
+    "path": "skia/src/gpu/graphite/precompile/PaintOptions.cpp",
+    "bytes": 14347
+  },
+  {
+    "path": "skia/src/gpu/graphite/precompile/PrecompileBlender.cpp",
+    "bytes": 5334
+  },
+  {
+    "path": "skia/src/gpu/graphite/precompile/PrecompileColorFilter.cpp",
+    "bytes": 21257
+  },
+  {
+    "path": "skia/src/gpu/graphite/precompile/PrecompileImageFilter.cpp",
+    "bytes": 17052
+  },
+  {
+    "path": "skia/src/gpu/graphite/precompile/PrecompileMaskFilter.cpp",
+    "bytes": 4824
+  },
+  {
+    "path": "skia/src/gpu/graphite/precompile/PrecompileRuntimeEffect.cpp",
+    "bytes": 9210
+  },
+  {
+    "path": "skia/src/gpu/graphite/precompile/PrecompileShader.cpp",
+    "bytes": 63756
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/AnalyticBlurRenderStep.cpp",
+    "bytes": 4950
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/AnalyticRRectRenderStep.cpp",
+    "bytes": 37107
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/BitmapTextRenderStep.cpp",
+    "bytes": 10053
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/CircularArcRenderStep.cpp",
+    "bytes": 19704
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/CoverBoundsRenderStep.cpp",
+    "bytes": 4428
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/CoverageMaskRenderStep.cpp",
+    "bytes": 13398
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/MiddleOutFanRenderStep.cpp",
+    "bytes": 3299
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/PerEdgeAAQuadRenderStep.cpp",
+    "bytes": 15119
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/SDFTextLCDRenderStep.cpp",
+    "bytes": 11182
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/SDFTextRenderStep.cpp",
+    "bytes": 9514
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/TessellateCurvesRenderStep.cpp",
+    "bytes": 9145
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/TessellateStrokesRenderStep.cpp",
+    "bytes": 12824
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/TessellateWedgesRenderStep.cpp",
+    "bytes": 10589
+  },
+  {
+    "path": "skia/src/gpu/graphite/render/VerticesRenderStep.cpp",
+    "bytes": 9231
+  },
+  {
+    "path": "skia/src/gpu/graphite/sparse_strips/Flatten.cpp",
+    "bytes": 37405
+  },
+  {
+    "path": "skia/src/gpu/graphite/sparse_strips/StripGenerator.cpp",
+    "bytes": 314
+  },
+  {
+    "path": "skia/src/gpu/graphite/surface/Surface_AndroidFactories.cpp",
+    "bytes": 3703
+  },
+  {
+    "path": "skia/src/gpu/graphite/task/ClearBuffersTask.cpp",
+    "bytes": 917
+  },
+  {
+    "path": "skia/src/gpu/graphite/task/ComputeTask.cpp",
+    "bytes": 3563
+  },
+  {
+    "path": "skia/src/gpu/graphite/task/CopyTask.cpp",
+    "bytes": 11091
+  },
+  {
+    "path": "skia/src/gpu/graphite/task/DrawTask.cpp",
+    "bytes": 3322
+  },
+  {
+    "path": "skia/src/gpu/graphite/task/RenderPassTask.cpp",
+    "bytes": 14656
+  },
+  {
+    "path": "skia/src/gpu/graphite/task/SynchronizeToCpuTask.cpp",
+    "bytes": 939
+  },
+  {
+    "path": "skia/src/gpu/graphite/task/TaskList.cpp",
+    "bytes": 3245
+  },
+  {
+    "path": "skia/src/gpu/graphite/task/UploadTask.cpp",
+    "bytes": 20535
+  },
+  {
+    "path": "skia/src/gpu/graphite/text/GlyphData.cpp",
+    "bytes": 5790
+  },
+  {
+    "path": "skia/src/gpu/graphite/text/TextAtlasManager.cpp",
+    "bytes": 15707
+  },
+  {
+    "path": "skia/src/gpu/graphite/text/TextStrike.cpp",
+    "bytes": 1554
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanBackendSemaphore.cpp",
+    "bytes": 1869
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanBackendTexture.cpp",
+    "bytes": 5050
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanBuffer.cpp",
+    "bytes": 19175
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanCaps.cpp",
+    "bytes": 62481
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanCommandBuffer.cpp",
+    "bytes": 101198
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanDescriptorPool.cpp",
+    "bytes": 4233
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanDescriptorSet.cpp",
+    "bytes": 1990
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanFramebuffer.cpp",
+    "bytes": 3259
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanGraphicsPipeline.cpp",
+    "bytes": 72245
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanGraphiteUtils.cpp",
+    "bytes": 14069
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanImageView.cpp",
+    "bytes": 3663
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanQueueManager.cpp",
+    "bytes": 2411
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanRenderPass.cpp",
+    "bytes": 29472
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanResourceProvider.cpp",
+    "bytes": 31884
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanSampler.cpp",
+    "bytes": 5118
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanSharedContext.cpp",
+    "bytes": 12616
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanSpirvTransforms.cpp",
+    "bytes": 20368
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanTexture.cpp",
+    "bytes": 28212
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanTextureInfo.cpp",
+    "bytes": 2358
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/VulkanYcbcrConversion.cpp",
+    "bytes": 13501
+  },
+  {
+    "path": "skia/src/gpu/graphite/vk/precompile/VulkanPrecompileShader.cpp",
+    "bytes": 1287
+  },
+  {
+    "path": "skia/src/gpu/mtl/MtlMemoryAllocatorImpl.mm",
+    "bytes": 1115
+  },
+  {
+    "path": "skia/src/gpu/mtl/MtlUtils.mm",
+    "bytes": 5562
+  },
+  {
+    "path": "skia/src/gpu/tessellate/FixedCountBufferUtils.cpp",
+    "bytes": 5878
+  },
+  {
+    "path": "skia/src/gpu/tessellate/Tessellation.cpp",
+    "bytes": 14152
+  },
+  {
+    "path": "skia/src/gpu/vk/VulkanExtensions.cpp",
+    "bytes": 5020
+  },
+  {
+    "path": "skia/src/gpu/vk/VulkanInterface.cpp",
+    "bytes": 28311
+  },
+  {
+    "path": "skia/src/gpu/vk/VulkanMemory.cpp",
+    "bytes": 6761
+  },
+  {
+    "path": "skia/src/gpu/vk/VulkanMutableTextureState.cpp",
+    "bytes": 3311
+  },
+  {
+    "path": "skia/src/gpu/vk/VulkanPreferredFeatures.cpp",
+    "bytes": 97169
+  },
+  {
+    "path": "skia/src/gpu/vk/VulkanUtilsPriv.cpp",
+    "bytes": 19665
+  },
+  {
+    "path": "skia/src/gpu/vk/vulkanmemoryallocator/VulkanAMDMemoryAllocator.cpp",
+    "bytes": 14589
+  },
+  {
+    "path": "skia/src/gpu/vk/vulkanmemoryallocator/VulkanMemoryAllocatorWrapper.cpp",
+    "bytes": 1136
+  }
+]

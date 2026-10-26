@@ -25,7 +25,7 @@ namespace SkOpts {
     void Init_BlitRow_lasx();
 
     static bool init() {
-    #if defined(SK_ENABLE_OPTIMIZE_SIZE)
+    #if defined(SK_ENABLE_OPTIMIZE_SIZE) || defined(STX_SKIA_BASELINE_SIMD)
         // All Init_foo functions are omitted when optimizing for size
     #elif defined(SK_CPU_X86)
         #if SK_CPU_X64_LEVEL < SK_CPU_X64_LEVEL_AVX2
