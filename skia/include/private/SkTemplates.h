@@ -11,6 +11,7 @@
 #include "include/private/SkAlign.h"
 #include "include/private/SkAutoTMalloc.h"
 #include "include/private/SkAutoTArray.h"
+#include "include/private/SkAutoSTMalloc.h"
 #include "include/private/SkAssert.h"
 #include "include/private/SkMalloc.h"
 #include "include/private/SkTLogic.h"
@@ -234,127 +235,6 @@ private:
     T* fArray;
     alignas(T) std::byte fStorage[kCount * sizeof(T)];
     int fCount;
-};
-
-template <size_t kCountRequested,
-          typename T,
-          typename = std::enable_if_t<std::is_trivially_default_constructible<T>::value &&
-                                      std::is_trivially_destructible<T>::value>>
-class AutoSTMalloc {
-public:
-    AutoSTMalloc() : fPtr(fTStorage) {}
-
-    AutoSTMalloc(size_t count) {
-        if (count > kCount) {
-            fPtr = (T*)sk_malloc_throw(count, sizeof(T));
-        } else if (count) {
-            fPtr = fTStorage;
-        } else {
-            fPtr = nullptr;
-        }
-    }
-
-    AutoSTMalloc(const AutoSTMalloc&) = delete;
-    AutoSTMalloc& operator=(const AutoSTMalloc&) = delete;
-
-    AutoSTMalloc(AutoSTMalloc&& that) {
-        if (that.fPtr == nullptr) {
-            fPtr = nullptr;
-        } else if (that.fPtr == that.fTStorage) {
-            fPtr = fTStorage;
-            memcpy(fPtr, that.fPtr, kCount * sizeof(T));
-        } else {
-            fPtr = std::exchange(that.fPtr, nullptr);
-        }
-    }
-    AutoSTMalloc& operator=(AutoSTMalloc&&) = delete;
-
-    ~AutoSTMalloc() {
-        if (fPtr != fTStorage) {
-            sk_free(fPtr);
-        }
-    }
-
-    // doesn't preserve contents
-    [[clang::reinitializes]]
-    T* reset(size_t count) {
-        if (fPtr != fTStorage) {
-            sk_free(fPtr);
-        }
-        if (count > kCount) {
-            fPtr = (T*)sk_malloc_throw(count, sizeof(T));
-        } else if (count) {
-            fPtr = fTStorage;
-        } else {
-            fPtr = nullptr;
-        }
-        return fPtr;
-    }
-
-    T* get() const { return fPtr; }
-
-    operator T*() {
-        return fPtr;
-    }
-
-    operator const T*() const {
-        return fPtr;
-    }
-
-    T& operator[](int index) {
-        return fPtr[index];
-    }
-
-    const T& operator[](int index) const {
-        return fPtr[index];
-    }
-
-    /** Aliases matching other types, like std::vector. */
-    const T* data() const { return fPtr; }
-    T* data() { return fPtr; }
-
-    // Reallocs the array, can be used to shrink the allocation.  Makes no attempt to be intelligent
-    void realloc(size_t count) {
-        if (count > kCount) {
-            if (fPtr == fTStorage) {
-                fPtr = (T*)sk_malloc_throw(count, sizeof(T));
-                memcpy((void*)fPtr, fTStorage, kCount * sizeof(T));
-            } else {
-                fPtr = (T*)sk_realloc_throw(fPtr, count, sizeof(T));
-            }
-        } else if (count) {
-            if (fPtr != fTStorage) {
-                fPtr = (T*)sk_realloc_throw(fPtr, count, sizeof(T));
-            }
-        } else {
-            this->reset(0);
-        }
-    }
-
-private:
-    // Since we use uint32_t storage, we might be able to get more elements for free.
-    static constexpr size_t kCountWithPadding = SkAlign4(kCountRequested*sizeof(T)) / sizeof(T);
-#if defined(SK_BUILD_FOR_GOOGLE3)
-    // Stack frame size is limited for SK_BUILD_FOR_GOOGLE3. 4k is less than the actual max, but some functions
-    // have multiple large stack allocations.
-    static constexpr size_t kMaxBytes = 4 * 1024;
-    static constexpr size_t kMinCount = kCountRequested * sizeof(T) > kMaxBytes
-        ? kMaxBytes / sizeof(T)
-        : kCountWithPadding;
-#else
-    static constexpr size_t kMinCount = kCountWithPadding;
-#endif
-
-public:
-    static constexpr size_t kCount = kMinCount;
-
-private:
-
-    T*          fPtr;
-    union {
-        uint32_t    fStorage32[SkAlign4(kCount*sizeof(T)) >> 2];
-        T           fTStorage[1];   // do NOT want to invoke T::T()
-    };
 };
 
 using UniqueVoidPtr = std::unique_ptr<void, SkOverloadedFunctionObject<void(void*), sk_free>>;

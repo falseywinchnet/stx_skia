@@ -767,6 +767,22 @@ transitions and constructed-element lifetimes, including failed replacement
 preserving the old array. No speed gain is claimed. See
 ../results/2026-10-26/AUTO_TARRAY.md. Inline array owners remain unconverted.
 
+## Inline scratch arrays
+
+AutoSTMalloc is extracted and converted. Aligned byte storage replaces its
+one-element union view, preserving inline capacity/padding and the single pointer.
+Existing reset/reallocation policies remain; count products are checked before
+mutation. Inline moves copy capacity and now empty the source, while heap moves
+transfer the allocation. No live-length or tracking field is added.
+
+Both 38-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass.
+The refined fixture covers
+1,024 transitions, alignment, initialized-prefix preservation, partial inline
+moves and independent source reuse. Four M4 layouts match the reference. No speed
+gain is claimed. See ../results/2026-10-26/AUTO_STMALLOC.md. The constructed inline
+array owner remains unconverted.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
