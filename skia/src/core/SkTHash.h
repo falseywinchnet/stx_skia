@@ -374,6 +374,8 @@ private:
 
     void removeSlot(int index) {
         fCount--;
+        // Create a real hole before scanning: resize() permits a full table.
+        fSlots[index].reset();
 
         // Rearrange elements to restore the invariants for linear probing.
         for (;;) {
@@ -401,6 +403,7 @@ private:
             // Move the element to the empty slot.
             Slot& moveFrom = fSlots[index];
             emptySlot = std::move(moveFrom);
+            moveFrom.reset();
         }
     }
 
