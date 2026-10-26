@@ -238,6 +238,11 @@ sk_sp<SkSurface> Raster(const SkImageInfo& info, size_t rowBytes, const SkSurfac
     if (!SkSurfaceValidateRasterInfo(info)) {
         return nullptr;
     }
+    const size_t effectiveRowBytes = rowBytes == 0 ? info.minRowBytes() : rowBytes;
+    if (effectiveRowBytes == kIgnoreRowBytesValue ||
+        !SkSurfaceValidateRasterInfo(info, effectiveRowBytes)) {
+        return nullptr;
+    }
 
     sk_sp<SkPixelRef> pr = SkMallocPixelRef::MakeAllocate(info, rowBytes);
     if (!pr) {
@@ -264,6 +269,11 @@ sk_sp<SkSurface> Recorder::makeBitmapSurface(const SkImageInfo& imageInfo,
                                              size_t rowBytes,
                                              const SkSurfaceProps* surfaceProps) {
     if (!SkSurfaceValidateRasterInfo(imageInfo)) {
+        return nullptr;
+    }
+    const size_t effectiveRowBytes = rowBytes == 0 ? imageInfo.minRowBytes() : rowBytes;
+    if (effectiveRowBytes == kIgnoreRowBytesValue ||
+        !SkSurfaceValidateRasterInfo(imageInfo, effectiveRowBytes)) {
         return nullptr;
     }
 

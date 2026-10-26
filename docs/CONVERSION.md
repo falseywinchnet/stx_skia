@@ -1004,6 +1004,12 @@ candidate-only cases and verification are recorded in
 ../results/2026-10-26/RASTER_REGION_INPUT_BOUNDS.md. Other region and surface
 implementation remains in the conversion programme.
 
+Owned raster surfaces and recorder-created bitmap surfaces now validate the
+effective stride before allocating a pixel reference. This closes the one-row
+case where the allocation could succeed but bitmap setup rejected an
+unrepresentable stride. See
+../results/2026-10-26/OWNED_RASTER_STRIDE.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

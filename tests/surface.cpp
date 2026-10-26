@@ -1,4 +1,5 @@
 #include "include/core/SkBitmap.h"
+#include "include/core/SkCPURecorder.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkPaint.h"
@@ -232,6 +233,16 @@ bool invalid_and_null() {
     const std::size_t excessiveStride = ignoredStride - 3;
     if (SkSurfaces::WrapPixels(info, storage.data(), excessiveStride,
                               record_release, &release)) return false;
+    const SkImageInfo singleRow = info.makeWH(width, 1);
+    const std::size_t unrepresentableStride = static_cast<std::size_t>(INT32_MAX) + 1;
+    if (SkSurfaces::Raster(singleRow, unrepresentableStride, nullptr)) return false;
+    if (SkSurfaces::Raster(singleRow, ignoredStride, nullptr)) return false;
+    sk_sp<SkSurface> recorderSurface = SkSurfaces::Raster(singleRow);
+    if (!recorderSurface) return false;
+    skcpu::Recorder* recorder = skcpu::AsRecorder((*recorderSurface).baseRecorder());
+    if (recorder == nullptr) return false;
+    if ((*recorder).makeBitmapSurface(singleRow, unrepresentableStride, nullptr)) return false;
+    if ((*recorder).makeBitmapSurface(singleRow, ignoredStride, nullptr)) return false;
 #endif
     if (SkSurfaces::Raster(info, 1, nullptr)) return false;
     if (release.calls != 0) return false;
