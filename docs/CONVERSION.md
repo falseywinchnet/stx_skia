@@ -17,6 +17,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Pixel allocation/data retention | `src/core/SkMallocPixelRef.cpp`, `include/core/SkMallocPixelRef.h` | Zeroed allocation, padded stride, insufficient extent rejection, retained immutable data |
 | Strong/weak reference-count implementation | `include/core/SkRefCnt.h`, `include/private/SkWeakRefCnt.h` | Copy/move/reset, reentrant release, concurrent sharing, weak lock/expiry; compatibility declarations remain as noted below |
 | Borrowed view implementation | `include/core/SkSpan.h` | Empty views, all valid slices of 0–33 elements, reverse traversal, const conversion, compile-time rejection of temporary owning containers |
+| Pixel extent and temporary allocation | `src/core/SkAutoPixmapStorage.cpp/.h`, `src/core/SkSafeMath.cpp/.h`, `src/core/SkReadPixelsRec.cpp/.h`, `src/core/SkWritePixelsRec.cpp/.h`, `src/core/SkImageInfo.cpp`, `include/core/SkImageInfo.h` | Checked arithmetic boundaries, clipped transfers, allocation/move/failure states and image metadata |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -59,6 +60,21 @@ The spelling checker reports four compatibility declarations in these headers:
 arrow expressions or trailing-return function definitions. The operator remains
 needed by unconverted source; its removal and explicit template spelling at
 remaining callers are tracked as outstanding, without suppressing the checker.
+
+## Pixel extent conversion notes
+
+Temporary pixmap storage now releases an occupied destination before a move,
+preserves borrowed pixel views during a move, and treats self-move as a no-op.
+Failed allocation leaves both ownership and the published view empty; aliased
+metadata is retained before reset. Negative dimensions and invalid format enums
+are rejected before size calculation. These are intentional corrections, with
+candidate-only regression tests; valid common behavior is checked in both builds.
+
+Checked size arithmetic retains its overflow state and the image extent's signed
+32-bit byte limit. Clipped transfers calculate row/column byte offsets before
+publishing pointer and rectangle updates. `SkColorTypeValidateAlphaType` rejects
+unknown enum values without changing the caller's output. These changes are not
+claimed as a new rendering optimization. See the pixel-extent measurement record.
 
 ## Still required
 

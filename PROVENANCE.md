@@ -78,3 +78,12 @@ adaptations and are separately retained in the baseline; this is not a claim of
 complete conversion of those larger files. The new ownership_views.cpp tests
 are original project tests. Compatibility declarations remaining in the headers
 are recorded in docs/CONVERSION.md.
+
+
+## Pixel extent conversion
+
+SkAutoPixmapStorage, SkSafeMath, SkReadPixelsRec, SkWritePixelsRec and SkImageInfo
+implementations and headers retain original copies under baseline/skia/.
+Allocation/move corrections are distinguished from arithmetic-preserving rewrites
+in docs/CONVERSION.md and results/2026-10-25/PIXEL_EXTENTS.md. Upstream copyright
+notices remain. tests/pixel_extent.cpp is original deterministic contract coverage.
