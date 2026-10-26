@@ -9,6 +9,10 @@ def main():
     directory = Path(sys.argv[1]) if len(sys.argv) == 2 else Path("build/candidate")
     commands = json.loads((directory / "compile_commands.json").read_text())
     rejected = []
+    source_root = Path(__file__).resolve().parents[1]
+    for header in ("SkLRUCache.h", "SkTDynamicHash.h", "SkTMultiMap.h"):
+        if (source_root / "skia/src/core" / header).exists():
+            rejected.append("Unused CPU hash/cache wrapper: " + header)
     forbidden_paths = ["/src/gpu/", "/src/codec/", "/src/encode/", "/src/android/",
                        "SkImageGeneratorCG.cpp", "SkFontMgr_mac", "SkTypeface_mac",
                        "SkTypeface_FreeType", "SkOpts_ml3", "SkOpts_ml4",
