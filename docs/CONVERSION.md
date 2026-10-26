@@ -24,6 +24,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Blur style composition and analytic rectangles | `src/core/SkBlurMask.cpp/.h` | All four styles, exact analytic profiles, checked temporary extents, padded reference convolution, bounded 16-bit coverage arithmetic |
 | Cached pixel/mask storage | `src/core/SkCachedData.cpp/.h` | Cache/client reference distinction, discard/reacquire and failure states, callback ordering, final release after unlocking and concurrent reference sharing |
 | Mask-filter dispatch and nine-patch ownership | `src/core/SkMaskFilterBase.cpp/.h`, `src/core/SkMaskFilter.cpp`; existing public header reviewed | Adopted cache/allocation owners, failure cleanup, bounded clipped run storage, named image-filter result and 240 rendering comparisons |
+| Shader-mask filtering | `src/effects/SkShaderMaskFilterImpl.cpp/.h`, `include/effects/SkShaderMaskFilter.h` | 576 byte-exact shader masks, checked source metadata, scoped pixel ownership and failure preservation |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -168,6 +169,17 @@ here; their remaining implementation is not marked converted. The unused legacy
 emboss factory bridge is removed from SkLightingImageFilter, while its retained
 lighting filters remain. These adapted files retain original baseline copies.
 See MASK_FILTER_DISPATCH.md for tests and remaining scope.
+
+## Shader-mask conversion notes
+
+Shader-mask filtering uses the checked shared row-copy kernel and retains new
+pixels until the bitmap and canvas have finished borrowing them. Invalid source
+metadata and overlapping descriptors fail before output mutation; metadata-only
+queries remain allocation-free. The shader still multiplies the input coverage
+through source-in blending. Public shader-mask support remains part of this CPU
+library despite upstream's deprecation notice. See SHADER_MASKS.md for scope and
+verification. This completes the shader-mask implementation previously adapted
+only for ImageFilterResult; blur-filter implementation remains next.
 
 ## Still required
 

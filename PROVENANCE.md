@@ -151,3 +151,12 @@ are not claimed converted by this batch. The uncalled legacy emboss factory
 bridge is removed from SkLightingImageFilter, with its original retained for the
 baseline. tests/mask_filter.cpp is original deterministic rendering and ownership
 coverage, now included in native differential comparisons.
+
+
+## Shader-mask conversion
+
+SkShaderMaskFilterImpl.cpp/.h now receive full boundary conversion after the
+prior signature adaptation. The public SkShaderMaskFilter.h retains an original
+baseline copy as well. Upstream notices remain. The derivative uses SkRectMemcpy,
+checked source metadata and an explicit pixel owner through bitmap/canvas use.
+The expanded mask_filter test adds original deterministic shader comparisons.

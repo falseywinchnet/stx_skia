@@ -2,6 +2,10 @@
 #include "include/core/SkCanvas.h"
 #include "include/core/SkGraphics.h"
 #include "include/core/SkImageInfo.h"
+#include "include/core/SkImageFilter.h"
+#include "include/core/SkShader.h"
+#include "include/effects/SkShaderMaskFilter.h"
+#include "include/effects/SkGradient.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkMatrix.h"
 #include "include/core/SkPaint.h"
@@ -158,6 +162,91 @@ bool patch_pixels(int width, bool sides_only) {
     return true;
 }
 
+bool shader_masks(std::FILE* file) {
+    if (SkShaderMaskFilter::Make(nullptr)) return false;
+    const std::array<float, 3> alphas = {0, 0.5f, 1};
+    uint64_t hash = 1469598103934665603ULL;
+    int cases = 0;
+    for (int kind = 0; kind < 4; ++kind) {
+        sk_sp<SkShader> shader;
+        if (kind < 3) {
+            shader = SkShaders::Color(SkColor4f{0.25f, 0.5f, 0.75f, alphas[static_cast<size_t>(kind)]}, nullptr);
+        } else {
+            const std::array<SkColor4f, 2> colors = {{{1, 0, 0, 0.1f}, {0, 1, 0, 0.9f}}};
+            const SkGradient::Colors gradientColors(SkSpan<const SkColor4f>(colors.data(), colors.size()),
+                SkSpan<const float>(), SkTileMode::kMirror, nullptr);
+            const SkGradient gradient(gradientColors, SkGradient::Interpolation());
+            const SkPoint points[2] = {{-3, 1}, {13, 11}};
+            shader = SkShaders::LinearGradient(points, gradient);
+        }
+        sk_sp<SkMaskFilter> owner = SkShaderMaskFilter::Make(std::move(shader));
+        if (!owner) return false;
+        const SkMaskFilterBase& filter = *as_MFB(owner);
+        for (const int width : {1, 7, 16, 33}) {
+            for (const int height : {1, 7}) {
+                for (const int origin : {-3, 0, 5}) {
+                    for (const int padding : {0, 13}) {
+                        const size_t stride = static_cast<size_t>(width + padding);
+#ifdef STX_SKIA_REFERENCE
+                        const size_t extent = static_cast<size_t>(height) * stride;
+#else
+                        const size_t extent = static_cast<size_t>(height - 1) * stride + width;
+#endif
+                        std::vector<uint8_t> pixels(extent);
+                        for (size_t i = 0; i < extent; ++i) pixels[i] = static_cast<uint8_t>(i * 79 + 23);
+                        const SkIRect bounds = SkIRect::MakeXYWH(origin, -origin, width, height);
+                        const SkMask input(pixels.data(), bounds, static_cast<uint32_t>(stride), SkMask::kA8_Format);
+                        for (int transform = 0; transform < 3; ++transform) {
+                            SkMatrix matrix = SkMatrix::I();
+                            if (transform == 1) matrix.setScaleTranslate(0.8f, 1.2f, 2.5f, -1.25f);
+                            if (transform == 2) matrix.setRotate(21);
+                            SkAutoMaskFreeImage outputOwner;
+                            SkMaskBuilder output;
+                            SkIPoint margin = {9, 9};
+                            const bool ok = filter.filterMask(&output, input, matrix, &margin);
+                            outputOwner.reset(output.image());
+                            if (!ok || !outputOwner || output.fBounds != bounds || output.fRowBytes != static_cast<uint32_t>(width) ||
+                                margin.x() != 0 || margin.y() != 0) return false;
+                            const size_t bytes = output.computeImageSize();
+                            for (int y = 0; y < height; ++y) {
+                                for (int x = 0; x < width; ++x) {
+                                    const uint8_t actual = output.fImage[static_cast<size_t>(y) * width + x];
+                                    if (kind == 0 && actual != 0) return false;
+                                    if (kind == 2 && actual != pixels[static_cast<size_t>(y) * stride + x]) return false;
+                                    hash ^= actual;
+                                    hash *= 1099511628211ULL;
+                                }
+                            }
+                            if (file != nullptr && std::fwrite(output.fImage, 1, bytes, file) != bytes) return false;
+                            ++cases;
+                        }
+                    }
+                }
+            }
+        }
+        SkMaskBuilder metadata;
+        const SkMask source(nullptr, SkIRect::MakeXYWH(-3, 2, 7, 5), 0, SkMask::kA8_Format);
+        if (!filter.filterMask(&metadata, source, SkMatrix::I(), nullptr) || metadata.fImage != nullptr ||
+            metadata.fBounds != source.fBounds || metadata.fRowBytes != 7) return false;
+        const SkPaint paint;
+#ifdef STX_SKIA_REFERENCE
+        const std::pair<sk_sp<SkImageFilter>, bool> converted = filter.asImageFilter(SkMatrix::I(), paint);
+        if (!converted.first || converted.second) return false;
+#else
+        const SkMaskFilterBase::ImageFilterResult converted = filter.asImageFilter(SkMatrix::I(), paint);
+        if (!converted.filter || converted.appliesShading) return false;
+        const std::array<uint8_t, 16> small{};
+        const SkMask invalid(small.data(), SkIRect::MakeWH(4, 2), 2, SkMask::kA8_Format);
+        SkIPoint margin = {9, 9};
+        if (filter.filterMask(&metadata, invalid, SkMatrix::I(), &margin) || margin != SkIPoint{9, 9} ||
+            metadata.fBounds != source.fBounds || metadata.fImage != nullptr) return false;
+        if (filter.filterMask(&metadata, metadata, SkMatrix::I(), nullptr)) return false;
+#endif
+    }
+    std::printf("shader masks: %d cases hash=%llu PASS\n", cases, static_cast<unsigned long long>(hash));
+    return true;
+}
+
 void draw_shape(SkCanvas& canvas, const SkPaint& paint, int shape) {
     const SkRect rectangle = SkRect::MakeXYWH(19.25f, 17.5f, 149, 103);
     switch (shape) {
@@ -253,7 +342,7 @@ int main(int argc, char** argv) {
         if (!patch_pixels(width, false) || !patch_pixels(width, true)) return 4;
     }
 #endif
-    if (!rendering(file.get())) return 5;
+    if (!rendering(file.get()) || !shader_masks(file.get())) return 5;
     SkGraphics::PurgeAllCaches();
     return 0;
 }

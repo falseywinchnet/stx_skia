@@ -31,6 +31,8 @@ public:
     SkMask::Format getFormat() const override { return SkMask::kA8_Format; }
     SkMaskFilterBase::Type type() const override { return SkMaskFilterBase::Type::kShader; }
 
+    // Caller owns the returned allocation. Failure preserves dst; actual source
+    // extent remains the caller's responsibility. See the base ownership contract.
     bool filterMask(SkMaskBuilder* dst, const SkMask& src, const SkMatrix&,
                     SkIPoint* margin) const override;
     SkMaskFilterBase::ImageFilterResult asImageFilter(const SkMatrix&,
