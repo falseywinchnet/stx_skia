@@ -21,6 +21,7 @@ jobs:
           sh tools/build_native.sh candidate
           cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
           cmake -E compare_files build/baseline/conversions.raw build/candidate/conversions.raw
+          cmake -E compare_files build/baseline/pixmap.raw build/candidate/pixmap.raw
           sh tools/verify_installed.sh
       - name: Instrumented deterministic suite
         run: sh tools/build_native.sh candidate-sanitize
@@ -42,4 +43,5 @@ jobs:
           sh tools/build_native.sh candidate
           cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
           cmake -E compare_files build/baseline/conversions.raw build/candidate/conversions.raw
+          cmake -E compare_files build/baseline/pixmap.raw build/candidate/pixmap.raw
           sh tools/verify_installed.sh

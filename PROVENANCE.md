@@ -97,3 +97,12 @@ checked buffer metadata. Original pixel arithmetic remains, including floating
 alpha truncation. tests/pixel_conversion.cpp and the conversion measurement and
 assembly-inspection tools are original additions. Native CI compares the complete
 conversion output between the original and candidate profiles.
+
+
+## Pixmap conversion
+
+SkPixmap.h, SkPixmap.cpp and SkPixmapDraw.cpp retain original reference copies.
+The derivative makes borrow lifetimes, byte offsets, fill dispatch and scaling
+ownership explicit. RGBA1010102 float channel order and invalid/empty-view paths
+have dedicated candidate-only regression checks. tests/pixmap.cpp is original
+coverage; common supported output is compared with the original source.

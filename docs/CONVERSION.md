@@ -19,6 +19,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Borrowed view implementation | `include/core/SkSpan.h` | Empty views, all valid slices of 0–33 elements, reverse traversal, const conversion, compile-time rejection of temporary owning containers |
 | Pixel extent and temporary allocation | `src/core/SkAutoPixmapStorage.cpp/.h`, `src/core/SkSafeMath.cpp/.h`, `src/core/SkReadPixelsRec.cpp/.h`, `src/core/SkWritePixelsRec.cpp/.h`, `src/core/SkImageInfo.cpp`, `include/core/SkImageInfo.h` | Checked arithmetic boundaries, clipped transfers, allocation/move/failure states and image metadata |
 | Pixel conversion and row copies | `src/core/SkConvertPixels.cpp/.h`, `src/core/SkRectMemcpy.h` | 21,420 byte-exact format/alpha/color-space cases, row padding, exact extents, in-place swaps and invalid-input rejection |
+| Pixel views and scaling | `include/core/SkPixmap.h`, `src/core/SkPixmap.cpp`, `src/core/SkPixmapDraw.cpp` | Color getters, alpha/opacity, clipped reads/fills/subsets, named fill kernels, temporary-metadata borrow rejection and five sampling modes |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -91,6 +92,23 @@ explicit no-ops; partial overlap is not supported.
 Capturing loop bounds enabled native Clang vectorization of several alpha kernels.
 The measured RGBA8-to-A8 gain and small-call validation costs are reported in
 PIXEL_CONVERSION.md. This is a specific kernel result, not a whole-renderer claim.
+
+## Pixmap conversion notes
+
+Pixmap remains a caller-backed view: no pixel storage is acquired or retained.
+Its documentation distinguishes metadata lifetime, writable storage authority,
+alignment and overlap. Metadata references reject temporary views. Address
+calculations name byte offsets; floating-format opacity scans form only live row
+addresses. Scaling keeps its unpremultiplied-color convention and makes image,
+shader, surface and canvas lifetimes explicit.
+
+Behavior corrections are separated from common reference comparisons: null/empty
+and malformed fill/read inputs fail before accessing pixels, unknown/null generic
+addresses return null, and the RGBA1010102 float-color getter now distinguishes
+red from blue. The BGRA getter retains its existing order. Integer and float
+conversion rounding otherwise remains the reference behavior. The upstream XR
+color-getter omissions remain omissions; this conversion does not claim added HDR
+accessor support.
 
 ## Still required
 
