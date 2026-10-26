@@ -848,6 +848,20 @@ fingerprint 7262172567427146524. No speed gain is claimed. See
 ../results/2026-10-26/CONTAINER_CAPACITY.md. Element-container storage and relocation
 remain required work.
 
+## Fixed aligned element storage
+
+SkAlignedStorage is converted without runtime administration. It retains exactly
+its aligned byte array and its non-initializing constructor. Positive capacity
+and byte-product bounds are checked at compilation; temporary borrows are rejected.
+The container continues to own element construction and destruction.
+
+Both 43-test Release profiles, nine rendering artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass. The new
+fixture covers 1,152 raw-storage object lifetimes and 289 container transition
+schedules. Tested M4 inline-container sizes match the reference. See
+../results/2026-10-26/ALIGNED_STORAGE.md. TArray's construction and relocation still
+require conversion; the integration fixture does not establish that work complete.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
