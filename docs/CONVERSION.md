@@ -1147,6 +1147,18 @@ eight signed boundary cases verify correct clamp-edge pixels. See
 ../results/2026-10-26/IMAGE_TRANSLATION_RANGE.md. Strict-subset behavior still needs
 focused follow-up; the common corpus does not establish that contract.
 
+## CPU subset paths
+
+Strict source bounds are now covered by 180 outside-pixel perturbation cases,
+including alpha masks, fractional/clipped rectangles, filtering, transforms and
+blur. The CPU implementation already extracts bounded pixel views. Unused GPU
+subset state and coverage-mask/analytic-blur dispatch branches are removed;
+the ordinary CPU bitmap-mask and nine-patch blur paths remain. Both release
+suites pass (58/58 candidate, 57/57 reference) and fifteen common artifacts match.
+The full instrumented suite returns PASS.
+See ../results/2026-10-26/CPU_SUBSET_PATH.md. This resolves the prior strict-subset
+follow-up; the broader canvas/device implementation still needs conversion.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

@@ -569,45 +569,6 @@ void SkBitmapDevice::drawSpecial(SkSpecialImage* src,
     }
 }
 
-void SkBitmapDevice::drawCoverageMask(const SkSpecialImage* mask,
-                                      const SkMatrix& maskToDevice,
-                                      const SkSamplingOptions& sampling,
-                                      const SkPaint& paint) {
-    SkASSERT(!mask->isGaneshBacked());
-    SkASSERT(!mask->isGraphiteBacked());
-
-    SkBitmap maskBM;
-    if (!SkSpecialImages::AsBitmap(mask, &maskBM)) {
-        return;
-    }
-
-    skcpu::Draw draw;
-    if (!this->accessPixels(&draw.fDst)) {
-      return; // no pixels to draw to so skip it
-    }
-    draw.fRC = &fRCStack.rc();
-    draw.fCTM = &maskToDevice;
-    draw.drawBitmapAsMask(maskBM, sampling, paint, &this->localToDevice());
-}
-
-// Try to filter as nine patch as a fast path.
-bool SkBitmapDevice::drawBlurredRRect(const SkRRect& rrect, const SkPaint& paint, float) {
-    SkASSERT(paint.getMaskFilter()
-             && as_MFB(paint.getMaskFilter())->type() == SkMaskFilterBase::Type::kBlur);
-
-    SkDrawTiler tiler(this, Bounder(rrect.getBounds(), paint));
-    // Check if the tiler only needs one iteration (common case). If there are multiple
-    // tiles, we just return false and fall back to the general mask filter path as we
-    // don't want to be in the scenario where only a subset fail/succeed.
-    if (!tiler.needsTiling()) {
-        if (const skcpu::Draw* draw = tiler.next()) {
-            return draw->drawRRectNinePatch(rrect, paint);
-        }
-    }
-
-    return false;
-}
-
 sk_sp<SkSpecialImage> SkBitmapDevice::snapSpecial(const SkIRect& bounds, bool forceCopy) {
     if (forceCopy) {
         return SkSpecialImages::CopyFromRaster(bounds, fBitmap, this->surfaceProps());

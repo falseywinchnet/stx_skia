@@ -39,7 +39,6 @@
 #include "include/private/SkTo.h"
 #include "include/utils/SkNoDrawCanvas.h"
 #include "src/core/SkBlenderBase.h"
-#include "src/core/SkBlurMaskFilterImpl.h"
 #include "src/core/SkCanvasPriv.h"
 #include "src/core/SkDevice.h"
 #include "src/core/SkLatticeIter.h"
@@ -53,7 +52,6 @@
 #include "src/core/SkVerticesPriv.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 #include "src/image/SkSurface_Base.h"
-#include "src/shaders/SkImageShader.h"
 #include "src/utils/SkPatchUtils.h"
 
 #include <algorithm>
@@ -1432,82 +1430,13 @@ void SkCanvas::onDrawPoints(PointMode mode, size_t count, const SkPoint pts[],
     }
 }
 
-const SkBlurMaskFilterImpl* SkCanvas::canAttemptBlurredRRectDraw(const SkPaint& paint) const {
-    if (!this->topDevice()->useDrawCoverageMaskForMaskFilters()) {
-        // Perform a regular draw in the legacy mask filter case.
-        return nullptr;
-    }
-
-    if (paint.getPathEffect()) {
-        return nullptr;
-    }
-
-    // TODO: Once stroke-and-fill goes away, we can check the paint's style directly.
-    if (SkStrokeRec(paint).getStyle() != SkStrokeRec::kFill_Style) {
-        return nullptr;
-    }
-
-    const SkMaskFilterBase* maskFilter = as_MFB(paint.getMaskFilter());
-    if (!maskFilter || maskFilter->type() != SkMaskFilterBase::Type::kBlur) {
-        return nullptr;
-    }
-
-    const SkBlurMaskFilterImpl* blurMaskFilter =
-            static_cast<const SkBlurMaskFilterImpl*>(maskFilter);
-    if (blurMaskFilter->blurStyle() != kNormal_SkBlurStyle) {
-        return nullptr;
-    }
-
-    if (!this->getTotalMatrix().isSimilarity()) {
-        // TODO: If the CTM does more than just translation, rotation, and uniform scale, then the
-        // results of analytic blurring will be different than mask filter blurring. Skip the
-        // specialized path in this case.
-        return nullptr;
-    }
-
-    return blurMaskFilter;
-}
-
-std::optional<PreparedDraw> SkCanvas::attemptBlurredRRectDraw(
-        const SkRRect& rrect,
-        const SkBlurMaskFilterImpl* blurMaskFilter,
-        const SkPaint& paint,
-        SkEnumBitMask<PredrawFlags> flags) {
-    SkASSERT(blurMaskFilter && blurMaskFilter == this->canAttemptBlurredRRectDraw(paint));
-    const SkRect& bounds = rrect.getBounds();
-
-    auto layer = this->aboutToDraw(paint, &bounds, flags);
-    if (!layer) {
-        // predrawNotify failed.
-        return std::nullopt;
-    }
-
-    const float deviceSigma = blurMaskFilter->computeXformedSigma(this->getTotalMatrix());
-    if (this->topDevice()->drawBlurredRRect(rrect, layer->paint, deviceSigma)) {
-        // Analytic draw was successful.
-        return std::nullopt;
-    }
-
-    // The CPU device handles the existing mask filter on the regular draw.
-    return layer;
-}
-
 void SkCanvas::onDrawRect(const SkRect& r, const SkPaint& paint) {
     SkASSERT(r.isSorted());
     if (this->internalQuickReject(r, paint)) {
         return;
     }
 
-    std::optional<PreparedDraw> layer;
-    constexpr PredrawFlags kPredrawFlags = PredrawFlags::kCheckForOverwrite;
-
-    if (const SkBlurMaskFilterImpl* blurMaskFilter = this->canAttemptBlurredRRectDraw(paint)) {
-        // Returns a layer if a blurred draw was unsuccessful.
-        layer = this->attemptBlurredRRectDraw(
-                SkRRect::MakeRect(r), blurMaskFilter, paint, kPredrawFlags);
-    } else {
-        layer = this->aboutToDraw(paint, &r, kPredrawFlags);
-    }
+    std::optional<PreparedDraw> layer = aboutToDraw(paint, &r, PredrawFlags::kCheckForOverwrite);
 
     if (layer) {
         this->topDevice()->drawRect(r, layer->paint);
@@ -1576,15 +1505,7 @@ void SkCanvas::onDrawOval(const SkRect& oval, const SkPaint& paint) {
         return;
     }
 
-    std::optional<PreparedDraw> layer;
-
-    if (const SkBlurMaskFilterImpl* blurMaskFilter = this->canAttemptBlurredRRectDraw(paint)) {
-        // Returns a layer if a blurred draw was unsuccessful.
-        layer = this->attemptBlurredRRectDraw(
-                SkRRect::MakeOval(oval), blurMaskFilter, paint, PredrawFlags::kNone);
-    } else {
-        layer = this->aboutToDraw(paint, &oval);
-    }
+    std::optional<PreparedDraw> layer = aboutToDraw(paint, &oval);
 
     if (layer) {
         this->topDevice()->drawOval(oval, layer->paint);
@@ -1599,17 +1520,7 @@ void SkCanvas::onDrawArc(const SkRect& oval, SkScalar startAngle,
         return;
     }
 
-    std::optional<PreparedDraw> layer;
-
-    // Arcs with sweeps >= 360° are ovals. In this case, attempt a specialized blurred draw.
-    if (const SkBlurMaskFilterImpl* blurMaskFilter = this->canAttemptBlurredRRectDraw(paint);
-        blurMaskFilter && SkScalarAbs(sweepAngle) >= 360.f) {
-        // Returns a layer if a blurred draw was unsuccessful.
-        layer = this->attemptBlurredRRectDraw(
-                SkRRect::MakeOval(oval), blurMaskFilter, paint, PredrawFlags::kNone);
-    } else {
-        layer = this->aboutToDraw(paint, &oval);
-    }
+    std::optional<PreparedDraw> layer = aboutToDraw(paint, &oval);
 
     if (layer) {
         this->topDevice()->drawArc(SkArc::Make(oval, startAngle, sweepAngle, useCenter),
@@ -1635,14 +1546,7 @@ void SkCanvas::onDrawRRect(const SkRRect& rrect, const SkPaint& paint) {
         return;
     }
 
-    std::optional<PreparedDraw> layer;
-
-    if (const SkBlurMaskFilterImpl* blurMaskFilter = this->canAttemptBlurredRRectDraw(paint)) {
-        // Returns a layer if a blurred draw was unsuccessful.
-        layer = this->attemptBlurredRRectDraw(rrect, blurMaskFilter, paint, PredrawFlags::kNone);
-    } else {
-        layer = this->aboutToDraw(paint, &bounds);
-    }
+    std::optional<PreparedDraw> layer = aboutToDraw(paint, &bounds);
 
     if (layer) {
         this->topDevice()->drawRRect(rrect, layer->paint);
@@ -1736,19 +1640,6 @@ void SkCanvas::onDrawImageRect2(const SkImage* image, const SkRect& src, const S
                     this, image, &src, dst, realSampling, realPaint, constraint)) {
             return;
         }
-    }
-
-    if (realPaint.getMaskFilter() && this->topDevice()->useDrawCoverageMaskForMaskFilters()) {
-        // Route mask-filtered drawImages to drawRect() to use the auto-layer for mask filters,
-        // which require all shading to be encoded in the paint.
-        SkImageShader::DrawRect imageDraw = SkImageShader::MakeForDrawRect(
-                image, realPaint, sampling, src, dst, constraint == kStrict_SrcRectConstraint);
-        if (imageDraw.destination.isEmpty() || !imageDraw.shader) {
-            return;
-        }
-        realPaint.setShader(std::move(imageDraw.shader));
-        this->drawRect(imageDraw.destination, realPaint);
-        return;
     }
 
     auto layer = this->aboutToDraw(realPaint, &dst,
@@ -1969,49 +1860,6 @@ void SkCanvas::onDrawEdgeAAImageSet2(const ImageSetEntry imageSet[], int count,
 
     // If we happen to have the draw bounds, though, might as well check quickReject().
     if (setBoundsValid && this->internalQuickReject(setBounds, realPaint)) {
-        return;
-    }
-
-    if (realPaint.getMaskFilter() && this->topDevice()->useDrawCoverageMaskForMaskFilters()) {
-        // Route mask-filtered drawEdgeAAImageSets to drawEdgeAAQuad() or drawImageRect()
-        // to use the auto-layer for mask filters, which require all shading to be encoded in
-        // the paint.
-        int dstClipIndex = 0;
-        for (int i = 0; i < count; ++i) {
-            SkPaint imagePaint = realPaint;
-            SkImageShader::DrawRect imageDraw =
-                    SkImageShader::MakeForDrawRect(imageSet[i].fImage.get(),
-                                                   imagePaint,
-                                                   sampling,
-                                                   imageSet[i].fSrcRect,
-                                                   imageSet[i].fDstRect,
-                                                   constraint == kStrict_SrcRectConstraint);
-            if (imageDraw.destination.isEmpty() || !imageDraw.shader) {
-                return;
-            }
-            imagePaint.setShader(std::move(imageDraw.shader));
-            auto layer = this->aboutToDraw(imagePaint, &imageDraw.destination);
-            if (layer) {
-                // Since we can't call mapRect to apply any preview matrix and drawEdgeAAQuad
-                // doesn't take an optional matrix, we can modify the local-to-device matrix
-                // of the layers top device.
-                if (imageSet[i].fMatrixIndex >= 0) {
-                    this->topDevice()->setLocalToDevice(
-                        this->topDevice()->localToDevice44() *
-                        SkM44(preViewMatrices[imageSet[i].fMatrixIndex]));
-                }
-
-                // Call drawEdgeAAImageSet on each image one at a time, to correctly
-                // paint the image.
-                this->topDevice()->drawEdgeAAQuad(imageDraw.destination,
-                                                  imageSet[i].fHasClip ? dstClips + dstClipIndex
-                                                                        : nullptr,
-                                                  (QuadAAFlags)imageSet[i].fAAFlags,
-                                                  layer->paint.getColor4f(),
-                                                  SkBlendMode::kSrcOver);
-            }
-            dstClipIndex += 4 * imageSet[i].fHasClip;
-        }
         return;
     }
 

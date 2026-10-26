@@ -9,10 +9,8 @@
 
 #include "include/core/SkAlphaType.h"
 #include "include/core/SkBitmap.h"
-#include "include/core/SkBlendMode.h"
 #include "include/core/SkColorType.h"
 #include "include/core/SkMatrix.h"
-#include "include/core/SkPaint.h"
 #include "include/core/SkPixmap.h"
 #include "include/core/SkScalar.h"
 #include "include/core/SkShader.h"
@@ -71,16 +69,7 @@ static SkTileMode optimize(SkTileMode tm, int dimension) {
 #endif
 }
 
-#if defined(SK_DEBUG)
-static bool needs_subset(SkImage* img, const SkRect& subset) {
-    const SkRect bounds = SkRect::Make((*img).dimensions());
-    const bool different = subset != bounds;
-    return different;
-}
-#endif
-
 SkImageShader::SkImageShader(sk_sp<SkImage> img,
-                             const SkRect& subset,
                              SkTileMode tmx, SkTileMode tmy,
                              const SkSamplingOptions& sampling,
                              bool raw,
@@ -89,7 +78,6 @@ SkImageShader::SkImageShader(sk_sp<SkImage> img,
         , fSampling(sampling)
         , fTileModeX(optimize(tmx, (*fImage).width()))
         , fTileModeY(optimize(tmy, (*fImage).height()))
-        , fSubset(subset)
         , fRaw(raw)
         , fClampAsIfUnpremul(clampAsIfUnpremul) {
     // These options should never appear together:
@@ -130,9 +118,6 @@ sk_sp<SkFlattenable> SkImageShader::CreateProc(SkReadBuffer& buffer) {
     const bool raw = buffer.isVersionLT(SkPicturePriv::Version::kRawImageShaders) ? false
                                                                             : buffer.readBool();
 
-    // TODO(skbug.com/40043877): Subset is not serialized yet; it's only used by special images so it
-    // will never be written to an SKP.
-
     sk_sp<SkFlattenable> result{};
     if (raw) {
         result = SkImageShader::MakeRaw(std::move(img), tmx, tmy, sampling, &localMatrix);
@@ -150,10 +135,6 @@ void SkImageShader::flatten(SkWriteBuffer& buffer) const {
 
     buffer.writeImage(fImage.get());
     SkASSERT(fClampAsIfUnpremul == false);
-
-    // TODO(skbug.com/40043877): Subset is not serialized yet; it's only used by special images so it
-    // will never be written to an SKP.
-    SkASSERT(!needs_subset(fImage.get(), fSubset));
 
     buffer.writeBool(fRaw);
 }
@@ -192,7 +173,6 @@ static bool legacy_shader_can_handle(const SkMatrix& inv) {
 
 SkShaderBase::Context* SkImageShader::onMakeContext(const ContextRec& rec,
                                                     SkArenaAlloc* alloc) const {
-    SkASSERT(!needs_subset(fImage.get(), fSubset)); // TODO(skbug.com/40043877)
     if ((*fImage).alphaType() == kUnpremul_SkAlphaType) {
         return nullptr;
     }
@@ -268,10 +248,26 @@ sk_sp<SkShader> SkImageShader::Make(sk_sp<SkImage> image,
                                     const SkSamplingOptions& options,
                                     const SkMatrix* localMatrix,
                                     bool clampAsIfUnpremul) {
-    const SkRect subset = image ? SkRect::Make((*image).dimensions()) : SkRect::MakeEmpty();
-    sk_sp<SkShader> shader = MakeSubset(std::move(image), subset, tmx, tmy, options,
-                                      localMatrix, clampAsIfUnpremul);
-    return shader;
+    if (options.useCubic) {
+        if (!(options.cubic.B >= 0 && options.cubic.B <= 1) ||
+            !(options.cubic.C >= 0 && options.cubic.C <= 1)) {
+            return nullptr;
+        }
+    }
+    if (!image) {
+        sk_sp<SkShader> empty = SkShaders::Empty();
+        return empty;
+    }
+    const SkISize dimensions = (*image).dimensions();
+    if (dimensions.isEmpty()) {
+        sk_sp<SkShader> empty = SkShaders::Empty();
+        return empty;
+    }
+    sk_sp<SkShader> shader = sk_make_sp<SkImageShader>(std::move(image), tmx, tmy,
+                                                     options, false, clampAsIfUnpremul);
+    const SkMatrix matrix = localMatrix ? *localMatrix : SkMatrix::I();
+    sk_sp<SkShader> wrapped = (*shader).makeWithLocalMatrix(matrix);
+    return wrapped;
 }
 
 sk_sp<SkShader> SkImageShader::MakeRaw(sk_sp<SkImage> image,
@@ -285,10 +281,7 @@ sk_sp<SkShader> SkImageShader::MakeRaw(sk_sp<SkImage> image,
         sk_sp<SkShader> empty = SkShaders::Empty();
         return empty;
     }
-    const SkRect subset = SkRect::Make((*image).dimensions());
-
     sk_sp<SkShader> s = sk_make_sp<SkImageShader>(std::move(image),
-                                                  subset,
                                                   tmx, tmy,
                                                   options,
                                                   /*raw=*/true,
@@ -296,91 +289,6 @@ sk_sp<SkShader> SkImageShader::MakeRaw(sk_sp<SkImage> image,
     const SkMatrix matrix = localMatrix ? *localMatrix : SkMatrix::I();
     sk_sp<SkShader> wrapped = (*s).makeWithLocalMatrix(matrix);
     return wrapped;
-}
-
-sk_sp<SkShader> SkImageShader::MakeSubset(sk_sp<SkImage> image,
-                                          const SkRect& subset,
-                                          SkTileMode tmx, SkTileMode tmy,
-                                          const SkSamplingOptions& options,
-                                          const SkMatrix* localMatrix,
-                                          bool clampAsIfUnpremul) {
-    if (options.useCubic) {
-        if (!(options.cubic.B >= 0 && options.cubic.B <= 1) ||
-            !(options.cubic.C >= 0 && options.cubic.C <= 1)) {
-            return nullptr;
-        }
-    }
-    if (!image || subset.isEmpty()) {
-        sk_sp<SkShader> empty = SkShaders::Empty();
-        return empty;
-    }
-
-    // Validate subset and check if we can drop it
-    const SkRect bounds = SkRect::Make((*image).bounds());
-    if (!bounds.contains(subset)) {
-        return nullptr;
-    }
-
-    sk_sp<SkShader> s = sk_make_sp<SkImageShader>(std::move(image),
-                                                  subset,
-                                                  tmx, tmy,
-                                                  options,
-                                                  /*raw=*/false,
-                                                  clampAsIfUnpremul);
-    const SkMatrix matrix = localMatrix ? *localMatrix : SkMatrix::I();
-    sk_sp<SkShader> wrapped = (*s).makeWithLocalMatrix(matrix);
-    return wrapped;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-SkImageShader::DrawRect SkImageShader::MakeForDrawRect(const SkImage* image,
-                                                                  const SkPaint& paint,
-                                                                  const SkSamplingOptions& sampling,
-                                                                  SkRect src,
-                                                                  SkRect dst,
-                                                                  bool strictSrcSubset) {
-    SkASSERT(image);
-    // The paint should have already been cleaned for a regular drawImageRect, e.g. no path
-    // effect and is a fill.
-    SkASSERT(paint.getStyle() == SkPaint::kFill_Style && !paint.getPathEffect());
-
-    const SkRect imgBounds = SkRect::Make((*image).bounds());
-
-    SkASSERT(src.isFinite() && dst.isFinite() && dst.isSorted());
-    const SkMatrix localMatrix = SkMatrix::RectToRectOrIdentity(src, dst);
-    if (!imgBounds.contains(src)) {
-        if (!src.intersect(imgBounds)) {
-            return {};  // Nothing to draw for this entry
-        }
-        // Update dst to match smaller src
-        dst = localMatrix.mapRect(src);
-    }
-
-    const bool imageIsAlphaOnly = SkColorTypeIsAlphaOnly((*image).colorType());
-
-    sk_sp<SkShader> imgShader{};
-    if (strictSrcSubset) {
-        sk_sp<SkImage> retained = sk_ref_sp(image);
-        imgShader = SkImageShader::MakeSubset(std::move(retained), src,
-                                              SkTileMode::kClamp, SkTileMode::kClamp,
-                                              sampling, &localMatrix);
-    } else {
-        imgShader = (*image).makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
-                                      sampling, &localMatrix);
-    }
-    if (!imgShader) {
-        return {};
-    }
-    if (imageIsAlphaOnly && paint.getShader()) {
-        // Compose the image shader with the paint's shader. Alpha images+shaders should output the
-        // texture's alpha multiplied by the shader's color. DstIn (d*sa) will achieve this with
-        // the source image and dst shader (MakeBlend takes dst first, src second).
-        sk_sp<SkShader> paintShader = paint.refShader();
-        imgShader = SkShaders::Blend(SkBlendMode::kDstIn, std::move(paintShader), std::move(imgShader));
-    }
-    DrawRect result{.destination = dst, .shader = std::move(imgShader)};
-    return result;
 }
 
 namespace {
@@ -687,7 +595,6 @@ void SkImageShader::appendColorStages(const SkStageRec& rec, const SkPixmap& pix
 }
 
 bool SkImageShader::appendStages(const SkStageRec& rec, const SkShaders::MatrixRec& mRec) const {
-    SkASSERT(!needs_subset(fImage.get(), fSubset));  // TODO(skbug.com/40043877)
 
     // We only support certain sampling options in stages so far
     SkSamplingOptions sampling = fSampling;

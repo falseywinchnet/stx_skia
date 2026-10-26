@@ -124,7 +124,7 @@ public:
     virtual sk_sp<SkShader> asShader(SkTileMode,
                                      const SkSamplingOptions&,
                                      const SkMatrix& lm,
-                                     bool strict=true) const;
+                                     bool strict=true) const = 0;
 
     /**
      *  If the SpecialImage is backed by a gpu texture, return true.
