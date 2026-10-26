@@ -916,6 +916,13 @@ the candidate compares with `==` and passes the focused regression. See
 ../results/2026-10-26/TARRAY_EQUALITY.md. Other container and renderer
 boundaries remain open.
 
+A scoped security review at revision `92e41ac` examined all 74 tracked files
+under `skia/include/private`, including TArray and its inline-storage helpers.
+It found no reportable vulnerability in that scope. The successful inline/heap
+swap regression and the scan's limits are recorded in
+../results/2026-10-26/TARRAY_PRIVATE_HEADER_REVIEW.md. This is not the CPU
+implementation's final bill of health.
+
 ## Arena allocation boundary
 
 The raster arena's heap-only and reset paths no longer do pointer arithmetic
