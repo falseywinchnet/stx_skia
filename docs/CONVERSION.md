@@ -1059,6 +1059,17 @@ pre-conversion source and header remain in the reference build. See
 ../results/2026-10-26/BITMAP_CONVERSION.md. This completes the bitmap facade,
 while its device drawing, sampling and canvas callers remain in the programme.
 
+## Color matrices and lookup tables
+
+The matrix value type and lighting factory, matrix and table filters, and
+immutable color-table storage are converted. Matrix aliasing and arithmetic are
+preserved; table storage is copied once and retained explicitly. Temporary
+coefficient/table borrows are rejected. Both release suites pass, the complete
+instrumented suite returns PASS, and nine output artifacts match the reference
+byte for byte. See ../results/2026-10-26/COLOR_ADJUSTMENT_CONVERSION.md.
+Composition, working-space handling and the remaining color pipeline still need
+conversion.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

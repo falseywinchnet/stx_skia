@@ -17,27 +17,30 @@
 static SkScalar byte_to_unit_float(U8CPU byte) {
     if (0xFF == byte) {
         // want to get this exact
-        return 1;
-    } else {
-        return byte * 0.00392156862745f;
+        return 1.0f;
     }
+    const SkScalar unit = static_cast<SkScalar>(byte) * 0.00392156862745f;
+    return unit;
 }
 
 sk_sp<SkColorFilter> SkColorFilters::Lighting(SkColor mul, SkColor add) {
     const SkColor opaqueAlphaMask = SK_ColorBLACK;
     // omit the alpha and compare only the RGB values
     if (0 == (add & ~opaqueAlphaMask)) {
-        return SkColorFilters::Blend(mul | opaqueAlphaMask, SkBlendMode::kModulate);
+        const SkColor opaqueMultiplier = mul | opaqueAlphaMask;
+        sk_sp<SkColorFilter> filter = SkColorFilters::Blend(opaqueMultiplier, SkBlendMode::kModulate);
+        return filter;
     }
 
-    SkColorMatrix matrix;
+    SkColorMatrix matrix{};
     matrix.setScale(byte_to_unit_float(SkColorGetR(mul)),
                     byte_to_unit_float(SkColorGetG(mul)),
                     byte_to_unit_float(SkColorGetB(mul)),
-                    1);
+                    1.0f);
     matrix.postTranslate(byte_to_unit_float(SkColorGetR(add)),
                          byte_to_unit_float(SkColorGetG(add)),
                          byte_to_unit_float(SkColorGetB(add)),
-                         0);
-    return SkColorFilters::Matrix(matrix);
+                         0.0f);
+    sk_sp<SkColorFilter> filter = SkColorFilters::Matrix(matrix);
+    return filter;
 }

@@ -39,17 +39,20 @@ public:
 
     void postTranslate(float dr, float dg, float db, float da);
 
+    // Sets this to a * b. Either input may be this matrix.
     void setConcat(const SkColorMatrix& a, const SkColorMatrix& b);
-    void preConcat(const SkColorMatrix& mat) { this->setConcat(*this, mat); }
-    void postConcat(const SkColorMatrix& mat) { this->setConcat(mat, *this); }
+    void preConcat(const SkColorMatrix& mat) { setConcat(*this, mat); }
+    void postConcat(const SkColorMatrix& mat) { setConcat(mat, *this); }
 
     void setSaturation(float sat);
 
+    // Arrays contain four rows of RGBA coefficients plus one translation per row.
+    // Caller arrays must hold all 20 floats; partial overlap is not supported.
     void setRowMajor(const float src[20]) { std::copy_n(src, 20, fMat.begin()); }
     void getRowMajor(float dst[20]) const { std::copy_n(fMat.begin(), 20, dst); }
 
 private:
-    std::array<float, 20> fMat;
+    std::array<float, 20> fMat; // Four rows, five coefficients per row.
 
     friend class SkColorFilters;
 };
