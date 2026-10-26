@@ -10,6 +10,7 @@
 
 #include "include/private/SkAlign.h"
 #include "include/private/SkAutoTMalloc.h"
+#include "include/private/SkAutoTArray.h"
 #include "include/private/SkAssert.h"
 #include "include/private/SkMalloc.h"
 #include "include/private/SkTLogic.h"
@@ -95,78 +96,6 @@ public:
 
 
 namespace skia_private {
-/** Allocate an array of T elements on the heap. Once this goes out of scope, the
- *  elements will be cleaned up "auto"matically.
- */
-template <typename T> class AutoTArray  {
-public:
-    AutoTArray() {}
-    // Allocate size number of T elements
-    explicit AutoTArray(size_t size)
-        : fData(size > 0 ? new T[check_size_bytes_too_big<T>(size)] : nullptr)
-        , fSize(size) {}
-
-    // TODO: remove when all uses are gone.
-    explicit AutoTArray(int size) : AutoTArray(SkToSizeT(size)) {}
-
-    AutoTArray(AutoTArray&& other)
-        : fData(std::move(other.fData))
-        , fSize(std::exchange(other.fSize, 0)) {}
-
-    AutoTArray& operator=(AutoTArray&& other) {
-        if (this != &other) {
-            fData = std::move(other.fData);
-            fSize = std::exchange(other.fSize, 0);
-        }
-        return *this;
-    }
-
-    // Reallocates given a new count. Reallocation occurs even if new count equals old count.
-    [[clang::reinitializes]]
-    void reset(size_t count = 0) {
-        *this = AutoTArray(count);
-    }
-
-    T* get() const { return fData.get(); }
-
-    T&  operator[](size_t index) const {
-        return fData[sk_collection_check_bounds(index, fSize)];
-    }
-
-    const T* data() const { return fData.get(); }
-    T* data() { return fData.get(); }
-
-    size_t size() const { return fSize; }
-    bool empty() const { return fSize == 0; }
-    size_t size_bytes() const { return sizeof(T) * fSize; }
-
-    T* begin() {
-        return fData.get();
-    }
-    const T* begin() const {
-        return fData.get();
-    }
-
-    // It's safe to use fItemArray + fSize because if fItemArray is nullptr then adding 0 is
-    // valid and returns nullptr. See [expr.add] in the C++ standard.
-    T* end() {
-        if (fData == nullptr) {
-            SkASSERT(fSize == 0);
-        }
-        return this->begin() + fSize;
-    }
-    const T* end() const {
-        if (fData == nullptr) {
-            SkASSERT(fSize == 0);
-        }
-        return this->begin() + fSize;
-    }
-
-private:
-    std::unique_ptr<T[]> fData;
-    size_t fSize = 0;
-};
-
 /** Like AutoTArray with storage for some number of elements "nested within". The requested number
  *  of elements to fit in the storage is specified by kCountRequested. kCount is the actual number
  *  of elements that will fit in the storage. If the runtime number of elements exceeds the space of

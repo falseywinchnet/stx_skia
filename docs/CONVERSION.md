@@ -752,6 +752,21 @@ New fixtures exercise 864
 resize transitions plus ownership transfer and reset. No speed gain is claimed.
 See ../results/2026-10-26/AUTO_TMALLOC.md.
 
+## Constructed heap arrays
+
+AutoTArray is extracted and converted with explicit element construction,
+replacement and transfer. Signed sizes and byte products are checked before
+allocation. Its unique pointer/count layout stays 16 bytes. Const and temporary
+borrows have compile-time contracts; there is no new tracking state. Default
+initialization and replacement-before-release behavior remain.
+
+Both 37-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass.
+The fixture checks 192 reset
+transitions and constructed-element lifetimes, including failed replacement
+preserving the old array. No speed gain is claimed. See
+../results/2026-10-26/AUTO_TARRAY.md. Inline array owners remain unconverted.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
