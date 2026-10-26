@@ -35,6 +35,11 @@ build-scope check passes, and all seven selected GUI.Forms renderer tests pass
 with the pinned LLVM 22.1 toolchain. The test file has zero spelling findings;
 the lifetime-rule check on the touched C++ files has none.
 
+The existing 24-scene in-memory renderer measured 6.670 ms candidate versus
+6.807 ms reference median over nine paired M4 trials. That suite compares the
+whole converted candidate with the retained reference, so it cannot attribute
+the difference to this arena change or bound performance on other scenes.
+
 General arena house-style conversion, arbitrary constructor reentrancy such
 as resetting the arena during construction, non-M4 platform gates, and the
 larger renderer review remain open.
