@@ -10,7 +10,6 @@
 
 #include "include/core/SkRect.h"
 #include "include/private/SkAssert.h"
-#include "include/private/SkTemplates.h"
 #include "src/core/SkColorData.h"
 #include "src/core/SkColorPriv.h"
 
@@ -20,7 +19,12 @@
 
 /** \class SkMask
     SkMask is used to describe alpha bitmaps, either 1bit, 8bit, or
-    the 3-channel 3D format. These are passed to SkMaskFilter objects.
+    the 3-plane 3D format. These are passed to SkMaskFilter objects.
+    Pixels are borrowed for the descriptor's lifetime. Callers establish valid
+    bounds, row strides, allocation extents and natural typed alignment before
+    address/iterator access. Bounds use image coordinates, not byte offsets.
+    Iterators compare/traverse within one allocation; row advances retain typed
+    alignment. Descriptors and pixel edits require external synchronization.
 */
 struct SkMask {
     enum Format : uint8_t {
@@ -38,26 +42,35 @@ struct SkMask {
 
     SkMask(const uint8_t* img, const SkIRect& bounds, uint32_t rowBytes, Format format)
         : fImage(img), fBounds(bounds), fRowBytes(rowBytes), fFormat(format) {}
-    uint8_t const * const fImage;
-    const SkIRect fBounds;
-    const uint32_t fRowBytes;
-    const Format fFormat;
+    // This descriptor borrows pixels. Its metadata is ordinary mutable data;
+    // observation through const SkMask& keeps the descriptor read-only. A builder
+    // additionally requires writable backing storage, owned separately by its caller.
+    const uint8_t* fImage;
+    SkIRect fBounds;
+    uint32_t fRowBytes;
+    Format fFormat;
 
-    static bool IsValidFormat(uint8_t format) { return format < kCountMaskFormats; }
+    static bool IsValidFormat(uint8_t format) {
+        const bool valid = format < kCountMaskFormats;
+        return valid;
+    }
 
     /** Returns true if the mask is empty: i.e. it has an empty bounds.
      */
-    bool isEmpty() const { return fBounds.isEmpty(); }
+    bool isEmpty() const {
+        const bool empty = fBounds.isEmpty();
+        return empty;
+    }
 
     /** Return the byte size of the mask, assuming only 1 plane.
         Does not account for k3D_Format. For that, use computeTotalImageSize().
-        If there is an overflow of 32bits, then returns 0.
+        Returns zero for a nonpositive height or a size exceeding INT32_MAX.
     */
     size_t computeImageSize() const;
 
     /** Return the byte size of the mask, taking into account
         any extra planes (e.g. k3D_Format).
-        If there is an overflow of 32bits, then returns 0.
+        Returns zero for a nonpositive height or a size exceeding INT32_MAX.
     */
     size_t computeTotalImageSize() const;
 
@@ -69,7 +82,10 @@ struct SkMask {
         SkASSERT(kBW_Format == fFormat);
         SkASSERT(fBounds.contains(x, y));
         SkASSERT(fImage != nullptr);
-        return fImage + ((x - fBounds.fLeft) >> 3) + (y - fBounds.fTop) * fRowBytes;
+        const size_t column = static_cast<size_t>(static_cast<int64_t>(x) - fBounds.fLeft) >> 3;
+        const size_t row = static_cast<size_t>(static_cast<int64_t>(y) - fBounds.fTop) * fRowBytes;
+        const uint8_t* address = fImage + row + column;
+        return address;
     }
 
     /** Returns the address of the specified byte.
@@ -80,7 +96,10 @@ struct SkMask {
         SkASSERT(kA8_Format == fFormat || kSDF_Format == fFormat);
         SkASSERT(fBounds.contains(x, y));
         SkASSERT(fImage != nullptr);
-        return fImage + x - fBounds.fLeft + (y - fBounds.fTop) * fRowBytes;
+        const size_t column = static_cast<size_t>(static_cast<int64_t>(x) - fBounds.fLeft);
+        const size_t row = static_cast<size_t>(static_cast<int64_t>(y) - fBounds.fTop) * fRowBytes;
+        const uint8_t* address = fImage + row + column;
+        return address;
     }
 
     /**
@@ -92,8 +111,11 @@ struct SkMask {
         SkASSERT(kLCD16_Format == fFormat);
         SkASSERT(fBounds.contains(x, y));
         SkASSERT(fImage != nullptr);
-        const uint16_t* row = (const uint16_t*)(fImage + (y - fBounds.fTop) * fRowBytes);
-        return row + (x - fBounds.fLeft);
+        const size_t row_offset = static_cast<size_t>(static_cast<int64_t>(y) - fBounds.fTop) * fRowBytes;
+        const size_t column = static_cast<size_t>(static_cast<int64_t>(x) - fBounds.fLeft);
+        const uint16_t* row = reinterpret_cast<const uint16_t*>(fImage + row_offset);
+        const uint16_t* address = row + column;
+        return address;
     }
 
     /**
@@ -105,8 +127,11 @@ struct SkMask {
         SkASSERT(kARGB32_Format == fFormat);
         SkASSERT(fBounds.contains(x, y));
         SkASSERT(fImage != nullptr);
-        const uint32_t* row = (const uint32_t*)(fImage + (y - fBounds.fTop) * fRowBytes);
-        return row + (x - fBounds.fLeft);
+        const size_t row_offset = static_cast<size_t>(static_cast<int64_t>(y) - fBounds.fTop) * fRowBytes;
+        const size_t column = static_cast<size_t>(static_cast<int64_t>(x) - fBounds.fLeft);
+        const uint32_t* row = reinterpret_cast<const uint32_t*>(fImage + row_offset);
+        const uint32_t* address = row + column;
+        return address;
     }
 
     /**
@@ -118,8 +143,7 @@ struct SkMask {
      *  x,y must be contained by the mask's bounds (this is asserted in the
      *  debug build, but not checked in the release build.)
      *
-     *  This should not be called with kBW_Format, as it will give unspecified
-     *  results (and assert in the debug build).
+     *  Returns null for kBW_Format or an unknown format. Use getAddr1 for BW.
      */
     const void* getAddr(int x, int y) const;
 
@@ -134,7 +158,9 @@ struct SkMask {
 };
 
 template <> struct SkMask::AlphaIter<SkMask::kBW_Format> {
-    AlphaIter(const uint8_t* ptr, int offset) : fPtr(ptr), fOffset(7 - offset) {}
+    AlphaIter(const uint8_t* ptr, int offset) : fPtr(ptr), fOffset(7 - offset) {
+        SkASSERT(offset >= 0 && offset < 8);
+    }
     AlphaIter(const AlphaIter& that) : fPtr(that.fPtr), fOffset(that.fOffset) {}
     AlphaIter& operator++() {
         if (0 < fOffset ) {
@@ -155,12 +181,17 @@ template <> struct SkMask::AlphaIter<SkMask::kBW_Format> {
         return *this;
     }
     AlphaIter& operator>>=(uint32_t rb) {
-        fPtr = SkTAddOffset<const uint8_t>(fPtr, rb);
+        fPtr += rb;
         return *this;
     }
-    uint8_t operator*() const { return ((*fPtr) >> fOffset) & 1 ? 0xFF : 0; }
+    uint8_t operator*() const {
+        const unsigned int bit = ((*fPtr) >> fOffset) & 1;
+        const uint8_t coverage = bit != 0 ? 0xFF : 0;
+        return coverage;
+    }
     bool operator<(const AlphaIter& that) const {
-        return fPtr < that.fPtr || (fPtr == that.fPtr && fOffset > that.fOffset);
+        const bool before = fPtr < that.fPtr || (fPtr == that.fPtr && fOffset > that.fOffset);
+        return before;
     }
     const uint8_t* fPtr;
     int fOffset;
@@ -172,11 +203,14 @@ template <> struct SkMask::AlphaIter<SkMask::kA8_Format> {
     AlphaIter& operator++() { ++fPtr; return *this; }
     AlphaIter& operator--() { --fPtr; return *this; }
     AlphaIter& operator>>=(uint32_t rb) {
-        fPtr = SkTAddOffset<const uint8_t>(fPtr, rb);
+        fPtr += rb;
         return *this;
     }
     uint8_t operator*() const { return *fPtr; }
-    bool operator<(const AlphaIter& that) const { return fPtr < that.fPtr; }
+    bool operator<(const AlphaIter& that) const {
+        const bool before = fPtr < that.fPtr;
+        return before;
+    }
     const uint8_t* fPtr;
 };
 
@@ -186,11 +220,18 @@ template <> struct SkMask::AlphaIter<SkMask::kARGB32_Format> {
     AlphaIter& operator++() { ++fPtr; return *this; }
     AlphaIter& operator--() { --fPtr; return *this; }
     AlphaIter& operator>>=(uint32_t rb) {
-        fPtr = SkTAddOffset<const uint32_t>(fPtr, rb);
+        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(fPtr);
+        fPtr = reinterpret_cast<const uint32_t*>(bytes + rb);
         return *this;
     }
-    uint8_t operator*() const { return SkGetPackedA32(*fPtr); }
-    bool operator<(const AlphaIter& that) const { return fPtr < that.fPtr; }
+    uint8_t operator*() const {
+        const uint8_t coverage = static_cast<uint8_t>(SkGetPackedA32(*fPtr));
+        return coverage;
+    }
+    bool operator<(const AlphaIter& that) const {
+        const bool before = fPtr < that.fPtr;
+        return before;
+    }
     const uint32_t* fPtr;
 };
 
@@ -200,50 +241,73 @@ template <> struct SkMask::AlphaIter<SkMask::kLCD16_Format> {
     AlphaIter& operator++() { ++fPtr; return *this; }
     AlphaIter& operator--() { --fPtr; return *this; }
     AlphaIter& operator>>=(uint32_t rb) {
-        fPtr = SkTAddOffset<const uint16_t>(fPtr, rb);
+        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(fPtr);
+        fPtr = reinterpret_cast<const uint16_t*>(bytes + rb);
         return *this;
     }
     uint8_t operator*() const {
-        unsigned packed = *fPtr;
-        unsigned r = SkPacked16ToR32(packed);
-        unsigned g = SkPacked16ToG32(packed);
-        unsigned b = SkPacked16ToB32(packed);
-        return (r + g + b) / 3;
+        const unsigned int packed = *fPtr;
+        const unsigned int r = SkPacked16ToR32(packed);
+        const unsigned int g = SkPacked16ToG32(packed);
+        const unsigned int b = SkPacked16ToB32(packed);
+        const uint8_t coverage = static_cast<uint8_t>((r + g + b) / 3);
+        return coverage;
     }
-    bool operator<(const AlphaIter& that) const { return fPtr < that.fPtr; }
+    bool operator<(const AlphaIter& that) const {
+        const bool before = fPtr < that.fPtr;
+        return before;
+    }
     const uint16_t* fPtr;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 
 struct SkMaskBuilder : public SkMask {
-    SkMaskBuilder() : SkMask(nullptr, {0}, 0, SkMask::Format::kBW_Format) {}
+    // A builder mutates a descriptor and its caller-owned writable pixels. It
+    // never frees storage. The caller must retain an allocation owner separately,
+    // including before overwriting an already populated destination descriptor.
+    SkMaskBuilder() : SkMask(nullptr, {0, 0, 0, 0}, 0, SkMask::kBW_Format) {}
     SkMaskBuilder(const SkMaskBuilder&) = delete;
-    SkMaskBuilder(SkMaskBuilder&&) = default;
+    SkMaskBuilder(SkMaskBuilder&& that)
+        : SkMask(that.fImage, that.fBounds, that.fRowBytes, that.fFormat) {
+        that.resetView();
+    }
     SkMaskBuilder& operator=(const SkMaskBuilder&) = delete;
     SkMaskBuilder& operator=(SkMaskBuilder&& that) {
-        this->image() = that.image();
-        this->bounds() = that.bounds();
-        this->rowBytes() = that.rowBytes();
-        this->format() = that.format();
-        that.image() = nullptr;
+        if (this == &that) return *this;
+        fImage = that.fImage;
+        fBounds = that.fBounds;
+        fRowBytes = that.fRowBytes;
+        fFormat = that.fFormat;
+        that.resetView();
         return *this;
     }
 
     SkMaskBuilder(uint8_t* img, const SkIRect& bounds, uint32_t rowBytes, Format format)
         : SkMask(img, bounds, rowBytes, format) {}
 
-    uint8_t*& image() { return *const_cast<uint8_t**>(&fImage); }
-    SkIRect& bounds() { return *const_cast<SkIRect*>(&fBounds); }
-    uint32_t& rowBytes() { return *const_cast<uint32_t*>(&fRowBytes); }
-    Format& format() { return *const_cast<Format*>(&fFormat); }
+    // Restore the builder's writable-pixel capability. fImage itself is a
+    // non-const pointer object; the cast changes pointee qualification only.
+    uint8_t*& image() & {
+        uint8_t*& writable = const_cast<uint8_t*&>(fImage);
+        return writable;
+    }
+    uint8_t*& image() && = delete;
+    SkIRect& bounds() & { return fBounds; }
+    SkIRect& bounds() && = delete;
+    uint32_t& rowBytes() & { return fRowBytes; }
+    uint32_t& rowBytes() && = delete;
+    Format& format() & { return fFormat; }
+    Format& format() && = delete;
 
     /** Returns the address of the byte that holds the specified bit.
         Asserts that the mask is kBW_Format, and that x,y are in range.
         x,y are in the same coordiate space as fBounds.
     */
     uint8_t* getAddr1(int x, int y) {
-        return const_cast<uint8_t*>(this->SkMask::getAddr1(x, y));
+        const uint8_t* borrowed = SkMask::getAddr1(x, y);
+        uint8_t* writable = const_cast<uint8_t*>(borrowed);
+        return writable;
     }
 
     /** Returns the address of the specified byte.
@@ -251,7 +315,9 @@ struct SkMaskBuilder : public SkMask {
         x,y are in the same coordiate space as fBounds.
     */
     uint8_t* getAddr8(int x, int y) {
-        return const_cast<uint8_t*>(this->SkMask::getAddr8(x, y));
+        const uint8_t* borrowed = SkMask::getAddr8(x, y);
+        uint8_t* writable = const_cast<uint8_t*>(borrowed);
+        return writable;
     }
 
     /**
@@ -260,7 +326,9 @@ struct SkMaskBuilder : public SkMask {
      *  are contained in the mask's fBounds.
      */
     uint16_t* getAddrLCD16(int x, int y) {
-        return const_cast<uint16_t*>(this->SkMask::getAddrLCD16(x, y));
+        const uint16_t* borrowed = SkMask::getAddrLCD16(x, y);
+        uint16_t* writable = const_cast<uint16_t*>(borrowed);
+        return writable;
     }
 
     /**
@@ -269,7 +337,9 @@ struct SkMaskBuilder : public SkMask {
      *  are contained in the mask's fBounds.
      */
     uint32_t* getAddr32(int x, int y) {
-        return const_cast<uint32_t*>(this->SkMask::getAddr32(x, y));
+        const uint32_t* borrowed = SkMask::getAddr32(x, y);
+        uint32_t* writable = const_cast<uint32_t*>(borrowed);
+        return writable;
     }
 
     /**
@@ -281,11 +351,12 @@ struct SkMaskBuilder : public SkMask {
      *  x,y must be contained by the mask's bounds (this is asserted in the
      *  debug build, but not checked in the release build.)
      *
-     *  This should not be called with kBW_Format, as it will give unspecified
-     *  results (and assert in the debug build).
+     *  Returns null for kBW_Format or an unknown format. Use getAddr1 for BW.
      */
     void* getAddr(int x, int y) {
-        return const_cast<void*>(this->SkMask::getAddr(x, y));
+        const void* borrowed = SkMask::getAddr(x, y);
+        void* writable = const_cast<void*>(borrowed);
+        return writable;
     }
 
     enum AllocType {
@@ -302,17 +373,34 @@ struct SkMaskBuilder : public SkMask {
     };
 
     /**
-     *  Returns initial destination mask data padded by radiusX and radiusY
+     *  Returns an A8 descriptor padded by nonnegative radiusX and radiusY.
+     *  Invalid dimensions, coordinates or byte extent return an empty descriptor.
+     *  A source with pixels acquires uninitialized destination storage; the caller
+     *  owns it and must adopt it into SkAutoMaskFreeImage or transfer it explicitly.
+     *  A metadata-only source produces metadata only. Allocation failure aborts.
      */
     static SkMaskBuilder PrepareDestination(int radiusX, int radiusY, const SkMask& src);
+
+private:
+    void resetView() {
+        fImage = nullptr;
+        fBounds.setEmpty();
+        fRowBytes = 0;
+        fFormat = SkMask::kBW_Format;
+    }
 };
 
 /**
  *  \using SkAutoMaskImage
  *
  *  Stack class used to manage the fImage buffer in a SkMask.
- *  When this object loses scope, the buffer is freed with SkMask::FreeImage().
+ *  When this object loses scope, the buffer is freed with SkMaskBuilder::FreeImage().
  */
-using SkAutoMaskFreeImage = std::unique_ptr<uint8_t, SkFunctionObject<SkMaskBuilder::FreeImage>>;
+struct SkMaskImageDeleter {
+    void operator()(uint8_t* image) const {
+        SkMaskBuilder::FreeImage(image);
+    }
+};
+using SkAutoMaskFreeImage = std::unique_ptr<uint8_t, SkMaskImageDeleter>;
 
 #endif

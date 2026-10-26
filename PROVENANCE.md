@@ -106,3 +106,13 @@ The derivative makes borrow lifetimes, byte offsets, fill dispatch and scaling
 ownership explicit. RGBA1010102 float channel order and invalid/empty-view paths
 have dedicated candidate-only regression checks. tests/pixmap.cpp is original
 coverage; common supported output is compared with the original source.
+
+
+## Mask and Gaussian blur conversion
+
+SkMask.cpp/.h and SkMaskBlurFilter.cpp/.h retain their original versions under
+baseline/skia. The derivative preserves Gaussian arithmetic while making row
+traversal, temporary coefficients and borrowed descriptor mutation explicit.
+Bounds/allocation rejection and moved-from states have candidate-only checks.
+tests/mask.cpp and tools/measure_masks.py are original deterministic coverage and
+measurement code; native CI compares complete mask output across both profiles.

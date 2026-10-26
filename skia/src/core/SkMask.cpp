@@ -8,114 +8,88 @@
 #include "src/core/SkMask.h"
 
 #include "include/private/SkMalloc.h"
-#include "include/private/SkMath.h"
-#include "include/private/SkTFitsIn.h"
-#include "include/private/SkTo.h"
 #include "src/core/SkSafeMath.h"
 
 #include <array>
 #include <climits>
 
-/** returns the product if it is positive and fits in 31 bits. Otherwise this
-    returns 0.
- */
-static int32_t safeMul32(int32_t a, int32_t b) {
-    int64_t size = sk_64_mul(a, b);
-    if (size > 0 && SkTFitsIn<int32_t>(size)) {
-        return size;
-    }
-    return 0;
-}
-
 size_t SkMask::computeImageSize() const {
-    return safeMul32(fBounds.height(), fRowBytes);
+    const int64_t height = fBounds.height64();
+    if (height <= 0 || fRowBytes == 0) return 0;
+    // The height can span the full signed-coordinate range. Check division
+    // before multiplication so even malformed descriptors cannot wrap the size.
+    if (height > INT32_MAX / static_cast<int64_t>(fRowBytes)) return 0;
+    const size_t size = static_cast<size_t>(height) * fRowBytes;
+    return size;
 }
 
 size_t SkMask::computeTotalImageSize() const {
-    size_t size = this->computeImageSize();
+    size_t size = computeImageSize();
     if (fFormat == SkMask::k3D_Format) {
-        size = safeMul32(SkToS32(size), 3);
+        if (size > INT32_MAX / 3) return 0;
+        size *= 3;
     }
     return size;
 }
 
-/** We explicitly use this allocator for SkBimap pixels, so that we can
-    freely assign memory allocated by one class to the other.
-*/
+// Use the bitmap-compatible allocator; ownership may transfer across that seam.
 uint8_t* SkMaskBuilder::AllocImage(size_t size, AllocType at) {
-    size_t aligned_size = SkSafeMath::Align4(size);
-    unsigned flags = SK_MALLOC_THROW;
-    if (at == kZeroInit_Alloc) {
-        flags |= SK_MALLOC_ZERO_INITIALIZE;
-    }
-    return static_cast<uint8_t*>(sk_malloc_flags(aligned_size, flags));
+    SkSafeMath extent;
+    const size_t aligned_size = extent.alignUp(size, 4);
+    SkASSERT_RELEASE(extent.ok());
+    unsigned int flags = SK_MALLOC_THROW;
+    if (at == kZeroInit_Alloc) flags |= SK_MALLOC_ZERO_INITIALIZE;
+    uint8_t* pixels = static_cast<uint8_t*>(sk_malloc_flags(aligned_size, flags));
+    return pixels;
 }
 
-/** We explicitly use this allocator for SkBimap pixels, so that we can
-    freely assign memory allocated by one class to the other.
-*/
 void SkMaskBuilder::FreeImage(void* image) {
     sk_free(image);
 }
 
 SkMaskBuilder SkMaskBuilder::PrepareDestination(int radiusX, int radiusY, const SkMask& src) {
-    SkSafeMath safe;
-
     SkMaskBuilder dst;
-    dst.image() = nullptr;
     dst.format() = SkMask::kA8_Format;
+    if (radiusX < 0 || radiusY < 0) return dst;
+    const int64_t src_width = src.fBounds.width64();
+    const int64_t src_height = src.fBounds.height64();
+    if (src_width < 0 || src_height < 0) return dst;
+    const int64_t width = src_width + 2 * static_cast<int64_t>(radiusX);
+    const int64_t height = src_height + 2 * static_cast<int64_t>(radiusY);
+    if (width > INT32_MAX || height > INT32_MAX) return dst;
+    const int64_t bytes = width * height;
+    if (bytes > INT32_MAX) return dst;
 
-    // dstW = srcW + 2 * radiusX;
-    size_t dstW = safe.add(src.fBounds.width(), safe.add(radiusX, radiusX));
-    // dstH = srcH + 2 * radiusY;
-    size_t dstH = safe.add(src.fBounds.height(), safe.add(radiusY, radiusY));
-
-    size_t toAlloc = safe.mul(dstW, dstH);
-
-    // We can only deal with masks that fit in INT_MAX and sides that fit in int.
-    if (!SkTFitsIn<int>(dstW) || !SkTFitsIn<int>(dstH) || toAlloc > INT_MAX || !safe) {
-        dst.bounds().setEmpty();
-        dst.rowBytes() = 0;
-        return dst;
-    }
-
-    dst.bounds().setWH(SkTo<int>(dstW), SkTo<int>(dstH));
-    dst.bounds().offset(src.fBounds.x(), src.fBounds.y());
-    dst.bounds().offset(-radiusX, -radiusY);
-    dst.rowBytes() = SkTo<uint32_t>(dstW);
-
+    const int64_t left = static_cast<int64_t>(src.fBounds.fLeft) - radiusX;
+    const int64_t top = static_cast<int64_t>(src.fBounds.fTop) - radiusY;
+    const int64_t right = static_cast<int64_t>(src.fBounds.fRight) + radiusX;
+    const int64_t bottom = static_cast<int64_t>(src.fBounds.fBottom) + radiusY;
+    if (left < INT32_MIN || top < INT32_MIN || right > INT32_MAX || bottom > INT32_MAX) return dst;
+    dst.bounds() = SkIRect::MakeLTRB(static_cast<int32_t>(left), static_cast<int32_t>(top),
+                                   static_cast<int32_t>(right), static_cast<int32_t>(bottom));
+    dst.rowBytes() = static_cast<uint32_t>(width);
     if (src.fImage != nullptr) {
-        dst.image() = SkMaskBuilder::AllocImage(toAlloc);
+        dst.image() = SkMaskBuilder::AllocImage(static_cast<size_t>(bytes));
     }
-
     return dst;
 }
 
-
-///////////////////////////////////////////////////////////////////////////////
-
-static const int gMaskFormatToShift[] = {
-    ~0, // BW -- not supported
-    0,  // A8
-    0,  // 3D
-    2,  // ARGB32
-    1,  // LCD16
-    0,  // SDF
+static constexpr std::array<int, SkMask::kCountMaskFormats> kMaskFormatShift = {
+    -1, // BW uses bit addresses rather than byte-per-pixel addresses.
+     0, // A8
+     0, // 3D first plane
+     2, // ARGB32
+     1, // LCD16
+     0  // SDF
 };
 
-static int maskFormatToShift(SkMask::Format format) {
-    SkASSERT((unsigned)format < std::size(gMaskFormatToShift));
-    SkASSERT(SkMask::kBW_Format != format);
-    return gMaskFormatToShift[format];
-}
-
 const void* SkMask::getAddr(int x, int y) const {
-    SkASSERT(kBW_Format != fFormat);
+    if (!IsValidFormat(fFormat) || fFormat == kBW_Format) return nullptr;
     SkASSERT(fBounds.contains(x, y));
-    SkASSERT(fImage);
-
-    const char* addr = (const char*)fImage;
-    addr += (y - fBounds.fTop) * fRowBytes;
-    addr += (x - fBounds.fLeft) << maskFormatToShift(fFormat);
-    return addr;
+    SkASSERT(fImage != nullptr);
+    const size_t row = static_cast<size_t>(static_cast<int64_t>(y) - fBounds.fTop) * fRowBytes;
+    const size_t column = static_cast<size_t>(static_cast<int64_t>(x) - fBounds.fLeft);
+    const size_t column_bytes = column << kMaskFormatShift[fFormat];
+    const void* address = fImage + row + column_bytes;
+    return address;
 }

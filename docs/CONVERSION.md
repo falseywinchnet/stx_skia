@@ -20,6 +20,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Pixel extent and temporary allocation | `src/core/SkAutoPixmapStorage.cpp/.h`, `src/core/SkSafeMath.cpp/.h`, `src/core/SkReadPixelsRec.cpp/.h`, `src/core/SkWritePixelsRec.cpp/.h`, `src/core/SkImageInfo.cpp`, `include/core/SkImageInfo.h` | Checked arithmetic boundaries, clipped transfers, allocation/move/failure states and image metadata |
 | Pixel conversion and row copies | `src/core/SkConvertPixels.cpp/.h`, `src/core/SkRectMemcpy.h` | 21,420 byte-exact format/alpha/color-space cases, row padding, exact extents, in-place swaps and invalid-input rejection |
 | Pixel views and scaling | `include/core/SkPixmap.h`, `src/core/SkPixmap.cpp`, `src/core/SkPixmapDraw.cpp` | Color getters, alpha/opacity, clipped reads/fills/subsets, named fill kernels, temporary-metadata borrow rejection and five sampling modes |
+| Mask descriptors and Gaussian blur | `src/core/SkMask.cpp/.h`, `src/core/SkMaskBlurFilter.cpp/.h` | Checked padded bounds, explicit borrowed storage, move-empty descriptors, exact last-row extents and 304 reference blur cases |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -109,6 +110,23 @@ red from blue. The BGRA getter retains its existing order. Integer and float
 conversion rounding otherwise remains the reference behavior. The upstream XR
 color-getter omissions remain omissions; this conversion does not claim added HDR
 accessor support.
+
+## Mask conversion notes
+
+Masks remain borrowed descriptors, with separately owned allocations. Builder
+metadata is actually mutable instead of changed through casts of const objects.
+Moving a builder clears its source and never releases either caller-owned buffer.
+Padded destinations check dimensions, coordinates, byte products and allocation
+alignment before use. Invalid padding/extent inputs produce empty A8 descriptors.
+
+Gaussian kernels retain their original fixed-point arithmetic and common-width
+vector representation. The small-radius coefficient arrays initialize their full
+capacity before loading vector arguments. Large-radius scans retain counts for
+strided columns instead of constructing a logical end pointer beyond the backing
+allocation. Source rows are borrowed individually; small-radius tail writes form
+only live row addresses. Results and measurement limits are in MASKS.md.
+SkBlurMask, blur-filter dispatch and the remaining mask rasterizers are still
+unconverted; this batch does not mark the whole blur subsystem complete.
 
 ## Still required
 
