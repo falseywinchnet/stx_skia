@@ -1,3 +1,4 @@
+#include "include/core/SkFlattenable.h"
 #if __has_include("src/core/SkMessageBus.h")
 #error "The installed CPU package must not expose the removed generic message bus"
 #endif
@@ -13,6 +14,10 @@
 #include "include/core/SkColorSpace.h"
 #include <vector>
 #include <cstddef>
+
+template <typename T>
+concept HasEffectFactoryRegistry = requires { &T::Register; };
+static_assert(!HasEffectFactoryRegistry<SkFlattenable>);
 
 template <typename T>
 concept HasImageFiltering = requires(T& paint) { paint.getImageFilter(); };

@@ -169,10 +169,6 @@ struct SkColor4fXformer {
     sk_sp<SkColorSpace> fIntermediateColorSpace;
 };
 
-void SkRegisterConicalGradientShaderFlattenable();
-void SkRegisterLinearGradientShaderFlattenable();
-void SkRegisterRadialGradientShaderFlattenable();
-void SkRegisterSweepGradientShaderFlattenable();
 
 #define MAKE_COLORS_POS_SPANS(colorPtr, posPtr, count)      \
     SkSpan<const SkColor4f> colors{colorPtr, (size_t)count};\

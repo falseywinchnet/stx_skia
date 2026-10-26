@@ -95,12 +95,3 @@ sk_sp<SkColorFilter> SkColorFilterPriv::MakeColorSpaceXform(sk_sp<SkColorSpace> 
                                                             sk_sp<SkColorSpace> dst) {
     return sk_make_sp<SkColorSpaceXformColorFilter>(std::move(src), std::move(dst));
 }
-
-void SkRegisterSkColorSpaceXformColorFilterFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkColorSpaceXformColorFilter);
-    // Previous name
-    SkFlattenable::Register("ColorSpaceXformColorFilter", SkColorSpaceXformColorFilter::CreateProc);
-    // TODO(ccameron): Remove after grace period for SKPs to stop using old serialization.
-    SkFlattenable::Register("SkSRGBGammaColorFilter",
-                            SkColorSpaceXformColorFilter::LegacyGammaOnlyCreateProc);
-}

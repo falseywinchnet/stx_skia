@@ -198,10 +198,6 @@ sk_sp<SkPathEffect> SkPathEffect::MakeCompose(sk_sp<SkPathEffect> outer,
     return SkComposePathEffect::Make(std::move(outer), std::move(inner));
 }
 
-void SkPathEffectBase::RegisterFlattenables() {
-    SK_REGISTER_FLATTENABLE(SkComposePathEffect);
-    SK_REGISTER_FLATTENABLE(SkSumPathEffect);
-}
 
 sk_sp<SkPathEffect> SkPathEffect::Deserialize(const void* data, size_t size,
                                               const SkDeserialProcs* procs) {

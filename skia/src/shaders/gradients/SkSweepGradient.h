@@ -36,7 +36,6 @@ protected:
                               SkRasterPipeline* postPipeline) const override;
 
 private:
-    friend void ::SkRegisterSweepGradientShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkSweepGradient)
 
     const SkPoint fCenter;

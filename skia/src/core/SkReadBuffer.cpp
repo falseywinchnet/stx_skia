@@ -469,8 +469,9 @@ SkFlattenable* SkReadBuffer::readRawFlattenable() {
         if (this->peekByte() != 0) {
             // If the first byte is non-zero, the flattenable is specified by a string.
             size_t ignored_length;
-            if (const char* name = this->readString(&ignored_length)) {
-                factory = SkFlattenable::NameToFactory(name);
+            if (this->readString(&ignored_length) != nullptr) {
+                // Built-in named effect deserialization is not admitted.
+                factory = nullptr;
                 fFlattenableDict.set(fFlattenableDict.count() + 1, factory);
             }
         } else {

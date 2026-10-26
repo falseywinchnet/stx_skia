@@ -93,9 +93,3 @@ sk_sp<SkMaskFilter> SkShaderMaskFilter::Make(sk_sp<SkShader> shader) {
     sk_sp<SkMaskFilter> filter(new SkShaderMaskFilterImpl(std::move(shader)));
     return filter;
 }
-
-void SkShaderMaskFilter::RegisterFlattenables() {
-    SK_REGISTER_FLATTENABLE(SkShaderMaskFilterImpl);
-    // Previous name
-    SkFlattenable::Register("SkShaderMF", SkShaderMaskFilterImpl::CreateProc);
-}

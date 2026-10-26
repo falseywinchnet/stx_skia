@@ -36,7 +36,6 @@ protected:
     bool onIsAlphaUnchanged() const override { return true; }
 
 private:
-    friend void ::SkRegisterSkColorSpaceXformColorFilterFlattenable();
     SK_FLATTENABLE_HOOKS(SkColorSpaceXformColorFilter)
     static sk_sp<SkFlattenable> LegacyGammaOnlyCreateProc(SkReadBuffer& buffer);
 

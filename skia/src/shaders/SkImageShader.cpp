@@ -400,7 +400,6 @@ std::pair<SkRect, sk_sp<SkShader>> SkImageShader::MakeForDrawRect(const SkImage*
     return {dst, std::move(imgShader)};
 }
 
-void SkShaderBase::RegisterFlattenables() { SK_REGISTER_FLATTENABLE(SkImageShader); }
 
 namespace {
 

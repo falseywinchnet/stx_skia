@@ -179,7 +179,3 @@ sk_sp<SkPathEffect> SkCornerPathEffect::Make(SkScalar radius) {
     return SkIsFinite(radius) && (radius > 0) ?
             sk_sp<SkPathEffect>(new SkCornerPathEffectImpl(radius)) : nullptr;
 }
-
-void SkCornerPathEffect::RegisterFlattenables() {
-    SkFlattenable::Register("SkCornerPathEffect", SkCornerPathEffectImpl::CreateProc);
-}

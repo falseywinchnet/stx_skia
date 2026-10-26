@@ -370,7 +370,6 @@ public:
         return sk_sp<SkShaderBase>(static_cast<SkShaderBase*>(
                 SkFlattenable::Deserialize(GetFlattenableType(), data, size, procs).release()));
     }
-    static void RegisterFlattenables();
 
     /** DEPRECATED. skbug.com/40040221
      *  If this shader can be represented by another shader + a localMatrix, return that shader and
@@ -419,11 +418,5 @@ inline const SkShaderBase* as_SB(const sk_sp<SkShader>& shader) {
     return static_cast<SkShaderBase*>(shader.get());
 }
 
-void SkRegisterBlendShaderFlattenable();
-void SkRegisterColorShaderFlattenable();
-void SkRegisterCoordClampShaderFlattenable();
-void SkRegisterEmptyShaderFlattenable();
-void SkRegisterPerlinNoiseShaderFlattenable();
-void SkRegisterWorkingColorSpaceShaderFlattenable();
 
 #endif // SkShaderBase_DEFINED

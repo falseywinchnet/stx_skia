@@ -151,9 +151,6 @@ sk_sp<SkColorFilter> SkColorFilterPriv::WithWorkingFormat(sk_sp<SkColorFilter> c
     return sk_make_sp<SkWorkingFormatColorFilter>(std::move(child), tf, gamut, at);
 }
 
-void SkRegisterWorkingFormatColorFilterFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkWorkingFormatColorFilter);
-}
 
 SkWorkingFormatCalculator::SkWorkingFormatCalculator(const skcms_TransferFunction* tf,
                                                      const skcms_Matrix3x3* gamut,

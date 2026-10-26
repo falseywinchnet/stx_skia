@@ -41,7 +41,6 @@ public:
     const SkColor4f& color() const { return fColor; }
 
 private:
-    friend void ::SkRegisterColorShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkColorShader)
 
     void flatten(SkWriteBuffer&) const override;

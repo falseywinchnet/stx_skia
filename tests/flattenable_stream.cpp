@@ -19,6 +19,10 @@
 #ifndef STX_SKIA_REFERENCE
 template <typename T> concept HasFactoryRecorder = requires { &T::setFactoryRecorder; };
 static_assert(!HasFactoryRecorder<SkBinaryWriteBuffer>);
+template <typename T> concept HasFactoryRegistry = requires { &T::Register; };
+template <typename T> concept HasFactoryLookup = requires { &T::NameToFactory; };
+static_assert(!HasFactoryRegistry<SkFlattenable>);
+static_assert(!HasFactoryLookup<SkFlattenable>);
 #endif
 
 namespace {
@@ -37,6 +41,24 @@ bool append_record(const SkFlattenable& effect, std::vector<uint8_t>& output) {
     std::vector<uint32_t> direct(storage.size());
     writer.writeToMemory(direct.data());
     if (storage != direct) return false;
+    sk_sp<SkFlattenable> decoded = SkFlattenable::Deserialize(
+        effect.getFlattenableType(), (*serialized).data(), bytes);
+#ifdef STX_SKIA_REFERENCE
+    if (!decoded || (*decoded).getFlattenableType() != effect.getFlattenableType()) return false;
+#else
+    if (decoded) return false;
+    if (SkFlattenable::Deserialize(effect.getFlattenableType(), nullptr, bytes)) return false;
+    if (SkFlattenable::Deserialize(effect.getFlattenableType(), nullptr, 0)) return false;
+    if (effect.serialize(nullptr, bytes) != 0) return false;
+    if (effect.serialize(nullptr, 0) != 0) return false;
+    std::array<uint32_t, 3> guard{0xaabbccddU, 0xaabbccddU, 0xaabbccddU};
+    const std::array<uint32_t, 3> unchanged = guard;
+    uint8_t* misaligned = reinterpret_cast<uint8_t*>(guard.data()) + 1;
+    if (effect.serialize(misaligned, sizeof(guard) - 1) != 0 || guard != unchanged) return false;
+    if (effect.serialize(guard.data(), 0) != 0 || guard != unchanged) return false;
+    if (effect.serialize(guard.data() + 1, sizeof(uint32_t)) != 0) return false;
+    if (guard.front() != unchanged.front() || guard.back() != unchanged.back()) return false;
+#endif
     const uint8_t* data = static_cast<const uint8_t*>((*serialized).data());
     output.insert(output.end(), data, data + bytes);
     return true;

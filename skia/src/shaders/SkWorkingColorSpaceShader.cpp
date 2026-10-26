@@ -138,7 +138,3 @@ sk_sp<SkFlattenable> SkWorkingColorSpaceShader::CreateProc(SkReadBuffer& buffer)
 
     return Make(std::move(shader), std::move(inputSpace), std::move(outputSpace), workInUnpremul);
 }
-
-void SkRegisterWorkingColorSpaceShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkWorkingColorSpaceShader);
-}

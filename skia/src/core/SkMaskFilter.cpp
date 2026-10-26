@@ -12,9 +12,6 @@
 #include "src/core/SkMaskFilterBase.h"
 struct SkDeserialProcs;
 
-void SkMaskFilter::RegisterFlattenables() {
-    sk_register_blur_maskfilter_createproc();
-}
 
 sk_sp<SkMaskFilter> SkMaskFilter::Deserialize(const void* data, size_t size,
                                               const SkDeserialProcs* procs) {

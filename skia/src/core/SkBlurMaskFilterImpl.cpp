@@ -538,7 +538,6 @@ void SkBlurMaskFilterImpl::flatten(SkWriteBuffer& buffer) const {
     buffer.writeUInt(!fRespectCTM); // historically we recorded ignoreCTM
 }
 
-void sk_register_blur_maskfilter_createproc() { SK_REGISTER_FLATTENABLE(SkBlurMaskFilterImpl); }
 
 sk_sp<SkMaskFilter> SkMaskFilter::MakeBlur(SkBlurStyle style, SkScalar sigma, bool respectCTM) {
     if (!SkIsFinite(sigma) || sigma <= 0 || static_cast<unsigned int>(style) > kLastEnum_SkBlurStyle) return nullptr;

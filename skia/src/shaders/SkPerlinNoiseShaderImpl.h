@@ -275,7 +275,6 @@ private:
     mutable SkOnce fInitPaintingDataOnce;
     std::unique_ptr<PaintingData> fPaintingData;
 
-    friend void SkRegisterPerlinNoiseShaderFlattenable();
 };
 
 #endif

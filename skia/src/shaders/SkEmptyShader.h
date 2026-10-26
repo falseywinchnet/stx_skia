@@ -38,7 +38,6 @@ protected:
     bool isOpaque() const override { return false; }
 
 private:
-    friend void ::SkRegisterEmptyShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkEmptyShader)
 };
 

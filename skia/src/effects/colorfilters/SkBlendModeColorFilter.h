@@ -30,7 +30,6 @@ public:
     SkBlendMode mode() const { return fMode; }
 
 private:
-    friend void ::SkRegisterModeColorFilterFlattenable();
     SK_FLATTENABLE_HOOKS(SkBlendModeColorFilter)
 
     void flatten(SkWriteBuffer&) const override;

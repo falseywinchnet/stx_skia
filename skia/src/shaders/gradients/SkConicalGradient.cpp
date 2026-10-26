@@ -307,9 +307,3 @@ sk_sp<SkShader> SkShaders::TwoPointConicalGradient(SkPoint start, float startRad
 
     return SkConicalGradient::Create(start, startRadius, end, endRadius, {newColors, interp}, lm);
 }
-
-void SkRegisterConicalGradientShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkConicalGradient);
-    // Previous name
-    SkFlattenable::Register("SkTwoPointConicalGradient", SkConicalGradient::CreateProc);
-}

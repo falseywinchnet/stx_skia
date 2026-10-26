@@ -77,7 +77,6 @@ private:
 
     friend class SkBlurMaskFilter;
 
-    friend void sk_register_blur_maskfilter_createproc();
 };
 
 #endif

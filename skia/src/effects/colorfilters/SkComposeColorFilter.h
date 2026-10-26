@@ -31,7 +31,6 @@ protected:
     void flatten(SkWriteBuffer& buffer) const override;
 
 private:
-    friend void ::SkRegisterComposeColorFilterFlattenable();
     SK_FLATTENABLE_HOOKS(SkComposeColorFilter)
 
     SkComposeColorFilter(sk_sp<SkColorFilter> outer, sk_sp<SkColorFilter> inner);

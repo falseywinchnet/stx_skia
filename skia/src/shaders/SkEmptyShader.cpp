@@ -18,7 +18,3 @@ sk_sp<SkFlattenable> SkEmptyShader::CreateProc(SkReadBuffer&) {
 }
 
 sk_sp<SkShader> SkShaders::Empty() { return sk_make_sp<SkEmptyShader>(); }
-
-void SkRegisterEmptyShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkEmptyShader);
-}

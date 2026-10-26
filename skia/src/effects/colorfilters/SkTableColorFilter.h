@@ -34,7 +34,6 @@ public:
     const SkBitmap& bitmap() const { return fTable->bitmap(); }
 
 private:
-    friend void ::SkRegisterTableColorFilterFlattenable();
     SK_FLATTENABLE_HOOKS(SkTableColorFilter)
 
     sk_sp<SkColorTable> fTable;

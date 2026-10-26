@@ -59,7 +59,6 @@ private:
 
     bool appendStages(const SkStageRec& rec, const SkShaders::MatrixRec&) const override;
 
-    friend void ::SkRegisterWorkingColorSpaceShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkWorkingColorSpaceShader)
 
     void flatten(SkWriteBuffer& buffer) const override;

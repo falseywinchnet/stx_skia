@@ -64,7 +64,6 @@ public:
     sk_sp<SkColorFilter> child() const { return fChild; }
 
 private:
-    friend void ::SkRegisterWorkingFormatColorFilterFlattenable();
     SK_FLATTENABLE_HOOKS(SkWorkingFormatColorFilter)
 
     void flatten(SkWriteBuffer& buffer) const override;

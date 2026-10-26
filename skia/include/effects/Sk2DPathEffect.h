@@ -20,14 +20,12 @@ class SK_API SkLine2DPathEffect {
 public:
     static sk_sp<SkPathEffect> Make(SkScalar width, const SkMatrix& matrix);
 
-    static void RegisterFlattenables();
 };
 
 class SK_API SkPath2DPathEffect {
 public:
     static sk_sp<SkPathEffect> Make(const SkMatrix& matrix, const SkPath& path);
 
-    static void RegisterFlattenables();
 };
 
 #endif

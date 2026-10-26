@@ -21,7 +21,6 @@ public:
     static sk_sp<SkMaskFilter> Make(sk_sp<SkShader> shader);
 
 private:
-    static void RegisterFlattenables();
     friend class SkFlattenable;
 };
 

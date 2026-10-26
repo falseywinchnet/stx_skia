@@ -49,12 +49,6 @@ bool SkCoordClampShader::appendStages(const SkStageRec& rec,
     return as_SB(fShader)->appendStages(rec, *childMRec);
 }
 
-void SkRegisterCoordClampShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkCoordClampShader);
-
-    // Previous name
-    SkFlattenable::Register("SkShader_CoordClamp", SkCoordClampShader::CreateProc);
-}
 
 sk_sp<SkShader> SkShaders::CoordClamp(sk_sp<SkShader> shader, const SkRect& subset) {
     if (!shader) {

@@ -18,7 +18,8 @@ def main():
                        "SkTypeface_FreeType", "SkOpts_ml3", "SkOpts_ml4",
                        "skcms_TransformHsw", "skcms_TransformSkx",
                        "SkExecutor.cpp", "SkTaskGroup.cpp", "SkSharedMutex.cpp",
-                       "SkPtrRecorder.cpp", "SkTSearch.cpp"]
+                       "SkPtrRecorder.cpp", "SkTSearch.cpp",
+                       "SkGlobalInitialization_core.cpp", "SkGlobalInitialization_default.cpp"]
     for command in commands:
         name = command["file"]
         for pattern in forbidden_paths:
@@ -30,7 +31,10 @@ def main():
                     "SkFontMgr_New_CoreText", "SkTypeface_FreeType::",
                     "SkExecutor::", "SkTaskGroup::", "SkThreadPool<", "SkSharedMutex::",
                     "SkPtrSet::", "SkRefCntSet::", "SkNamedFactorySet::", "SkStrSearch(",
-                    "SkStrLCSearch(", "SkAutoAsciiToLC::", "SkBinaryWriteBuffer::setFactoryRecorder"]:
+                    "SkStrLCSearch(", "SkAutoAsciiToLC::", "SkBinaryWriteBuffer::setFactoryRecorder",
+                    "SkFlattenable::Register", "SkFlattenable::NameToFactory",
+                    "SkFlattenable::FactoryToName", "SkFlattenable::Finalize",
+                    "SkFlattenable::PrivateInitializer", "SkRegister"]:
         if pattern in symbols:
             rejected.append(pattern)
     if rejected:

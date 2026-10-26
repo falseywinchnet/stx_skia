@@ -38,7 +38,6 @@ protected:
     bool appendStages(const SkStageRec&, const SkShaders::MatrixRec&) const override;
 
 private:
-    friend void ::SkRegisterCoordClampShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkCoordClampShader)
 
     sk_sp<SkShader> fShader;

@@ -125,11 +125,6 @@ static bool valid_input(
     return true;
 }
 
-void SkRegisterPerlinNoiseShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkPerlinNoiseShader);
-    // Previous name
-    SkFlattenable::Register("SkPerlinNoiseShaderImpl", SkPerlinNoiseShader::CreateProc);
-}
 
 namespace SkShaders {
 sk_sp<SkShader> MakeFractalNoise(SkScalar baseFrequencyX,

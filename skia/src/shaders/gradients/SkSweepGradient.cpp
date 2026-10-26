@@ -140,7 +140,3 @@ sk_sp<SkShader> SkShaders::SweepGradient(SkPoint center, float startAngle, float
     sk_sp<SkShader> s = sk_make_sp<SkSweepGradient>(center, t0, t1, newGrad);
     return s->makeWithLocalMatrix(lm ? *lm : SkMatrix::I());
 }
-
-void SkRegisterSweepGradientShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkSweepGradient);
-}

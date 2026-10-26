@@ -130,7 +130,6 @@ public:
     // If 'bounds' is null, performs a dry-run determining if bounds could be computed.
     virtual bool computeFastBounds(SkRect* bounds) const = 0;
 
-    static void RegisterFlattenables();
 
 private:
     using INHERITED = SkPathEffect;

@@ -639,6 +639,23 @@ artifact. Nine rendering artifacts, instrumented suites, installed consumer and
 GUI.Forms fixture also pass. See ../results/2026-10-26/RECORDER_PRUNE.md for scope
 and the distinction between source removal and measured runtime improvement.
 
+## Disabled effect registry and flattenable entry points
+
+The candidate's unused process-wide factory registry and manual registration API
+are removed, along with two initialization units, 27 registration functions and
+their declarations/friendship. Original registration remains in the reference
+profile. Default candidate named-effect rejection is preserved; ordinary serialized
+bytes and rendering artifacts remain identical. Retained virtual-method ordering
+and historical type tags are unchanged.
+
+SkFlattenable.h/.cpp are converted with explicit procedure initialization, owned
+data returns, borrowed callback/buffer contracts and checked null/empty/alignment
+boundaries. No fields, registries or locks are added. The lower-level reader/writer,
+private explicit factory arrays and remaining reconstruction methods still require
+work. Both 32-test profiles, instrumented suites, relocated consumer and GUI.Forms
+fixture pass. See ../results/2026-10-26/FACTORY_REGISTRY.md for the intentional API
+removal, preserved reference behavior and exact scope.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

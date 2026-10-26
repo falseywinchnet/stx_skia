@@ -123,9 +123,3 @@ sk_sp<SkColorFilter> SkColorFilters::HSLAMatrix(const float array[20]) {
 sk_sp<SkColorFilter> SkColorFilters::HSLAMatrix(const SkColorMatrix& cm) {
     return MakeMatrix(cm.fMat.data(), SkMatrixColorFilter::Domain::kHSLA, Clamp::kYes);
 }
-
-void SkRegisterMatrixColorFilterFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkMatrixColorFilter);
-    // Previous name
-    SkFlattenable::Register("SkColorFilter_Matrix", SkMatrixColorFilter::CreateProc);
-}

@@ -92,7 +92,6 @@ protected:
                               SkRasterPipeline* postPipeline) const override;
 
 private:
-    friend void ::SkRegisterConicalGradientShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkConicalGradient)
 
     SkPoint fCenter1;

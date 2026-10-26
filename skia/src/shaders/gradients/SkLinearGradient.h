@@ -34,7 +34,6 @@ protected:
                               SkRasterPipeline* postPipeline) const final;
 
 private:
-    friend void ::SkRegisterLinearGradientShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkLinearGradient)
 
     class LinearGradient4fContext;

@@ -344,3 +344,38 @@ foreach(unit IN ITEMS SkPtrRecorder SkTSearch SkFlattenable)
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
+
+# Original effect registration remains confined to the reference build.
+foreach(unit IN ITEMS
+    src/core/SkBlurMaskFilterImpl.cpp
+    src/core/SkGlobalInitialization_core.cpp
+    src/core/SkMaskFilter.cpp
+    src/core/SkPathEffect.cpp
+    src/effects/Sk1DPathEffect.cpp
+    src/effects/Sk2DPathEffect.cpp
+    src/effects/SkCornerPathEffect.cpp
+    src/effects/SkDiscretePathEffect.cpp
+    src/effects/SkShaderMaskFilterImpl.cpp
+    src/effects/SkTableMaskFilter.cpp
+    src/effects/colorfilters/SkBlendModeColorFilter.cpp
+    src/effects/colorfilters/SkColorSpaceXformColorFilter.cpp
+    src/effects/colorfilters/SkComposeColorFilter.cpp
+    src/effects/colorfilters/SkMatrixColorFilter.cpp
+    src/effects/colorfilters/SkTableColorFilter.cpp
+    src/effects/colorfilters/SkWorkingFormatColorFilter.cpp
+    src/ports/SkGlobalInitialization_default.cpp
+    src/shaders/SkBlendShader.cpp
+    src/shaders/SkColorShader.cpp
+    src/shaders/SkCoordClampShader.cpp
+    src/shaders/SkEmptyShader.cpp
+    src/shaders/SkImageShader.cpp
+    src/shaders/SkPerlinNoiseShaderImpl.cpp
+    src/shaders/SkWorkingColorSpaceShader.cpp
+    src/shaders/gradients/SkConicalGradient.cpp
+    src/shaders/gradients/SkLinearGradient.cpp
+    src/shaders/gradients/SkRadialGradient.cpp
+    src/shaders/gradients/SkSweepGradient.cpp
+)
+    list(REMOVE_ITEM stx_sources skia/${unit} baseline/skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()

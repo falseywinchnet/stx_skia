@@ -113,7 +113,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkFont_serial.cpp
     skia/src/core/SkGaussFilter.cpp
     skia/src/core/SkGeometry.cpp
-    skia/src/core/SkGlobalInitialization_core.cpp
     skia/src/core/SkGlyph.cpp
     skia/src/core/SkGlyphRunPainter.cpp
     skia/src/core/SkGraphics.cpp
@@ -312,7 +311,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/lazy/SkDiscardableMemoryPool.cpp
     skia/src/pdf/SkDocument_PDF_None.cpp
     skia/src/ports/SkDiscardableMemory_none.cpp
-    skia/src/ports/SkGlobalInitialization_default.cpp
     skia/src/ports/SkImageGeneratorCG.cpp
     skia/src/ports/SkLog_stdio.cpp
     skia/src/ports/SkMemory_malloc.cpp

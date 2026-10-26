@@ -36,7 +36,6 @@ public:
     const float* matrix() const { return fMatrix; }
 
 private:
-    friend void ::SkRegisterMatrixColorFilterFlattenable();
     SK_FLATTENABLE_HOOKS(SkMatrixColorFilter)
 
     void flatten(SkWriteBuffer&) const override;

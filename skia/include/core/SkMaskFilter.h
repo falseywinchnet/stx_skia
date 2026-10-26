@@ -38,7 +38,6 @@ public:
                                            const SkDeserialProcs* procs = nullptr);
 
 private:
-    static void RegisterFlattenables();
     friend class SkFlattenable;
 };
 

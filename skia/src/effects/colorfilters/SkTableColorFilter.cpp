@@ -70,9 +70,3 @@ sk_sp<SkColorFilter> SkColorFilters::Table(sk_sp<SkColorTable> table) {
     }
     return sk_make_sp<SkTableColorFilter>(std::move(table));
 }
-
-void SkRegisterTableColorFilterFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkTableColorFilter);
-    // Previous name
-    SkFlattenable::Register("SkTable_ColorFilter", SkTableColorFilter::CreateProc);
-}

@@ -95,7 +95,3 @@ sk_sp<SkShader> SkShaders::RadialGradient(SkPoint center, float radius,
     sk_sp<SkShader> s = sk_make_sp<SkRadialGradient>(center, radius, grad);
     return s->makeWithLocalMatrix(lm ? *lm : SkMatrix::I());
 }
-
-void SkRegisterRadialGradientShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkRadialGradient);
-}

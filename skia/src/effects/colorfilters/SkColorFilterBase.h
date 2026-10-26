@@ -101,11 +101,5 @@ static inline sk_sp<SkColorFilterBase> as_CFB_sp(sk_sp<SkColorFilter> filter) {
     return sk_sp<SkColorFilterBase>(static_cast<SkColorFilterBase*>(filter.release()));
 }
 
-void SkRegisterComposeColorFilterFlattenable();
-void SkRegisterMatrixColorFilterFlattenable();
-void SkRegisterModeColorFilterFlattenable();
-void SkRegisterSkColorSpaceXformColorFilterFlattenable();
-void SkRegisterTableColorFilterFlattenable();
-void SkRegisterWorkingFormatColorFilterFlattenable();
 
 #endif

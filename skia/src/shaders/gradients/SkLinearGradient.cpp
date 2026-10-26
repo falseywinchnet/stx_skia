@@ -105,7 +105,3 @@ sk_sp<SkShader> SkShaders::LinearGradient(const SkPoint pts[2], const SkGradient
     sk_sp<SkShader> s = sk_make_sp<SkLinearGradient>(pts, grad);
     return s->makeWithLocalMatrix(lm ? *lm : SkMatrix::I());
 }
-
-void SkRegisterLinearGradientShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkLinearGradient);
-}

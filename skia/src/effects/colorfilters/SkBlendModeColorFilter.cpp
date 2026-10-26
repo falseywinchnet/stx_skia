@@ -125,9 +125,3 @@ sk_sp<SkColorFilter> SkColorFilters::Blend(const SkColor4f& color,
 sk_sp<SkColorFilter> SkColorFilters::Blend(SkColor color, SkBlendMode mode) {
     return Blend(SkColor4f::FromColor(color), /*sRGB*/ nullptr, mode);
 }
-
-void SkRegisterModeColorFilterFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkBlendModeColorFilter);
-    // Previous name
-    SkFlattenable::Register("SkModeColorFilter", SkBlendModeColorFilter::CreateProc);
-}

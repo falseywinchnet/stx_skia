@@ -25,26 +25,6 @@
 
 #include <utility>
 
-namespace {
-
-sk_sp<SkFlattenable> legacy_color4_create_proc(SkReadBuffer& buffer) {
-    if (buffer.validate(buffer.isVersionLT(SkPicturePriv::Version::kCombineColorShaders))) {
-        // Only SKPs older than this version should be referring to this create proc.
-        SkColor4f color;
-        sk_sp<SkColorSpace> colorSpace;
-        buffer.readColor4f(&color);
-        if (buffer.readBool()) {
-            sk_sp<SkData> data = buffer.readByteArrayAsData();
-            colorSpace = data ? SkColorSpace::Deserialize(data->data(), data->size()) : nullptr;
-        }
-        return SkShaders::Color(color, std::move(colorSpace));
-    }
-
-    return nullptr;
-}
-
-} // anonymous namespace
-
 sk_sp<SkFlattenable> SkColorShader::CreateProc(SkReadBuffer& buffer) {
     if (buffer.isVersionLT(SkPicturePriv::Version::kCombineColorShaders)) {
         // Stored an 8-bit color only.
@@ -71,10 +51,6 @@ bool SkColorShader::appendStages(const SkStageRec& rec, const SkShaders::MatrixR
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-void SkRegisterColorShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkColorShader);
-    SkFlattenable::Register("SkColorShader4", legacy_color4_create_proc);
-}
 
 namespace SkShaders {
 sk_sp<SkShader> Color(SkColor color) {

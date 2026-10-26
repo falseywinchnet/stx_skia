@@ -144,9 +144,3 @@ sk_sp<SkShader> SkShaders::Blend(sk_sp<SkBlender> blender,
     // Custom runtime blenders are outside the CPU raster contract.
     return nullptr;
 }
-
-void SkRegisterBlendShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkBlendShader);
-    // Previous name
-    SkFlattenable::Register("SkShader_Blend", SkBlendShader::CreateProc);
-}
