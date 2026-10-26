@@ -469,6 +469,21 @@ whole chains, padded output, constant preservation and unchanged source bytes.
 All nine rendering/mipmap artifacts match. See
 ../results/2026-10-26/MIPMAP_DRAW.md.
 
+## Resource cache and synchronization boundary
+
+SkResourceCache.cpp/.h and SkSynchronizedResourceCache.cpp/.h now state record,
+hash, key and callback lifetimes explicitly. Pending insertion and the hash use
+scoped owners; list/hash unlink precedes destruction. Key byte views avoid typed
+aliasing, and admission checks charge/count arithmetic before replacement.
+
+Global message draining and direct shared-ID purge now take the synchronized
+wrapper's mutex. Internal message processing uses base dispatch under its existing
+access authority to avoid recursive locking. The historical LRU, duplicate and
+strict-budget policies remain. New deterministic tests cover those policies,
+4,000 concurrent record operations across local/global caches, and accounting
+boundaries. See ../results/2026-10-26/RESOURCE_CACHE.md. Hash-table, message-bus and
+mutex/semaphore implementations remain separate conversion work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

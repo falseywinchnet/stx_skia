@@ -16,7 +16,9 @@
 
 class SkCachedData;
 
-class SkSynchronizedResourceCache : public SkResourceCache {
+// Serializes each operation, including callbacks. Callbacks must not reenter.
+// Destruction requires all concurrent calls and record users to have finished.
+class SkSynchronizedResourceCache final : public SkResourceCache {
 public:
     bool find(const Key& key, FindVisitor, void* context) override;
     void add(Rec*, void* payload = nullptr) override;
@@ -32,6 +34,8 @@ public:
     size_t getEffectiveSingleAllocationByteLimit() const override;
 
     void purgeAll() override;
+    void purgeSharedID(uint64_t sharedID) override;
+    void checkMessages();
 
     DiscardableFactory discardableFactory() const override;
 
@@ -39,11 +43,11 @@ public:
 
     void dump() const override;
 
-    SkSynchronizedResourceCache(DiscardableFactory);
+    explicit SkSynchronizedResourceCache(DiscardableFactory factory);
     explicit SkSynchronizedResourceCache(size_t byteLimit);
     ~SkSynchronizedResourceCache() override;
 
 private:
-    mutable SkMutex fMutex;
+    mutable SkMutex fMutex{};
 };
 #endif
