@@ -87,3 +87,13 @@ implementations and headers retain original copies under baseline/skia/.
 Allocation/move corrections are distinguished from arithmetic-preserving rewrites
 in docs/CONVERSION.md and results/2026-10-25/PIXEL_EXTENTS.md. Upstream copyright
 notices remain. tests/pixel_extent.cpp is original deterministic contract coverage.
+
+
+## Pixel conversion
+
+SkConvertPixels.cpp/.h and SkRectMemcpy.h retain original reference copies under
+baseline/skia/. The derivative uses explicit dispatch, stable loop bounds and
+checked buffer metadata. Original pixel arithmetic remains, including floating
+alpha truncation. tests/pixel_conversion.cpp and the conversion measurement and
+assembly-inspection tools are original additions. Native CI compares the complete
+conversion output between the original and candidate profiles.

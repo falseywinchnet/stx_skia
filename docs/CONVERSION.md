@@ -18,6 +18,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Strong/weak reference-count implementation | `include/core/SkRefCnt.h`, `include/private/SkWeakRefCnt.h` | Copy/move/reset, reentrant release, concurrent sharing, weak lock/expiry; compatibility declarations remain as noted below |
 | Borrowed view implementation | `include/core/SkSpan.h` | Empty views, all valid slices of 0–33 elements, reverse traversal, const conversion, compile-time rejection of temporary owning containers |
 | Pixel extent and temporary allocation | `src/core/SkAutoPixmapStorage.cpp/.h`, `src/core/SkSafeMath.cpp/.h`, `src/core/SkReadPixelsRec.cpp/.h`, `src/core/SkWritePixelsRec.cpp/.h`, `src/core/SkImageInfo.cpp`, `include/core/SkImageInfo.h` | Checked arithmetic boundaries, clipped transfers, allocation/move/failure states and image metadata |
+| Pixel conversion and row copies | `src/core/SkConvertPixels.cpp/.h`, `src/core/SkRectMemcpy.h` | 21,420 byte-exact format/alpha/color-space cases, row padding, exact extents, in-place swaps and invalid-input rejection |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -75,6 +76,21 @@ Checked size arithmetic retains its overflow state and the image extent's signed
 publishing pointer and rectangle updates. `SkColorTypeValidateAlphaType` rejects
 unknown enum values without changing the caller's output. These changes are not
 claimed as a new rendering optimization. See the pixel-extent measurement record.
+
+## Pixel conversion notes
+
+Pixel conversion names its dispatch sequence, snapshots stable dimensions before
+pixel loops, and derives row addresses without forming a pointer beyond the last
+active extent. It validates format enums, matching shapes, null storage, stride
+units/ranges and extent arithmetic before writing. One-row arrays retain the real
+internal stride-zero convention used by vertex and patch color conversion.
+Caller storage must satisfy the documented alignment, extent and overlap rules;
+floating alpha retains its finite [0,1] input contract. Identical row copies are
+explicit no-ops; partial overlap is not supported.
+
+Capturing loop bounds enabled native Clang vectorization of several alpha kernels.
+The measured RGBA8-to-A8 gain and small-call validation costs are reported in
+PIXEL_CONVERSION.md. This is a specific kernel result, not a whole-renderer claim.
 
 ## Still required
 

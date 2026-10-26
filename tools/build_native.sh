@@ -24,4 +24,5 @@ if [ "$sanitize" = ON ]; then
 else
     ctest --test-dir "build/$profile" --output-on-failure
     "build/$profile/stx_skia_render_tests" "build/$profile/render.raw"
+    "build/$profile/stx_skia_pixel_conversion_tests" "build/$profile/conversions.raw"
 fi
