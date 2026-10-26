@@ -22,7 +22,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <tuple>
 
 class SkArenaAlloc;
 class SkColorSpace;
@@ -35,23 +34,11 @@ struct SkStageRec;
 
 namespace SkShaders {
 /**
- * This is used to accumulate matrices, starting with the CTM, when building up
- * SkRasterPipeline or GrFragmentProcessor by walking the SkShader tree. It avoids
- * adding a matrix multiply for each individual matrix. It also handles the reverse matrix
- * concatenation order required by Android Framework, see b/256873449.
- *
- * This also tracks the dubious concept of a "total matrix", in the legacy Context/shadeSpan system.
- * That includes all the matrices encountered during traversal to the current shader, including ones
- * that have already been applied. The total matrix represents the transformation from the current
- * shader's coordinate space to device space. It is dubious because it doesn't account for SkShaders
- * that manipulate the coordinates passed to their children, which may not even be representable by
- * a matrix.
- *
- * The total matrix is used for mipmap level selection and a filter downgrade optimizations in
- * SkImageShader and sizing of the SkImage created by SkPictureShader. If we can remove usages
- * of the "total matrix" and if Android Framework could be updated to not use backwards local
- * matrix concatenation this could just be replaced by a simple SkMatrix or SkM44 passed down
- * during traversal.
+ * Accumulates shader transforms before emitting CPU raster stages, avoiding a
+ * matrix stage for every wrapper. Pending matrices have not yet been applied.
+ * The total matrix also includes previously applied transforms and supports
+ * image mipmap/filter selection. Coordinate-changing shaders may invalidate it.
+ * Android Framework retains its reversed local-matrix concatenation order.
  */
 class MatrixRec {
 public:
@@ -74,28 +61,6 @@ public:
     [[nodiscard]] std::optional<MatrixRec> apply(const SkStageRec& rec,
                                                  const SkMatrix& postInv = {}) const;
 
-    /**
-     * FP matrices work differently than SkRasterPipeline. The starting coordinates provided to the
-     * root SkShader's FP are already in local space. So we never apply the inverse CTM. This
-     * returns the inverted pending local matrix with the provided postInv matrix applied after it.
-     * If the pending local matrix cannot be inverted, the boolean is false.
-     */
-    std::tuple<SkMatrix, bool> applyForFragmentProcessor(const SkMatrix& postInv) const;
-
-    /**
-     * A parent FP may need to create a FP for its child by calling
-     * SkShaderBase::asFragmentProcessor() and then pass the result to the apply() above.
-     * This comes up when the parent needs to ensure pending matrices are applied before the
-     * child because the parent is going to manipulate the coordinates *after* any pending
-     * matrix and pass the resulting coords to the child. This function gets a MatrixRec that
-     * reflects the state after this MatrixRec has bee applied but it does not apply it!
-     * Example:
-     * auto childFP = fChild->asFragmentProcessor(args, mrec.applied());
-     * childFP = MakeAWrappingFPThatModifiesChildsCoords(std::move(childFP));
-     * auto [success, parentFP] = mrec.apply(std::move(childFP));
-     */
-    MatrixRec applied() const;
-
     /** Call to indicate that the mapping from shader to device space is not known. */
     void markTotalMatrixInvalid() { fTotalMatrixIsValid = false; }
 
@@ -113,16 +78,23 @@ public:
      * may not be valid. Shaders should avoid making decisions based on this matrix if
      * totalMatrixIsValid() is false.
      */
-    SkMatrix totalMatrix() const { return SkMatrix::Concat(fCTM, fTotalLocalMatrix); }
+    SkMatrix totalMatrix() const {
+        const SkMatrix total = SkMatrix::Concat(fCTM, fTotalLocalMatrix);
+        return total;
+    }
 
     /** Gets the inverse of totalMatrix(), if invertible. */
     std::optional<SkMatrix> totalInverse() const {
-        return this->totalMatrix().invert();
+        const SkMatrix total = totalMatrix();
+        const std::optional<SkMatrix> inverse = total.invert();
+        return inverse;
     }
 
     /** Is there a transform that has not yet been applied by a parent shader? */
     bool hasPendingMatrix() const {
-        return (!fCTMApplied && !fCTM.isIdentity()) || !fPendingLocalMatrix.isIdentity();
+        const bool pending = (!fCTMApplied && !fCTM.isIdentity()) ||
+                             !fPendingLocalMatrix.isIdentity();
+        return pending;
     }
 
     /** When generating raster pipeline, have the device coordinates been seeded? */
@@ -140,14 +112,14 @@ private:
             , fTotalMatrixIsValid(totalIsValid)
             , fCTMApplied(ctmApplied) {}
 
-    const SkMatrix fCTM;
+    const SkMatrix fCTM{};
 
     // Concatenation of all local matrices, including those already applied.
-    const SkMatrix fTotalLocalMatrix;
+    const SkMatrix fTotalLocalMatrix{};
 
     // The accumulated local matrices from walking down the shader hierarchy that have NOT yet
     // been incorporated into the SkRasterPipeline.
-    const SkMatrix fPendingLocalMatrix;
+    const SkMatrix fPendingLocalMatrix{};
 
     bool fTotalMatrixIsValid = true;
 
@@ -246,10 +218,10 @@ public:
                                                //   output.
         SkColor4f*  fColors        = nullptr;  //!< The colors in the gradient.
         SkScalar*   fColorOffsets  = nullptr;  //!< The unit offset for color transitions.
-        SkPoint     fPoint[2];                 //!< Type specific, see above.
-        SkScalar    fRadius[2];                //!< Type specific, see above.
-        SkTileMode  fTileMode;
-        bool        fPremulInterp;
+        SkPoint     fPoint[2]{};                 //!< Type specific, see above.
+        SkScalar    fRadius[2]{};                //!< Type specific, see above.
+        SkTileMode  fTileMode{};
+        bool        fPremulInterp = false;
     };
 
     virtual GradientType asGradient(GradientInfo* info    = nullptr,
@@ -278,11 +250,10 @@ public:
                 , fPaintAlpha(paintAlpha) {}
 
         static ContextRec Concat(const ContextRec& parentRec, const SkMatrix& localM) {
-            return {parentRec.fPaintAlpha,
-                    parentRec.fMatrixRec.concat(localM),
-                    parentRec.fDstColorType,
-                    parentRec.fDstColorSpace,
-                    parentRec.fProps};
+            const SkShaders::MatrixRec matrix = parentRec.fMatrixRec.concat(localM);
+            const ContextRec result{parentRec.fPaintAlpha, matrix, parentRec.fDstColorType,
+                                    parentRec.fDstColorSpace, parentRec.fProps};
+            return result;
         }
 
         const SkShaders::MatrixRec fMatrixRec;
@@ -297,6 +268,7 @@ public:
     class Context : public ::SkNoncopyable {
     public:
         Context(const SkShaderBase& shader, const ContextRec&);
+        Context(const SkShaderBase&&, const ContextRec&) = delete;
 
         virtual ~Context();
 
@@ -317,7 +289,7 @@ public:
         virtual void shadeSpan(int x, int y, SkPMColor[], int count) = 0;
 
     protected:
-        // Reference to shader, so we don't have to dupe information.
+        // The shader owner must outlive this arena-owned context.
         const SkShaderBase& fShader;
 
         uint8_t getPaintAlpha() const { return fPaintAlpha; }
@@ -352,8 +324,7 @@ public:
 
     /**
      * Adds stages to implement this shader. To ensure that the correct input coords are present
-     * in r,g MatrixRec::apply() must be called (unless the shader doesn't require it's input
-     * coords). The default impl creates shadercontext and calls that (not very efficient).
+     * in r,g MatrixRec::apply() must be called unless the shader needs no coordinates.
      */
     virtual bool appendStages(const SkStageRec&, const SkShaders::MatrixRec&) const = 0;
 
@@ -363,12 +334,14 @@ public:
 
 
     static Type GetFlattenableType() { return kSkShader_Type; }
-    Type getFlattenableType() const override { return GetFlattenableType(); }
+    Type getFlattenableType() const override { return kSkShader_Type; }
 
     static sk_sp<SkShaderBase> Deserialize(const void* data, size_t size,
                                              const SkDeserialProcs* procs = nullptr) {
-        return sk_sp<SkShaderBase>(static_cast<SkShaderBase*>(
-                SkFlattenable::Deserialize(GetFlattenableType(), data, size, procs).release()));
+        sk_sp<SkFlattenable> decoded = SkFlattenable::Deserialize(kSkShader_Type, data, size, procs);
+        SkShaderBase* shader = static_cast<SkShaderBase*>(decoded.release());
+        sk_sp<SkShaderBase> result(shader);
+        return result;
     }
 
     /** DEPRECATED. skbug.com/40040221
@@ -379,9 +352,11 @@ public:
 
     static SkMatrix ConcatLocalMatrices(const SkMatrix& parentLM, const SkMatrix& childLM) {
 #if defined(SK_BUILD_FOR_ANDROID_FRAMEWORK)  // b/256873449
-        return SkMatrix::Concat(childLM, parentLM);
+        const SkMatrix combined = SkMatrix::Concat(childLM, parentLM);
+#else
+        const SkMatrix combined = SkMatrix::Concat(parentLM, childLM);
 #endif
-        return SkMatrix::Concat(parentLM, childLM);
+        return combined;
     }
 
 protected:
@@ -407,16 +382,20 @@ private:
     friend class SkShaders::MatrixRec;
 };
 inline SkShaderBase* as_SB(SkShader* shader) {
-    return static_cast<SkShaderBase*>(shader);
+    SkShaderBase* base = static_cast<SkShaderBase*>(shader);
+    return base;
 }
 
 inline const SkShaderBase* as_SB(const SkShader* shader) {
-    return static_cast<const SkShaderBase*>(shader);
+    const SkShaderBase* base = static_cast<const SkShaderBase*>(shader);
+    return base;
 }
 
 inline const SkShaderBase* as_SB(const sk_sp<SkShader>& shader) {
-    return static_cast<SkShaderBase*>(shader.get());
+    const SkShaderBase* base = static_cast<const SkShaderBase*>(shader.get());
+    return base;
 }
 
+const SkShaderBase* as_SB(const sk_sp<SkShader>&&) = delete;
 
 #endif // SkShaderBase_DEFINED

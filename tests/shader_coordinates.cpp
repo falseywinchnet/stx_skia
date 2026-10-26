@@ -4,6 +4,10 @@
 #include "include/core/SkShader.h"
 #include "include/core/SkSurface.h"
 #include "src/shaders/SkLocalMatrixShader.h"
+#include "src/core/SkArenaAlloc.h"
+#include "src/core/SkEffectPriv.h"
+#include "src/core/SkRasterPipeline.h"
+#include "src/core/SkRasterPipelineOpList.h"
 
 #include <array>
 #include <cstdint>
@@ -18,7 +22,13 @@ template <typename T>
 concept TemporaryCTM = requires(T&& value) { std::move(value).ctm(); };
 template <typename T>
 concept TemporaryImage = requires(T&& value) { std::move(value).isAImage(nullptr, nullptr); };
+template <typename T>
+concept TemporaryShaderBase = requires(T&& value) { as_SB(std::move(value)); };
+template <typename T>
+concept FragmentProcessorMatrix = requires(T& value) { value.applyForFragmentProcessor(SkMatrix::I()); };
 #ifndef STX_SKIA_REFERENCE
+static_assert(!TemporaryShaderBase<sk_sp<SkShader>>);
+static_assert(!FragmentProcessorMatrix<SkShaders::MatrixRec>);
 static_assert(!TemporaryLocalMatrix<SkLocalMatrixShader>);
 static_assert(!TemporaryCTM<SkCTMShader>);
 static_assert(!TemporaryImage<SkLocalMatrixShader>);
@@ -124,6 +134,41 @@ bool coordinate_cases(std::vector<uint32_t>& output) {
     return true;
 }
 
+bool matrix_state() {
+    SkSTArenaAlloc<2048> arena{};
+    const SkSurfaceProps props{};
+    SkRasterPipeline pipeline(&arena);
+    const SkStageRec rec{&pipeline, &arena, kRGBA_8888_SkColorType, nullptr,
+                         SkColors::kWhite, props, SkRect::MakeEmpty()};
+    const SkShaders::MatrixRec identity{};
+    if (identity.hasPendingMatrix() || identity.rasterPipelineCoordsAreSeeded()) return false;
+    const std::optional<SkShaders::MatrixRec> seeded = identity.apply(rec);
+    if (!seeded || !(*seeded).rasterPipelineCoordsAreSeeded() ||
+        (*seeded).hasPendingMatrix() || pipeline.getNumStages() != 1) return false;
+    const std::optional<SkShaders::MatrixRec> repeated = (*seeded).apply(rec);
+    if (!repeated || pipeline.getNumStages() != 1) return false;
+
+    SkMatrix scale{};
+    scale.setScale(2, 4);
+    SkShaders::MatrixRec scaled = (*seeded).concat(scale);
+    scaled.markTotalMatrixInvalid();
+    const std::optional<SkShaders::MatrixRec> applied = scaled.apply(rec);
+    if (!applied || (*applied).totalMatrixIsValid() || (*applied).hasPendingMatrix() ||
+        (*applied).totalMatrix() != scale || pipeline.getNumStages() != 2) return false;
+    const std::optional<SkMatrix> inverse = (*applied).totalInverse();
+    const SkMatrix expectedInverse = SkMatrix::Scale(0.5f, 0.25f);
+    if (!inverse || *inverse != expectedInverse) return false;
+
+    SkMatrix singular{};
+    singular.setScale(0, 1);
+    const SkShaders::MatrixRec invalid = (*applied).concat(singular);
+    const SkRasterPipeline::StageList* previous = pipeline.getStageList();
+    const int stageCount = pipeline.getNumStages();
+    if (invalid.apply(rec) || invalid.totalInverse()) return false;
+    if (pipeline.getStageList() != previous || pipeline.getNumStages() != stageCount) return false;
+    return true;
+}
+
 bool empty_and_singular() {
     const sk_sp<SkShader> empty = SkShaders::Empty();
     SkMatrix singular{};
@@ -149,6 +194,7 @@ int main(int argc, char** argv) {
     std::vector<uint32_t> output{};
     if (!coordinate_cases(output)) return 1;
     if (!empty_and_singular()) return 2;
+    if (!matrix_state()) return 4;
     if (argc == 2) {
         FILE* file = std::fopen(argv[1], "wb");
         if (file == nullptr) return 3;

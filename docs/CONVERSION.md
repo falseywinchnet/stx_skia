@@ -1118,6 +1118,18 @@ match, and the complete instrumented suite returns PASS. See
 ../results/2026-10-26/SHADER_COORDINATE_CONVERSION.md for coverage and limitations.
 The shared shader base and remaining sampling classes are still separate work.
 
+## Shared shader base and matrix state
+
+The shared shader base now makes matrix application, context borrowing and
+factory ownership explicit. Gradient query fields start initialized; temporary
+shared owners cannot supply persistent base views. Uncalled fragment-processor
+matrix helpers are removed, with source closure and archive evidence; the CPU
+context path remains. Release suites pass 56/56 and 55/55, all thirteen common
+artifacts match, and the full instrumented suite returns PASS. A fresh relocated
+consumer exercises the public shader interface. See
+../results/2026-10-26/SHADER_BASE_CONVERSION.md for the matrix-state checks,
+conditional compilation coverage and remaining scope.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

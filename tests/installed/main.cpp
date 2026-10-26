@@ -13,6 +13,9 @@
 #include "include/core/SkImage.h"
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkColorFilter.h"
+#include "include/core/SkShader.h"
+#include "include/core/SkTileMode.h"
+#include <array>
 #include "include/effects/SkColorMatrix.h"
 #include <vector>
 #include <cstddef>
@@ -74,5 +77,22 @@ int main() {
     const SkColor4f adjusted = (*composed).filterColor4f(SkColors::kWhite, nullptr, nullptr);
     if (adjusted.fR != 0.25f || adjusted.fG != 0.0625f ||
         adjusted.fB != 0.5625f || adjusted.fA != 1.0f) return 7;
+    const SkSamplingOptions sampling{};
+    const sk_sp<SkShader> imageShader = (*image).makeShader(SkTileMode::kRepeat,
+                                                           SkTileMode::kMirror, sampling);
+    if (!imageShader) return 8;
+    const SkMatrix local = SkMatrix::Translate(2, -3);
+    const sk_sp<SkShader> wrapped = (*imageShader).makeWithLocalMatrix(local);
+    if (!wrapped) return 9;
+    SkMatrix reported{};
+    std::array<SkTileMode, 2> modes{};
+    SkImage* borrowedImage = (*wrapped).isAImage(&reported, modes.data());
+    if (borrowedImage != image.get() || reported != local ||
+        modes[0] != SkTileMode::kRepeat || modes[1] != SkTileMode::kMirror) return 10;
+    const sk_sp<SkShader> filtered = (*wrapped).makeWithColorFilter(composed);
+    if (!filtered) return 11;
+    SkPaint paint{};
+    paint.setShader(filtered);
+    canvas.drawPaint(paint);
     return 0;
 }
