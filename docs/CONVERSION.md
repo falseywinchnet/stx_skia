@@ -917,8 +917,14 @@ on null storage. Initial extents, raw alignment and footer additions are
 checked before narrowing or pointer formation. The original source is retained
 for differential builds and the focused fixture covers valid heap/inline/reset
 behavior and invalid Release inputs. See
-../results/2026-10-26/ARENA_BOUNDARY.md. Constructor-throw cleanup and full
-house-style conversion of this arena remain open.
+../results/2026-10-26/ARENA_BOUNDARY.md. Full house-style conversion of this
+arena remains open.
+
+The next arena pass makes a footer inert until an object's constructor
+completes, and records the completed prefix of a nontrivial array. Interrupted
+construction can therefore be cleaned up without destroying unconstructed
+storage. See ../results/2026-10-26/ARENA_CONSTRUCTION.md. Full source-style
+conversion and broader renderer verification remain open.
 
 ## Still required
 

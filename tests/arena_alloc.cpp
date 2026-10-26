@@ -21,6 +21,117 @@ struct Tracked {
     }
 };
 
+#ifndef STX_SKIA_REFERENCE
+struct ConstructionFailure {};
+struct ThrowingElement {
+    inline static int live = 0;
+    inline static int attempts = 0;
+    inline static int failAt = 0;
+    int value = 31;
+    ThrowingElement() { finishConstruction(); }
+    explicit ThrowingElement(int initial) : value(initial) { finishConstruction(); }
+    ThrowingElement(const ThrowingElement& source) : value(source.value) {
+        finishConstruction();
+    }
+    ThrowingElement(ThrowingElement&& source) noexcept : value(source.value) { ++live; }
+    ~ThrowingElement() { --live; }
+    static void finishConstruction() {
+        ++attempts;
+        if (attempts == failAt) throw ConstructionFailure{};
+        ++live;
+    }
+};
+
+ThrowingElement make_initialized_element(size_t index) {
+    const int value = static_cast<int>(index) + 71;
+    ThrowingElement result(value);
+    return result;
+}
+
+enum class ArrayMode { Default, Value, Initialized, Copy };
+
+bool interrupted_array_case(ArrayMode mode, int failure) {
+    ThrowingElement::live = 0;
+    ThrowingElement::attempts = 0;
+    ThrowingElement::failAt = 0;
+    {
+        std::array<ThrowingElement, 4> source{};
+        {
+            SkArenaAlloc arena(64);
+            ThrowingElement::failAt = ThrowingElement::attempts + failure;
+            bool caught = false;
+            try {
+                switch (mode) {
+                    case ArrayMode::Default:
+                        arena.makeArrayDefault<ThrowingElement>(4);
+                        break;
+                    case ArrayMode::Value:
+                        arena.makeArray<ThrowingElement>(4);
+                        break;
+                    case ArrayMode::Initialized:
+                        arena.makeInitializedArray<ThrowingElement>(4, make_initialized_element);
+                        break;
+                    case ArrayMode::Copy:
+                        arena.makeArrayCopy<ThrowingElement>(source);
+                        break;
+                    default:
+                        return false;
+                }
+            } catch (const ConstructionFailure&) {
+                caught = true;
+            }
+            ThrowingElement::failAt = 0;
+            if (!caught || ThrowingElement::live != 4 + failure - 1) return false;
+            int* following = arena.make<int>(83);
+            if (*following != 83) return false;
+        }
+        if (ThrowingElement::live != 4) return false;
+    }
+    return ThrowingElement::live == 0;
+}
+
+struct NestedFailure {
+    inline static int destroyed = 0;
+    explicit NestedFailure(SkArenaAlloc* arena) {
+        Tracked* child = (*arena).make<Tracked>(47);
+        if ((*child).value != 47) throw ConstructionFailure{};
+        throw ConstructionFailure{};
+    }
+    ~NestedFailure() { ++destroyed; }
+};
+
+bool interrupted_object_case() {
+    Tracked::live = 0;
+    Tracked::destroyed = 0;
+    NestedFailure::destroyed = 0;
+    {
+        SkArenaAlloc arena(64);
+        bool caught = false;
+        try {
+            arena.make<NestedFailure>(&arena);
+        } catch (const ConstructionFailure&) {
+            caught = true;
+        }
+        if (!caught || Tracked::live != 1 || NestedFailure::destroyed != 0) return false;
+        Tracked* following = arena.make<Tracked>(53);
+        if ((*following).value != 53 || Tracked::live != 2) return false;
+    }
+    return Tracked::live == 0 && Tracked::destroyed == 2 &&
+           NestedFailure::destroyed == 0;
+}
+
+bool interrupted_construction_case() {
+    if (!interrupted_object_case()) return false;
+    for (int failure = 1; failure <= 4; ++failure) {
+        if (!interrupted_array_case(ArrayMode::Default, failure)) return false;
+        if (!interrupted_array_case(ArrayMode::Value, failure)) return false;
+        if (!interrupted_array_case(ArrayMode::Initialized, failure)) return false;
+        if (!interrupted_array_case(ArrayMode::Copy, failure)) return false;
+    }
+    return true;
+}
+#endif
+
 bool heap_only_case() {
     Tracked::live = 0;
     Tracked::destroyed = 0;
@@ -29,6 +140,9 @@ bool heap_only_case() {
         uint32_t* number = arena.make<uint32_t>(73);
         Tracked* first = arena.make<Tracked>(41);
         Tracked* array = arena.makeArray<Tracked>(5);
+        arena.makeArray<Tracked>(0);
+        SkSpan<const uint32_t> emptyValues;
+        arena.makeArrayCopy<uint32_t>(emptyValues);
         if (*number != 73 || (*first).value != 41 || Tracked::live != 6) return false;
         for (int index = 0; index < 5; ++index) {
             if (array[index].value != 31) return false;
@@ -93,7 +207,10 @@ int main(int argc, char** argv) {
         return 0;
     }
 #endif
-    const bool valid = heap_only_case() && inline_case() && reset_case();
+    bool valid = heap_only_case() && inline_case() && reset_case();
+#ifndef STX_SKIA_REFERENCE
+    valid = interrupted_construction_case() && valid;
+#endif
     if (!valid) {
         std::fputs("arena allocation contract mismatch\n", stderr);
         return 1;

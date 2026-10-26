@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <new>
 #include <type_traits>  // IWYU pragma: keep
 #include <utility>
@@ -137,12 +138,11 @@ public:
             // Advance to end of object to install footer.
             fCursor = objStart + size;
             sk_asan_unpoison_memory_region(objStart, size);
-            FooterAction* releaser = [](char* objEnd) {
-                char* objStart = objEnd - (sizeof(T) + sizeof(Footer));
-                ((T*)objStart)->~T();
-                return objStart;
-            };
-            this->installFooter(releaser, padding);
+            installFooter(SkipObject<T>, padding);
+            char* footerEnd = fDtorCursor;
+            T* object = ctor(objStart);
+            setFooterAction(footerEnd, DestroyObject<T>);
+            return object;
         }
 
         // This must be last to make objects with nested use of this allocator work.
@@ -175,6 +175,7 @@ public:
         for (size_t i = 0; i < count; i++) {
             // Default initialization: if T is primitive then the value is left uninitialized.
             new (&array[i]) T;
+            recordConstructedArrayElement(array, count, i + 1);
         }
         return array;
     }
@@ -185,6 +186,7 @@ public:
         for (size_t i = 0; i < count; i++) {
             // Value initialization: if T is primitive then the value is zero-initialized.
             new (&array[i]) T();
+            recordConstructedArrayElement(array, count, i + 1);
         }
         return array;
     }
@@ -194,6 +196,7 @@ public:
         T* array = this->allocUninitializedArray<T>(count);
         for (size_t i = 0; i < count; i++) {
             new (&array[i]) T(initializer(i));
+            recordConstructedArrayElement(array, count, i + 1);
         }
         return array;
     }
@@ -202,10 +205,11 @@ public:
     T* makeArrayCopy(SkSpan<const T> toCopy) {
         T* array = this->allocUninitializedArray<T>(toCopy.size());
         if constexpr (std::is_trivially_copyable<T>::value) {
-            memcpy(array, toCopy.data(), toCopy.size_bytes());
+            if (!toCopy.empty()) memcpy(array, toCopy.data(), toCopy.size_bytes());
         } else {
             for (size_t i = 0; i < toCopy.size(); ++i) {
                 new (&array[i]) T(toCopy[i]);
+                recordConstructedArrayElement(array, toCopy.size(), i + 1);
             }
         }
         return array;
@@ -238,6 +242,51 @@ private:
         AssertRelease(SkTFitsIn<uint32_t>(size));
         const uint32_t checked = static_cast<uint32_t>(size);
         return checked;
+    }
+
+    template <typename T> static char* SkipObject(char* footerEnd) {
+        char* objectStart = footerEnd - (sizeof(T) + sizeof(Footer));
+        return objectStart;
+    }
+
+    template <typename T> static char* DestroyObject(char* footerEnd) {
+        char* objectStart = SkipObject<T>(footerEnd);
+        T* object = reinterpret_cast<T*>(objectStart);
+        std::destroy_at(object);
+        return objectStart;
+    }
+
+    static void setFooterAction(char* footerEnd, FooterAction* action) {
+        char* actionStorage = footerEnd - sizeof(Footer);
+        memcpy(actionStorage, &action, sizeof(action));
+    }
+
+    template <typename T> static char* DestroyArrayPrefix(char* footerEnd) {
+        char* metadata = footerEnd - (sizeof(Footer) + 2 * sizeof(uint32_t));
+        uint32_t allocatedCount = 0;
+        uint32_t constructedCount = 0;
+        memcpy(&allocatedCount, metadata, sizeof(allocatedCount));
+        memcpy(&constructedCount, metadata + sizeof(uint32_t), sizeof(constructedCount));
+        AssertRelease(constructedCount <= allocatedCount);
+        const size_t arrayBytes = static_cast<size_t>(allocatedCount) * sizeof(T);
+        char* arrayStart = metadata - arrayBytes;
+        T* array = reinterpret_cast<T*>(arrayStart);
+        for (uint32_t index = 0; index < constructedCount; ++index) {
+            std::destroy_at(&array[index]);
+        }
+        return arrayStart;
+    }
+
+    template <typename T>
+    static void recordConstructedArrayElement(T* array, size_t requested, size_t constructed) {
+        if constexpr (!std::is_trivially_destructible_v<T>) {
+            AssertRelease(constructed <= requested);
+            const size_t arrayBytes = requested * sizeof(T);
+            char* metadata = reinterpret_cast<char*>(array) + arrayBytes;
+            char* countStorage = metadata + sizeof(uint32_t);
+            const uint32_t liveCount = static_cast<uint32_t>(constructed);
+            memcpy(countStorage, &liveCount, sizeof(liveCount));
+        }
     }
 
     static char* SkipPod(char* footerEnd);
@@ -291,7 +340,7 @@ private:
             fCursor = objStart + arraySize;
             sk_asan_unpoison_memory_region(objStart, arraySize);
         } else {
-            constexpr uint32_t overhead = sizeof(Footer) + sizeof(uint32_t);
+            constexpr uint32_t overhead = sizeof(Footer) + 2 * sizeof(uint32_t);
             AssertRelease(arraySize <= std::numeric_limits<uint32_t>::max() - overhead);
             uint32_t totalSize = arraySize + overhead;
             objStart = this->allocObjectWithFooter(totalSize, alignment);
@@ -302,20 +351,9 @@ private:
             // Advance to end of array to install footer.
             fCursor = objStart + arraySize;
             sk_asan_unpoison_memory_region(objStart, arraySize);
-            this->installRaw(SkToU32(count));
-            this->installFooter(
-                [](char* footerEnd) {
-                    char* objEnd = footerEnd - (sizeof(Footer) + sizeof(uint32_t));
-                    uint32_t count;
-                    memmove(&count, objEnd, sizeof(uint32_t));
-                    char* objStart = objEnd - count * sizeof(T);
-                    T* array = (T*) objStart;
-                    for (uint32_t i = 0; i < count; i++) {
-                        array[i].~T();
-                    }
-                    return objStart;
-                },
-                padding);
+            installRaw(SkToU32(count));
+            installRaw(uint32_t{0});
+            installFooter(DestroyArrayPrefix<T>, padding);
         }
 
         return (T*)objStart;
