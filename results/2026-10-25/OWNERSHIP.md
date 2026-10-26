@@ -38,5 +38,8 @@ The existing GUI.Forms GN profile supplies -fms-extensions, and the CMake target
 now supplies that same requirement to the library and its consumers. These are
 build failures, not runtime review findings. Corrected native CI remains required.
 
-The updated installed consumer and seven GUI.Forms integration tests are being
-rerun as a separate gate. Their result will be added once execution completes.
+After the corrected RTTI contract, all four reference and candidate tests pass,
+the instrumented suite returns PASS, and all seven selected GUI.Forms renderer
+tests pass with LLVM 22.1.8. A freshly relocated installed consumer also builds
+and runs; it explicitly checks dynamic_cast on application-owned types alongside
+the image-storage/drawing calls. Native corrected CI is still pending.

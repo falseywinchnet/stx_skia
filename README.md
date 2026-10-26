@@ -89,6 +89,7 @@ checkout is unchanged. Its coordinator owns integration and platform gates.
 - [Consumer scope and pruning investigation](docs/INTAKE.md)
 - [Coordinator requirements, including future material capabilities](docs/COORDINATOR_REQUIREMENTS.md)
 - [Implementation sequence and remaining work](docs/PLAN.md)
+- [Full conversion ledger](docs/CONVERSION.md)
 - [Programming house style](docs/PROGRAMMING_HOUSE_STYLE.md)
 - [Source identities and modifications](PROVENANCE.md)
 - [Original source inventory](baseline/inventory.json)

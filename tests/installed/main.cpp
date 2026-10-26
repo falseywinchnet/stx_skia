@@ -6,7 +6,19 @@
 #include <vector>
 #include <cstddef>
 
+namespace {
+struct ConsumerBase {
+    virtual ~ConsumerBase() = default;
+};
+struct ConsumerDerived final : ConsumerBase {};
+}
+
 int main() {
+    // Skia's private no-RTTI build must not disable RTTI for application types.
+    ConsumerDerived consumer;
+    ConsumerBase* base = &consumer;
+    ConsumerDerived* recovered = dynamic_cast<ConsumerDerived*>(base);
+    if (recovered != &consumer) return 4;
     std::vector<std::byte> pixels(16U * 16U * 4U, std::byte{0xFF});
     sk_sp<SkData> data = stx_skia::take_pixel_data(pixels);
     if (!data || !pixels.empty()) return 1;
