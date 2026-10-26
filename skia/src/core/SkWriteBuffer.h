@@ -37,18 +37,20 @@ struct SkRect;
 
 class SkWriteBuffer {
 public:
-    explicit SkWriteBuffer(const SkSerialProcs& p) : fProcs(p) {}
+    explicit SkWriteBuffer(const SkSerialProcs& procs) : fProcs(procs) {}
     virtual ~SkWriteBuffer() {}
 
     virtual void writePad32(const void* buffer, size_t bytes) = 0;
 
     virtual void writeByteArray(const void* data, size_t size) = 0;
     void writeDataAsByteArray(const SkData* data) {
-        if (!data) {
-            this->write32(0);
-        } else {
-            this->writeByteArray(data->data(), data->size());
+        if (data == nullptr) {
+            write32(0);
+            return;
         }
+        const void* bytes = (*data).data();
+        const size_t size = (*data).size();
+        writeByteArray(bytes, size);
     }
 
     virtual void writeBool(bool value) = 0;
@@ -58,7 +60,7 @@ public:
     virtual void writeIntArray(SkSpan<const int32_t>) = 0;
     virtual void writeUInt(uint32_t value) = 0;
     void write32(int32_t value) {
-        this->writeInt(value);
+        writeInt(value);
     }
     virtual void writeString(std::string_view value) = 0;
 
@@ -80,33 +82,37 @@ public:
     virtual void writeImage(const SkImage*) = 0;
     virtual void writePaint(const SkPaint& paint) = 0;
 
-    const SkSerialProcs& serialProcs() const { return fProcs; }
+    // The copied procedure record borrows its callback context for synchronous writes.
+    const SkSerialProcs& serialProcs() const & { return fProcs; }
+    const SkSerialProcs& serialProcs() const && = delete;
 
 protected:
-    SkSerialProcs   fProcs;
+    SkSerialProcs fProcs{};
 };
 
-/**
- * Concrete implementation that serializes to a flat binary blob.
- */
+// Owns grown storage and type-name dictionary entries. Initial storage is borrowed
+// and must remain writable and alive until reset/destruction. Input buffers are
+// consumed synchronously and must not overlap writer storage. Stored type-name
+// pointers are process-lifetime strings supplied by SkFlattenable.
+// The void write interface treats invalid extents/counts as programmer errors;
+// allocation failure follows SkWriter32's terminating allocation policy.
 class SkBinaryWriteBuffer : public SkWriteBuffer {
 public:
-    explicit SkBinaryWriteBuffer(const SkSerialProcs&);
-    SkBinaryWriteBuffer(void* initialStorage, size_t storageSize, const SkSerialProcs&);
+    explicit SkBinaryWriteBuffer(const SkSerialProcs& procs);
+    SkBinaryWriteBuffer(void* initialStorage, size_t storageSize, const SkSerialProcs& procs);
     ~SkBinaryWriteBuffer() override;
 
-    void write(const void* buffer, size_t bytes) {
-        fWriter.write(buffer, bytes);
-    }
-    void writePad32(const void* buffer, size_t bytes) override {
-        fWriter.writePad(buffer, bytes);
-    }
+    void write(const void* buffer, size_t bytes);
+    void writePad32(const void* buffer, size_t bytes) override;
 
-    void reset(void* storage = nullptr, size_t storageSize = 0) {
-        fWriter.reset(storage, storageSize);
-    }
+    // Begins an independent stream, discarding prior bytes and type-name indices.
+    // SkWriter32 retains its internal allocation until reuse/destruction.
+    void reset(void* storage = nullptr, size_t storageSize = 0);
 
-    size_t bytesWritten() const { return fWriter.bytesWritten(); }
+    size_t bytesWritten() const {
+        const size_t bytes = fWriter.bytesWritten();
+        return bytes;
+    }
 
     // Returns true iff all of the bytes written so far are stored in the initial storage
     // buffer provided in the constructor or the most recent call to reset.
@@ -140,14 +146,16 @@ public:
     void writePaint(const SkPaint& paint) override;
 
     bool writeToStream(SkWStream*) const;
-    void writeToMemory(void* dst) const { fWriter.flatten(dst); }
-    sk_sp<SkData> snapshotAsData() const { return fWriter.snapshotAsData(); }
+    // Destination supplies bytesWritten() disjoint writable bytes. Null is valid
+    // for an empty stream. Snapshots own a copy and survive reset/destruction.
+    void writeToMemory(void* destination) const;
+    sk_sp<SkData> snapshotAsData() const;
 
 private:
-    SkWriter32 fWriter;
+    SkWriter32 fWriter{};
 
     // Inline type names are shared within this stream.
-    skia_private::THashMap<const char*, uint32_t> fFlattenableDict;
+    skia_private::THashMap<const char*, uint32_t> fFlattenableDict{};
 };
 
 enum SkWriteBufferImageFlags {

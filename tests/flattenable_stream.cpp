@@ -6,6 +6,7 @@
 #include "include/core/SkPathEffect.h"
 #include "include/core/SkSerialProcs.h"
 #include "include/core/SkShader.h"
+#include "include/core/SkStream.h"
 #include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkShaderMaskFilter.h"
 #include "src/core/SkWriteBuffer.h"
@@ -28,6 +29,8 @@ template <typename T> concept HasFactoryPlayback = requires { &T::setFactoryPlay
 template <typename T> concept HasRecursionLimit = requires { &T::setRecursionLimit; };
 static_assert(!HasFactoryPlayback<SkReadBuffer>);
 static_assert(!HasRecursionLimit<SkReadBuffer>);
+template <typename T> concept HasStreamInput = requires { &T::writeStream; };
+static_assert(!HasStreamInput<SkBinaryWriteBuffer>);
 #endif
 
 namespace {
@@ -68,6 +71,50 @@ bool reader_contract() {
     // A valid, non-null empty extent cannot supply even the null marker.
     SkReadBuffer empty(sentinel.data(), 0);
     if (empty.readRawFlattenable() != nullptr || empty.isValid()) return false;
+#endif
+    return true;
+}
+
+bool writer_reuse() {
+#ifndef STX_SKIA_REFERENCE
+    const SkSerialProcs procs{};
+    SkBinaryWriteBuffer reused(procs);
+    reused.write(nullptr, 0);
+    reused.writePad32(nullptr, 0);
+    reused.writeToMemory(nullptr);
+    sk_sp<SkData> empty = reused.snapshotAsData();
+    if (!empty || (*empty).size() != 0 || reused.bytesWritten() != 0) return false;
+    sk_sp<SkShader> shader = SkShaders::Color(0xff123456U);
+    if (!shader) return false;
+    SkBinaryWriteBuffer fresh(procs);
+    fresh.writeFlattenable(shader.get());
+    fresh.writeFlattenable(shader.get());
+    fresh.writeUInt(0x12345678U);
+    sk_sp<SkData> expected = fresh.snapshotAsData();
+    if (!expected) return false;
+    std::array<uint32_t, 1026> external{};
+    const std::array<size_t, 4> capacities{0, 4, 16, 4096};
+    for (const size_t capacity : capacities) {
+        for (uint32_t& word : external) word = 0xaabbccddU;
+        reused.reset(external.data() + 1, capacity);
+        if (reused.bytesWritten() != 0 || !reused.usingInitialStorage()) return false;
+        reused.writeFlattenable(shader.get());
+        reused.writeFlattenable(shader.get());
+        reused.writeUInt(0x12345678U);
+        sk_sp<SkData> snapshot = reused.snapshotAsData();
+        if (!snapshot || *snapshot != *expected) return false;
+        const bool fits = (*expected).size() <= capacity;
+        if (reused.usingInitialStorage() != fits) return false;
+        if (external.front() != 0xaabbccddU || external[1 + capacity / 4] != 0xaabbccddU) return false;
+        SkDynamicMemoryWStream stream{};
+        if (!reused.writeToStream(&stream) || stream.bytesWritten() != (*expected).size()) return false;
+        std::vector<uint8_t> copied(stream.bytesWritten());
+        stream.copyTo(copied.data());
+        if (std::memcmp(copied.data(), (*expected).data(), copied.size()) != 0) return false;
+        reused.reset();
+        sk_sp<SkData> resetEmpty = reused.snapshotAsData();
+        if (!resetEmpty || (*resetEmpty).size() != 0 || *snapshot != *expected) return false;
+    }
 #endif
     return true;
 }
@@ -162,7 +209,7 @@ bool streams(std::vector<uint8_t>& output, int& cases) {
 int main(int argc, char** argv) {
     std::vector<uint8_t> output{};
     int cases = 0;
-    if (!reader_contract() || !streams(output, cases)) return 1;
+    if (!reader_contract() || !writer_reuse() || !streams(output, cases)) return 1;
     uint64_t digest = UINT64_C(1469598103934665603);
     for (const uint8_t byte : output) {
         digest ^= byte;

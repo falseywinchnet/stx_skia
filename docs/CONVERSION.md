@@ -688,6 +688,23 @@ loop median is about 5.5% slower with overlapping ranges. Earlier regressions ar
 preserved. See ../results/2026-10-26/READ_BUFFER.md and raw timing files. This does
 not complete the writer or remaining private reconstruction implementations.
 
+## Retained binary writer
+
+SkWriteBuffer.h/.cpp are converted with explicit borrowed initial storage,
+callback contexts, independent snapshots and process-lifetime type names. The
+writer stays 80 bytes. Reset now clears the existing stream dictionary, so reused
+writers produce fresh-stream bytes. Empty snapshots and zero-byte operations have
+explicit behavior. Count/index conversions are checked without adding error state.
+The unused stream-input interface is removed; stream output remains.
+
+Both 33-test Release profiles, nine render artifacts, unchanged 24-case serialized
+output, instrumented suites, relocated consumer and seven GUI.Forms tests pass.
+Reuse fixtures cover four
+supplied capacities, growth, guards, persistent snapshots and stream output. Image
+callbacks now round-trip the base and two mip levels. No speed gain is claimed.
+See ../results/2026-10-26/WRITE_BUFFER.md. SkWriter32's underlying storage and growth
+implementation remains a separate required conversion.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

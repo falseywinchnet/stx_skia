@@ -35,7 +35,7 @@ def main():
                     "SkFlattenable::Register", "SkFlattenable::NameToFactory",
                     "SkFlattenable::FactoryToName", "SkFlattenable::Finalize",
                     "SkFlattenable::PrivateInitializer", "SkRegister",
-                    "SkReadBuffer::setFactoryPlayback"]:
+                    "SkReadBuffer::setFactoryPlayback", "SkBinaryWriteBuffer::writeStream"]:
         if pattern in symbols:
             rejected.append(pattern)
     if rejected:

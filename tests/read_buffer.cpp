@@ -170,6 +170,15 @@ sk_sp<SkImage> image_data(sk_sp<SkData> data, std::optional<SkAlphaType> alpha, 
     return image;
 }
 
+sk_sp<const SkData> image_encode(SkImage* image, void* context) {
+    ImageContext& state = *static_cast<ImageContext*>(context);
+    ++state.calls;
+    const std::array<uint32_t, 2> dimensions{
+        static_cast<uint32_t>((*image).width()), static_cast<uint32_t>((*image).height())};
+    sk_sp<const SkData> data = SkData::MakeWithCopy(dimensions.data(), sizeof(dimensions));
+    return data;
+}
+
 bool images() {
     const SkSerialProcs procs{};
     const std::array<uint32_t, 2> base{4, 4};
@@ -202,6 +211,25 @@ bool images() {
             if (mode == 2 && !context.alpha) return false;
         }
     }
+    ImageContext creation{};
+    sk_sp<SkImage> source = image_bytes(base.data(), sizeof(base), &creation);
+    if (!source) return false;
+    source = (*source).withDefaultMipmaps();
+    if (!source) return false;
+    ImageContext encoding{};
+    const SkSerialProcs encoder{.fImageProc = image_encode, .fImageCtx = &encoding};
+    SkBinaryWriteBuffer imageWriter(encoder);
+    imageWriter.writeImage(source.get());
+    if (encoding.calls != 3) return false;
+    sk_sp<SkData> encoded = imageWriter.snapshotAsData();
+    ImageContext decoding{};
+    const SkDeserialProcs decoder{.fImageDataProc = image_data, .fImageCtx = &decoding};
+    SkReadBuffer imageReader((*encoded).data(), (*encoded).size());
+    imageReader.setDeserialProcs(decoder);
+    sk_sp<SkImage> restored = imageReader.readImage();
+    if (!restored || decoding.calls != 3 || !imageReader.isValid()) return false;
+    if (!imageReader.eof() || (*restored).dimensions() != (*source).dimensions()) return false;
+    if (!(*restored).hasMipmaps()) return false;
     return true;
 }
 
