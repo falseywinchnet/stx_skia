@@ -848,6 +848,20 @@ fingerprint 7262172567427146524. No speed gain is claimed. See
 ../results/2026-10-26/CONTAINER_CAPACITY.md. Element-container storage and relocation
 remain required work.
 
+## Fixed aligned element storage
+
+SkAlignedStorage is converted without runtime administration. It retains exactly
+its aligned byte array and its non-initializing constructor. Positive capacity
+and byte-product bounds are checked at compilation; temporary borrows are rejected.
+The container continues to own element construction and destruction.
+
+Both 43-test Release profiles, nine rendering artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass. The new
+fixture covers 1,152 raw-storage object lifetimes and 289 container transition
+schedules. Tested M4 inline-container sizes match the reference. See
+../results/2026-10-26/ALIGNED_STORAGE.md. TArray's construction and relocation still
+require conversion; the integration fixture does not establish that work complete.
+
 ## TArray construction and bitmap reference boundary
 
 TArray's copy/default construction and self-subrange reset now keep source
@@ -864,19 +878,19 @@ pre-fix AddressSanitizer write, fix and regression scope are in
 Release suites and candidate Release/Debug instrumented suites pass 44 tests;
 rendering and serialization artifacts remain byte-identical to reference.
 
-## Fixed aligned element storage
+## Block deque conversion integrated with TArray
 
-SkAlignedStorage is converted without runtime administration. It retains exactly
-its aligned byte array and its non-initializing constructor. Positive capacity
-and byte-product bounds are checked at compilation; temporary borrows are rejected.
-The container continues to own element construction and destruction.
+SkDeque's block owner, borrowed initial storage and iterator transitions are
+converted without changing its instance layout or delayed empty-block reuse.
+The isolated STOP came from an invalid enum value in its new test; the corrected
+fixture uses a valid unbound iterator. See ../results/2026-10-26/DEQUE.md.
 
-Both 43-test Release profiles, nine rendering artifacts, unchanged serialization,
-instrumented suites, relocated consumer and seven GUI.Forms tests pass. The new
-fixture covers 1,152 raw-storage object lifetimes and 289 container transition
-schedules. Tested M4 inline-container sizes match the reference. See
-../results/2026-10-26/ALIGNED_STORAGE.md. TArray's construction and relocation still
-require conversion; the integration fixture does not establish that work complete.
+In the combined candidate, native M4 candidate/reference Release suites pass
+45 tests each, candidate Release instrumentation reports PASS, ten rendering
+and serialization artifacts match reference byte-for-byte, the CPU build-scope
+check passes, a relocated installed consumer runs, and the seven selected
+GUI.Forms renderer tests pass. This establishes the current combined boundary;
+it does not complete the remaining TArray relocation or larger raster conversion.
 
 ## Still required
 

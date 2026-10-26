@@ -47,6 +47,14 @@ The corrected test and source pass the house-style and lifetime spelling checks.
 No performance measurement or full GUI.Forms integration is claimed for this
 branch.
 
+The conversion was subsequently cherry-picked onto `codex/cpu-library` beside
+the TArray and bitmap fixes. The combined candidate/reference Release suites
+pass 45 tests each; Release instrumentation reports PASS, ten rendering and
+serialization artifacts match, the CPU build-scope check passes, a relocated
+installed consumer runs, and seven selected GUI.Forms renderer tests pass.
+The branch's independent Debug instrumented PASS remains separate evidence;
+the combined candidate has not yet run that Debug profile.
+
 The failed source snapshot, fixture, runner, hashes, tracked patch and ordinary
 gate log remain in `build/deque-stop/`. The matching M4 directory contains the
 preserved STOP record. Do not overwrite either review bundle.
