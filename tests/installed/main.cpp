@@ -34,6 +34,7 @@ static_assert(!HasProgrammableMesh<SkCanvas>);
     __has_include("include/android/SkImageAndroid.h") || \
     __has_include("include/effects/Sk1DPathEffect.h") || \
     __has_include("include/private/chromium/GrPromiseImageTexture.h") || \
+    __has_include("include/private/SkAnySubclass.h") || \
     __has_include("include/private/SkJpegGainmapEncoder.h") || \
     __has_include("modules/skcms/src/skcms_internals.h")
 #error The installed package exposes a removed subsystem.

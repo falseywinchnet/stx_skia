@@ -365,6 +365,7 @@ install(DIRECTORY skia/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/stx_skia
     PATTERN "SkTableMaskFilter.h" EXCLUDE
     PATTERN "SkTrimPathEffect.h" EXCLUDE
     PATTERN "SkPerlinNoiseShader.h" EXCLUDE
+    PATTERN "SkAnySubclass.h" EXCLUDE
     PATTERN "SkEncodedInfo.h" EXCLUDE
     PATTERN "SkExif.h" EXCLUDE
     PATTERN "SkGainmapInfo.h" EXCLUDE

@@ -20,6 +20,7 @@ template has only eight-byte inline alignment and assumes the base subobject
 begins at the stored address. Current uses are in excluded GPU code, with no
 demonstrated failing derived type. If GPU support is admitted, that contract
 requires a fresh review or a stronger implementation before use.
+The current CPU package also omits this GPU-only header from installation.
 
 The sealed report and canonical coverage remain in the local Codex Security
 workbench. The full CPU raster library conversion and security review remain
