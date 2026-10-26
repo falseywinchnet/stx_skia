@@ -26,9 +26,12 @@ The first CI run independently passed the release suite, pixel comparison and
 relocated installation on both Linux arm64 and x64. Linux arm64's instrumented
 build then failed to link because client UBSan instrumentation expected RTTI
 that the Skia archive does not provide. A derived listener in the new macOS test
-reproduced the missing RTTI contract. CMake now exports the no-RTTI requirement
-for private renderer consumers. This preserves the upstream library's contract;
-it does not claim coverage of RTTI-dependent instrumentation.
+reproduced the missing RTTI contract. The first fix exported no-RTTI to consumers, but the GUI.Forms integration build
+rejected that: its own adapter uses dynamic_cast. The corrected contract keeps
+no-RTTI private to Skia, applies it to the derived-listener test and excludes
+vptr instrumentation at this interface. Consumer RTTI remains enabled. This
+preserves the library and consumer contracts; RTTI-dependent instrumentation is
+explicitly outside this check.
 
 Windows CLANG64 failed compilation because upstream headers use __forceinline.
 The existing GUI.Forms GN profile supplies -fms-extensions, and the CMake target

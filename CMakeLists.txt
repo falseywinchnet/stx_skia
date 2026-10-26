@@ -48,11 +48,8 @@ if(NOT STX_SKIA_BASELINE)
     target_compile_definitions(stx_skia PRIVATE STX_SKIA_BASELINE_SIMD)
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(stx_skia PRIVATE -ffp-contract=off -fno-exceptions
+    target_compile_options(stx_skia PRIVATE -ffp-contract=off -fno-exceptions -fno-rtti
         -fvisibility=hidden -fvisibility-inlines-hidden -Wno-attributes)
-    # Skia's polymorphic classes have no RTTI. Derived consumer classes must
-    # use the same contract, including when instrumented with UBSan.
-    target_compile_options(stx_skia PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
     if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         target_compile_options(stx_skia PUBLIC -fms-extensions)
     endif()
@@ -65,7 +62,10 @@ if(APPLE)
     endif()
 endif()
 if(STX_SKIA_SANITIZE)
-    target_compile_options(stx_skia PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
+    # Skia supplies no RTTI, so vptr instrumentation cannot cross this boundary.
+    # Do not disable consumer RTTI: GUI.Forms uses it for its own adapter types.
+    target_compile_options(stx_skia PUBLIC -fsanitize=address,undefined
+        -fno-sanitize=vptr -fno-omit-frame-pointer)
     target_link_options(stx_skia PUBLIC -fsanitize=address,undefined)
 endif()
 if(BUILD_TESTING)
@@ -82,6 +82,9 @@ if(BUILD_TESTING)
     add_executable(stx_skia_pixel_ref_tests tests/pixel_ref.cpp)
     target_link_libraries(stx_skia_pixel_ref_tests PRIVATE stx_skia Threads::Threads)
     add_test(NAME pixel_ref_contract COMMAND stx_skia_pixel_ref_tests)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(stx_skia_pixel_ref_tests PRIVATE -fno-rtti)
+    endif()
 endif()
 
 install(TARGETS stx_skia EXPORT stx_skiaTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
