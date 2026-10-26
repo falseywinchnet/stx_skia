@@ -1,0 +1,105 @@
+is_debug = false
+is_official_build = true
+is_component_build = false
+
+# Produce PE/COFF objects with MinGW while selecting Skia's portable CPU
+# source set. This avoids importing the MSVC/Windows-SDK toolchain into the
+# GUI.Forms build and keeps the raster module usable on Windows 7/Wine.
+target_os = "linux"
+target_cpu = "x64"
+target_cc = "/usr/bin/clang --target=x86_64-w64-windows-gnu"
+target_cxx = "/usr/bin/clang++ --target=x86_64-w64-windows-gnu"
+target_ar = "/opt/homebrew/bin/x86_64-w64-mingw32-ar"
+skia_gui_forms_mingw_port = true
+extra_cflags = [
+  # Skia selects Win32 spelling for force-inline/no-inline once Clang defines
+  # _WIN32. Enable those language extensions without selecting the MSVC ABI.
+  "-fms-extensions",
+  # Clang supplies its own target-compatible SIMD headers. Injecting GCC's
+  # private intrinsic directory here would shadow them.
+  # Keep the target CRT after libstdc++ so its include_next directives can
+  # resolve stdlib.h/math.h while Clang's built-in intrinsics stay first.
+  "-idirafter/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include",
+]
+extra_cflags_cc = [
+  "-nostdinc++",
+  "-isystem/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include/c++/16.1.0",
+  "-isystem/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include/c++/16.1.0/x86_64-w64-mingw32",
+  "-isystem/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include/c++/16.1.0/backward",
+]
+
+skia_enable_ganesh = false
+skia_enable_graphite = false
+skia_use_gl = false
+skia_gl_standard = ""
+skia_use_egl = false
+skia_use_epoxy_egl = false
+skia_use_angle = false
+skia_use_metal = false
+skia_use_vulkan = false
+skia_use_direct3d = false
+skia_use_dawn = false
+skia_use_webgpu = false
+skia_use_webgl = false
+skia_enable_discrete_gpu = false
+skia_enable_gpu_debug_layers = false
+
+skia_enable_pdf = false
+skia_enable_svg = false
+skia_enable_skottie = false
+skia_enable_tools = false
+skia_compile_modules = false
+skia_compile_sksl_tests = false
+skia_disable_tracing = true
+skia_use_perfetto = false
+skia_use_partition_alloc = false
+skia_use_expat = false
+skia_use_lua = false
+skia_use_xps = false
+
+# ADR-004: GUI.Forms shapes, rasterizes and composites text with its own
+# HarfBuzz/FreeType engine. Skia draws no text and is built without any font
+# backend: no OS font manager, FreeType or shaping stack.
+skia_use_fonthost_mac = false
+skia_enable_fontmgr_win = false
+skia_enable_fontmgr_win_gdi = false
+skia_use_freetype = false
+skia_use_fontconfig = false
+skia_use_fontations = false
+skia_use_harfbuzz = false
+skia_use_icu = false
+skia_use_icu4x = false
+skia_use_client_icu = false
+skia_use_bidi = false
+skia_use_libgrapheme = false
+
+# No codec and no zlib in Skia (Z-stage I5): PNG is stx_png on stx_zlib.
+skia_use_libpng_decode = false
+skia_use_libpng_encode = false
+skia_use_rust_png_decode = false
+skia_use_rust_png_encode = false
+skia_use_system_libpng = false
+skia_use_zlib = false
+skia_use_system_zlib = false
+
+skia_use_libjpeg_turbo_decode = false
+skia_use_libjpeg_turbo_encode = false
+skia_use_no_jpeg_encode = true
+skia_use_jpeg_gainmaps = false
+skia_use_libwebp_decode = false
+skia_use_libwebp_encode = false
+skia_use_no_webp_encode = true
+skia_use_libavif = false
+skia_use_crabbyavif = false
+skia_use_libjxl_decode = false
+skia_use_dng_sdk = false
+skia_use_piex = false
+skia_use_wuffs = false
+skia_use_ffmpeg = false
+skia_use_ndk_images = false
+skia_use_rust_bmp_decode = false
+skia_use_rust_ico_decode = false
+skia_use_rust_exif = false
+skia_use_rust_icc = false
+skia_build_rust_targets = false
+skia_include_multiframe_procs = false

@@ -1,0 +1,208 @@
+{
+  "date": "2026-10-25",
+  "gui_forms_revision": "8d1f2be06a40c5da78bb75e45cbe1fecec2f6b62",
+  "skia_revision": "2a9b593bab4b2fd019fa494c8d401ff1fab0b883",
+  "imported_files": 12278,
+  "imported_manifest_sha256": "aed69632c1672e3a34316bbb2eee18c38300208ab25a7526ab170ab018f49caf",
+  "manifest_rule": "SHA256 of UTF-8 path, NUL, lowercase file SHA256, LF in git ls-files order",
+  "changed_upstream_files": [
+    "BUILD.gn",
+    "gn/BUILDCONFIG.gn"
+  ],
+  "copied_files_sha256": {
+    "baseline/skia_cpu_args.gn": "ced932800460d408e0174c6715a301e08981ecc94097499621a34c754d9f3d96",
+    "baseline/skia_cpu_windows_mingw_args.gn": "619478b206015485c7ed7c93fb2511c0d98da00ed738435eb4a9bfb513e96407",
+    "baseline/skia_png_only.patch": "8f782f91e8e5fa017ed5dad7e8672ffb5f6dd02ccd45be1b524b46aeac57b237",
+    "baseline/skia_windows_mingw.patch": "e0c4cd0d9911d2d30eb8fc342cc98aaec528231188c2fa0e9e5c5b86627afffe",
+    "baseline/check_skia_archive.cmake": "eecc68a882ae05f2d76afafbfd6b6357e85e38978357220c9f8295ddd2f6e2dd",
+    "docs/PROGRAMMING_HOUSE_STYLE.md": "9415372ae2771776ffcd6e3cba546c5bbab8a4e6c4dde596a3fbc566f4ed736e",
+    "LICENSE": "9b64b1c5ecd4fff8fb11ef8ab8a86d631912daa84adecaa434cfe45f8b21b266"
+  },
+  "consumer_includes": [
+    {
+      "path": "src/render/skia/executor/skia_executor.cpp",
+      "sha256": "ffa6885647f6de1bdbbf0ee9db11cfeb625426bc1bbe7a2f208b499e94af185f",
+      "includes": [
+        {
+          "line": 3,
+          "include": "#include \"include/core/SkBlendMode.h\""
+        },
+        {
+          "line": 4,
+          "include": "#include \"include/core/SkCanvas.h\""
+        },
+        {
+          "line": 5,
+          "include": "#include \"include/core/SkColorFilter.h\""
+        },
+        {
+          "line": 6,
+          "include": "#include \"include/core/SkColorSpace.h\""
+        },
+        {
+          "line": 7,
+          "include": "#include \"include/core/SkData.h\""
+        },
+        {
+          "line": 8,
+          "include": "#include \"include/core/SkImage.h\""
+        },
+        {
+          "line": 9,
+          "include": "#include \"include/core/SkImageInfo.h\""
+        },
+        {
+          "line": 10,
+          "include": "#include \"include/core/SkMatrix.h\""
+        },
+        {
+          "line": 11,
+          "include": "#include \"include/core/SkPaint.h\""
+        },
+        {
+          "line": 12,
+          "include": "#include \"include/core/SkPath.h\""
+        },
+        {
+          "line": 13,
+          "include": "#include \"include/core/SkPathBuilder.h\""
+        },
+        {
+          "line": 14,
+          "include": "#include \"include/core/SkPixmap.h\""
+        },
+        {
+          "line": 15,
+          "include": "#include \"include/core/SkSamplingOptions.h\""
+        },
+        {
+          "line": 16,
+          "include": "#include \"include/core/SkSurface.h\""
+        },
+        {
+          "line": 17,
+          "include": "#include \"include/effects/SkColorMatrixFilter.h\""
+        },
+        {
+          "line": 18,
+          "include": "#include \"include/effects/SkDashPathEffect.h\""
+        },
+        {
+          "line": 19,
+          "include": "#include \"include/effects/SkGradient.h\""
+        }
+      ]
+    },
+    {
+      "path": "src/render/skia/raster/prepared_skia_frame.cpp",
+      "sha256": "f3b6d826ad54e8c2d4c5dab24966ea8076c94e12c5626ec0d11e2347c40eb3cb",
+      "includes": [
+        {
+          "line": 3,
+          "include": "#include \"include/core/SkCanvas.h\""
+        },
+        {
+          "line": 4,
+          "include": "#include \"include/core/SkColorSpace.h\""
+        },
+        {
+          "line": 5,
+          "include": "#include \"include/core/SkImage.h\""
+        },
+        {
+          "line": 6,
+          "include": "#include \"include/core/SkPaint.h\""
+        },
+        {
+          "line": 7,
+          "include": "#include \"include/core/SkPixmap.h\""
+        }
+      ]
+    },
+    {
+      "path": "src/render/skia/raster/prepared_skia_frame.hpp",
+      "sha256": "b61663858641121f701952f06488baf87e4f12ebbd01f8fbb2542bdce889becc",
+      "includes": [
+        {
+          "line": 7,
+          "include": "#include \"include/core/SkSurface.h\""
+        }
+      ]
+    },
+    {
+      "path": "src/render/skia/raster/skia_raster.cpp",
+      "sha256": "b3176cc632d75bcadeb7cffc5b5968ea908374ea39c405efdf8ca1fb7d12ed28",
+      "includes": [
+        {
+          "line": 16,
+          "include": "#include \"include/core/SkCanvas.h\""
+        },
+        {
+          "line": 17,
+          "include": "#include \"include/core/SkBlurTypes.h\""
+        },
+        {
+          "line": 18,
+          "include": "#include \"include/core/SkColorSpace.h\""
+        },
+        {
+          "line": 19,
+          "include": "#include \"include/core/SkData.h\""
+        },
+        {
+          "line": 20,
+          "include": "#include \"include/core/SkImage.h\""
+        },
+        {
+          "line": 21,
+          "include": "#include \"include/core/SkImageInfo.h\""
+        },
+        {
+          "line": 22,
+          "include": "#include \"include/core/SkMaskFilter.h\""
+        },
+        {
+          "line": 23,
+          "include": "#include \"include/core/SkPaint.h\""
+        },
+        {
+          "line": 24,
+          "include": "#include \"include/core/SkPath.h\""
+        },
+        {
+          "line": 25,
+          "include": "#include \"include/core/SkPathBuilder.h\""
+        },
+        {
+          "line": 26,
+          "include": "#include \"include/core/SkPixmap.h\""
+        },
+        {
+          "line": 27,
+          "include": "#include \"include/core/SkRegion.h\""
+        },
+        {
+          "line": 28,
+          "include": "#include \"include/core/SkRRect.h\""
+        },
+        {
+          "line": 29,
+          "include": "#include \"include/core/SkStream.h\""
+        },
+        {
+          "line": 30,
+          "include": "#include \"include/core/SkSurface.h\""
+        },
+        {
+          "line": 31,
+          "include": "#include \"include/effects/SkShaderMaskFilter.h\""
+        },
+        {
+          "line": 32,
+          "include": "#include \"include/effects/SkGradient.h\""
+        }
+      ]
+    }
+  ],
+  "scope": "Static source intake; not compiled or benchmarked"
+}

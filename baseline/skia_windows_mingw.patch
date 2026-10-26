@@ -1,0 +1,19 @@
+diff --git a/BUILD.gn b/BUILD.gn
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -2081,2 +2081,4 @@ skia_component("skia") {
+-  if (is_win) {
++  if (skia_gui_forms_mingw_port) {
++    sources += skia_ports_windows_sources + [ "src/ports/SkLog_win.cpp" ]
++  } else if (is_win) {
+     sources += skia_ports_windows_sources + [
+diff --git a/gn/BUILDCONFIG.gn b/gn/BUILDCONFIG.gn
+--- a/gn/BUILDCONFIG.gn
++++ b/gn/BUILDCONFIG.gn
+@@ -10,2 +10,6 @@ declare_args() {
+ declare_args() {
++  # GUI.Forms uses the Unix-style GN toolchain to cross-compile a Windows PE
++  # archive with MinGW. Select only Skia's portable Windows file implementation.
++  skia_gui_forms_mingw_port = false
++
+   is_official_build = false
