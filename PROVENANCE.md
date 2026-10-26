@@ -127,3 +127,13 @@ honors source row stride; failure and extent validation are explicit. The unused
 BlurRRect declaration had no implementation or source caller and was removed;
 rounded-rectangle rendering remains in the retained mask-filter implementation.
 Expanded deterministic cases and rectangle timing are original project tests.
+
+
+## Cached storage conversion
+
+SkCachedData.cpp/.h retain original copies under baseline/skia. The derivative
+uses explicitly mutable reference/lock state and named mutex scopes, preserving
+cache ownership and callback publication order. SkMipmap.h has a matching const
+callback/mutable view adaptation only, with its original header retained for the
+reference build. tests/cached_data.cpp is original deterministic transition,
+callback and concurrent-reference coverage.

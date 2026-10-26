@@ -22,6 +22,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Pixel views and scaling | `include/core/SkPixmap.h`, `src/core/SkPixmap.cpp`, `src/core/SkPixmapDraw.cpp` | Color getters, alpha/opacity, clipped reads/fills/subsets, named fill kernels, temporary-metadata borrow rejection and five sampling modes |
 | Mask descriptors and Gaussian blur | `src/core/SkMask.cpp/.h`, `src/core/SkMaskBlurFilter.cpp/.h` | Checked padded bounds, explicit borrowed storage, move-empty descriptors, exact last-row extents and 304 reference blur cases |
 | Blur style composition and analytic rectangles | `src/core/SkBlurMask.cpp/.h` | All four styles, exact analytic profiles, checked temporary extents, padded reference convolution, bounded 16-bit coverage arithmetic |
+| Cached pixel/mask storage | `src/core/SkCachedData.cpp/.h` | Cache/client reference distinction, discard/reacquire and failure states, callback ordering, final release after unlocking and concurrent reference sharing |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
@@ -134,6 +135,22 @@ The direct Gaussian comparison routine now respects source stride and checks
 scratch extents. Private failure/ownership contracts and exceptional geometry
 are recorded in BLUR_STYLES.md. Blur-filter dispatch and remaining mask
 rasterizers are still unconverted; this does not mark the subsystem complete.
+
+## Cached storage conversion notes
+
+SkCachedData adopts either a malloc-compatible allocation or locked discardable
+storage. The immutable storage identity is initialized directly. Reference count,
+lock/cache state and its published borrowed pointer are explicitly mutable;
+const ref/unref no longer casts away the object's const qualification. Mutex
+scopes end before final deletion. Cache attachment and client reference operations
+retain their distinct transitions, including failed reacquisition with null data.
+
+Data-change callbacks run under the mutex, before publication, and cannot reenter
+reference/cache methods or throw. The sole production override in SkMipmap.h now
+uses a const callback and a mutable borrowed level pointer. That header receives
+only this adapter change, not a full-conversion claim. Diagnostics require
+quiescent reference transitions; a cache-only reference cannot use pixel data.
+Details and coverage are in CACHED_DATA.md.
 
 ## Still required
 

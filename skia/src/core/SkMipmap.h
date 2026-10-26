@@ -87,13 +87,13 @@ public:
     static std::unique_ptr<SkMipmapDownSampler> MakeDownSampler(const SkPixmap&);
 
 protected:
-    void onDataChange(void* oldData, void* newData) override {
-        fLevels = (Level*)newData; // could be nullptr
+    void onDataChange(void* oldData, void* newData) const override {
+        fLevels = static_cast<Level*>(newData); // could be nullptr
     }
 
 private:
     sk_sp<SkColorSpace> fCS;
-    Level*              fLevels;    // managed by the baseclass, may be null due to onDataChanged.
+    mutable Level*      fLevels;    // managed by the baseclass, may be null due to onDataChanged.
     int                 fCount;
 
     SkMipmap(void* malloc, size_t size);
