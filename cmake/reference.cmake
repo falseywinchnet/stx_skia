@@ -389,3 +389,7 @@ foreach(unit IN ITEMS src/core/SkMalloc.cpp src/ports/SkMemory_malloc.cpp)
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
+
+# Preserve original container capacity and allocation-span behavior.
+list(REMOVE_ITEM stx_sources skia/src/core/SkContainers.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkContainers.cpp)

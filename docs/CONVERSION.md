@@ -832,6 +832,22 @@ reallocation cases, three fallible overflow cases and 5,577 byte-operation cases
 No speed gain is claimed. See ../results/2026-10-26/ALLOCATION_PRIMITIVES.md.
 Alignment helpers and remaining container/raster work are still required.
 
+## Alignment and container capacity
+
+SkAlign and SkContainers are converted. Unsigned alignment wrap is preserved for
+format checks, and inline byte rounding remains distinct from runtime element
+rounding. The allocator retains its two fields and 16-byte M4 layout. Count/byte
+bounds and finite growth are checked at allocation boundaries; growth clamps
+before integer conversion, including enormous finite factors.
+
+Both 42-test Release profiles, nine render artifacts, unchanged serialization,
+instrumented suites, relocated consumer and seven GUI.Forms tests pass. Fixtures
+cover 4,161 alignment cases, 30,780 ordinary growth cases and 590 allocations.
+The complete 246,240-byte ordinary growth trace matches the reference, with
+fingerprint 7262172567427146524. No speed gain is claimed. See
+../results/2026-10-26/CONTAINER_CAPACITY.md. Element-container storage and relocation
+remain required work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
