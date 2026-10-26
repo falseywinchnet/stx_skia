@@ -10,9 +10,12 @@
 
 #include "include/core/SkTypes.h"
 #include "src/core/SkChecksum.h"
-#include "src/core/SkMathPriv.h"
 
+#include <bit>
+#include <cstddef>
+#include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <new>
 #include <type_traits>
@@ -20,53 +23,68 @@
 
 namespace skia_private {
 
-// Before trying to use THashTable, look below to see if THashMap or THashSet works for you.
-// They're easier to use, usually perform the same, and have fewer sharp edges.
+// Descending linear probing with backward-shift deletion. Hash zero marks an
+// empty slot; stored values have an active lifetime exactly when hash != zero.
+// Traits supplies GetKey(value) and Hash(key); keys remain stable while stored.
+// Entry/trait/visitor operations must not throw or reenter a mutating table.
+// No internal synchronization. Allocation failure follows package allocation policy.
+// Grow at 3/4 occupancy and shrink at 1/4; manual resize may create a full table.
 
-// T and K are treated as ordinary copyable C++ types.
-// Traits must have:
-//   - static K GetKey(T)
-//   - static uint32_t Hash(K)
-// Traits may also define (both required if either is defined):
-//   - static bool ShouldGrow(int count, int capacity)
-//   - static bool ShouldShrink(int count, int capacity)
-// , which specify the max/min load factor of the table.
-// If the key is large and stored inside T, you may want to make K a const&.
-// Similarly, if T is large you might want it to be a pointer.
+inline int HashCapacityForCount(size_t count) {
+    constexpr uint32_t maximumCapacity = uint32_t{1} << 30;
+    constexpr size_t maximumCount = maximumCapacity / 4 * 3;
+    if (count > maximumCount) {
+        SK_ABORT("Hash entry count exceeds supported capacity");
+    }
+    if (count == 0) {
+        return 0;
+    }
+    uint32_t capacity = std::bit_ceil(static_cast<uint32_t>(count));
+    if (static_cast<uint64_t>(count) * 4 > static_cast<uint64_t>(capacity) * 3) {
+        capacity *= 2;
+    }
+    const int result = static_cast<int>(capacity);
+    return result;
+}
+
 template <typename T, typename K, typename Traits = T>
 class THashTable {
 public:
     THashTable()  = default;
     ~THashTable() = default;
 
-    THashTable(const THashTable&  that) { *this = that; }
-    THashTable(      THashTable&& that) { *this = std::move(that); }
+    THashTable(const THashTable& that)
+        : fCount(that.fCount), fCapacity(that.fCapacity), fSlots(allocateSlots(that.fCapacity)) {
+        for (int index = 0; index < fCapacity; ++index) {
+            fSlots[index] = that.fSlots[index];
+        }
+    }
+    THashTable(THashTable&& that) {
+        swap(that);
+    }
 
     THashTable& operator=(const THashTable& that) {
         if (this != &that) {
-            fCount     = that.fCount;
-            fCapacity  = that.fCapacity;
-            fSlots.reset(new Slot[that.fCapacity]);
-            for (int i = 0; i < fCapacity; i++) {
-                fSlots[i] = that.fSlots[i];
-            }
+            THashTable replacement(that);
+            swap(replacement);
         }
         return *this;
     }
 
     THashTable& operator=(THashTable&& that) {
         if (this != &that) {
-            fCount    = that.fCount;
-            fCapacity = that.fCapacity;
-            fSlots    = std::move(that.fSlots);
-
-            that.fCount = that.fCapacity = 0;
+            swap(that);
+            that.reset();
         }
         return *this;
     }
 
-    // Clear the table.
-    void reset() { *this = THashTable(); }
+    // Destroy entries and release all slot storage. A moved-from table is empty.
+    void reset() {
+        fSlots.reset();
+        fCount = 0;
+        fCapacity = 0;
+    }
 
     // How many entries are in the table?
     int count() const { return fCount; }
@@ -76,7 +94,10 @@ public:
     int capacity() const { return fCapacity; }
 
     // Approximately how many bytes of memory do we use beyond sizeof(*this)?
-    size_t approxBytesUsed() const { return fCapacity * sizeof(Slot); }
+    size_t approxBytesUsed() const {
+        const size_t bytes = static_cast<size_t>(fCapacity) * sizeof(Slot);
+        return bytes;
+    }
 
     // Exchange two hash tables.
     void swap(THashTable& that) {
@@ -89,35 +110,37 @@ public:
         *this = std::move(that);
     }
 
-    // !!!!!!!!!!!!!!!!!                 CAUTION                   !!!!!!!!!!!!!!!!!
-    // set(), find() and foreach() all allow mutable access to table entries.
-    // If you change an entry so that it no longer has the same key, all hell
-    // will break loose.  Do not do that!
-    //
-    // Please prefer to use THashMap or THashSet, which do not have this danger.
+    // Values may be edited only without changing their key. Any mutation,
+    // resize, swap, move or destruction may invalidate borrowed entry addresses
+    // and iterators. Visitors run synchronously and may not mutate table structure.
 
-    // The pointers returned by set() and find() are valid only until the next call to set().
-    // The pointers you receive in foreach() are only valid for its duration.
-
-    // Copy val into the hash table, returning a pointer to the copy now in the table.
+    // Accept a value by value and move it into the table, returning its stored address.
     // If there already is an entry in the table with the same key, we overwrite it.
-    T* set(T val) {
-        bool shouldGrow = false;
-        if constexpr (HasShouldGrow<Traits>::value) {
-            shouldGrow = Traits::ShouldGrow(fCount, fCapacity);
-        } else {
-            shouldGrow = (4 * fCount >= 3 * fCapacity);
-        }
+    T* set(T val) & {
+        // Capacity is zero or a positive power of two. This is ceil(3*capacity/4)
+        // without overflowing multiplication, including manual capacities 1 and 2.
+        const int growthThreshold = fCapacity - (fCapacity >> 2);
+        const bool shouldGrow = fCount >= growthThreshold;
         if (shouldGrow) {
-            this->resize(fCapacity > 0 ? fCapacity * 2 : 4);
+            constexpr int maximumCapacity = 1 << 30;
+            if (fCapacity >= maximumCapacity) {
+                SK_ABORT("Hash growth exceeds supported capacity");
+            }
+            const int capacity = fCapacity > 0 ? fCapacity * 2 : 4;
+            resize(capacity);
         }
-        return this->uncheckedSet(std::move(val));
+        T* result = uncheckedSet(std::move(val));
+        return result;
     }
+    T* set(T val) && = delete;
 
     // If there is an entry in the table with this key, return a pointer to it.  If not, null.
-    T* find(const K& key) const {
-        uint32_t hash = Hash(key);
-        int index = hash & (fCapacity-1);
+    T* find(const K& key) const& {
+        if (fCapacity == 0) {
+            return nullptr;
+        }
+        const uint32_t hash = Hash(key);
+        int index = static_cast<int>(hash & static_cast<uint32_t>(fCapacity - 1));
         for (int n = 0; n < fCapacity; n++) {
             Slot& s = fSlots[index];
             if (s.empty()) {
@@ -126,16 +149,20 @@ public:
             if (hash == s.fHash && key == Traits::GetKey(*s)) {
                 return &*s;
             }
-            index = this->next(index);
+            index = next(index);
         }
         SkASSERT(fCapacity == fCount);
         return nullptr;
     }
 
+    T* find(const K& key) const&& = delete;
+
     // If there is an entry in the table with this key, return it.  If not, null.
     // This only works for pointer type T, and cannot be used to find an nullptr entry.
     T findOrNull(const K& key) const {
-        if (T* p = this->find(key)) {
+        static_assert(std::is_pointer_v<T>);
+        T* p = find(key);
+        if (p != nullptr) {
             return *p;
         }
         return nullptr;
@@ -144,29 +171,27 @@ public:
     // If a value with this key exists in the hash table, removes it and returns true.
     // Otherwise, returns false.
     bool removeIfExists(const K& key) {
-        uint32_t hash = Hash(key);
-        int index = hash & (fCapacity-1);
+        if (fCapacity == 0) {
+            return false;
+        }
+        const uint32_t hash = Hash(key);
+        int index = static_cast<int>(hash & static_cast<uint32_t>(fCapacity - 1));
         for (int n = 0; n < fCapacity; n++) {
             Slot& s = fSlots[index];
             if (s.empty()) {
                 return false;
             }
             if (hash == s.fHash && key == Traits::GetKey(*s)) {
-                this->removeSlot(index);
+                removeSlot(index);
                 if (fCapacity > 4) {
-                    bool shouldShrink = false;
-                    if constexpr (HasShouldShrink<Traits>::value) {
-                        shouldShrink = Traits::ShouldShrink(fCount, fCapacity);
-                    } else {
-                        shouldShrink = (4 * fCount <= fCapacity);
-                    }
+                    const bool shouldShrink = fCount <= (fCapacity >> 2);
                     if (shouldShrink) {
-                        this->resize(fCapacity / 2);
+                        resize(fCapacity / 2);
                     }
                 }
                 return true;
             }
-            index = this->next(index);
+            index = next(index);
         }
         SkASSERT(fCapacity == fCount);
         return false;
@@ -174,55 +199,41 @@ public:
 
     // Removes the value with this key from the hash table. Asserts if it is missing.
     void remove(const K& key) {
-        SkAssertResult(this->removeIfExists(key));
+        const bool removed = removeIfExists(key);
+        SkASSERT(removed);
+        (void)removed;
     }
 
     // Hash tables will automatically resize themselves when set() and remove() are called, but
     // resize() can be called to manually grow capacity before a bulk insertion.
     void resize(int capacity) {
-        // We must have enough capacity to hold every key.
-        SkASSERT(capacity >= fCount);
-        // `capacity` must be a power of two, because we use `hash & (capacity-1)` to look up keys
-        // in the table (since this is faster than a modulo).
-        SkASSERT((capacity & (capacity - 1)) == 0);
-
-        int oldCapacity = fCapacity;
-        SkDEBUGCODE(int oldCount = fCount);
-
-        fCount = 0;
-        fCapacity = capacity;
-        std::unique_ptr<Slot[]> oldSlots = std::move(fSlots);
-        fSlots.reset(new Slot[capacity]);
-
-        for (int i = 0; i < oldCapacity; i++) {
-            Slot& s = oldSlots[i];
-            if (s.has_value()) {
-                this->uncheckedSet(*std::move(s));
+        if (capacity < fCount || capacity < 0 ||
+            (capacity != 0 && !std::has_single_bit(static_cast<uint32_t>(capacity)))) {
+            SK_ABORT("Hash capacity must be a power of two with room for all entries");
+        }
+        // Allocate before disturbing existing storage. Transfer values into the
+        // replacement, then swap ownership; old moved-from entries die afterward.
+        THashTable replacement{};
+        replacement.fSlots = allocateSlots(capacity);
+        replacement.fCapacity = capacity;
+        for (int index = 0; index < fCapacity; ++index) {
+            Slot& source = fSlots[index];
+            if (source.has_value()) {
+                replacement.uncheckedSet(std::move(*source));
             }
         }
-        SkASSERT(fCount == oldCount);
+        SkASSERT(replacement.fCount == fCount);
+        swap(replacement);
     }
 
-    // Reserve extra capacity. This only grows capacity; requests to shrink are ignored.
-    // We assume that the passed-in value represents the number of items that the caller wants to
-    // store in the table. The passed-in value is adjusted to honor the following rules:
-    // - Hash tables must have a power-of-two capacity.
-    // - Hash tables grow when they exceed 3/4 capacity, not when they are full.
+    // n is a desired entry count, not a slot count. Never shrink. Zero is a no-op.
     void reserve(int n) {
-        int newCapacity = SkNextPow2(n);
-
-        bool shouldGrow = false;
-        if constexpr (HasShouldGrow<Traits>::value) {
-            shouldGrow = Traits::ShouldGrow(n, newCapacity);
-        } else {
-            shouldGrow = (n * 4 > newCapacity * 3);
+        if (n < 0) {
+            SK_ABORT("Hash reserve count must not be negative");
         }
-        if (shouldGrow) {
-            newCapacity *= 2;
-        }
-
-        if (newCapacity > fCapacity) {
-            this->resize(newCapacity);
+        const int capacity = HashCapacityForCount(static_cast<size_t>(n));
+        if (capacity > fCapacity) {
+            resize(capacity);
         }
     }
 
@@ -257,39 +268,42 @@ public:
         Iter(const TTable* table, int slot) : fTable(table), fSlot(slot) {}
 
         static Iter MakeBegin(const TTable* table) {
-            return Iter{table, table->firstPopulatedSlot()};
+            const int slot = (*table).firstPopulatedSlot();
+            const Iter iterator(table, slot);
+            return iterator;
         }
 
         static Iter MakeEnd(const TTable* table) {
-            return Iter{table, table->capacity()};
+            const int slot = (*table).capacity();
+            const Iter iterator(table, slot);
+            return iterator;
         }
 
         const SlotVal& operator*() const {
-            return *fTable->slot(fSlot);
-        }
-
-        const SlotVal* operator->() const {
-            return fTable->slot(fSlot);
+            const SlotVal& value = *(*fTable).slot(fSlot);
+            return value;
         }
 
         bool operator==(const Iter& that) const {
             // Iterators from different tables shouldn't be compared against each other.
             SkASSERT(fTable == that.fTable);
-            return fSlot == that.fSlot;
+            const bool equal = fSlot == that.fSlot;
+            return equal;
         }
 
         bool operator!=(const Iter& that) const {
-            return !(*this == that);
+            const bool different = !(*this == that);
+            return different;
         }
 
         Iter& operator++() {
-            fSlot = fTable->nextPopulatedSlot(fSlot);
+            fSlot = (*fTable).nextPopulatedSlot(fSlot);
             return *this;
         }
 
         Iter operator++(int) {
             Iter old = *this;
-            this->operator++();
+            operator++();
             return old;
         }
 
@@ -299,27 +313,6 @@ public:
     };
 
 private:
-    template <typename U, typename = void> struct HasShouldGrow : std::false_type {};
-    template <typename U, typename = void> struct HasShouldShrink : std::false_type {};
-
-    template <typename U>
-    struct HasShouldGrow<
-            U,
-            std::void_t<decltype(U::ShouldGrow(std::declval<int>(), std::declval<int>()))>>
-            : std::true_type {
-        static_assert(HasShouldShrink<U>::value,
-                      "The traits class must also provide ShouldShrink() method.");
-    };
-
-    template <typename U>
-    struct HasShouldShrink<
-            U,
-            std::void_t<decltype(U::ShouldShrink(std::declval<int>(), std::declval<int>()))>>
-            : std::true_type {
-        static_assert(HasShouldGrow<U>::value,
-                      "The traits class must also provide ShouldGrow() method.");
-    };
-
     // Finds the first non-empty slot for an iterator.
     int firstPopulatedSlot() const {
         for (int i = 0; i < fCapacity; i++) {
@@ -343,14 +336,15 @@ private:
     // Reads from an iterator's slot.
     const T* slot(int i) const {
         SkASSERT(fSlots[i].has_value());
-        return &*fSlots[i];
+        T* value = &*fSlots[i];
+        return value;
     }
 
     T* uncheckedSet(T&& val) {
         const K& key = Traits::GetKey(val);
         SkASSERT(key == key);
-        uint32_t hash = Hash(key);
-        int index = hash & (fCapacity-1);
+        const uint32_t hash = Hash(key);
+        int index = static_cast<int>(hash & static_cast<uint32_t>(fCapacity - 1));
         for (int n = 0; n < fCapacity; n++) {
             Slot& s = fSlots[index];
             if (s.empty()) {
@@ -366,7 +360,7 @@ private:
                 return &*s;
             }
 
-            index = this->next(index);
+            index = next(index);
         }
         SkASSERT(false);
         return nullptr;
@@ -381,7 +375,7 @@ private:
         for (;;) {
             Slot& emptySlot = fSlots[index];
             int emptyIndex = index;
-            int originalIndex;
+            int originalIndex = 0;
             // Look for an element that can be moved into the empty slot.
             // If the empty slot is in between where an element landed, and its native slot, then
             // move it to the empty slot. Don't move it if its native slot is in between where
@@ -389,14 +383,14 @@ private:
             // [native] <= [empty] < [candidate] == GOOD, can move candidate to empty slot
             // [empty] < [native] < [candidate] == BAD, need to leave candidate where it is
             do {
-                index = this->next(index);
+                index = next(index);
                 Slot& s = fSlots[index];
                 if (s.empty()) {
                     // We're done shuffling elements around.  Clear the last empty slot.
                     emptySlot.reset();
                     return;
                 }
-                originalIndex = s.fHash & (fCapacity - 1);
+                originalIndex = static_cast<int>(s.fHash & static_cast<uint32_t>(fCapacity - 1));
             } while ((index <= originalIndex && originalIndex < emptyIndex)
                      || (originalIndex < emptyIndex && emptyIndex < index)
                      || (emptyIndex < index && index <= originalIndex));
@@ -414,35 +408,31 @@ private:
     }
 
     static uint32_t Hash(const K& key) {
-        uint32_t hash = Traits::Hash(key) & 0xffffffff;
-        return hash ? hash : 1;  // We reserve hash 0 to mark empty.
+        const uint32_t hash = static_cast<uint32_t>(Traits::Hash(key));
+        const uint32_t nonzero = hash == 0 ? 1 : hash;
+        return nonzero;  // We reserve hash 0 to mark empty.
     }
 
     class Slot {
     public:
         Slot() = default;
-        ~Slot() { this->reset(); }
+        ~Slot() { reset(); }
 
         Slot(const Slot& that) { *this = that; }
         Slot& operator=(const Slot& that) {
             if (this == &that) {
                 return *this;
             }
-            if (fHash) {
-                if (that.fHash) {
-                    fVal.fStorage = that.fVal.fStorage;
-                    fHash = that.fHash;
-                } else {
-                    this->reset();
-                }
-            } else {
-                if (that.fHash) {
-                    new (&fVal.fStorage) T(that.fVal.fStorage);
-                    fHash = that.fHash;
-                } else {
-                    // do nothing, no value on either side
-                }
+            if (that.empty()) {
+                reset();
+                return *this;
             }
+            if (has_value()) {
+                fVal.fStorage = that.fVal.fStorage;
+            } else {
+                std::construct_at(&fVal.fStorage, that.fVal.fStorage);
+            }
+            fHash = that.fHash;
             return *this;
         }
 
@@ -451,43 +441,41 @@ private:
             if (this == &that) {
                 return *this;
             }
-            if (fHash) {
-                if (that.fHash) {
-                    fVal.fStorage = std::move(that.fVal.fStorage);
-                    fHash = that.fHash;
-                } else {
-                    this->reset();
-                }
-            } else {
-                if (that.fHash) {
-                    new (&fVal.fStorage) T(std::move(that.fVal.fStorage));
-                    fHash = that.fHash;
-                } else {
-                    // do nothing, no value on either side
-                }
+            if (that.empty()) {
+                reset();
+                return *this;
             }
+            if (has_value()) {
+                fVal.fStorage = std::move(that.fVal.fStorage);
+            } else {
+                std::construct_at(&fVal.fStorage, std::move(that.fVal.fStorage));
+            }
+            fHash = that.fHash;
             return *this;
         }
 
         T& operator*() & { return fVal.fStorage; }
         const T& operator*() const& { return fVal.fStorage; }
-        T&& operator*() && { return std::move(fVal.fStorage); }
-        const T&& operator*() const&& { return std::move(fVal.fStorage); }
 
         Slot& emplace(T&& v, uint32_t h) {
-            this->reset();
-            new (&fVal.fStorage) T(std::move(v));
+            reset();
+            std::construct_at(&fVal.fStorage, std::move(v));
             fHash = h;
             return *this;
         }
 
-        bool has_value() const { return fHash != 0; }
-        explicit operator bool() const { return this->has_value(); }
-        bool empty() const { return !this->has_value(); }
+        bool has_value() const {
+            const bool present = fHash != 0;
+            return present;
+        }
+        bool empty() const {
+            const bool absent = !has_value();
+            return absent;
+        }
 
         void reset() {
             if (fHash) {
-                fVal.fStorage.~T();
+                std::destroy_at(&fVal.fStorage);
                 fHash = 0;
             }
         }
@@ -499,15 +487,28 @@ private:
             T fStorage;
             Storage() {}
             ~Storage() {}
-        } fVal;
+        } fVal{};
     };
 
-    int fCount    = 0,
-        fCapacity = 0;
-    std::unique_ptr<Slot[]> fSlots;
+    static std::unique_ptr<Slot[]> allocateSlots(int capacity) {
+        const size_t count = static_cast<size_t>(capacity);
+        if (capacity < 0 || count > std::numeric_limits<size_t>::max() / sizeof(Slot)) {
+            SK_ABORT("Hash slot allocation extent overflows");
+        }
+        std::unique_ptr<Slot[]> slots{};
+        if (count != 0) {
+            // Default-initialize slots: initialize occupancy, not inactive payload bytes.
+            slots.reset(new Slot[count]);
+        }
+        return slots;
+    }
+
+    int fCount = 0;
+    int fCapacity = 0;
+    std::unique_ptr<Slot[]> fSlots{};
 };
 
-// Maps K->V.  A more user-friendly wrapper around THashTable, suitable for most use cases.
+// Maps keys to values.  A more user-friendly wrapper around THashTable, suitable for most use cases.
 // K and V are treated as ordinary copyable C++ types, with no assumed relationship between the two.
 template <typename K, typename V, typename HashK = SkGoodHash>
 class THashMap {
@@ -525,12 +526,17 @@ public:
     struct Pair : public std::pair<K, V> {
         using std::pair<K, V>::pair;
         static const K& GetKey(const Pair& p) { return p.first; }
-        static auto Hash(const K& key) { return HashK()(key); }
+        static const K& GetKey(const Pair&&) = delete;
+        static uint32_t Hash(const K& key) {
+            const HashK hasher{};
+            const uint32_t hash = static_cast<uint32_t>(hasher(key));
+            return hash;
+        }
     };
 
     THashMap(std::initializer_list<Pair> pairs) {
-        int capacity = pairs.size() >= 4 ? SkNextPow2(pairs.size() * 4 / 3)
-                                         : 4;
+        const int requested = HashCapacityForCount(pairs.size());
+        const int capacity = requested < 4 ? 4 : requested;
         fTable.resize(capacity);
         for (const Pair& p : pairs) {
             fTable.set(p);
@@ -541,13 +547,22 @@ public:
     void reset() { fTable.reset(); }
 
     // How many key/value pairs are in the table?
-    int count() const { return fTable.count(); }
+    int count() const {
+        const int count = fTable.count();
+        return count;
+    }
 
     // Is empty?
-    bool empty() const { return fTable.count() == 0; }
+    bool empty() const {
+        const bool empty = fTable.count() == 0;
+        return empty;
+    }
 
     // Approximately how many bytes of memory do we use beyond sizeof(*this)?
-    size_t approxBytesUsed() const { return fTable.approxBytesUsed(); }
+    size_t approxBytesUsed() const {
+        const size_t bytes = fTable.approxBytesUsed();
+        return bytes;
+    }
 
     // Reserve extra capacity.
     void reserve(int n) { fTable.reserve(n); }
@@ -556,30 +571,41 @@ public:
     void swap(THashMap& that) { fTable.swap(that.fTable); }
     void swap(THashMap&& that) { fTable.swap(std::move(that.fTable)); }
 
-    // N.B. The pointers returned by set() and find() are valid only until the next call to set().
+    // Returned borrows expire on mutation, resize, swap, move or destruction.
+    // Const find retains the historical mutable-value API; keys must not change.
 
     // Set key to val in the table, replacing any previous value with the same key.
     // We copy both key and val, and return a pointer to the value copy now in the table.
-    V* set(K key, V val) {
-        Pair* out = fTable.set({std::move(key), std::move(val)});
-        return &out->second;
+    V* set(K key, V val) & {
+        Pair entry(std::move(key), std::move(val));
+        Pair* out = fTable.set(std::move(entry));
+        V* value = &(*out).second;
+        return value;
     }
 
     // If there is key/value entry in the table with this key, return a pointer to the value.
     // If not, return null.
-    V* find(const K& key) const {
-        if (Pair* p = fTable.find(key)) {
-            return &p->second;
+    V* find(const K& key) const& {
+        Pair* pair = fTable.find(key);
+        if (pair != nullptr) {
+            V* value = &(*pair).second;
+            return value;
         }
         return nullptr;
     }
 
-    V& operator[](const K& key) {
-        if (V* val = this->find(key)) {
-            return *val;
+    V* set(K key, V val) && = delete;
+    V* find(const K& key) const&& = delete;
+
+    V& operator[](const K& key) & {
+        V* value = find(key);
+        if (value == nullptr) {
+            value = set(key, V{});
         }
-        return *this->set(key, V{});
+        return *value;
     }
+
+    V& operator[](const K& key) && = delete;
 
     // Removes the key/value entry in the table with this key. Asserts if the key is not present.
     void remove(const K& key) {
@@ -588,43 +614,58 @@ public:
 
     // If the key exists in the table, removes it and returns true. Otherwise, returns false.
     bool removeIfExists(const K& key) {
-        return fTable.removeIfExists(key);
+        const bool removed = fTable.removeIfExists(key);
+        return removed;
     }
 
     // Call fn on every key/value pair in the table.  You may mutate the value but not the key.
     template <typename Fn,  // f(K, V*) or f(const K&, V*)
               std::enable_if_t<std::is_invocable_v<Fn, K, V*>>* = nullptr>
     void foreach(Fn&& fn) {
-        fTable.foreach([&fn](Pair* p) { fn(p->first, &p->second); });
+        MutableVisitor<Fn> visitor{fn};
+        fTable.foreach(visitor);
     }
 
     // Call fn on every key/value pair in the table.  You may not mutate anything.
     template <typename Fn,  // f(K, V), f(const K&, V), f(K, const V&) or f(const K&, const V&).
               std::enable_if_t<std::is_invocable_v<Fn, K, V>>* = nullptr>
     void foreach(Fn&& fn) const {
-        fTable.foreach([&fn](const Pair& p) { fn(p.first, p.second); });
+        ConstVisitor<Fn> visitor{fn};
+        fTable.foreach(visitor);
     }
 
     // Call fn on every key/value pair in the table.  You may not mutate anything.
     template <typename Fn,  // f(Pair), or f(const Pair&)
               std::enable_if_t<std::is_invocable_v<Fn, Pair>>* = nullptr>
     void foreach(Fn&& fn) const {
-        fTable.foreach([&fn](const Pair& p) { fn(p); });
+        fTable.foreach(fn);
     }
 
-    // Dereferencing an iterator gives back a key-value pair, suitable for structured binding.
+    // Iterators borrow read-only key/value pairs from this map.
     using Iter = typename THashTable<Pair, K>::template Iter<std::pair<K, V>>;
 
-    Iter begin() const {
-        return Iter::MakeBegin(&fTable);
+    Iter begin() const& {
+        const Iter iterator = Iter::MakeBegin(&fTable);
+        return iterator;
     }
+    Iter begin() const&& = delete;
 
-    Iter end() const {
-        return Iter::MakeEnd(&fTable);
+    Iter end() const& {
+        const Iter iterator = Iter::MakeEnd(&fTable);
+        return iterator;
     }
+    Iter end() const&& = delete;
 
 private:
-    THashTable<Pair, K> fTable;
+    template <typename Fn> struct MutableVisitor {
+        Fn& function;
+        void operator()(Pair* pair) const { function((*pair).first, &(*pair).second); }
+    };
+    template <typename Fn> struct ConstVisitor {
+        Fn& function;
+        void operator()(const Pair& pair) const { function(pair.first, pair.second); }
+    };
+    THashTable<Pair, K> fTable{};
 };
 
 // A set of T.  T is treated as an ordinary copyable C++ type.
@@ -642,8 +683,8 @@ public:
 
     // Construct with an initializer list of Ts.
     THashSet(std::initializer_list<T> vals) {
-        int capacity = vals.size() >= 4 ? SkNextPow2(vals.size() * 4 / 3)
-                                        : 4;
+        const int requested = HashCapacityForCount(vals.size());
+        const int capacity = requested < 4 ? 4 : requested;
         fTable.resize(capacity);
         for (const T& val : vals) {
             fTable.set(val);
@@ -654,13 +695,22 @@ public:
     void reset() { fTable.reset(); }
 
     // How many items are in the set?
-    int count() const { return fTable.count(); }
+    int count() const {
+        const int count = fTable.count();
+        return count;
+    }
 
     // Is empty?
-    bool empty() const { return fTable.count() == 0; }
+    bool empty() const {
+        const bool empty = fTable.count() == 0;
+        return empty;
+    }
 
     // Approximately how many bytes of memory do we use beyond sizeof(*this)?
-    size_t approxBytesUsed() const { return fTable.approxBytesUsed(); }
+    size_t approxBytesUsed() const {
+        const size_t bytes = fTable.approxBytesUsed();
+        return bytes;
+    }
 
     // Reserve extra capacity.
     void reserve(int n) { fTable.reserve(n); }
@@ -673,15 +723,23 @@ public:
     void add(T item) { fTable.set(std::move(item)); }
 
     // Is this item in the set?
-    bool contains(const T& item) const { return SkToBool(this->find(item)); }
+    bool contains(const T& item) const {
+        const T* value = find(item);
+        const bool present = value != nullptr;
+        return present;
+    }
 
     // If an item equal to this is in the set, return a pointer to it, otherwise null.
-    // This pointer remains valid until the next call to add().
-    const T* find(const T& item) const { return fTable.find(item); }
+    // This borrow expires on mutation, resize, swap, move or destruction.
+    const T* find(const T& item) const& {
+        const T* value = fTable.find(item);
+        return value;
+    }
+    const T* find(const T& item) const&& = delete;
 
     // Remove the item in the set equal to this.
     void remove(const T& item) {
-        SkASSERT(this->contains(item));
+        SkASSERT(contains(item));
         fTable.remove(item);
     }
 
@@ -694,22 +752,31 @@ public:
 private:
     struct Traits {
         static const T& GetKey(const T& item) { return item; }
-        static auto Hash(const T& item) { return HashT()(item); }
+        static const T& GetKey(const T&&) = delete;
+        static uint32_t Hash(const T& item) {
+            const HashT hasher{};
+            const uint32_t hash = static_cast<uint32_t>(hasher(item));
+            return hash;
+        }
     };
 
 public:
     using Iter = typename THashTable<T, T, Traits>::template Iter<T>;
 
-    Iter begin() const {
-        return Iter::MakeBegin(&fTable);
+    Iter begin() const& {
+        const Iter iterator = Iter::MakeBegin(&fTable);
+        return iterator;
     }
+    Iter begin() const&& = delete;
 
-    Iter end() const {
-        return Iter::MakeEnd(&fTable);
+    Iter end() const& {
+        const Iter iterator = Iter::MakeEnd(&fTable);
+        return iterator;
     }
+    Iter end() const&& = delete;
 
 private:
-    THashTable<T, T, Traits> fTable;
+    THashTable<T, T, Traits> fTable{};
 };
 
 }  // namespace skia_private
