@@ -367,21 +367,39 @@ private:
     }
 
     void removeSlot(int index) {
-        fCount--;
-        // Create a real hole before scanning: resize() permits a full table.
-        fSlots[index].reset();
+        const bool full = fCount == fCapacity;
+        --fCount;
+        // Normal automatic growth leaves an empty terminator. Only manual resize
+        // can make this full; choose that extra lifetime work outside the probe loop.
+        if (full) [[unlikely]] {
+            closeFullHole(index);
+        } else {
+            closeHole<false>(index);
+        }
+    }
 
+    // Keep the manual-full-table recovery out of the ordinary deletion body.
+    // Native assembly showed that inlining both loops inflated this hot path.
+    SK_NEVER_INLINE void closeFullHole(int index) {
+        closeHole<true>(index);
+    }
+
+    template <bool FullTable>
+    void closeHole(int index) {
+        const uint32_t mask = static_cast<uint32_t>(fCapacity - 1);
+        if constexpr (FullTable) {
+            fSlots[index].reset();
+        }
         // Rearrange elements to restore the invariants for linear probing.
         for (;;) {
             Slot& emptySlot = fSlots[index];
-            int emptyIndex = index;
-            int originalIndex = 0;
-            // Look for an element that can be moved into the empty slot.
-            // If the empty slot is in between where an element landed, and its native slot, then
-            // move it to the empty slot. Don't move it if its native slot is in between where
-            // the element landed and the empty slot.
-            // [native] <= [empty] < [candidate] == GOOD, can move candidate to empty slot
-            // [empty] < [native] < [candidate] == BAD, need to leave candidate where it is
+            const uint32_t emptyIndex = static_cast<uint32_t>(index);
+            uint32_t distanceFromNative = 0;
+            uint32_t distanceFromHole = 0;
+            // Descending probes move native -> hole -> candidate. A candidate
+            // may fill the hole precisely when its wrapped displacement reaches
+            // past that hole. Unsigned subtraction and the capacity mask also
+            // cover wraparound without three separate interval comparisons.
             do {
                 index = next(index);
                 Slot& s = fSlots[index];
@@ -390,14 +408,22 @@ private:
                     emptySlot.reset();
                     return;
                 }
-                originalIndex = static_cast<int>(s.fHash & static_cast<uint32_t>(fCapacity - 1));
-            } while ((index <= originalIndex && originalIndex < emptyIndex)
-                     || (originalIndex < emptyIndex && emptyIndex < index)
-                     || (emptyIndex < index && index <= originalIndex));
+                const uint32_t candidateIndex = static_cast<uint32_t>(index);
+                distanceFromNative = (s.fHash - candidateIndex) & mask;
+                distanceFromHole = (emptyIndex - candidateIndex) & mask;
+            } while (distanceFromNative < distanceFromHole);
             // Move the element to the empty slot.
             Slot& moveFrom = fSlots[index];
-            emptySlot = std::move(moveFrom);
-            moveFrom.reset();
+            if constexpr (FullTable) {
+                emptySlot.emplace(std::move(*moveFrom), moveFrom.fHash);
+                moveFrom.reset();
+            } else {
+                // This is a logical hole: its value remains alive until replaced.
+                // The scan established a distinct, live source. No occupancy or
+                // self-assignment dispatch is needed for this relocation.
+                *emptySlot = std::move(*moveFrom);
+                emptySlot.fHash = moveFrom.fHash;
+            }
         }
     }
 

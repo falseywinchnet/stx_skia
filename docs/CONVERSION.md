@@ -481,7 +481,7 @@ wrapper's mutex. Internal message processing uses base dispatch under its existi
 access authority to avoid recursive locking. The historical LRU, duplicate and
 strict-budget policies remain. New deterministic tests cover those policies,
 4,000 concurrent record operations across local/global caches, and accounting
-boundaries. See ../results/2026-10-26/RESOURCE_CACHE.md. Hash-table, message-bus and
+boundaries. See ../results/2026-10-26/RESOURCE_CACHE.md. Hash storage and invalidation are converted in the later entries below;
 mutex/semaphore implementations remain separate conversion work.
 
 ## Remove the unused task scheduler
@@ -505,7 +505,26 @@ capacities; empty checks remain within timing spread and measured nonempty
 administration becomes cheaper. Concurrent delivery/registration tests and all
 nine reference render artifacts pass. See
 ../results/2026-10-26/CACHE_INVALIDATION.md and its raw measurement JSON. The hash
-table and mutex/semaphore implementations remain separate conversion work.
+table conversion is recorded below; mutex/semaphore implementation remains separate work.
+
+## Hash storage, probing and borrowed entries
+
+SkTHash.h now uses explicit slot construction/destruction, checked power-of-two
+capacity arithmetic, prepared replacement storage, named map visitors and
+lvalue-only entry/iterator borrows. Unused policy-member detection is removed;
+retained callers use the original three-quarter growth/one-quarter shrink policy.
+The table and slot footprints are unchanged. Original SkTHash.h is preserved
+byte-for-byte in the reference include tree.
+
+A separate correction makes deletion terminate after manual resize fills every
+slot. The measured optimization uses wrapped probe distances and direct assignment
+between known live slots; full-table recovery stays outside the ordinary deletion
+body. Deterministic collision/permutation and owned-value tests accompany all
+nine unchanged render artifacts, 25-test release/instrumented suites, installed
+consumption and seven GUI.Forms fixture tests. Small measured lookup/churn costs
+are near parity; the collision-heavy churn workload takes about 7% less time in
+the final M4 series. Earlier regressions are retained. See
+../results/2026-10-26/HASH_STORAGE.md and its measurement files.
 
 ## Still required
 
