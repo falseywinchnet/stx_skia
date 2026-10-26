@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdint>
 #include <cstring>
 
 namespace {
@@ -1527,6 +1528,23 @@ bool SkAAClip::op(const SkRect& rect, SkClipOp op, bool doAA) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Preserve the run dimensions when translation approaches the signed coordinate limits.
+// Saturating each edge separately can produce empty bounds around live coverage runs.
+static int pin_aa_offset(int minimum, int maximum, int offset) {
+    SkASSERT(minimum <= maximum);
+    const int64_t shiftedMinimum = static_cast<int64_t>(minimum) + offset;
+    if (shiftedMinimum < SK_MinS32) {
+        const int64_t pinned = static_cast<int64_t>(SK_MinS32) - minimum;
+        return static_cast<int>(pinned);
+    }
+    const int64_t shiftedMaximum = static_cast<int64_t>(maximum) + offset;
+    if (shiftedMaximum > SK_MaxS32) {
+        const int64_t pinned = static_cast<int64_t>(SK_MaxS32) - maximum;
+        return static_cast<int>(pinned);
+    }
+    return offset;
+}
+
 bool SkAAClip::translate(int dx, int dy, SkAAClip* dst) const {
     if (nullptr == dst) {
         return !this->isEmpty();
@@ -1536,13 +1554,16 @@ bool SkAAClip::translate(int dx, int dy, SkAAClip* dst) const {
         return dst->setEmpty();
     }
 
+    const int appliedDx = pin_aa_offset(fBounds.fLeft, fBounds.fRight, dx);
+    const int appliedDy = pin_aa_offset(fBounds.fTop, fBounds.fBottom, dy);
+
     if (this != dst) {
         fRunHead->fRefCnt++;
         dst->freeRuns();
         dst->fRunHead = fRunHead;
         dst->fBounds = fBounds;
     }
-    dst->fBounds.offset(dx, dy);
+    dst->fBounds.offset(appliedDx, appliedDy);
     return true;
 }
 

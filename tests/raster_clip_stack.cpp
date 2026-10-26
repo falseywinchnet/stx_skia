@@ -4,6 +4,7 @@
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkMatrix.h"
 #include "include/core/SkPaint.h"
+#include "include/core/SkPath.h"
 #include "include/core/SkPixmap.h"
 #include "include/core/SkRect.h"
 #include "include/core/SkShader.h"
@@ -11,6 +12,7 @@
 #include "src/core/SkCanvasPriv.h"
 #include "src/core/SkRasterClipStack.h"
 
+#include <climits>
 #include <cstdio>
 #include <cstring>
 
@@ -66,6 +68,69 @@ bool replacement_drops_shader_case() {
     if (!(*surface).peekPixels(&pixels)) return false;
     return SkColorGetA(pixels.getColor(1, 1)) == 255;
 }
+
+bool aa_translation_preserves_bounds_case() {
+    const SkRect fractional = SkRect::MakeLTRB(0.25f, 0.25f, 4.75f, 4.75f);
+    const SkPath path = SkPath::Rect(fractional);
+    const SkIRect limit = SkIRect::MakeWH(8, 8);
+    const SkRasterClip source(path, limit, true);
+    if (!source.isAA() || source.isEmpty()) return false;
+    const int originalWidth = source.getBounds().width();
+    const int originalHeight = source.getBounds().height();
+
+    SkAAClip direct;
+    source.aaRgn().translate(INT_MAX, INT_MAX, &direct);
+    if (direct.isEmpty() || direct.getBounds().width() != originalWidth ||
+        direct.getBounds().height() != originalHeight) {
+        std::fputs("direct AA translation changed bounds\n", stderr);
+        return false;
+    }
+
+    SkRasterClip raster;
+    source.translate(INT_MAX, INT_MAX, &raster);
+    if (raster.isEmpty() || raster.getBounds().width() != originalWidth ||
+        raster.getBounds().height() != originalHeight) {
+        std::fputs("raster AA translation changed bounds\n", stderr);
+        return false;
+    }
+
+    SkAAClip inPlace = source.aaRgn();
+    inPlace.translate(INT_MAX, INT_MAX, &inPlace);
+    if (inPlace.isEmpty() || inPlace.getBounds().width() != originalWidth ||
+        inPlace.getBounds().height() != originalHeight) {
+        std::fputs("in-place AA translation changed bounds\n", stderr);
+        return false;
+    }
+
+    const SkRect negativeFractional = SkRect::MakeLTRB(-4.75f, -4.75f, -0.25f, -0.25f);
+    const SkPath negativePath = SkPath::Rect(negativeFractional);
+    const SkIRect negativeLimit = SkIRect::MakeLTRB(-8, -8, 0, 0);
+    const SkRasterClip negativeSource(negativePath, negativeLimit, true);
+    if (!negativeSource.isAA() || negativeSource.isEmpty()) {
+        std::fputs("negative AA source was empty\n", stderr);
+        return false;
+    }
+    SkRasterClip negativeRaster;
+    negativeSource.translate(INT_MIN, INT_MIN, &negativeRaster);
+    if (negativeRaster.isEmpty() ||
+        negativeRaster.getBounds().width() != negativeSource.getBounds().width() ||
+        negativeRaster.getBounds().height() != negativeSource.getBounds().height()) {
+        std::fputs("negative AA translation changed bounds\n", stderr);
+        return false;
+    }
+    return true;
+}
+
+bool bw_translation_preserves_bounds_case() {
+    const SkIRect original = SkIRect::MakeLTRB(-5, -5, 0, 0);
+    const SkRasterClip source(original);
+    SkRasterClip translated;
+    source.translate(INT_MIN, INT_MIN, &translated);
+    if (translated.isEmpty()) return false;
+    if (translated.getBounds().width() != original.width() ||
+        translated.getBounds().height() != original.height()) return false;
+    return true;
+}
 #endif
 }
 
@@ -87,6 +152,8 @@ int main(int argc, char** argv) {
 #ifndef STX_SKIA_REFERENCE
     valid = resized_clip_case() && valid;
     valid = replacement_drops_shader_case() && valid;
+    valid = aa_translation_preserves_bounds_case() && valid;
+    valid = bw_translation_preserves_bounds_case() && valid;
 #endif
     if (!valid) {
         std::fputs("raster clip stack mismatch\n", stderr);

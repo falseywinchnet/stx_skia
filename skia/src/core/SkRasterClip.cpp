@@ -264,15 +264,7 @@ void SkRasterClip::translate(int dx, int dy, SkRasterClip* dst) const {
         return;
     }
 
-    // The geometric clip moves into tile coordinates, while the shader keeps
-    // the device CTM captured when clipShader was called.
-    if (fShader) {
-        const SkPoint offset = {-static_cast<float>(dx), -static_cast<float>(dy)};
-        sk_sp<SkShader> translated(new SkCTMShader(fShader, SkMatrix::I(), offset));
-        (*dst).fShader = std::move(translated);
-    } else {
-        (*dst).fShader.reset();
-    }
+    const SkIRect sourceBounds = this->getBounds();
     dst->fIsBW = fIsBW;
     if (fIsBW) {
         fBW.translate(dx, dy, &dst->fBW);
@@ -282,6 +274,20 @@ void SkRasterClip::translate(int dx, int dy, SkRasterClip* dst) const {
         dst->fBW.setEmpty();
     }
     dst->updateCacheAndReturnNonEmpty();
+
+    // Geometry may clamp a requested offset near the coordinate limits. The
+    // shader must receive the offset that the clip actually applied.
+    const SkIRect destinationBounds = (*dst).getBounds();
+    const int appliedDx = destinationBounds.fLeft - sourceBounds.fLeft;
+    const int appliedDy = destinationBounds.fTop - sourceBounds.fTop;
+    if (fShader) {
+        const SkPoint offset = {-static_cast<float>(appliedDx),
+                                -static_cast<float>(appliedDy)};
+        sk_sp<SkShader> translated(new SkCTMShader(fShader, SkMatrix::I(), offset));
+        (*dst).fShader = std::move(translated);
+    } else {
+        (*dst).fShader.reset();
+    }
 }
 
 void SkRasterClip::convertToAA() {

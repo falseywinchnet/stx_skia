@@ -608,8 +608,10 @@ bool SkRegion::operator==(const SkRegion& b) const {
 // Return a (new) offset such that when applied (+=) to min and max, we don't overflow/underflow
 static int32_t pin_offset_s32(int32_t min, int32_t max, int32_t offset) {
     SkASSERT(min <= max);
-    const int32_t lo = -SK_MaxS32-1,
-                  hi = +SK_MaxS32;
+    // SkIRect::offset saturates at SK_MinS32, one above INT_MIN. Keeping the
+    // complete span in that range preserves its width and its run coordinates.
+    const int32_t lo = SK_MinS32,
+                  hi = SK_MaxS32;
     if ((int64_t)min + offset < lo) { offset = lo - min; }
     if ((int64_t)max + offset > hi) { offset = hi - max; }
     return offset;

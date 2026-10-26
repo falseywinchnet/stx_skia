@@ -980,6 +980,13 @@ covered by a focused regression. See
 ../results/2026-10-26/RASTER_CLIP_REPLACEMENT.md. The broader clipping and
 scan-conversion implementation remains open.
 
+Antialiased and integer clip translations now clamp the applied offset so
+their bounds retain their dimensions at signed coordinate limits. The shader
+clip wrapper uses that applied offset. Original antialiased and integer region
+sources remain in the reference profile; see
+../results/2026-10-26/CLIP_TRANSLATION_LIMITS.md. No inner-pixel throughput
+claim is made from this boundary fix.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
