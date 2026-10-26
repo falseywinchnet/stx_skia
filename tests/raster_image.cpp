@@ -13,6 +13,9 @@
 #include "include/core/SkImageGenerator.h"
 #include "include/core/SkPixmap.h"
 #include "src/core/SkMipmap.h"
+#include "src/core/SkMipmapAccessor.h"
+#include "src/core/SkArenaAlloc.h"
+#include "include/core/SkGraphics.h"
 #include "src/image/SkImage_Raster.h"
 
 #include <array>
@@ -370,6 +373,112 @@ private:
     const bool fSucceed;
 };
 
+struct MipmapSelection {
+    SkMipmapMode mode;
+    float scaleX;
+    float scaleY;
+    int upperWidth;
+    int upperHeight;
+    int lowerWidth;
+    int lowerHeight;
+    float lowerWeight;
+};
+
+bool check_level(const std::pair<SkPixmap, SkMatrix>& selected, int expectedWidth,
+                 int expectedHeight, int baseWidth, int baseHeight) {
+    const SkPixmap& pixels = selected.first;
+    if (pixels.width() != expectedWidth || pixels.height() != expectedHeight) return false;
+    const float scaleX = static_cast<float>(expectedWidth) / baseWidth;
+    const float scaleY = static_cast<float>(expectedHeight) / baseHeight;
+    const SkMatrix expectedScale = SkMatrix::Scale(scaleX, scaleY);
+    if (selected.second != expectedScale) return false;
+    for (int y = 0; y < expectedHeight; ++y) {
+        for (int x = 0; x < expectedWidth; ++x) {
+            if (pixels.getColor(x, y) != SK_ColorGREEN) return false;
+        }
+    }
+    return true;
+}
+
+bool mipmap_selection() {
+    // ComputeLevel's existing half-level sharpening bias makes inverse scales
+    // 2, 4 and 8 yield 0.5, 1.5 and 2.5. These expectations do not call it.
+    constexpr std::array<MipmapSelection, 13> cases{{
+        {SkMipmapMode::kNone, 4.0f, 4.0f, 9, 7, 0, 0, 0.0f},
+        {SkMipmapMode::kNearest, 1.0f, 1.0f, 9, 7, 0, 0, 0.0f},
+        {SkMipmapMode::kLinear, 0.5f, 0.5f, 9, 7, 0, 0, 0.0f},
+        {SkMipmapMode::kNearest, 2.0f, 2.0f, 4, 3, 0, 0, 0.0f},
+        {SkMipmapMode::kLinear, 2.0f, 2.0f, 9, 7, 4, 3, 0.5f},
+        {SkMipmapMode::kNearest, 4.0f, 4.0f, 2, 1, 0, 0, 0.0f},
+        {SkMipmapMode::kLinear, 4.0f, 4.0f, 4, 3, 2, 1, 0.5f},
+        {SkMipmapMode::kNearest, 8.0f, 8.0f, 1, 1, 0, 0, 0.0f},
+        {SkMipmapMode::kLinear, 8.0f, 8.0f, 2, 1, 1, 1, 0.5f},
+        {SkMipmapMode::kLinear, 16.0f, 16.0f, 1, 1, 0, 0, 0.0f},
+        {SkMipmapMode::kNearest, 1024.0f, 1024.0f, 9, 7, 0, 0, 0.0f},
+        {SkMipmapMode::kLinear, 4.0f, 1.0f, 4, 3, 2, 1, 0.5f},
+        {SkMipmapMode::kLinear, 0.0f, 0.0f, 9, 7, 0, 0, 0.0f},
+    }};
+    Pixels storage{};
+    const SkPixmap source(image_info(), storage.data(), stride);
+    if (!source.erase(SK_ColorGREEN)) return false;
+    for (int attached = 0; attached < 2; ++attached) {
+        for (const MipmapSelection& expected : cases) {
+            sk_sp<SkImage> image = SkImages::RasterFromPixmapCopy(source);
+            if (!image) return false;
+            if (attached != 0) {
+                image = (*image).withDefaultMipmaps();
+                if (!image) return false;
+            }
+            SkArenaAlloc arena(1024);
+            const SkMatrix inverse = SkMatrix::Scale(expected.scaleX, expected.scaleY);
+            SkMipmapAccessor* accessor = SkMipmapAccessor::Make(&arena, image.get(),
+                                                               inverse, expected.mode);
+            if (!accessor) return false;
+            SkMipmapAccessor* repeated = SkMipmapAccessor::Make(&arena, image.get(),
+                                                               inverse, expected.mode);
+            if (!repeated) return false;
+            const std::pair<SkPixmap, SkMatrix> first = (*accessor).level();
+            const std::pair<SkPixmap, SkMatrix> second = (*repeated).level();
+            if (first.first.addr() != second.first.addr()) return false;
+            // Only accessors now retain the pixel storage, even after eviction.
+            image.reset();
+            SkGraphics::PurgeResourceCache();
+            if (!check_level(first, expected.upperWidth, expected.upperHeight, width, height)) {
+                return false;
+            }
+            if ((*accessor).lowerWeight() != expected.lowerWeight) return false;
+            if (expected.lowerWeight > 0.0f) {
+                const std::pair<SkPixmap, SkMatrix> lower = (*accessor).lowerLevel();
+                if (!check_level(lower, expected.lowerWidth, expected.lowerHeight, width, height)) {
+                    return false;
+                }
+            }
+        }
+    }
+    // A one-pixel image cannot produce any mip levels and must use its base.
+    const SkImageInfo tinyInfo = image_info().makeWH(1, 1);
+    const SkPixmap tinySource(tinyInfo, storage.data(), stride);
+    sk_sp<SkImage> tiny = SkImages::RasterFromPixmapCopy(tinySource);
+    if (!tiny) return false;
+    SkArenaAlloc arena(1024);
+    const SkMatrix reduced = SkMatrix::Scale(4.0f, 4.0f);
+    SkMipmapAccessor* fallback = SkMipmapAccessor::Make(&arena, tiny.get(), reduced,
+                                                       SkMipmapMode::kLinear);
+    if (!fallback || (*fallback).lowerWeight() != 0.0f) return false;
+    const std::pair<SkPixmap, SkMatrix> selected = (*fallback).level();
+    if (!check_level(selected, 1, 1, 1, 1)) return false;
+    constexpr std::array<SkMipmapMode, 3> modes{
+        SkMipmapMode::kNone, SkMipmapMode::kNearest, SkMipmapMode::kLinear};
+    for (const SkMipmapMode mode : modes) {
+        std::unique_ptr<SkImageGenerator> generator = std::make_unique<SolidGenerator>(false);
+        sk_sp<SkImage> failed = SkImages::DeferredFromGenerator(std::move(generator));
+        if (!failed) return false;
+        SkMipmapAccessor* missing = SkMipmapAccessor::Make(&arena, failed.get(), reduced, mode);
+        if (missing != nullptr) return false;
+    }
+    return true;
+}
+
 struct ReadState {
     int calls = 0;
     std::unique_ptr<const SkImage::AsyncReadResult> result = nullptr;
@@ -414,6 +523,7 @@ int main() {
     if (!generated_reads(false) || !generated_reads(true)) return 5;
     if (!facade_scaling()) return 6;
     if (!facade_shaders()) return 7;
+    if (!mipmap_selection()) return 8;
     std::printf("raster images: ownership, subsets, mipmaps, conversion, reads; base %zu, raster %zu bytes; PASS\n",
                 sizeof(SkImage_Base), sizeof(SkImage_Raster));
     return 0;

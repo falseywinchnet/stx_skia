@@ -396,6 +396,17 @@ translated clamp/repeat sampling. Image, surface, raster and deferred ownership
 boundaries are converted; surrounding imported cache, device and sampling code
 still requires conversion. See ../results/2026-10-26/IMAGE_FACADE.md.
 
+## CPU mipmap selection
+
+SkMipmapAccessor.cpp/.h now use named acquisition and scale helpers, explicit
+selection state, and storage owners declared before their borrowed level views.
+Temporary accessor views are rejected. Existing rounding, half-level bias,
+cache lookup order and missing-level fallbacks are unchanged. Deterministic
+checks cover 26 attached/generated selection cases, eviction/lifetime, a
+one-pixel fallback and three unreadable-provider cases. Mipmap generation,
+bitmap caching and the image shader remain separate conversion work. See
+../results/2026-10-26/MIPMAP_ACCESSOR.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

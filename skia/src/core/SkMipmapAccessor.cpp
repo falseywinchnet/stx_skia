@@ -18,98 +18,110 @@
 #include "src/core/SkMipmap.h"
 #include "src/image/SkImage_Base.h"
 
-class SkImage;
-
-// Try to load from the base image, or from the cache
-static sk_sp<const SkMipmap> try_load_mips(const SkImage_Base* image) {
-    sk_sp<const SkMipmap> mips = image->refMips();
+namespace {
+// Retain image-provided levels first, then cached levels, then construct/cache
+// them from readable pixels. Each returned handle owns its cache reference.
+sk_sp<const SkMipmap> try_load_mips(const SkImage_Base& image) {
+    sk_sp<const SkMipmap> mips = image.refMips();
     if (!mips) {
-        mips.reset(SkMipmapCache::FindAndRef(SkBitmapCacheDesc::Make(image)));
+        const SkBitmapCacheDesc description = SkBitmapCacheDesc::Make(&image);
+        const SkMipmap* cached = SkMipmapCache::FindAndRef(description);
+        mips.reset(cached);
     }
     if (!mips) {
-        mips.reset(SkMipmapCache::AddAndRef(image));
+        const SkMipmap* generated = SkMipmapCache::AddAndRef(&image);
+        mips.reset(generated);
     }
     return mips;
 }
 
-SkMipmapAccessor::SkMipmapAccessor(const SkImage_Base* image, const SkMatrix& inv,
-                                   SkMipmapMode requestedMode) {
+SkMatrix level_scale(const SkPixmap& pixels, const SkImage_Base& image) {
+    const SkScalar scaleX = SkIntToScalar(pixels.width()) / image.width();
+    const SkScalar scaleY = SkIntToScalar(pixels.height()) / image.height();
+    const SkMatrix scale = SkMatrix::Scale(scaleX, scaleY);
+    return scale;
+}
+}
+
+void SkMipmapAccessor::loadUpperFromBase(const SkImage_Base& image) {
+    if (fBaseStorage.getPixels() != nullptr) {
+        return;
+    }
+    (void)image.getROPixels(&fBaseStorage);
+    fUpper.reset(fBaseStorage.info(), fBaseStorage.getPixels(), fBaseStorage.rowBytes());
+}
+
+SkMipmapAccessor::SkMipmapAccessor(const SkImage_Base* imagePointer, const SkMatrix& inverse,
+                                 SkMipmapMode requestedMode) {
+    const SkImage_Base& image = *imagePointer;
     SkMipmapMode resolvedMode = requestedMode;
-    fLowerWeight = 0;
-
-    auto load_upper_from_base = [&]() {
-        // only do this once
-        if (fBaseStorage.getPixels() == nullptr) {
-            (void)image->getROPixels(&fBaseStorage);
-            fUpper.reset(fBaseStorage.info(), fBaseStorage.getPixels(), fBaseStorage.rowBytes());
-        }
-    };
-
-    float level = 0;
+    float level = 0.0f;
     if (requestedMode != SkMipmapMode::kNone) {
-        SkSize scale;
-        if (!inv.decomposeScale(&scale, nullptr)) {
+        SkSize scale{};
+        if (!inverse.decomposeScale(&scale, nullptr)) {
             resolvedMode = SkMipmapMode::kNone;
         } else {
-            level = SkMipmap::ComputeLevel({1/scale.width(), 1/scale.height()});
-            if (level <= 0) {
+            const SkSize forwardScale{1.0f / scale.width(), 1.0f / scale.height()};
+            level = SkMipmap::ComputeLevel(forwardScale);
+            if (level <= 0.0f) {
                 resolvedMode = SkMipmapMode::kNone;
-                level = 0;
+                level = 0.0f;
             }
         }
     }
 
-    auto scale = [image](const SkPixmap& pm) {
-        return SkMatrix::Scale(SkIntToScalar(pm.width())  / image->width(),
-                               SkIntToScalar(pm.height()) / image->height());
-    };
-
-    // Nearest mode uses this level, so we round to pick the nearest. In linear mode we use this
-    // level as the lower of the two to interpolate between, so we take the floor.
-    int levelNum = resolvedMode == SkMipmapMode::kNearest ? sk_float_round2int(level)
-                                                          : sk_float_floor2int(level);
-    float lowerWeight = level - levelNum;   // fract(level)
-    SkASSERT(levelNum >= 0);
-
-    if (levelNum == 0) {
-        load_upper_from_base();
+    // Level zero is the source image. Nearest rounds; linear brackets the
+    // fractional level with floor and floor+1. SkMipmap indices omit the source.
+    int levelNumber = 0;
+    if (resolvedMode == SkMipmapMode::kNearest) {
+        levelNumber = sk_float_round2int(level);
+    } else {
+        levelNumber = sk_float_floor2int(level);
     }
-    // load fCurrMip if needed
-    if (levelNum > 0 || (resolvedMode == SkMipmapMode::kLinear && lowerWeight > 0)) {
+    const float lowerWeight = level - levelNumber;
+    SkASSERT(levelNumber >= 0);
+
+    if (levelNumber == 0) {
+        (*this).loadUpperFromBase(image);
+    }
+    const bool needsLower = resolvedMode == SkMipmapMode::kLinear && lowerWeight > 0.0f;
+    if (levelNumber > 0 || needsLower) {
         fCurrMip = try_load_mips(image);
         if (!fCurrMip) {
-            load_upper_from_base();
+            (*this).loadUpperFromBase(image);
             resolvedMode = SkMipmapMode::kNone;
         } else {
-            SkMipmap::Level levelRec;
-
+            const SkMipmap& mips = *fCurrMip;
+            SkMipmap::Level selected{};
             SkASSERT(resolvedMode != SkMipmapMode::kNone);
-            if (levelNum > 0) {
-                if (fCurrMip->getLevel(levelNum - 1, &levelRec)) {
-                    fUpper = levelRec.fPixmap;
+            if (levelNumber > 0) {
+                if (mips.getLevel(levelNumber - 1, &selected)) {
+                    fUpper = selected.fPixmap;
                 } else {
-                    load_upper_from_base();
+                    (*this).loadUpperFromBase(image);
                     resolvedMode = SkMipmapMode::kNone;
                 }
             }
 
             if (resolvedMode == SkMipmapMode::kLinear) {
-                if (fCurrMip->getLevel(levelNum, &levelRec)) {
-                    fLower = levelRec.fPixmap;
+                if (mips.getLevel(levelNumber, &selected)) {
+                    fLower = selected.fPixmap;
                     fLowerWeight = lowerWeight;
-                    fLowerInv = scale(fLower);
-                } else {
-                    resolvedMode = SkMipmapMode::kNearest;
+                    fLowerInv = level_scale(fLower, image);
                 }
+                // A missing lower level leaves weight zero: upper-only sampling.
             }
         }
     }
-    fUpperInv = scale(fUpper);
+    fUpperInv = level_scale(fUpper, image);
 }
 
-SkMipmapAccessor* SkMipmapAccessor::Make(SkArenaAlloc* alloc, const SkImage* image,
-                                         const SkMatrix& inv, SkMipmapMode mipmap) {
-    auto* access = alloc->make<SkMipmapAccessor>(as_IB(image), inv, mipmap);
-    // return null if we failed to get the level (so the caller won't try to use it)
-    return access->fUpper.addr() ? access : nullptr;
+SkMipmapAccessor* SkMipmapAccessor::Make(SkArenaAlloc* allocator, const SkImage* image,
+                                       const SkMatrix& inverse, SkMipmapMode mode) {
+    const SkImage_Base* base = as_IB(image);
+    SkMipmapAccessor* accessor = (*allocator).make<SkMipmapAccessor>(base, inverse, mode);
+    if ((*accessor).fUpper.addr() == nullptr) {
+        return nullptr;
+    }
+    return accessor;
 }
