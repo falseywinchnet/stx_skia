@@ -938,6 +938,13 @@ Release. The original header is retained for differential builds. See
 ../results/2026-10-26/TBLOCK_LIST.md. This is a targeted correctness pass;
 the retained header and block allocator still need full source-style review.
 
+The allocator constructor now validates growth policy, nonzero bounded block
+increment and inline extent before alignment, narrowing or block construction.
+Its original source is retained for differential builds. The focused Release
+rejection cases and validation record are in
+../results/2026-10-26/BLOCK_ALLOCATOR.md. This fixes the constructor boundary;
+the remaining block allocation and release algorithms still need conversion.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

@@ -14,20 +14,43 @@
 #include <vector>
 #endif
 
+namespace {
+size_t ValidatedIncrement(size_t bytes) {
+    SkASSERT_RELEASE(bytes > 0 && bytes <= SkBlockAllocator::kMaxAllocationSize);
+    return bytes;
+}
+
+SkBlockAllocator::GrowthPolicy ValidatedPolicy(SkBlockAllocator::GrowthPolicy policy) {
+    SkASSERT_RELEASE(policy >= SkBlockAllocator::GrowthPolicy::kFixed &&
+                     policy <= SkBlockAllocator::GrowthPolicy::kLast);
+    return policy;
+}
+
+int ValidatedHeadSize(size_t extraBytes, int baseBytes) {
+    SkASSERT_RELEASE(extraBytes <= SkBlockAllocator::kMaxAllocationSize);
+    const size_t maximum = static_cast<size_t>(std::numeric_limits<int>::max() - baseBytes);
+    SkASSERT_RELEASE(extraBytes <= maximum);
+    const int headSize = baseBytes + static_cast<int>(extraBytes);
+    return headSize;
+}
+}
+
 SkBlockAllocator::SkBlockAllocator(GrowthPolicy policy, size_t blockIncrementBytes,
                                    size_t additionalPreallocBytes)
         : fTail(&fHead)
         // Round up to the nearest max-aligned value, and then divide so that fBlockSizeIncrement
         // can effectively fit higher byte counts in its 16 bits of storage
         , fBlockIncrement(SkTo<uint16_t>(
-                std::min(SkAlignTo(blockIncrementBytes, kAddressAlign) / kAddressAlign,
+                std::min(SkAlignTo(ValidatedIncrement(blockIncrementBytes), kAddressAlign) /
+                                 kAddressAlign,
                          (size_t) std::numeric_limits<uint16_t>::max())))
-        , fGrowthPolicy(static_cast<uint64_t>(policy))
+        , fGrowthPolicy(static_cast<uint64_t>(ValidatedPolicy(policy)))
         , fN0((policy == GrowthPolicy::kLinear || policy == GrowthPolicy::kExponential) ? 1 : 0)
         , fN1(1)
         // The head block always fills remaining space from SkBlockAllocator's size, because it's
         // inline, but can take over the specified number of bytes immediately after it.
-        , fHead(/*prev=*/nullptr, additionalPreallocBytes + BaseHeadBlockSize()) {
+        , fHead(/*prev=*/nullptr,
+                ValidatedHeadSize(additionalPreallocBytes, BaseHeadBlockSize())) {
     SkASSERT(fBlockIncrement >= 1);
     SkASSERT(additionalPreallocBytes <= kMaxAllocationSize);
 }

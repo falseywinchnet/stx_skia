@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -151,6 +152,26 @@ int main(int argc, char** argv) {
     if (argc == 2 && std::strcmp(argv[1], "--empty-front") == 0) {
         SkTBlockList<int, 2> invalid;
         return invalid.front();
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--zero-increment") == 0) {
+        SkBlockAllocator invalid(SkBlockAllocator::GrowthPolicy::kFixed, 0);
+        return 0;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--huge-increment") == 0) {
+        const size_t huge = std::numeric_limits<size_t>::max();
+        SkBlockAllocator invalid(SkBlockAllocator::GrowthPolicy::kFixed, huge);
+        return 0;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--huge-prealloc") == 0) {
+        const size_t huge = std::numeric_limits<size_t>::max();
+        SkBlockAllocator invalid(SkBlockAllocator::GrowthPolicy::kFixed, 64, huge);
+        return 0;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--invalid-policy") == 0) {
+        const SkBlockAllocator::GrowthPolicy invalidPolicy =
+                static_cast<SkBlockAllocator::GrowthPolicy>(-1);
+        SkBlockAllocator invalid(invalidPolicy, 64);
+        return 0;
     }
 #endif
     bool valid = ordinary_case() && nontrivial_case();

@@ -8,6 +8,9 @@ endforeach()
 list(REMOVE_ITEM stx_sources skia/src/core/SkArenaAlloc.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkArenaAlloc.cpp)
 
+list(REMOVE_ITEM stx_sources skia/src/core/SkBlockAllocator.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkBlockAllocator.cpp)
+
 list(REMOVE_ITEM stx_sources skia/src/effects/SkShaderMaskFilterImpl.cpp)
 list(APPEND stx_sources baseline/skia/src/effects/SkShaderMaskFilterImpl.cpp)
 
