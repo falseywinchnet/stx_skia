@@ -13,7 +13,6 @@
 #include "include/effects/SkGradient.h"
 #include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkShaderMaskFilter.h"
-#include "include/effects/SkImageFilters.h"
 #include "include/core/SkMaskFilter.h"
 #include <array>
 #include <chrono>
@@ -123,10 +122,7 @@ void draw_scene(SkCanvas& canvas, int variation) {
     canvas.drawRect(SkRect::MakeXYWH(1, 100, 35, 20), paint);
     paint.setMaskFilter(nullptr);
     canvas.drawImage(mask, 140, 10, SkSamplingOptions(), &paint);
-    sk_sp<SkImageFilter> blur = SkImageFilters::Blur(2, 2, nullptr);
-    const SkCanvas::SaveLayerRec layer(&layer_bounds, nullptr, blur.get(), 0);
-    canvas.saveLayer(layer);
-    canvas.restore();
+
 }
 }
 

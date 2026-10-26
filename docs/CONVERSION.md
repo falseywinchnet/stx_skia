@@ -23,7 +23,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Mask descriptors and Gaussian blur | `src/core/SkMask.cpp/.h`, `src/core/SkMaskBlurFilter.cpp/.h` | Checked padded bounds, explicit borrowed storage, move-empty descriptors, exact last-row extents and 304 reference blur cases |
 | Blur style composition and analytic rectangles | `src/core/SkBlurMask.cpp/.h` | All four styles, exact analytic profiles, checked temporary extents, padded reference convolution, bounded 16-bit coverage arithmetic |
 | Cached pixel/mask storage | `src/core/SkCachedData.cpp/.h` | Cache/client reference distinction, discard/reacquire and failure states, callback ordering, final release after unlocking and concurrent reference sharing |
-| Mask-filter dispatch and nine-patch ownership | `src/core/SkMaskFilterBase.cpp/.h`, `src/core/SkMaskFilter.cpp`; existing public header reviewed | Adopted cache/allocation owners, failure cleanup, bounded clipped run storage, named image-filter result and 240 rendering comparisons |
+| Mask-filter dispatch and nine-patch ownership | `src/core/SkMaskFilterBase.cpp/.h`, `src/core/SkMaskFilter.cpp`; existing public header reviewed | Adopted cache/allocation owners, failure cleanup, bounded clipped run storage and reference rendering comparisons |
 | Shader-mask filtering | `src/effects/SkShaderMaskFilterImpl.cpp/.h`, `include/effects/SkShaderMaskFilter.h` | 576 byte-exact shader masks, checked source metadata, scoped pixel ownership and failure preservation |
 | Blur-filter construction and cached masks | `src/core/SkBlurMaskFilterImpl.cpp/.h` | Explicit shape alternatives, cache/allocation handoff, checked raster extents and 288 reference scenes |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
@@ -164,7 +164,8 @@ Horizontal nine-patch run payload is allocated only when those clipped strips
 exist, and capped at 98,304 bytes by splitting lengths above 32,767. Side-only
 clips do not construct that scratch owner. Source offsets use size_t.
 
-ImageFilterResult names the image filter and shading effect. SkBlurMaskFilterImpl,
+The earlier ImageFilterResult conversion named the image filter and shading effect;
+that adapter is now removed under the clarified contract below. SkBlurMaskFilterImpl,
 SkShaderMaskFilterImpl and SkCanvasPriv receive only signature/consumer adaptations
 here; their remaining implementation is not marked converted. The unused legacy
 emboss factory bridge is removed from SkLightingImageFilter, while its retained
@@ -196,6 +197,21 @@ are rejected. Sigma, Gaussian rounding, fractional rectangle phase and cache key
 remain unchanged. See BLUR_DISPATCH.md for verification. The image-filter adapter
 is still present in this tested conversion but is now scheduled for removal under
 the owner's clarified contract.
+
+## Image-effect pruning under the clarified contract
+
+All 17 general image-filter factory implementations and SkImageFilters.h are now
+reference-only. Mask-filter-to-image-filter adapters and their canvas call path
+are removed; the CPU bitmap device retains direct blur/shader mask execution.
+The obsolete backdrop scene is removed from both differential profiles. All
+remaining render output matches the original implementations for that revised
+contract. No output/timing comparison across the two different scene definitions
+is claimed.
+
+The core SkImageFilter/FilterTypes/layer machinery and SkSL still compile. Their
+removal, and removal of Skia's text/font internals, remain explicit next work.
+SkCanvas and SkCanvasPriv receive narrow dependency edits, not full house-style
+conversion. See IMAGE_FILTER_PRUNING.md for the exact scope.
 
 ## Still required
 

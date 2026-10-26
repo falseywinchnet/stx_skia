@@ -16,17 +16,19 @@ still awaits house-style conversion.
 
 - CPU surfaces, paths, strokes, dashes, clipping and affine transforms.
 - Linear, radial and sweep gradients; nearest, linear, cubic and mipmap sampling.
-- Layers, group opacity, blend modes, rounded corners, mask blur and backdrop blur.
+- Layers, group opacity, blend modes, rounded corners, blur masks, shader masks and matrix color filters.
 - RGBA/BGRA pixels and A8 masks, with explicit transfer of owned pixel storage.
 - No compiled GPU backend, image decoder/encoder or platform font backend.
 
 The candidate removes generic codec scaffolding, Apple's encoded-image generator,
 unused effects and wider CPU-dispatch objects. Excluded GPU implementations,
 unused modules and upstream infrastructure have also been removed from the tree.
-Picture/text internals and the general filter/SkSL machinery remain dependencies;
-they have not been replaced with incomplete implementations.
+All 17 general image-filter factory implementations and their public factory
+header are removed from the candidate. GUI.Forms owns CSS and backdrop effects.
+Picture/text internals, core layer/filter plumbing and SkSL remain removal work;
+removing the factories alone does not establish that those dependencies are gone.
 
-On the recorded M4/macOS build, the candidate passed seven selected GUI.Forms
+On the initial recorded M4/macOS build, the candidate passed seven selected GUI.Forms
 renderer tests and produced byte-identical output across 24 baseline comparison
 cases. Its static archive is 6.1% smaller, with essentially unchanged rendering
 time in that small workload. Pixel ownership transfer removes a full buffer copy.

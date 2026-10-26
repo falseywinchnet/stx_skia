@@ -8,3 +8,7 @@ list(FILTER stx_sources EXCLUDE REGEX "skia/src/effects/(Sk1DPathEffect|Sk2DPath
 
 # Keep the compiler baseline (128-bit SSE2/NEON), without wider CPU dispatch.
 list(FILTER stx_sources EXCLUDE REGEX "skia/src/core/.*_opts_(ssse3|ml3|lasx|avx|erms)\\.cpp$")
+
+# General image effects belong to GUI.Forms. Factory implementations and the
+# mask-to-image adapters are removed; core layer/filter plumbing is next.
+list(FILTER stx_sources EXCLUDE REGEX "skia/src/effects/imagefilters/")

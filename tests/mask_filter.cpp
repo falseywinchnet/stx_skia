@@ -2,7 +2,6 @@
 #include "include/core/SkCanvas.h"
 #include "include/core/SkGraphics.h"
 #include "include/core/SkImageInfo.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkShader.h"
 #include "include/effects/SkShaderMaskFilter.h"
 #include "include/effects/SkGradient.h"
@@ -228,13 +227,7 @@ bool shader_masks(std::FILE* file) {
         const SkMask source(nullptr, SkIRect::MakeXYWH(-3, 2, 7, 5), 0, SkMask::kA8_Format);
         if (!filter.filterMask(&metadata, source, SkMatrix::I(), nullptr) || metadata.fImage != nullptr ||
             metadata.fBounds != source.fBounds || metadata.fRowBytes != 7) return false;
-        const SkPaint paint;
-#ifdef STX_SKIA_REFERENCE
-        const std::pair<sk_sp<SkImageFilter>, bool> converted = filter.asImageFilter(SkMatrix::I(), paint);
-        if (!converted.first || converted.second) return false;
-#else
-        const SkMaskFilterBase::ImageFilterResult converted = filter.asImageFilter(SkMatrix::I(), paint);
-        if (!converted.filter || converted.appliesShading) return false;
+#ifndef STX_SKIA_REFERENCE
         const std::array<uint8_t, 16> small{};
         const SkMask invalid(small.data(), SkIRect::MakeWH(4, 2), 2, SkMask::kA8_Format);
         SkIPoint margin = {9, 9};

@@ -6,7 +6,6 @@
  */
 #include "src/core/SkMaskFilterBase.h"
 
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkMatrix.h"
 #include "include/core/SkPath.h"
 #include "include/core/SkPoint.h"
@@ -39,12 +38,6 @@ SkMaskFilterBase::NinePatch::~NinePatch() {
 
 bool SkMaskFilterBase::asABlur(BlurRec*) const {
     return false;
-}
-
-SkMaskFilterBase::ImageFilterResult SkMaskFilterBase::asImageFilter(const SkMatrix& ctm,
-                                                                      const SkPaint& paint) const {
-    const ImageFilterResult result{.filter = nullptr, .appliesShading = false};
-    return result;
 }
 
 static SkMask extract_mask_subset(const SkMask& src, SkIRect bounds, int32_t newX, int32_t newY) {

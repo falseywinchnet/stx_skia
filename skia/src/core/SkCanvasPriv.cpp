@@ -175,35 +175,20 @@ bool SkCanvasPriv::ImageToColorFilter(SkPaint* paint) {
 AutoLayerForImageFilter::AutoLayerForImageFilter(SkCanvas* canvas,
                                                  const SkPaint& paint,
                                                  const SkRect* rawBounds,
-                                                 bool skipMaskFilterLayer)
+                                                 bool /*skipMaskFilterLayer*/)
             : fPaint(paint)
             , fCanvas(canvas)
             , fTempLayersForFilters(0) {
     SkDEBUGCODE(fSaveCount = canvas->getSaveCount();)
 
-    // Depending on the original paint, this will add 0, 1, or 2 layers that apply the
-    // filter effects to a temporary layer that rasterized the remaining effects. Image filters
-    // are applied to the result of any mask filter, so its layer is added first in the stack.
-    //
     // If present on the original paint, the image filter layer's restore paint steals the blender
     // and the image filter so that the draw's paint will never have an image filter.
     if (fPaint.getImageFilter() && !SkCanvasPriv::ImageToColorFilter(&fPaint)) {
         this->addImageFilterLayer(rawBounds);
     }
 
-    // If present on the original paint, the mask filter layer's restore paint steals all shading
-    // effects and the draw's paint shading is updated to draw a solid opaque color (thus encoding
-    // coverage into the alpha channel). The draw's paint preserves all geometric effects that have
-    // to be applied before the mask filter. The layer's restore paint adds an image filter
-    // representing the mask filter.
-    if (fPaint.getMaskFilter() && !skipMaskFilterLayer) {
-        this->addMaskFilterLayer(rawBounds);
-    }
+    // CPU devices apply mask filters directly to coverage.
 
-   // When the original paint has both an image filter and a mask filter, this will create two
-   // internal layers and perform two restores when finished. This actually creates one fewer
-   // offscreen passes compared to directly composing the mask filter's output with an
-   // SkImageFilters::Shader node and passing that into the rest of the image filter.
 }
 
 AutoLayerForImageFilter::~AutoLayerForImageFilter() {
@@ -249,53 +234,6 @@ void AutoLayerForImageFilter::addImageFilterLayer(const SkRect* drawBounds) {
     fPaint.setBlendMode(SkBlendMode::kSrcOver);
 
     this->addLayer(restorePaint, drawBounds, /*coverageOnly=*/false);
-}
-
-void AutoLayerForImageFilter::addMaskFilterLayer(const SkRect* drawBounds) {
-    // Shouldn't be adding a layer if there was no mask filter to begin with.
-    SkASSERT(fPaint.getMaskFilter());
-
-    // Image filters are evaluated after mask filters so any filter should have been converted to
-    // a layer and removed from fPaint already.
-    SkASSERT(!fPaint.getImageFilter());
-
-    // TODO: Eventually all SkMaskFilters will implement this method so this can switch to an assert
-    const SkMaskFilterBase& maskFilter = *as_MFB(fPaint.getMaskFilter());
-    SkMaskFilterBase::ImageFilterResult converted = maskFilter.asImageFilter(
-        (*fCanvas).getTotalMatrix(), fPaint);
-    if (!converted.filter) {
-        // This is a legacy mask filter that can be handled by raster and Ganesh directly, but will
-        // be ignored by Graphite. Return now, leaving the paint with the mask filter so that the
-        // underlying SkDevice can handle it if it will.
-        return;
-    }
-
-    // The restore paint for the coverage layer takes over all shading effects that had been on the
-    // original paint, which will be applied to the alpha-only output image from the mask filter
-    // converted to an image filter.
-    // If we know our mask filter will affect shading, we don't want to add the original shading
-    // into the restore paint.
-    SkPaint restorePaint;
-    if (!converted.appliesShading) {
-        restorePaint.setColor4f(fPaint.getColor4f());
-        restorePaint.setShader(fPaint.refShader());
-        restorePaint.setColorFilter(fPaint.refColorFilter());
-        restorePaint.setDither(fPaint.isDither());
-    }
-    restorePaint.setBlender(fPaint.refBlender());
-    restorePaint.setImageFilter(std::move(converted.filter));
-
-    // Remove all shading effects from the "working" paint so that the layer's alpha channel
-    // will correspond to the coverage. This leaves the original style and AA settings that
-    // contribute to coverage (including any path effect).
-    fPaint.setColor4f(SkColors::kWhite);
-    fPaint.setShader(nullptr);
-    fPaint.setColorFilter(nullptr);
-    fPaint.setMaskFilter(nullptr);
-    fPaint.setDither(false);
-    fPaint.setBlendMode(SkBlendMode::kSrcOver);
-
-    this->addLayer(restorePaint, drawBounds, /*coverageOnly=*/!converted.appliesShading);
 }
 
 void AutoLayerForImageFilter::addLayer(const SkPaint& restorePaint,

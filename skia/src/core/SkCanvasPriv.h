@@ -132,8 +132,8 @@ public:
     // paint. It's used to determine the size of the offscreen layer for filters.
     // If null, the clip will be used instead.
     //
-    // If `skipMaskFilterLayer` is true, any SkMaskFilter on `paint` will be left as-is and is
-    // assumed to be handled by the SkDevice that handles the draw.
+    // CPU devices always handle mask filters directly. The final argument is
+    // retained temporarily while canvas layer plumbing is being reduced.
     //
     // Draw functions should use layer->paint() instead of the passed-in paint.
     AutoLayerForImageFilter(SkCanvas* canvas,
@@ -150,9 +150,7 @@ public:
 
     const SkPaint& paint() const { return fPaint; }
 
-    // This is public so that a canvas can attempt to specially handle mask filters, specifically
-    // for blurs, and then if the attempt fails fall back on a regular draw with the same autolayer.
-    void addMaskFilterLayer(const SkRect* drawBounds);
+
 
 private:
     void addImageFilterLayer(const SkRect* drawBounds);

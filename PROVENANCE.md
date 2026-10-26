@@ -169,3 +169,18 @@ copies were already retained for differential testing. The derivative replaces
 anonymous drawing callbacks with explicit shape alternatives, scopes temporary
 and cached storage, and checks raster extents. tests/mask_filter.cpp adds
 asymmetric-corner rendering comparisons and invalid-style rejection checks.
+
+
+## General image-filter factory removal
+
+The owner's revised scope removes Skia-provided CSS/backdrop effects. All 17
+skia/src/effects/imagefilters implementations and SkImageFilters.h now live only
+in baseline/skia for the original comparison build. The earlier retained original
+SkLightingImageFilter.cpp is used there, preserving its upstream emboss bridge.
+SkCanvas.cpp and SkCanvasPriv.h receive original baseline copies before narrow
+mask-layer dependency edits. Existing original copies cover other changed files.
+
+Mask-to-image-filter adapters are removed from the candidate. Both render profiles
+omit the withdrawn backdrop scene and compare the same remaining behavior. This
+is dependency pruning, not a claim that Canvas or core image-filter plumbing has
+been fully converted or removed.

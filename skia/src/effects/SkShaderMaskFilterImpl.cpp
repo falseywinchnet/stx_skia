@@ -11,7 +11,6 @@
 #include "include/core/SkBlendMode.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkFlattenable.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPoint.h"
@@ -19,7 +18,6 @@
 #include "include/core/SkRefCnt.h"
 #include "include/core/SkScalar.h"
 #include "include/core/SkShader.h"
-#include "include/effects/SkImageFilters.h"
 #include "include/effects/SkShaderMaskFilter.h"
 #include "src/core/SkMask.h"
 #include "src/core/SkReadBuffer.h"
@@ -88,14 +86,6 @@ bool SkShaderMaskFilterImpl::filterMask(SkMaskBuilder* dst, const SkMask& src, c
     *dst = std::move(result);
     if (margin != nullptr) (*margin).set(0, 0);
     return true;
-}
-
-SkMaskFilterBase::ImageFilterResult SkShaderMaskFilterImpl::asImageFilter(const SkMatrix&,
-                                                                            const SkPaint&) const {
-    sk_sp<SkImageFilter> shader = SkImageFilters::Shader(fShader);
-    sk_sp<SkImageFilter> filter = SkImageFilters::Blend(SkBlendMode::kDstIn, std::move(shader), nullptr);
-    ImageFilterResult result{.filter = std::move(filter), .appliesShading = false};
-    return result;
 }
 
 sk_sp<SkMaskFilter> SkShaderMaskFilter::Make(sk_sp<SkShader> shader) {

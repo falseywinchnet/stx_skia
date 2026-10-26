@@ -7,12 +7,9 @@
 
 #include "src/core/SkBlurMaskFilterImpl.h"
 
-#include "include/core/SkBlendMode.h"
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkFlattenable.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkImageInfo.h"
-#include "include/core/SkM44.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkMatrix.h"
 #include "include/core/SkPaint.h"
@@ -25,7 +22,6 @@
 #include "include/core/SkRect.h"
 #include "include/core/SkRefCnt.h"
 #include "include/core/SkScalar.h"
-#include "include/effects/SkImageFilters.h"
 #include "include/private/SkAlign.h"
 #include "include/private/SkAssert.h"
 #include "include/private/SkFloatingPoint.h"
@@ -71,47 +67,6 @@ bool SkBlurMaskFilterImpl::asABlur(BlurRec* rec) const {
         (*rec).fStyle = fBlurStyle;
     }
     return true;
-}
-
-SkMaskFilterBase::ImageFilterResult SkBlurMaskFilterImpl::asImageFilter(const SkMatrix& ctm,
-                                                                          const SkPaint&) const {
-    // Mask filters apply a uniform blur in either local or device space. Depending on the scale
-    // factors of the `ctm`, the actual blur radii can end up non-uniform.
-    SkV2 sigma = {fSigma, fSigma};
-    if (ignoreXform()) {
-        // This is analogous to computeXformedSigma(), but it might be more correct to wrap the
-        // blur image filter in a local matrix with ctm^-1, or to control the skif::Mapping when
-        // the mask filter layer is restored. It calculates new blur radii such that transforming
-        // these to the layer space of the image filter will match the original device-space fSigma.
-        // This can be inaccurate when 'ctm' has skew or perspective. A full fix requires layers
-        // having flexible operating coordinate spaces (e.g. parent or root canvas).
-        const SkVector xVector = ctm.mapVector(fSigma, 0.f);
-        const SkVector yVector = ctm.mapVector(0.f, fSigma);
-        const float xScaleFactor = fSigma / xVector.length();
-        const float yScaleFactor = fSigma / yVector.length();
-        sigma = {fSigma * xScaleFactor, fSigma * yScaleFactor};
-    }
-
-    // The null input image filter will be bound to the original coverage mask.
-    sk_sp<SkImageFilter> filter = SkImageFilters::Blur(sigma.x, sigma.y, nullptr);
-    // Original coverage is src; blurred coverage is dst.
-    switch (fBlurStyle) {
-        case kInner_SkBlurStyle:
-            filter = SkImageFilters::Blend(SkBlendMode::kDstIn, std::move(filter), nullptr);
-            break;
-        case kSolid_SkBlurStyle:
-            filter = SkImageFilters::Blend(SkBlendMode::kSrcOver, std::move(filter), nullptr);
-            break;
-        case kOuter_SkBlurStyle:
-            filter = SkImageFilters::Blend(SkBlendMode::kDstOut, std::move(filter), nullptr);
-            break;
-        case kNormal_SkBlurStyle:
-            break;
-        default:
-            return {};
-    }
-    ImageFilterResult result{.filter = std::move(filter), .appliesShading = false};
-    return result;
 }
 
 SkScalar SkBlurMaskFilterImpl::computeXformedSigma(const SkMatrix& ctm) const {

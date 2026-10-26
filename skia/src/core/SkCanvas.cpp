@@ -2033,9 +2033,7 @@ std::optional<AutoLayerForImageFilter> SkCanvas::attemptBlurredRRectDraw(
         return std::nullopt;
     }
 
-    // Fall back on a regular draw, adding any mask filter layer we skipped earlier. We know the
-    // paint has a mask filter here, otherwise we would have failed the can_attempt check above.
-    layer->addMaskFilterLayer(&bounds);
+    // The CPU device handles the existing mask filter on the regular draw.
     return layer;
 }
 

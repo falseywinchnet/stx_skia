@@ -17,7 +17,6 @@
 #include <optional>
 #include <utility>
 
-class SkImageFilter;
 class SkMatrix;
 class SkPaint;
 class SkRRect;
@@ -43,8 +42,7 @@ public:
 
     void computeFastBounds(const SkRect&, SkRect*) const override;
     bool asABlur(BlurRec*) const override;
-    SkMaskFilterBase::ImageFilterResult asImageFilter(const SkMatrix& ctm,
-                                                        const SkPaint&) const override;
+
 
     SkScalar computeXformedSigma(const SkMatrix& ctm) const;
     SkBlurStyle blurStyle() const {return fBlurStyle;}

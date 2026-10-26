@@ -17,7 +17,6 @@
 
 #include <utility>
 
-class SkImageFilter;
 class SkMatrix;
 class SkPaint;
 class SkReadBuffer;
@@ -35,8 +34,7 @@ public:
     // extent remains the caller's responsibility. See the base ownership contract.
     bool filterMask(SkMaskBuilder* dst, const SkMask& src, const SkMatrix&,
                     SkIPoint* margin) const override;
-    SkMaskFilterBase::ImageFilterResult asImageFilter(const SkMatrix&,
-                                                        const SkPaint&) const override;
+
 
     void computeFastBounds(const SkRect& src, SkRect* dst) const override {
         *dst = src;
