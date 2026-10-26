@@ -1093,6 +1093,20 @@ alpha conventions and raster tails, with all eleven output files matching the
 reference. See ../results/2026-10-26/COLOR_PLAN_CONVERSION.md. Lower-level raster
 and skcms arithmetic remain separate conversion work.
 
+## Constant-color and working-space shaders
+
+The constant-color shader and working-space wrapper are converted. Working-space
+resolution returns named owned fields; temporary shader-color views are rejected.
+The wrapper preserves the incoming stage context while replacing color-dependent
+fields. This also carries two separately committed corrections: use the resolved
+input color space and preserve nonzero tile offsets. The reference fixture keeps
+the original color error observable, separately from the common-output comparison;
+offset propagation is checked against the candidate's tile-aware stage record.
+Candidate/reference suites pass 55/55 and 54/54, all twelve common output files
+match, and the full instrumented suite returns PASS.
+See ../results/2026-10-26/SHADER_WORKING_SPACE.md. Other shader classes and their
+shared base still remain in the conversion programme.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

@@ -6,6 +6,8 @@
 #include "src/core/SkEffectPriv.h"
 #include "src/core/SkRasterPipeline.h"
 #include "src/shaders/SkShaderBase.h"
+#include "src/shaders/SkColorShader.h"
+#include <utility>
 
 #include <array>
 #include <cmath>
@@ -13,6 +15,11 @@
 #include <vector>
 
 namespace {
+template <typename T>
+concept TemporaryShaderColor = requires(T&& shader) { std::move(shader).color(); };
+#ifndef STX_SKIA_REFERENCE
+static_assert(!TemporaryShaderColor<SkColorShader>);
+#endif
 bool render(const sk_sp<SkShader>& shader, const sk_sp<SkColorSpace>& destination,
             std::array<float, 4>& pixel) {
     const SkImageInfo info = SkImageInfo::Make(1, 1, kRGBA_F32_SkColorType,

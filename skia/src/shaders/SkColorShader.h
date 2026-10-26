@@ -28,7 +28,10 @@ public:
     */
     explicit SkColorShader(const SkColor4f& c) : fColor(c) {}
 
-    bool isOpaque() const override { return fColor.isOpaque(); }
+    bool isOpaque() const override {
+        const bool opaque = fColor.isOpaque();
+        return opaque;
+    }
     bool isConstant(SkColor4f* color = nullptr) const override {
         if (color) {
             *color = fColor;
@@ -38,7 +41,8 @@ public:
 
     ShaderType type() const override { return ShaderType::kColor; }
 
-    const SkColor4f& color() const { return fColor; }
+    const SkColor4f& color() const & { return fColor; }
+    const SkColor4f& color() const && = delete;
 
 private:
     SK_FLATTENABLE_HOOKS(SkColorShader)

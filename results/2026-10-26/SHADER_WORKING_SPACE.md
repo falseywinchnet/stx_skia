@@ -18,3 +18,31 @@ it does not count that as correct rendering. The original reference stage record
 predates the device-offset field, so offset forwarding is a candidate-only check. The byte-comparison artifact holds
 216 explicit-input-space cases that should remain unchanged, with inherited and
 explicitly equal output spaces compared within each case.
+
+## Following house-style conversion
+
+The constant-color shader and working-color-space wrapper now use explicit types,
+initialized values, named color-conversion plans and owner transfers. A named
+WorkingSpace record replaces the positional tuple and structured binding. The
+wrapper copies the incoming stage record and overrides only the resolved color
+space and paint color, retaining tile placement and bounds. Source color-space
+owners stay live while child stages are constructed; arena-owned conversion
+coefficients stay live through pipeline execution.
+
+The constant-color view rejects temporary shader objects. Serialization holds
+its data owner in a named local through the write. Existing baseline copies and
+reference selections were preserved. These changes retain the corrections in
+the preceding commit rather than folding them into an unexplained pixel change.
+
+Candidate release verification passes 55/55 tests. House spelling and lifetime
+checks report no findings across the four converted files and the fixture.
+
+Final M4 release verification: candidate 55/55, reference 54/54. All twelve
+common-output artifacts match byte for byte, including the new 3,456-byte shader
+working-space output. The full candidate instrumented suite returned PASS; its
+diagnostic file was not read. These checks establish the scoped corrections and
+conversion, not a completed shader/raster conversion or a new speed result.
+
+Commands are the candidate, baseline and candidate-sanitize profiles of
+`tools/build_native.sh` through m4build as documented in AGENTS.md. The native CI
+workflow compares shader-working-space.raw on every existing platform job.
