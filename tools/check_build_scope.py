@@ -34,7 +34,8 @@ def main():
                     "SkStrLCSearch(", "SkAutoAsciiToLC::", "SkBinaryWriteBuffer::setFactoryRecorder",
                     "SkFlattenable::Register", "SkFlattenable::NameToFactory",
                     "SkFlattenable::FactoryToName", "SkFlattenable::Finalize",
-                    "SkFlattenable::PrivateInitializer", "SkRegister"]:
+                    "SkFlattenable::PrivateInitializer", "SkRegister",
+                    "SkReadBuffer::setFactoryPlayback"]:
         if pattern in symbols:
             rejected.append(pattern)
     if rejected:

@@ -656,6 +656,22 @@ work. Both 32-test profiles, instrumented suites, relocated consumer and GUI.For
 fixture pass. See ../results/2026-10-26/FACTORY_REGISTRY.md for the intentional API
 removal, preserved reference behavior and exact scope.
 
+## Reader factory playback and recursion bookkeeping
+
+Unused private factory playback and recursion-limit controls are removed, together
+with the dictionary, borrowed factory-array pointer/count and nesting counter.
+Only the zero null-effect marker is accepted; other effect tokens invalidate the
+reader under the already-disabled effect-deserialization policy. Primitive,
+paint and callback image reading remain. No replacement tracking state is added.
+
+A controlled M4 Release header comparison measures the reader at 96 bytes before
+and 64 after. Both 32-test Release profiles, nine rendering artifacts, unchanged
+24-case serialization output, instrumented suites, relocated consumer and seven
+GUI.Forms integration tests pass.
+The fixture also checks cursor preservation, plain paint round-trips and unsupported
+effect rejection. This is scoped pruning, not a completed reader conversion or a
+rendering-speed claim. See ../results/2026-10-26/READER_FACTORY_PRUNE.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

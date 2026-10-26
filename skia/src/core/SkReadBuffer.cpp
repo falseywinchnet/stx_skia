@@ -445,84 +445,19 @@ sk_sp<SkImage> SkReadBuffer::readImage() {
 
 
 SkFlattenable* SkReadBuffer::readRawFlattenable() {
-    if (!this->isValid()) {
+    if (!isValid()) {
         return nullptr;
     }
-    SkFlattenable::Factory factory = nullptr;
-
-    if (fFactoryCount > 0) {
-        int32_t index = this->read32();
-        if (0 == index || !this->isValid()) {
-            return nullptr; // writer failed to give us the flattenable
-        }
-        if (index < 0) {
-            this->validate(false);
-            return nullptr;
-        }
-        index -= 1;     // we stored the index-base-1
-        if ((unsigned)index >= (unsigned)fFactoryCount) {
-            this->validate(false);
-            return nullptr;
-        }
-        factory = fFactoryArray[index];
-    } else {
-        if (this->peekByte() != 0) {
-            // If the first byte is non-zero, the flattenable is specified by a string.
-            size_t ignored_length;
-            if (this->readString(&ignored_length) != nullptr) {
-                // Built-in named effect deserialization is not admitted.
-                factory = nullptr;
-                fFlattenableDict.set(fFlattenableDict.count() + 1, factory);
-            }
-        } else {
-            // Read the index.  We are guaranteed that the first byte
-            // is zeroed, so we must shift down a byte.
-            uint32_t index = this->readUInt() >> 8;
-            if (index == 0) {
-                return nullptr; // writer failed to give us the flattenable
-            }
-
-            if (SkFlattenable::Factory* found = fFlattenableDict.find(index)) {
-                factory = *found;
-            }
-        }
-
-        if (!this->validate(factory != nullptr)) {
-            return nullptr;
-        }
-    }
-
-    // if we get here, factory may still be null, but if that is the case, the
-    // failure was ours, not the writer.
-    sk_sp<SkFlattenable> obj;
-    uint32_t sizeRecorded = this->read32();
-    if (factory) {
-        size_t offset = this->offset();
-        obj = (*factory)(*this);
-        // check that we read the amount we expected
-        size_t sizeRead = this->offset() - offset;
-        if (sizeRecorded != sizeRead) {
-            this->validate(false);
-            return nullptr;
-        }
-    } else {
-        // we must skip the remaining data
-        this->skip(sizeRecorded);
-    }
-    if (!this->isValid()) {
-        return nullptr;
-    }
-    return obj.release();
+    // The writer's null marker is a zero word. Named effects and picture factory
+    // indices are unsupported; rejecting them needs no name table or factory array.
+    const uint32_t token = readUInt();
+    validate(token == 0);
+    return nullptr;
 }
 
-SkFlattenable* SkReadBuffer::readFlattenable(SkFlattenable::Type ft) {
-    SkFlattenable* obj = this->readRawFlattenable();
-    if (obj && obj->getFlattenableType() != ft) {
-        this->validate(false);
-        obj->unref();
-        return nullptr;
-    }
-    return obj;
+SkFlattenable* SkReadBuffer::readFlattenable(SkFlattenable::Type) {
+    SkFlattenable* effect = readRawFlattenable();
+    return effect;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

@@ -29,7 +29,6 @@
 #include "src/core/SkPaintPriv.h"
 #include "src/core/SkPicturePriv.h"
 #include "src/core/SkSamplingPriv.h"
-#include "src/core/SkTHash.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 #include "src/shaders/SkShaderBase.h"
 
@@ -128,6 +127,7 @@ public:
         return SkPaintPriv::Unflatten(*this);
     }
 
+    // Only the null-effect marker is admitted. Any other token invalidates the reader.
     SkFlattenable* readRawFlattenable();
     SkFlattenable* readFlattenable(SkFlattenable::Type);
     template <typename T> sk_sp<T> readFlattenable() {
@@ -163,15 +163,6 @@ public:
     sk_sp<SkImage> readImage();
 
 
-
-    /**
-     *  Call this with a pre-loaded array of Factories, in the same order as
-     *  were created/written by the writer. SkPicture uses this.
-     */
-    void setFactoryPlayback(SkFlattenable::Factory array[], int count) {
-        fFactoryArray = array;
-        fFactoryCount = count;
-    }
 
     void setDeserialProcs(const SkDeserialProcs& procs);
     const SkDeserialProcs& getDeserialProcs() const { return fProcs; }
@@ -220,21 +211,6 @@ public:
 
     SkSamplingOptions readSampling();
 
-    // SKPs can contain other SKPs and ImageFilters can contain other ImageFilters, so this
-    // can be used to limit how deeply nested things are.
-    void downLevel() {
-        fRecursionLimit -= 1;
-        this->validate(fRecursionLimit > 0);
-    }
-    void upLevel() {
-        fRecursionLimit += 1;
-        // If the readbuffer hit the limit, we'll maintain the error state
-    }
-    void setRecursionLimit(int newLimit) {
-        fRecursionLimit = newLimit;
-        this->validate(fRecursionLimit > 0);
-    }
-
 private:
     const char* readString(size_t* length);
 
@@ -247,22 +223,14 @@ private:
     const char* fStop = nullptr;  // end of buffer
     const char* fBase = nullptr;  // beginning of buffer
 
-    // Only used if we do not have an fFactoryArray.
-    skia_private::THashMap<uint32_t, SkFlattenable::Factory> fFlattenableDict;
-
     int fVersion = 0;
 
-
-    SkFlattenable::Factory* fFactoryArray = nullptr;
-    int                     fFactoryCount = 0;
 
     SkDeserialProcs fProcs;
 
     static bool IsPtrAlign4(const void* ptr) {
         return SkIsAlign4((uintptr_t)ptr);
     }
-
-    int fRecursionLimit = 100;
 
     bool fError = false;
 };

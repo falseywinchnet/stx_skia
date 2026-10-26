@@ -9,6 +9,7 @@
 #include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkShaderMaskFilter.h"
 #include "src/core/SkWriteBuffer.h"
+#include "src/core/SkReadBuffer.h"
 
 #include <array>
 #include <cstdint>
@@ -23,9 +24,54 @@ template <typename T> concept HasFactoryRegistry = requires { &T::Register; };
 template <typename T> concept HasFactoryLookup = requires { &T::NameToFactory; };
 static_assert(!HasFactoryRegistry<SkFlattenable>);
 static_assert(!HasFactoryLookup<SkFlattenable>);
+template <typename T> concept HasFactoryPlayback = requires { &T::setFactoryPlayback; };
+template <typename T> concept HasRecursionLimit = requires { &T::setRecursionLimit; };
+static_assert(!HasFactoryPlayback<SkReadBuffer>);
+static_assert(!HasRecursionLimit<SkReadBuffer>);
 #endif
 
 namespace {
+bool reader_contract() {
+    // A null effect consumes exactly one word; following paint/primitive data remains readable.
+    const std::array<uint32_t, 2> sentinel{0, 0x12345678U};
+    SkReadBuffer reader(sentinel.data(), sizeof(sentinel));
+    if (reader.readRawFlattenable() != nullptr || !reader.isValid()) return false;
+    if (reader.offset() != sizeof(uint32_t) || reader.readUInt() != sentinel[1]) return false;
+    if (!reader.isValid() || !reader.eof()) return false;
+    const SkSerialProcs procs{};
+    for (int style = 0; style <= static_cast<int>(SkPaint::kStrokeAndFill_Style); ++style) {
+        SkPaint paint{};
+        paint.setColor(0x80563412U);
+        paint.setAntiAlias(true);
+        paint.setStrokeWidth(2.5f);
+        paint.setStyle(static_cast<SkPaint::Style>(style));
+        SkBinaryWriteBuffer writer(procs);
+        writer.writePaint(paint);
+        writer.writeUInt(sentinel[1]);
+        const size_t bytes = writer.bytesWritten();
+        if (bytes % sizeof(uint32_t) != 0) return false;
+        std::vector<uint32_t> storage(bytes / sizeof(uint32_t));
+        writer.writeToMemory(storage.data());
+        SkReadBuffer paintReader(storage.data(), bytes);
+        const SkPaint decoded = paintReader.readPaint();
+        if (decoded != paint || paintReader.readUInt() != sentinel[1]) return false;
+        if (!paintReader.isValid() || !paintReader.eof()) return false;
+    }
+#ifndef STX_SKIA_REFERENCE
+    const std::array<uint32_t, 5> tokens{1, 0x100U, 0x10000U, 0x80000000U, 0xffffffffU};
+    for (const uint32_t token : tokens) {
+        const std::array<uint32_t, 2> input{token, sentinel[1]};
+        SkReadBuffer rejected(input.data(), sizeof(input));
+        if (rejected.readRawFlattenable() != nullptr || rejected.isValid()) return false;
+        if (!rejected.eof() || rejected.readUInt() != 0) return false;
+    }
+    // A valid, non-null empty extent cannot supply even the null marker.
+    SkReadBuffer empty(sentinel.data(), 0);
+    if (empty.readRawFlattenable() != nullptr || empty.isValid()) return false;
+#endif
+    return true;
+}
+
 bool append_record(const SkFlattenable& effect, std::vector<uint8_t>& output) {
     sk_sp<SkData> serialized = effect.serialize();
     if (!serialized || (*serialized).size() == 0) return false;
@@ -116,7 +162,7 @@ bool streams(std::vector<uint8_t>& output, int& cases) {
 int main(int argc, char** argv) {
     std::vector<uint8_t> output{};
     int cases = 0;
-    if (!streams(output, cases)) return 1;
+    if (!reader_contract() || !streams(output, cases)) return 1;
     uint64_t digest = UINT64_C(1469598103934665603);
     for (const uint8_t byte : output) {
         digest ^= byte;
@@ -131,6 +177,6 @@ int main(int argc, char** argv) {
     }
     std::printf("flattenable streams: %d cases, %zu bytes, hash=%llu\n", cases, output.size(),
                 static_cast<unsigned long long>(digest));
-    std::printf("writer_size=%zu\n", sizeof(SkBinaryWriteBuffer));
+    std::printf("writer_size=%zu reader_size=%zu\n", sizeof(SkBinaryWriteBuffer), sizeof(SkReadBuffer));
     return 0;
 }
