@@ -28,3 +28,10 @@ list(REMOVE_ITEM stx_sources skia/src/shaders/SkRuntimeShader.cpp)
 list(REMOVE_ITEM stx_sources skia/src/effects/SkBlenders.cpp)
 list(REMOVE_ITEM stx_sources skia/src/effects/colorfilters/SkRuntimeColorFilter.cpp)
 list(REMOVE_ITEM stx_sources skia/src/utils/SkShaderUtils.cpp)
+
+# Text enters through external image masks, not Skia glyph drawing.
+list(REMOVE_ITEM stx_sources skia/src/core/SkDraw_text.cpp)
+list(REMOVE_ITEM stx_sources skia/src/core/SkGlyphRunPainter.cpp)
+list(REMOVE_ITEM stx_sources skia/src/core/SkOverdrawCanvas.cpp)
+list(REMOVE_ITEM stx_sources skia/src/utils/SkTextUtils.cpp)
+list(REMOVE_ITEM stx_sources skia/src/text/GlyphRun.cpp)

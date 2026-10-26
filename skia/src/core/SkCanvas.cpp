@@ -29,7 +29,6 @@
 #include "include/core/SkShader.h"
 #include "include/core/SkStrokeRec.h"
 #include "include/core/SkSurface.h"
-#include "include/core/SkTextBlob.h"
 #include "include/core/SkTileMode.h"
 #include "include/core/SkTypes.h"
 #include "include/core/SkVertices.h"
@@ -39,7 +38,6 @@
 #include "include/private/SkTPin.h"
 #include "include/private/SkTemplates.h"
 #include "include/private/SkTo.h"
-#include "include/private/chromium/Slug.h"
 #include "include/utils/SkNoDrawCanvas.h"
 #include "src/core/SkBlenderBase.h"
 #include "src/core/SkBlurMaskFilterImpl.h"
@@ -57,7 +55,6 @@
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 #include "src/image/SkSurface_Base.h"
 #include "src/shaders/SkImageShader.h"
-#include "src/text/GlyphRun.h"
 #include "src/utils/SkPatchUtils.h"
 
 #include <algorithm>
@@ -73,8 +70,6 @@
 // This is a test: static_assert with no message is a c++17 feature,
 // and std::max() is constexpr only since the c++14 stdlib.
 static_assert(std::max(3,4) == 4);
-
-using Slug = sktext::gpu::Slug;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -291,7 +286,6 @@ void SkCanvas::init(sk_sp<SkDevice> device) {
 
     fSurfaceBase = nullptr;
     fRootDevice = std::move(device);
-    fRunBuilders.push_back(std::make_unique<sktext::GlyphRunBuilder>());
     fQuickRejectBounds = this->computeDeviceClipBounds();
 }
 
@@ -1076,7 +1070,6 @@ bool SkCanvas::internalQuickReject(const SkRect& bounds, const SkPaint& paint,
     return false;
 }
 
-
 SkRect SkCanvas::getLocalClipBounds() const {
     SkIRect ibounds = this->getDeviceClipBounds();
     if (ibounds.isEmpty()) {
@@ -1813,193 +1806,6 @@ void SkCanvas::drawImageRect(const SkImage* image, const SkRect& dst,
                         paint, kFast_SrcRectConstraint);
 }
 
-sktext::GlyphRunBuilder* SkCanvas::obtainGlyphRunBuilder() {
-    if (fRunBuildersUsed >= fRunBuilders.size()) {
-        fRunBuilders.push_back(std::make_unique<sktext::GlyphRunBuilder>());
-    }
-    sktext::GlyphRunBuilder* result = fRunBuilders[fRunBuildersUsed].get();
-    fRunBuildersUsed++;
-    return result;
-}
-
-void SkCanvas::releaseGlyphRunBuilder() {
-    SkASSERT(fRunBuildersUsed > 0);
-    fRunBuildersUsed--;
-}
-
-class AutoGlyphRunBuilder {
-public:
-    AutoGlyphRunBuilder(SkCanvas* canvas)
-            : fCanvas(canvas), fGlyphRunBuilder(canvas->obtainGlyphRunBuilder()) {}
-    ~AutoGlyphRunBuilder() { fCanvas->releaseGlyphRunBuilder(); }
-
-    sktext::GlyphRunBuilder* operator->() { return fGlyphRunBuilder; }
-
-private:
-    SkCanvas* fCanvas;
-    sktext::GlyphRunBuilder* fGlyphRunBuilder;
-};
-
-void SkCanvas::onDrawTextBlob(const SkTextBlob* blob, SkScalar x, SkScalar y,
-                              const SkPaint& paint) {
-    AutoGlyphRunBuilder scratchBuilder(this);
-    auto glyphRunList = scratchBuilder->blobToGlyphRunList(*blob, {x, y});
-    this->onDrawGlyphRunList(glyphRunList, paint);
-}
-
-void SkCanvas::onDrawGlyphRunList(const sktext::GlyphRunList& glyphRunList, const SkPaint& paint) {
-    SkRect bounds = glyphRunList.sourceBoundsWithOrigin();
-    if (this->internalQuickReject(bounds, paint)) {
-        return;
-    }
-
-    // Text attempts to apply any SkMaskFilter internally and save the blurred masks in the
-    // strike cache; if a glyph must be drawn as a path or drawable, SkDevice routes back to
-    // this SkCanvas to retry, which will go through a function that does *not* skip the mask
-    // filter layer.
-    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kNone);
-    if (layer) {
-        this->topDevice()->drawGlyphRunList(this, glyphRunList, layer->paint);
-    }
-}
-
-sk_sp<Slug> SkCanvas::convertBlobToSlug(
-        const SkTextBlob& blob, SkPoint origin, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    AutoGlyphRunBuilder scratchBuilder(this);
-    auto glyphRunList = scratchBuilder->blobToGlyphRunList(blob, origin);
-    return this->onConvertGlyphRunListToSlug(glyphRunList, paint);
-}
-
-sk_sp<Slug> SkCanvas::onConvertGlyphRunListToSlug(const sktext::GlyphRunList& glyphRunList,
-                                                  const SkPaint& paint) {
-    SkRect bounds = glyphRunList.sourceBoundsWithOrigin();
-    if (bounds.isEmpty() || !bounds.isFinite() || this->nothingToDraw(paint)) {
-        return nullptr;
-    }
-    // See comment in onDrawGlyphRunList()
-    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kNone);
-    if (layer) {
-        return this->topDevice()->convertGlyphRunListToSlug(glyphRunList, layer->paint);
-    }
-    return nullptr;
-}
-
-void SkCanvas::drawSlug(const Slug* slug, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    if (slug) {
-        this->onDrawSlug(slug, paint);
-    }
-}
-
-void SkCanvas::onDrawSlug(const Slug* slug, const SkPaint& paint) {
-    SkRect bounds = slug->sourceBoundsWithOrigin();
-    if (this->internalQuickReject(bounds, paint)) {
-        return;
-    }
-    // See comment in onDrawGlyphRunList()
-    auto layer = this->aboutToDraw(paint, &bounds, PredrawFlags::kNone);
-    if (layer) {
-        this->topDevice()->drawSlug(this, slug, layer->paint);
-    }
-}
-
-// These call the (virtual) onDraw... method
-void SkCanvas::drawSimpleText(const void* text, size_t byteLength, SkTextEncoding encoding,
-                              SkScalar x, SkScalar y, const SkFont& font, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    if (byteLength) {
-        sk_msan_assert_initialized(text, SkTAddOffset<const void>(text, byteLength));
-        AutoGlyphRunBuilder scratchBuilder(this);
-        const sktext::GlyphRunList& glyphRunList =
-        scratchBuilder->textToGlyphRunList(
-                    font, paint, text, byteLength, {x, y}, encoding);
-        if (!glyphRunList.empty()) {
-            this->onDrawGlyphRunList(glyphRunList, paint);
-        }
-    }
-}
-
-void SkCanvas::drawGlyphs(SkSpan<const SkGlyphID> glyphs, SkSpan<const SkPoint> positions,
-                          SkSpan<const uint32_t> clusters, SkSpan<const char> utf8text,
-                          SkPoint origin, const SkFont& font, const SkPaint& paint) {
-    if (glyphs.empty()) { return; }
-    AutoGlyphRunBuilder scratchBuilder(this);
-
-    sktext::GlyphRun glyphRun {
-            font,
-            positions,
-            glyphs,
-            utf8text,
-            clusters,
-            SkSpan<SkVector>()
-    };
-
-    sktext::GlyphRunList glyphRunList = scratchBuilder->makeGlyphRunList(glyphRun, paint, origin);
-    this->onDrawGlyphRunList(glyphRunList, paint);
-}
-
-void SkCanvas::drawGlyphs(SkSpan<const SkGlyphID> glyphs, SkSpan<const SkPoint> positions,
-                          SkPoint origin, const SkFont& font, const SkPaint& paint) {
-    if (glyphs.empty()) { return; }
-    AutoGlyphRunBuilder scratchBuilder(this);
-
-    sktext::GlyphRun glyphRun {
-        font,
-        positions,
-        glyphs,
-        SkSpan<const char>(),
-        SkSpan<const uint32_t>(),
-        SkSpan<SkVector>()
-    };
-
-    sktext::GlyphRunList glyphRunList = scratchBuilder->makeGlyphRunList(glyphRun, paint, origin);
-
-    this->onDrawGlyphRunList(glyphRunList, paint);
-}
-
-void SkCanvas::drawGlyphsRSXform(SkSpan<const SkGlyphID> glyphs, SkSpan<const SkRSXform> xforms,
-                                 SkPoint origin, const SkFont& font, const SkPaint& paint) {
-    if (glyphs.empty()) { return; }
-    AutoGlyphRunBuilder scratchBuilder(this);
-
-    auto [positions, rotateScales] = scratchBuilder->convertRSXForm(xforms);
-
-    sktext::GlyphRun glyphRun {
-            font,
-            positions,
-            glyphs,
-            SkSpan<const char>(),
-            SkSpan<const uint32_t>(),
-            rotateScales
-    };
-
-    sktext::GlyphRunList glyphRunList = scratchBuilder->makeGlyphRunList(glyphRun, paint, origin);
-    this->onDrawGlyphRunList(glyphRunList, paint);
-}
-
-void SkCanvas::drawTextBlob(const SkTextBlob* blob, SkScalar x, SkScalar y,
-                            const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    RETURN_ON_NULL(blob);
-    RETURN_ON_FALSE(blob->bounds().makeOffset(x, y).isFinite());
-
-    // Overflow if more than 2^21 glyphs stopping a buffer overflow latter in the stack.
-    // See chromium:1080481
-    // TODO: can consider unrolling a few at a time if this limit becomes a problem.
-    int totalGlyphCount = 0;
-    constexpr int kMaxGlyphCount = 1 << 21;
-    SkTextBlob::Iter i(*blob);
-    SkTextBlob::Iter::Run r;
-    while (i.next(&r)) {
-        int glyphsLeft = kMaxGlyphCount - totalGlyphCount;
-        RETURN_ON_FALSE(r.fGlyphCount <= glyphsLeft);
-        totalGlyphCount += r.fGlyphCount;
-    }
-
-    this->onDrawTextBlob(blob, x, y, paint);
-}
-
 void SkCanvas::onDrawVerticesObject(const SkVertices* vertices, SkBlendMode bmode,
                                     const SkPaint& paint) {
     SkPaint simplePaint = clean_paint_for_drawVertices(paint);
@@ -2275,7 +2081,6 @@ void SkCanvas::drawArc(const SkRect& oval, SkScalar startAngle,
 ///////////////////////////////////////////////////////////////////////////////
 #ifdef SK_DISABLE_SKPICTURE
 void SkCanvas::drawPicture(const SkPicture* picture, const SkMatrix* matrix, const SkPaint* paint) {}
-
 
 void SkCanvas::onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
                              const SkPaint* paint) {}

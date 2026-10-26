@@ -26,7 +26,6 @@ class SkBitmap;
 class SkBlender;
 class SkBlitter;
 class SkDevice;
-class SkGlyph;
 class SkMaskFilter;
 class SkMatrix;
 class SkMipmap;
@@ -42,15 +41,9 @@ struct SkPoint3;
 struct SkRSXform;
 struct SkRect;
 
-namespace sktext {
-class GlyphRunList;
-}
-
 namespace skcpu {
 
-class GlyphRunListPainter;
 class ContextImpl;
-
 
 /** Helper function that creates a mask from a path and a required maskfilter.
     Note however, that the resulting mask will not have been actually filtered,
@@ -64,30 +57,6 @@ bool DrawToMask(const SkPathRaw& devRaw,
                 SkMaskBuilder* dst,
                 SkMaskBuilder::CreateMode mode,
                 SkStrokeRec::InitStyle style);
-
-/**
- *  BitmapDevicePainter provides a minimal interface for painting pre-rasterized objects like glyphs
- *  and bitmaps.
- *
- *  This interface creates a seam that allows components to intercept and handle low-level drawing
- *  primitives. For example, SkOverdrawCanvas uses this to visualize overdraw by drawing bounding
- *  boxes for glyphs
- */
-class BitmapDevicePainter {
-public:
-    BitmapDevicePainter() = default;
-    BitmapDevicePainter(const BitmapDevicePainter&) = default;
-    virtual ~BitmapDevicePainter() = default;
-
-    virtual void paintMasks(SkZip<const SkGlyph*, SkPoint> accepted,
-                            const SkPaint& paint) const = 0;
-    virtual void drawBitmap(const SkBitmap&,
-                            const SkMatrix&,
-                            const SkRect* dstOrNull,
-                            const SkSamplingOptions&,
-                            const SkPaint&,
-                            sk_sp<SkMipmap>) const = 0;
-};
 
 /**
  *  The Draw class is the workhorse for the software rendering backend. It is an implementation
@@ -104,7 +73,7 @@ public:
  *  the actual work of writing pixels into the destination pixmap.
  *  The default Blitter is chosen via SkBlitter::Choose()
  */
-class Draw : public BitmapDevicePainter {
+class Draw {
 public:
     Draw();
 
@@ -189,14 +158,8 @@ public:
                     const SkRect* dstOrNull,
                     const SkSamplingOptions&,
                     const SkPaint&,
-                    sk_sp<SkMipmap>) const override;
+                    sk_sp<SkMipmap>) const;
     void drawSprite(const SkBitmap&, int x, int y, const SkPaint&) const;
-    void drawGlyphRunList(SkCanvas* canvas,
-                          GlyphRunListPainter* glyphPainter,
-                          const sktext::GlyphRunList& glyphRunList,
-                          const SkPaint& paint) const;
-
-    void paintMasks(SkZip<const SkGlyph*, SkPoint> accepted, const SkPaint& paint) const override;
 
     void drawPoints(SkCanvas::PointMode, SkSpan<const SkPoint>, const SkPaint&, SkDevice*) const;
     /* If skipColorXform, skips color conversion when assigning per-vertex colors */

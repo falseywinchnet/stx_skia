@@ -38,7 +38,6 @@
 #include "src/image/SkImage_Base.h"
 #include "src/image/SkImage_Raster.h"
 #include "src/shaders/SkImageShader.h"
-#include "src/text/GlyphRun.h"
 
 #include <utility>
 
@@ -242,8 +241,7 @@ SkBitmapDevice::SkBitmapDevice(skcpu::RecorderImpl* recorder, const SkBitmap& bi
         : SkDevice(bitmap.info(), SkSurfaceProps())
         , fRecorder(recorder)
         , fBitmap(bitmap)
-        , fRCStack(bitmap.width(), bitmap.height())
-        , fGlyphPainter(this->surfaceProps(), bitmap.colorType(), bitmap.colorSpace()) {
+        , fRCStack(bitmap.width(), bitmap.height()) {
     SkASSERT(valid_for_bitmap_device(bitmap.info(), nullptr));
 }
 
@@ -255,8 +253,7 @@ SkBitmapDevice::SkBitmapDevice(skcpu::RecorderImpl* recorder,
         , fRasterHandle(hndl)
         , fRecorder(recorder)
         , fBitmap(bitmap)
-        , fRCStack(bitmap.width(), bitmap.height())
-        , fGlyphPainter(this->surfaceProps(), bitmap.colorType(), bitmap.colorSpace()) {
+        , fRCStack(bitmap.width(), bitmap.height()) {
     SkASSERT(valid_for_bitmap_device(bitmap.info(), nullptr));
 }
 
@@ -529,13 +526,6 @@ void SkBitmapDevice::drawImageRect(const SkImage* image, const SkRect* src, cons
     // Call ourself, in case the subclass wanted to share this setup code
     // but handle the drawRect code themselves.
     this->drawRect(*dstPtr, paintWithShader);
-}
-
-void SkBitmapDevice::onDrawGlyphRunList(SkCanvas* canvas,
-                                        const sktext::GlyphRunList& glyphRunList,
-                                        const SkPaint& paint) {
-    SkASSERT(!glyphRunList.hasRSXForm());
-    LOOP_TILER( drawGlyphRunList(canvas, &fGlyphPainter, glyphRunList, paint), nullptr )
 }
 
 void SkBitmapDevice::drawVertices(const SkVertices* vertices,

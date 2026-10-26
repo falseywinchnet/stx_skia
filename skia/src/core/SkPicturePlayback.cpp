@@ -629,22 +629,10 @@ void SkPicturePlayback::handleOp(SkReadBuffer* reader,
 
             canvas->private_draw_shadow_rec(path, rec);
         } break;
-        case DRAW_TEXT_BLOB: {
-            const SkPaint& paint = fPictureData->requiredPaint(reader);
-            const SkTextBlob* blob = fPictureData->getTextBlob(reader);
-            SkScalar x = reader->readScalar();
-            SkScalar y = reader->readScalar();
-            BREAK_ON_READ_ERROR(reader);
-
-            canvas->drawTextBlob(blob, x, y, paint);
-        } break;
-        case DRAW_SLUG: {
-            const SkPaint& paint = fPictureData->requiredPaint(reader);
-            const sktext::gpu::Slug* slug = fPictureData->getSlug(reader);
-            BREAK_ON_READ_ERROR(reader);
-
-            canvas->drawSlug(slug, paint);
-        } break;
+        case DRAW_TEXT_BLOB:
+        case DRAW_SLUG:
+            (*reader).validate(false); // Text rendering belongs to the external glyph engine.
+            break;
         case DRAW_VERTICES_OBJECT: {
             const SkPaint& paint = fPictureData->requiredPaint(reader);
             const SkVertices* vertices = fPictureData->getVertices(reader);

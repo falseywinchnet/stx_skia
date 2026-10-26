@@ -11,7 +11,6 @@
 #include "src/core/SkBitmapDevice.h"
 #include "src/core/SkDevice.h"
 #include "src/core/SkSurfacePriv.h"
-#include "src/text/GlyphRun.h" // IWYU pragma: keep
 
 #include <memory>
 #include <utility>

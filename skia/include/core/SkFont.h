@@ -67,7 +67,6 @@ public:
     */
     explicit SkFont(sk_sp<SkTypeface> typeface);
 
-
     /** Constructs SkFont with default values with SkTypeface and size in points,
         horizontal scale, and horizontal skew. Horizontal scale emulates condensed
         and expanded fonts. Horizontal skew emulates oblique fonts.
@@ -79,7 +78,6 @@ public:
         @return          initialized SkFont
     */
     SkFont(sk_sp<SkTypeface> typeface, SkScalar size, SkScalar scaleX, SkScalar skewX);
-
 
     /** Compares SkFont and font, and returns true if they are equivalent.
         May return false if SkTypeface has identical contents but different pointers.
@@ -434,19 +432,6 @@ public:
      */
     void getXPos(SkSpan<const SkGlyphID> glyphs, SkSpan<SkScalar> xpos, SkScalar origin = 0) const;
 
-    /** Returns intervals [start, end] describing lines parallel to the advance that intersect
-     *  with the glyphs.
-     *
-     *  @param glyphs   the glyphs to intersect
-     *  @param pos      the position of each glyph
-     *  @param top      the top of the line intersecting
-     *  @param bottom   the bottom of the line intersecting
-        @return         array of pairs of x values [start, end]. May be empty.
-     */
-    std::vector<SkScalar> getIntercepts(SkSpan<const SkGlyphID> glyphs,
-                                        SkSpan<const SkPoint> pos,
-                                        SkScalar top, SkScalar bottom,
-                                        const SkPaint* = nullptr) const;
 
     /*
      * If the specified glyph can be represented as a path, return its path.

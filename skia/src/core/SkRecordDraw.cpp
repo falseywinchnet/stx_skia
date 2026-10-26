@@ -148,8 +148,6 @@ DRAW(DrawPoints, drawPoints(r.mode, {r.pts.data(), r.count}, r.paint))
 DRAW(DrawRRect, drawRRect(r.rrect, r.paint))
 DRAW(DrawRect, drawRect(r.rect, r.paint))
 DRAW(DrawRegion, drawRegion(r.region, r.paint))
-DRAW(DrawTextBlob, drawTextBlob(r.blob.get(), r.x, r.y, r.paint))
-DRAW(DrawSlug, drawSlug(r.slug.get(), r.paint))
 DRAW(DrawAtlas, drawAtlas(r.atlas.get(),
                           {r.xforms.data(), r.count},
                           {r.texs.data(), r.count},
@@ -475,17 +473,6 @@ private:
         SkRect dst = op.picture->cullRect();
         op.matrix.mapRect(&dst);
         return this->adjustAndMap(dst, op.paint);
-    }
-
-    Bounds bounds(const DrawTextBlob& op) const {
-        SkRect dst = op.blob->bounds();
-        dst.offset(op.x, op.y);
-        return this->adjustAndMap(dst, &op.paint);
-    }
-
-    Bounds bounds(const DrawSlug& op) const {
-        SkRect dst = op.slug->sourceBoundsWithOrigin();
-        return this->adjustAndMap(dst, &op.paint);
     }
 
     Bounds bounds(const DrawDrawable& op) const {

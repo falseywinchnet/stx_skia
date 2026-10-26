@@ -31,7 +31,6 @@
 #include "src/core/SkCanvasPriv.h"
 #include "src/core/SkRecord.h"
 #include "src/core/SkRecords.h"
-#include "src/text/GlyphRun.h"
 #include "src/utils/SkPatchUtils.h"
 
 #include <cstdint>
@@ -254,27 +253,6 @@ void SkRecordCanvas::onDrawImageLattice2(const SkImage* image,
                                               *lattice.fBounds,
                                               dst,
                                               filter);
-}
-
-void SkRecordCanvas::onDrawTextBlob(const SkTextBlob* blob,
-                                    SkScalar x,
-                                    SkScalar y,
-                                    const SkPaint& paint) {
-    this->append<SkRecords::DrawTextBlob>(paint, sk_ref_sp(blob), x, y);
-}
-
-void SkRecordCanvas::onDrawSlug(const sktext::gpu::Slug* slug, const SkPaint& paint) {
-    this->append<SkRecords::DrawSlug>(paint, sk_ref_sp(slug));
-}
-
-void SkRecordCanvas::onDrawGlyphRunList(const sktext::GlyphRunList& glyphRunList,
-                                        const SkPaint& paint) {
-    sk_sp<SkTextBlob> blob = sk_ref_sp(glyphRunList.blob());
-    if (glyphRunList.blob() == nullptr) {
-        blob = glyphRunList.makeBlob();
-    }
-
-    this->onDrawTextBlob(blob.get(), glyphRunList.origin().x(), glyphRunList.origin().y(), paint);
 }
 
 void SkRecordCanvas::onDrawPicture(const SkPicture* pic,

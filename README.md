@@ -27,8 +27,10 @@ All 17 general image-filter factory implementations and their public factory
 header are removed from the candidate. GUI.Forms owns CSS and backdrop effects.
 The core image-filter graph, cache, paint field and device/image entry points are
 also removed. Ordinary layers compose devices directly. SkSL/runtime effects, programmable
-meshes and shader-language capability APIs are also removed. Picture/text
-internals remain removal work.
+meshes and shader-language capability APIs are also removed. The canvas no longer
+exposes text drawing or owns glyph-run scratch; external A8 glyph-mask composition
+remains. Picture serialization, typefaces and strike-cache internals remain removal
+work.
 
 On the initial recorded M4/macOS build, the candidate passed seven selected GUI.Forms
 renderer tests and produced byte-identical output across 24 baseline comparison

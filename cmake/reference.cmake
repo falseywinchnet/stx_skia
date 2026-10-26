@@ -161,3 +161,31 @@ list(APPEND stx_sources baseline/skia/src/core/SkRasterPipeline.cpp)
 
 list(REMOVE_ITEM stx_sources skia/src/core/SkOpts.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkOpts.cpp)
+
+# Original text drawing and adapted canvas/device forwarding.
+foreach(unit IN ITEMS
+    src/capture/SkCaptureCanvas.cpp
+    src/core/SkBitmapDevice.cpp
+    src/core/SkCanvas.cpp
+    src/core/SkDevice.cpp
+    src/core/SkDraw_text.cpp
+    src/core/SkGlyphRunPainter.cpp
+    src/core/SkOverdrawCanvas.cpp
+    src/core/SkPicturePlayback.cpp
+    src/core/SkPictureRecord.cpp
+    src/core/SkRecordCanvas.cpp
+    src/core/SkRecordDraw.cpp
+    src/text/GlyphRun.cpp
+    src/utils/SkNWayCanvas.cpp
+    src/utils/SkPaintFilterCanvas.cpp
+    src/utils/SkTextUtils.cpp
+)
+    list(REMOVE_ITEM stx_sources skia/${unit} baseline/skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkCanvas_Raster.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkCanvas_Raster.cpp)
+
+list(REMOVE_ITEM stx_sources skia/src/core/SkTextBlob.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkTextBlob.cpp)

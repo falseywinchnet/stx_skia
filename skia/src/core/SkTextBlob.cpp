@@ -8,10 +8,7 @@
 #include "include/core/SkTextBlob.h"
 
 #include "include/core/SkData.h"
-#include "include/core/SkMaskFilter.h"
 #include "include/core/SkMatrix.h"
-#include "include/core/SkPaint.h"
-#include "include/core/SkPathEffect.h"
 #include "include/core/SkPoint.h"
 #include "include/core/SkRSXform.h"
 #include "include/core/SkSpan.h"
@@ -20,13 +17,10 @@
 #include "include/private/SkMalloc.h"
 #include "include/private/SkTo.h"
 #include "src/core/SkFontPriv.h"
-#include "src/core/SkGlyph.h"
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkSafeMath.h"
-#include "src/core/SkStrikeSpec.h"
 #include "src/core/SkTextBlobPriv.h"
 #include "src/core/SkWriteBuffer.h"
-#include "src/text/GlyphRun.h"
 
 #include <algorithm>
 #include <atomic>
@@ -873,107 +867,6 @@ size_t SkTextBlob::serialize(const SkSerialProcs& procs, void* memory, size_t me
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-namespace {
-int get_glyph_run_intercepts(const sktext::GlyphRun& glyphRun,
-                             const SkPaint& paint,
-                             const SkScalar bounds[2],
-                             SkScalar intervals[],
-                             int* intervalCount) {
-    SkScalar scale = SK_Scalar1;
-    SkPaint interceptPaint{paint};
-    SkFont interceptFont{glyphRun.font()};
-
-    interceptPaint.setMaskFilter(nullptr);   // don't want this affecting our path-cache lookup
-
-    // can't use our canonical size if we need to apply path effects
-    if (interceptPaint.getPathEffect() == nullptr) {
-        // If the wrong size is going to be used, don't hint anything.
-        interceptFont.setHinting(SkFontHinting::kNone);
-        interceptFont.setSubpixel(true);
-        scale = interceptFont.getSize() / SkFontPriv::kCanonicalTextSizeForPaths;
-        interceptFont.setSize(SkIntToScalar(SkFontPriv::kCanonicalTextSizeForPaths));
-        // Note: fScale can be zero here (even if it wasn't before the divide). It can also
-        // be very very small. We call sk_ieee_float_divide below to ensure IEEE divide behavior,
-        // since downstream we will check for the resulting coordinates being non-finite anyway.
-        // Thus we don't need to check for zero here.
-        if (interceptPaint.getStrokeWidth() > 0
-            && interceptPaint.getStyle() != SkPaint::kFill_Style) {
-            interceptPaint.setStrokeWidth(
-                    sk_ieee_float_divide(interceptPaint.getStrokeWidth(), scale));
-        }
-    }
-
-    interceptPaint.setStyle(SkPaint::kFill_Style);
-    interceptPaint.setPathEffect(nullptr);
-
-    SkStrikeSpec strikeSpec = SkStrikeSpec::MakeWithNoDevice(interceptFont, &interceptPaint);
-    SkBulkGlyphMetricsAndPaths metricsAndPaths{strikeSpec};
-
-    const SkPoint* posCursor = glyphRun.positions().data();
-    for (const SkGlyph* glyph : metricsAndPaths.glyphs(glyphRun.glyphsIDs())) {
-        SkPoint pos = *posCursor++;
-
-        if (glyph->path() != nullptr) {
-            // The typeface is scaled, so un-scale the bounds to be in the space of the typeface.
-            // Also ensure the bounds are properly offset by the vertical positioning of the glyph.
-            SkScalar scaledBounds[2] = {
-                (bounds[0] - pos.y()) / scale,
-                (bounds[1] - pos.y()) / scale
-            };
-            metricsAndPaths.findIntercepts(
-                    scaledBounds, scale, pos.x(), glyph, intervals, intervalCount);
-        }
-    }
-    return *intervalCount;
-}
-}  // namespace
-
-int SkTextBlob::getIntercepts(const SkScalar bounds[2], SkScalar intervals[],
-                              const SkPaint* paint) const {
-    std::optional<SkPaint> defaultPaint;
-    if (paint == nullptr) {
-        defaultPaint.emplace();
-        paint = &defaultPaint.value();
-    }
-
-    sktext::GlyphRunBuilder builder;
-    auto glyphRunList = builder.blobToGlyphRunList(*this, {0, 0});
-
-    int intervalCount = 0;
-    for (const sktext::GlyphRun& glyphRun : glyphRunList) {
-        // Ignore RSXForm runs.
-        if (glyphRun.scaledRotations().empty()) {
-            intervalCount = get_glyph_run_intercepts(
-                glyphRun, *paint, bounds, intervals, &intervalCount);
-        }
-    }
-
-    return intervalCount;
-}
-
-std::vector<SkScalar> SkFont::getIntercepts(SkSpan<const SkGlyphID> glyphs,
-                                            SkSpan<const SkPoint> positions,
-                                            SkScalar top, SkScalar bottom,
-                                            const SkPaint* paintPtr) const {
-    const auto count = std::min(glyphs.size(), positions.size());
-    if (count == 0) {
-        return std::vector<SkScalar>();
-    }
-
-    const SkPaint paint(paintPtr ? *paintPtr : SkPaint());
-    const SkScalar bounds[] = {top, bottom};
-    const sktext::GlyphRun run(*this, positions, glyphs, {}, {}, {});
-
-    std::vector<SkScalar> result;
-    result.resize(count * 2);   // worst case allocation
-    int intervalCount = 0;
-    intervalCount = get_glyph_run_intercepts(run, paint, bounds, result.data(), &intervalCount);
-    result.resize(intervalCount);
-    return result;
-}
-
-////////
 
 SkTextBlob::Iter::Iter(const SkTextBlob& blob) {
     fRunRecord = RunRecord::First(&blob);

@@ -31,8 +31,6 @@ protected:
     void onDrawPath(const SkPath& path, const SkPaint& paint) override = 0;
     void onDrawRegion(const SkRegion& region, const SkPaint& paint) override = 0;
 
-    void onDrawTextBlob(const SkTextBlob* blob, SkScalar x, SkScalar y,
-                        const SkPaint& paint) override = 0;
 
     void onDrawPatch(const SkPoint cubics[12], const SkColor colors[4],
                      const SkPoint texCoords[4], SkBlendMode mode,

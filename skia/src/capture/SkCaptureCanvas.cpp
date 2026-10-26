@@ -268,24 +268,6 @@ void SkCaptureCanvas::onDrawAtlas2(const SkImage* image,
     }
 }
 
-void SkCaptureCanvas::onDrawGlyphRunList(const sktext::GlyphRunList& list, const SkPaint& paint) {
-    this->pollCapturingStatus();
-    this->SkNWayCanvas::onDrawGlyphRunList(list, paint);
-}
-
-void SkCaptureCanvas::onDrawTextBlob(const SkTextBlob* blob,
-                                     SkScalar x,
-                                     SkScalar y,
-                                     const SkPaint& paint) {
-    this->pollCapturingStatus();
-    this->SkNWayCanvas::onDrawTextBlob(blob, x, y, paint);
-}
-
-void SkCaptureCanvas::onDrawSlug(const sktext::gpu::Slug* slug, const SkPaint& paint) {
-    this->pollCapturingStatus();
-    this->SkNWayCanvas::onDrawSlug(slug, paint);
-}
-
 void SkCaptureCanvas::onDrawPicture(const SkPicture* picture,
                                     const SkMatrix* matrix,
                                     const SkPaint* paint) {

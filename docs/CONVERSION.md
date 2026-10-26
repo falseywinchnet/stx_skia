@@ -281,6 +281,23 @@ the full pipeline or its vector kernels. The new direct test covers 3,168 padded
 row, precision, extension, reset and compiled-execution combinations with independent
 expected pixels. See ../results/2026-10-26/RASTER_STAGE_PRUNING.md.
 
+## Text drawing front end removed
+
+Canvas text/glyph/slug drawing, device glyph dispatch, the glyph-run painter and
+builder, text drawing utilities and overdraw canvas are reference-only. Text
+record/capture/forwarding hooks are removed; legacy text playback operations
+invalidate the reader. Unused text-blob/font interception queries are removed
+with their glyph-run dependency. Canvas no longer allocates glyph-builder scratch;
+bitmap devices no longer contain their glyph painter.
+
+The new external glyph-mask test checks every A8 coverage value, four paint
+colors, integer clipping and padded source/destination rows against independent
+RGBA expectations. It also checks text-blob API absence in the candidate and its
+presence in the original reference. This is dependency pruning, not conversion
+of the adapted imported canvas/device/record code. Picture serialization still
+retains text blobs, typefaces and font/strike internals; their removal is next.
+See ../results/2026-10-26/TEXT_DRAWING_REMOVAL.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

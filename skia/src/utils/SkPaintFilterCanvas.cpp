@@ -207,22 +207,6 @@ void SkPaintFilterCanvas::onDrawDrawable(SkDrawable* drawable, const SkMatrix* m
     }
 }
 
-void SkPaintFilterCanvas::onDrawGlyphRunList(
-        const sktext::GlyphRunList& list, const SkPaint& paint) {
-    AutoPaintFilter apf(this, paint);
-    if (apf.shouldDraw()) {
-        this->SkNWayCanvas::onDrawGlyphRunList(list, apf.paint());
-    }
-}
-
-void SkPaintFilterCanvas::onDrawTextBlob(const SkTextBlob* blob, SkScalar x, SkScalar y,
-                                         const SkPaint& paint) {
-    AutoPaintFilter apf(this, paint);
-    if (apf.shouldDraw()) {
-        this->SkNWayCanvas::onDrawTextBlob(blob, x, y, apf.paint());
-    }
-}
-
 void SkPaintFilterCanvas::onDrawAtlas2(const SkImage* image, const SkRSXform xform[],
                                        const SkRect tex[], const SkColor colors[], int count,
                                        SkBlendMode bmode, const SkSamplingOptions& sampling,

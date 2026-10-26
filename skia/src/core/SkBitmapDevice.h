@@ -17,7 +17,6 @@
 #include "include/core/SkSpan.h"
 #include "src/core/SkCPURecorderImpl.h"
 #include "src/core/SkDevice.h"
-#include "src/core/SkGlyphRunPainter.h"
 #include "src/core/SkRasterClipStack.h"
 
 class SkBlender;
@@ -40,7 +39,6 @@ enum class SkClipOp;
 struct SkImageInfo;
 struct SkPoint;
 struct SkRSXform;
-namespace sktext { class GlyphRunList; }
 
 ///////////////////////////////////////////////////////////////////////////////
 class SkBitmapDevice final : public SkDevice {
@@ -136,7 +134,6 @@ private:
 
     void onClipShader(sk_sp<SkShader>) override;
 
-    void onDrawGlyphRunList(SkCanvas*, const sktext::GlyphRunList&, const SkPaint& paint) override;
 
     bool onReadPixels(const SkPixmap&, int x, int y) override;
     bool onWritePixels(const SkPixmap&, int, int) override;
@@ -154,7 +151,6 @@ private:
     skcpu::RecorderImpl* fRecorder = nullptr;
     SkBitmap fBitmap;
     SkRasterClipStack fRCStack;
-    skcpu::GlyphRunListPainter fGlyphPainter;
 };
 
 #endif // SkBitmapDevice_DEFINED

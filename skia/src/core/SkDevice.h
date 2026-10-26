@@ -51,12 +51,7 @@ class SkSurface;
 class SkVertices;
 enum SkColorType : int;
 enum class SkBlendMode;
-enum class SkScalerContextFlags : uint32_t;
 struct SkRSXform;
-
-namespace sktext {
-class GlyphRunList;
-}
 
 namespace skgpu::ganesh {
 class Device;
@@ -65,17 +60,6 @@ namespace skgpu::graphite {
 class Device;
 class Recorder;
 }
-namespace sktext::gpu {
-class SubRunControl;
-class Slug;
-}
-
-struct SkStrikeDeviceInfo {
-    const SkSurfaceProps fSurfaceProps;
-    const SkScalerContextFlags fScalerContextFlags;
-    // This is a pointer so this can be compiled without SK_GPU_SUPPORT.
-    const sktext::gpu::SubRunControl* const fSubRunControl;
-};
 
 /**
  * SkDevice is the internal API and implementation that SkCanvas will use to perform rendering and
@@ -117,12 +101,6 @@ public:
      */
     const SkSurfaceProps& surfaceProps() const {
         return fSurfaceProps;
-    }
-
-    SkScalerContextFlags scalerContextFlags() const;
-
-    virtual SkStrikeDeviceInfo strikeDeviceInfo() const {
-        return {fSurfaceProps, this->scalerContextFlags(), nullptr};
     }
 
     // -- Direct pixel manipulation
@@ -310,15 +288,6 @@ public:
 
     // -- Drawing routines (called after saveLayers and imagefilter operations are applied)
 
-    // Ensure that non-RSXForm runs are passed to onDrawGlyphRunList.
-    void drawGlyphRunList(SkCanvas*,
-                          const sktext::GlyphRunList& glyphRunList,
-                          const SkPaint& paint);
-    // Slug handling routines.
-    virtual sk_sp<sktext::gpu::Slug> convertGlyphRunListToSlug(
-            const sktext::GlyphRunList& glyphRunList, const SkPaint& paint);
-    virtual void drawSlug(SkCanvas*, const sktext::gpu::Slug* slug, const SkPaint& paint);
-
     virtual void drawPaint(const SkPaint& paint) = 0;
     virtual void drawPoints(SkCanvas::PointMode, SkSpan<const SkPoint>, const SkPaint&) = 0;
     virtual void drawRect(const SkRect& r,
@@ -454,7 +423,6 @@ public:
         return false;
     }
 
-
 protected:
     // Configure the device's coordinate spaces, specifying both how its device image maps back to
     // the global space (via 'deviceToGlobal') and the initial CTM of the device (via
@@ -486,7 +454,6 @@ private:
     friend class SkCanvas; // for setOrigin/setDeviceCoordinateSystem
     friend class DeviceTestingAccess;
 
-
     // Implementations can assume that the device from (x,y) to (w,h) will fit within dst.
     virtual bool onReadPixels(const SkPixmap&, int x, int y) { return false; }
 
@@ -498,15 +465,6 @@ private:
     virtual bool onPeekPixels(SkPixmap*) { return false; }
 
     virtual void onClipShader(sk_sp<SkShader>) = 0;
-
-    // Only called with glyphRunLists that do not contain RSXForm.
-    virtual void onDrawGlyphRunList(SkCanvas*,
-                                    const sktext::GlyphRunList&,
-                                    const SkPaint& paint) = 0;
-
-    void simplifyGlyphRunRSXFormAndRedraw(SkCanvas*,
-                                          const sktext::GlyphRunList&,
-                                          const SkPaint& paint);
 
     const SkImageInfo    fInfo;
     const SkSurfaceProps fSurfaceProps;
@@ -572,9 +530,6 @@ protected:
     void drawPath(const SkPath&, const SkPaint&) override {}
     void drawDevice(SkDevice*, const SkSamplingOptions&, const SkPaint&) override {}
     void drawVertices(const SkVertices*, sk_sp<SkBlender>, const SkPaint&, bool) override {}
-
-    void drawSlug(SkCanvas*, const sktext::gpu::Slug*, const SkPaint&) override {}
-    void onDrawGlyphRunList(SkCanvas*, const sktext::GlyphRunList&, const SkPaint&) override {}
 
     bool isNoPixelsDevice() const override { return true; }
 

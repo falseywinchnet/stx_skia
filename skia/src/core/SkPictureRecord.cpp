@@ -533,31 +533,6 @@ void SkPictureRecord::onDrawImageLattice2(const SkImage* image, const Lattice& l
     this->validate(initialOffset, size);
 }
 
-void SkPictureRecord::onDrawTextBlob(const SkTextBlob* blob, SkScalar x, SkScalar y,
-                                     const SkPaint& paint) {
-
-    // op + paint index + blob index + x/y
-    size_t size = 3 * kUInt32Size + 2 * sizeof(SkScalar);
-    size_t initialOffset = this->addDraw(DRAW_TEXT_BLOB, &size);
-
-    this->addPaint(paint);
-    this->addTextBlob(blob);
-    this->addScalar(x);
-    this->addScalar(y);
-
-    this->validate(initialOffset, size);
-}
-
-void SkPictureRecord::onDrawSlug(const sktext::gpu::Slug* slug, const SkPaint& paint) {
-    // op + paint index + slug id
-    size_t size = 3 * kUInt32Size;
-    size_t initialOffset = this->addDraw(DRAW_SLUG, &size);
-
-    this->addPaint(paint);
-    this->addSlug(slug);
-    this->validate(initialOffset, size);
-}
-
 void SkPictureRecord::onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
                                     const SkPaint* paint) {
     // op + picture index

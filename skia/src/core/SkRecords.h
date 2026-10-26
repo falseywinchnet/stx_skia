@@ -86,8 +86,6 @@ namespace SkRecords {
     M(DrawRRect)                                                    \
     M(DrawRect)                                                     \
     M(DrawRegion)                                                   \
-    M(DrawTextBlob)                                                 \
-    M(DrawSlug)                                                     \
     M(DrawAtlas)                                                    \
     M(DrawVertices)                                                 \
     M(DrawShadowRec)                                                \
@@ -300,14 +298,6 @@ RECORD(DrawRect, kDraw_Tag|kHasPaint_Tag,
 RECORD(DrawRegion, kDraw_Tag|kHasPaint_Tag,
         SkPaint paint;
         SkRegion region)
-RECORD(DrawTextBlob, kDraw_Tag|kHasText_Tag|kHasPaint_Tag,
-        SkPaint paint;
-        sk_sp<const SkTextBlob> blob;
-        SkScalar x;
-        SkScalar y)
-RECORD(DrawSlug, kDraw_Tag|kHasText_Tag|kHasPaint_Tag,
-       SkPaint paint;
-       sk_sp<const sktext::gpu::Slug> slug)
 RECORD(DrawPatch, kDraw_Tag|kHasPaint_Tag,
         SkPaint paint;
         PODArray<SkPoint> cubics;

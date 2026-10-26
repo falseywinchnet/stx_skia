@@ -321,29 +321,6 @@ void SkNWayCanvas::onDrawAtlas2(const SkImage* image, const SkRSXform xform[], c
     }
 }
 
-void SkNWayCanvas::onDrawGlyphRunList(const sktext::GlyphRunList& list,
-                                      const SkPaint &paint) {
-    Iter iter(fList);
-    while (iter.next()) {
-        iter->onDrawGlyphRunList(list, paint);
-    }
-}
-
-void SkNWayCanvas::onDrawTextBlob(const SkTextBlob* blob, SkScalar x, SkScalar y,
-                                  const SkPaint &paint) {
-    Iter iter(fList);
-    while (iter.next()) {
-        iter->drawTextBlob(blob, x, y, paint);
-    }
-}
-
-void SkNWayCanvas::onDrawSlug(const sktext::gpu::Slug* slug, const SkPaint& paint) {
-    Iter iter(fList);
-    while (iter.next()) {
-        iter->drawSlug(slug, paint);
-    }
-}
-
 void SkNWayCanvas::onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
                                  const SkPaint* paint) {
     Iter iter(fList);
