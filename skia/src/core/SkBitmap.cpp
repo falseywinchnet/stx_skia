@@ -597,15 +597,20 @@ bool SkBitmap::extractAlpha(SkBitmap* dst, const SkPaint* paint,
     }
     SkAutoMaskFreeImage dstCleanup(dstM.image());
 
-    tmpBitmap.setInfo(SkImageInfo::MakeA8(dstM.fBounds.width(), dstM.fBounds.height()),
-                      dstM.fRowBytes);
+    const size_t sourceSize = dstM.computeImageSize();
+    if (dstM.image() == nullptr || sourceSize == 0) return false;
+    if (!tmpBitmap.setInfo(SkImageInfo::MakeA8(dstM.fBounds.width(), dstM.fBounds.height()),
+                           dstM.fRowBytes)) return false;
     if (!tmpBitmap.tryAllocPixels(allocator)) {
         // Allocation of pixels for alpha bitmap failed.
         SkDebugf("extractAlpha failed to allocate (%d,%d) alpha bitmap\n",
                 tmpBitmap.width(), tmpBitmap.height());
         return false;
     }
-    memcpy(tmpBitmap.getPixels(), dstM.fImage, dstM.computeImageSize());
+    // Bitmap allocation omits padding after the final row; the mask includes it.
+    const size_t destinationSize = tmpBitmap.computeByteSize();
+    if (destinationSize > sourceSize) return false;
+    memcpy(tmpBitmap.getPixels(), dstM.fImage, destinationSize);
     if (offset) {
         offset->set(dstM.fBounds.fLeft, dstM.fBounds.fTop);
     }

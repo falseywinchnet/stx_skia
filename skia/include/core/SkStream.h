@@ -267,6 +267,10 @@ public:
     bool writeScalar(SkScalar);
     bool writePackedUInt(size_t);
 
+    /** Copies exactly length bytes, including through positive short reads.
+     *  Returns false if input ends early or output fails; an already written
+     *  prefix remains in the destination on failure.
+     */
     bool writeStream(SkStream* input, size_t length);
 
     /**

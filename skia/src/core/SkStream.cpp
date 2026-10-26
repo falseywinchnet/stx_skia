@@ -152,11 +152,14 @@ bool SkWStream::writeStream(SkStream* stream, size_t length) {
         if (n > MAX) {
             n = MAX;
         }
-        stream->read(scratch, n);
-        if (!this->write(scratch, n)) {
+        const size_t bytesRead = (*stream).read(scratch, n);
+        if (bytesRead == 0 || bytesRead > n) {
             return false;
         }
-        length -= n;
+        if (!(*this).write(scratch, bytesRead)) {
+            return false;
+        }
+        length -= bytesRead;
     }
     return true;
 }

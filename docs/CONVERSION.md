@@ -1034,6 +1034,12 @@ the surface notification result. See
 ../results/2026-10-26/INSTALLED_HEADER_SCOPE.md for the measured header count
 and the remaining header-review limit.
 
+A scoped core security review found bounds defects in the compiled private
+Base64 decoder, the public stream-copy helper and filtered alpha extraction.
+The repaired paths and deterministic checks are recorded in
+../results/2026-10-26/CORE_BOUNDS_REVIEW.md. That scan covered selected core
+files and does not clear the remaining retained implementation.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

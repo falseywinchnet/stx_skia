@@ -29,86 +29,90 @@ static const signed char decodeData[] = {
     41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
 };
 
-#if defined _WIN32  // disable 'two', etc. may be used without having been initialized
-#pragma warning ( push )
-#pragma warning ( disable : 4701 )
-#endif
-
-SkBase64::Error SkBase64::Decode(const void* srcv, size_t srcLength, void* dstv, size_t* dstLength){
-    const unsigned char* src = static_cast<const unsigned char*>(srcv);
-    unsigned char* dst = static_cast<unsigned char*>(dstv);
-
-    int i = 0;
-    bool padTwo = false;
-    bool padThree = false;
-    char unsigned const * const end = src + srcLength;
-    while (src < end) {
-        unsigned char bytes[4] = {0, 0, 0, 0};
-        int byte = 0;
-        do {
-            unsigned char srcByte = *src++;
-            if (srcByte == 0)
-                goto goHome;
-            if (srcByte <= ' ')
-                continue; // treat as white space
-            if (srcByte < '+' || srcByte > 'z')
-                return kBadCharError;
-            signed char decoded = decodeData[srcByte - '+'];
-            bytes[byte] = decoded;
-            if (decoded < 0) {
-                if (decoded == DecodePad)
-                    goto handlePad;
-                return kBadCharError;
-            } else
-                byte++;
-            if (*src)
-                continue;
-            if (byte == 0)
-                goto goHome;
-            if (byte == 4)
-                break;
-handlePad:
-            if (byte < 2)
-                return kPadError;
-            padThree = true;
-            if (byte == 2)
-                padTwo = true;
-            break;
-        } while (byte < 4);
-        int two = 0;
-        int three = 0;
-        if (dst) {
-            int one = (uint8_t) (bytes[0] << 2);
-            two = bytes[1];
-            one |= two >> 4;
-            two = (uint8_t) ((two << 4) & 0xFF);
-            three = bytes[2];
-            two |= three >> 2;
-            three = (uint8_t) ((three << 6) & 0xFF);
-            three |= bytes[3];
-            SkASSERT(one < 256 && two < 256 && three < 256);
-            dst[i] = (unsigned char) one;
-        }
-        i++;
-        if (padTwo)
-            break;
-        if (dst)
-            dst[i] = (unsigned char) two;
-        i++;
-        if (padThree)
-            break;
-        if (dst)
-            dst[i] = (unsigned char) three;
-        i++;
+static void write_decoded_group(const unsigned char group[4], int count,
+                                unsigned char* dst, size_t offset) {
+    if (dst == nullptr) return;
+    dst[offset] = static_cast<unsigned char>((group[0] << 2) | (group[1] >> 4));
+    if (count >= 2) {
+        dst[offset + 1] = static_cast<unsigned char>((group[1] << 4) | (group[2] >> 2));
     }
-goHome:
-    *dstLength = i;
-    return kNoError;
+    if (count == 3) {
+        dst[offset + 2] = static_cast<unsigned char>((group[2] << 6) | group[3]);
+    }
 }
 
-#if defined _WIN32
-#pragma warning ( pop )
-#endif
+// Input and output do not overlap. Each input byte is read within srcLength.
+static SkBase64::Error decode_pass(const unsigned char* src, size_t srcLength,
+                                   unsigned char* dst, size_t* length) {
+    unsigned char group[4] = {0, 0, 0, 0};
+    int count = 0;
+    int padCount = 0;
+    bool paddedEnd = false;
+    size_t produced = 0;
+
+    for (size_t index = 0; index < srcLength; ++index) {
+        const unsigned char value = src[index];
+        if (value == 0) return SkBase64::kBadCharError;
+        if (value <= ' ') continue;
+        if (paddedEnd) return SkBase64::kPadError;
+        if (value < '+' || value > 'z') return SkBase64::kBadCharError;
+        const signed char decoded = decodeData[value - '+'];
+        if (decoded == DecodePad) {
+            if (count < 2 || count >= 4) return SkBase64::kPadError;
+            group[count] = 0;
+            ++count;
+            ++padCount;
+            if (count == 4) {
+                const int outputCount = 3 - padCount;
+                write_decoded_group(group, outputCount, dst, produced);
+                produced += static_cast<size_t>(outputCount);
+                count = 0;
+                paddedEnd = true;
+            }
+            continue;
+        }
+        if (decoded < 0) return SkBase64::kBadCharError;
+        if (padCount != 0) return SkBase64::kPadError;
+        group[count] = static_cast<unsigned char>(decoded);
+        ++count;
+        if (count == 4) {
+            write_decoded_group(group, 3, dst, produced);
+            produced += 3;
+            count = 0;
+        }
+    }
+
+    if (padCount != 0 && !paddedEnd) return SkBase64::kPadError;
+    if (count == 1) return SkBase64::kPadError;
+    if (count >= 2) {
+        if (count == 2) group[2] = 0;
+        group[3] = 0;
+        const int outputCount = count - 1;
+        write_decoded_group(group, outputCount, dst, produced);
+        produced += static_cast<size_t>(outputCount);
+    }
+    *length = produced;
+    return SkBase64::kNoError;
+}
+
+SkBase64::Error SkBase64::Decode(const void* srcv, size_t srcLength, void* dstv,
+                                 size_t* dstLength) {
+    *dstLength = 0;
+    if (srcv == nullptr && srcLength != 0) return kBadCharError;
+    const unsigned char* src = static_cast<const unsigned char*>(srcv);
+    size_t required = 0;
+    const Error valid = decode_pass(src, srcLength, nullptr, &required);
+    if (valid != kNoError) return valid;
+    if (dstv != nullptr) {
+        unsigned char* dst = static_cast<unsigned char*>(dstv);
+        size_t written = 0;
+        const Error decoded = decode_pass(src, srcLength, dst, &written);
+        if (decoded != kNoError) return decoded;
+        SkASSERT(written == required);
+    }
+    *dstLength = required;
+    return kNoError;
+}
 
 size_t SkBase64::Encode(const void* srcv, size_t length, void* dstv, const char* encodeMap) {
     const unsigned char* src = static_cast<const unsigned char*>(srcv);

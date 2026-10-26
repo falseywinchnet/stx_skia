@@ -1,4 +1,5 @@
 #include "include/core/SkBlurTypes.h"
+#include "include/core/SkBitmap.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkGraphics.h"
 #include "include/core/SkImageInfo.h"
@@ -84,6 +85,57 @@ public:
 private:
     int& fAttempts;
 };
+
+class PaddedAlphaFilter final : public SkMaskFilterBase {
+public:
+    SkMask::Format getFormat() const override { return SkMask::kA8_Format; }
+    Type type() const override { return Type::kShader; }
+    Factory getFactory() const override { return nullptr; }
+    const char* getTypeName() const override { return "test-padded-alpha"; }
+    bool filterMask(SkMaskBuilder* dst, const SkMask& src, const SkMatrix&,
+                    SkIPoint* margin) const override {
+        const int width = src.fBounds.width();
+        const int height = src.fBounds.height();
+        if (width < 1 || width > 3 || height != 2) return false;
+        const uint32_t stride = 4;
+        *dst = SkMaskBuilder(nullptr, src.fBounds, stride, SkMask::kA8_Format);
+        if (margin != nullptr) *margin = {0, 0};
+        if (src.fImage == nullptr) return true;
+        (*dst).image() = SkMaskBuilder::AllocImage((*dst).computeImageSize());
+        for (int y = 0; y < height; ++y) {
+            uint8_t* output = (*dst).image() + static_cast<size_t>(y) * stride;
+            const uint8_t* input = src.fImage + static_cast<size_t>(y) * src.fRowBytes;
+            for (uint32_t x = 0; x < stride; ++x) output[x] = 0xa5;
+            for (int x = 0; x < width; ++x) output[x] = input[x];
+        }
+        return true;
+    }
+};
+
+bool padded_alpha_extent() {
+    for (const int width : {1, 2, 3}) {
+        SkBitmap source;
+        if (!source.tryAllocPixels(SkImageInfo::MakeA8(width, 2))) return false;
+        for (int y = 0; y < 2; ++y) {
+            for (int x = 0; x < width; ++x) {
+                *source.getAddr8(x, y) = static_cast<uint8_t>(20 + y * 10 + x);
+            }
+        }
+        SkPaint paint;
+        paint.setMaskFilter(sk_sp<SkMaskFilter>(new PaddedAlphaFilter));
+        SkBitmap extracted;
+        if (!source.extractAlpha(&extracted, &paint, nullptr, nullptr)) return false;
+        if (extracted.width() != width || extracted.height() != 2 || extracted.rowBytes() != 4) {
+            return false;
+        }
+        for (int y = 0; y < 2; ++y) {
+            for (int x = 0; x < width; ++x) {
+                if (*extracted.getAddr8(x, y) != *source.getAddr8(x, y)) return false;
+            }
+        }
+    }
+    return true;
+}
 
 bool failed_filter_cleanup() {
     int attempts = 0;
@@ -341,6 +393,7 @@ int main(int argc, char** argv) {
     if (!PatchFilter::ownership() || !patch_pixels(33, false) || !patch_pixels(33, true)) return 3;
 #ifndef STX_SKIA_REFERENCE
     if (!failed_filter_cleanup()) return 6;
+    if (!padded_alpha_extent()) return 7;
     for (const int width : {32766, 32767, 32768, 50000}) {
         if (!patch_pixels(width, false) || !patch_pixels(width, true)) return 4;
     }
