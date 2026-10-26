@@ -9,143 +9,93 @@
 #define SkTDPQueue_DEFINED
 
 #include "include/private/SkAssert.h"
-#include "include/private/SkDebug.h"
 #include "include/private/SkTDArray.h"
-#include "include/private/SkTo.h"
 
 #include <utility>
 
-/**
- * This class implements a priority queue. T is the type of the elements in the queue. LESS is a
- * function that compares two Ts and returns true if the first is higher priority than the second.
- *
- */
-template <typename T,
-          bool (*LESS)(const T&, const T&)>
+// Owns a contiguous binary min-heap of raw-copyable values. LESS is a strict weak
+// ordering, may only observe its operands, and must not throw or reenter the queue.
+// Equal priorities retain the original
+// heap's tie choices; insertion order is not a stability guarantee.
+// Mutation requires exclusive access. peek borrows until the next mutation or
+// destruction. Pointer-valued entries do not own their pointees. Allocation uses
+// SkTDArray's abort-on-failure policy. No indexed membership or priority updates.
+template <typename T, bool (*LESS)(const T&, const T&)>
 class SkTDPQueue {
 public:
     SkTDPQueue() {}
-    SkTDPQueue(int reserve) { fArray.reserve(reserve); }
+    explicit SkTDPQueue(int reserve) { fArray.reserve(reserve); }
 
-    SkTDPQueue(SkTDPQueue&&) = default;
-    SkTDPQueue& operator =(SkTDPQueue&&) = default;
-
+    SkTDPQueue(SkTDPQueue&& source) : fArray(std::move(source.fArray)) {}
+    SkTDPQueue& operator=(SkTDPQueue&& source) {
+        fArray = std::move(source.fArray);
+        return *this;
+    }
     SkTDPQueue(const SkTDPQueue&) = delete;
     SkTDPQueue& operator=(const SkTDPQueue&) = delete;
 
-    /** Number of items in the queue. */
-    int count() const { return fArray.size(); }
+    int count() const {
+        const int result = fArray.size();
+        return result;
+    }
+    const T& peek() const & { return fArray[0]; }
+    const T& peek() const && = delete;
 
-    /** Gets the next item in the queue without popping it. */
-    const T& peek() const { return fArray[0]; }
-    T& peek() { return fArray[0]; }
+    void insert(T entry) {
+        validate();
+        int index = fArray.size();
+        fArray.append();
+        T* elements = fArray.data();
+        // Reserve one hole and slide ancestors down. The inserted value stays
+        // local until its final position, avoiding a full swap at each level.
+        while (index > 0) {
+            const int parent = (index - 1) / 2;
+            if (!LESS(entry, elements[parent])) break;
+            elements[index] = elements[parent];
+            index = parent;
+        }
+        elements[index] = entry;
+        validate();
+    }
 
-    /** Removes the next item. */
     void pop() {
-        this->validate();
-        if (1 == fArray.size()) {
+        validate();
+        const int oldCount = fArray.size();
+        SkASSERT_RELEASE(oldCount > 0);
+        if (oldCount == 1) {
             fArray.pop_back();
             return;
         }
-
-        fArray[0] = fArray[fArray.size() - 1];
-
+        T* elements = fArray.data();
+        const T entry = elements[oldCount - 1];
         fArray.pop_back();
-        this->percolateDownIfNecessary(0);
-
-        this->validate();
+        const int count = oldCount - 1;
+        int index = 0;
+        // Prove a left child exists before doubling the index. Even a capacity
+        // of INT_MAX cannot overflow the child-index arithmetic.
+        while (index < count / 2) {
+            int child = 2 * index + 1;
+            if (child + 1 < count && LESS(elements[child + 1], elements[child])) ++child;
+            if (!LESS(elements[child], entry)) break;
+            elements[index] = elements[child];
+            index = child;
+        }
+        elements[index] = entry;
+        validate();
     }
-
-    /** Inserts a new item in the queue based on its priority. */
-    void insert(T entry) {
-        this->validate();
-        int index = fArray.size();
-        *fArray.append() = entry;
-
-        this->percolateUpIfNecessary(index);
-        this->validate();
-    }
-
 
 private:
-    static int LeftOf(int x) { SkASSERT(x >= 0); return 2 * x + 1; }
-    static int ParentOf(int x) { SkASSERT(x > 0); return (x - 1) >> 1; }
-
-    bool percolateUpIfNecessary(int index) {
-        SkASSERT(index >= 0);
-        bool percolated = false;
-        do {
-            if (0 == index) {
-
-                return percolated;
-            }
-            int p = ParentOf(index);
-            if (LESS(fArray[index], fArray[p])) {
-                using std::swap;
-                swap(fArray[index], fArray[p]);
-
-                index = p;
-                percolated = true;
-            } else {
-
-                return percolated;
-            }
-            this->validate(index);
-        } while (true);
-    }
-
-    void percolateDownIfNecessary(int index) {
-        SkASSERT(index >= 0);
-        do {
-            int child = LeftOf(index);
-
-            if (child >= fArray.size()) {
-                // We're a leaf.
-
-                return;
-            }
-
-            if (child + 1 >= fArray.size()) {
-                // We only have a left child.
-                if (LESS(fArray[child], fArray[index])) {
-                    using std::swap;
-                    swap(fArray[child], fArray[index]);
-
-
-                    return;
-                }
-            } else if (LESS(fArray[child + 1], fArray[child])) {
-                // The right child is the one we should swap with, if we swap.
-                child++;
-            }
-
-            // Check if we need to swap.
-            if (LESS(fArray[child], fArray[index])) {
-                using std::swap;
-                swap(fArray[child], fArray[index]);
-
-                index = child;
-            } else {
-                // We're less than both our children.
-
-                return;
-            }
-            this->validate(index);
-        } while (true);
-    }
-
-    void validate(int excludedIndex = -1) const {
+    void validate() const {
 #ifdef SK_DEBUG
-        for (int i = 1; i < fArray.size(); ++i) {
-            int p = ParentOf(i);
-            if (excludedIndex != p && excludedIndex != i) {
-                SkASSERT(!(LESS(fArray[i], fArray[p])));
-            }
+        const int count = fArray.size();
+        const T* elements = fArray.data();
+        for (int index = 1; index < count; ++index) {
+            const int parent = (index - 1) / 2;
+            SkASSERT(!LESS(elements[index], elements[parent]));
         }
 #endif
     }
-
-    SkTDArray<T> fArray;
+    SkTDArray<T> fArray{};
 };
 
 #endif

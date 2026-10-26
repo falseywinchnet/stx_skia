@@ -591,6 +591,23 @@ build. Both releases pass 29 tests, nine artifacts match, and instrumented,
 installed-consumer and GUI.Forms gates pass. The measured small insert/erase
 regression is retained in ../results/2026-10-26/TD_ARRAY.md and its raw timings.
 
+## Retained CPU priority queue
+
+SkTDPQueue.h now covers only the insert/peek/pop contract used by the polygon
+sweep. Indexed GPU-cache operations, mutable priorities, sorting and random access
+are removed separately. The converted heap keeps a displaced entry locally and
+slides one ancestor/child per level, retaining original tie choices. Explicit
+bounds permit direct contiguous access without repeated indexed checks. It keeps
+the same 24-byte owner and adds no persistent state.
+
+The complete original header is reference-only. Thirty tests, nine matching
+artifacts, instrumented suites, relocated consumer and GUI.Forms fixture pass.
+A controlled old-header comparison keeps the current polygon source, array and
+library fixed. It measures gains for larger descending/permuted queues and comb
+polygons, with small ascending regressions retained. See
+../results/2026-10-26/PRIORITY_QUEUE.md and its timing/assembly evidence. This does
+not claim full polygon utility conversion or a universal rendering speedup.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
