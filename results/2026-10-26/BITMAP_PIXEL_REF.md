@@ -19,3 +19,14 @@ current source the M4 candidate and reference Release suites each pass 44 tests;
 candidate Release and Debug instrumented suites report PASS. Nine rendering
 artifacts and the serialized artifact match the reference byte-for-byte.
 These checks establish this boundary fix, not a repository-wide security claim.
+
+## Data-backed pixel-reference factory
+
+The next boundary pass found that `SkMallocPixelRef::MakeWithData` dereferenced
+a null `SkData` owner in Release and accepted a row stride that
+`SkImageInfo::validRowBytes` rejects. It now checks the owner, aligned stride,
+and byte-size overflow before reading the data length or constructing the
+reference. The focused fixture passes a null owner and a 13-byte stride for a
+four-byte pixel format; both return null. On the M4 Mini, the candidate suite
+passes 49/49 tests and the sanitizer runner reports `PASS`. Both touched C++
+files pass the house-style spelling and lifetime-rule checks with no findings.

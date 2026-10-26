@@ -67,6 +67,12 @@ bool allocations() {
     if (events.releases != 1) return false;
     data = SkData::MakeZeroInitialized(27);
     if (SkMallocPixelRef::MakeWithData(info, 16, data)) return false;
+#ifndef STX_SKIA_REFERENCE
+    sk_sp<SkData> absent;
+    if (SkMallocPixelRef::MakeWithData(info, 16, absent)) return false;
+    data = SkData::MakeZeroInitialized(28);
+    if (SkMallocPixelRef::MakeWithData(info, 13, data)) return false;
+#endif
     return true;
 }
 

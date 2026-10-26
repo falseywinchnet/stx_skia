@@ -68,11 +68,9 @@ sk_sp<SkPixelRef> SkMallocPixelRef::MakeAllocate(const SkImageInfo& info, size_t
 
 sk_sp<SkPixelRef> SkMallocPixelRef::MakeWithData(const SkImageInfo& info,
                                               size_t row_bytes, sk_sp<SkData> data) {
-    SkASSERT(data != nullptr);
-    if (!is_valid(info)) return nullptr;
-    const size_t minimum_stride = info.minRowBytes();
-    if (row_bytes < minimum_stride) return nullptr;
+    if (!data || !is_valid(info) || !info.validRowBytes(row_bytes)) return nullptr;
     const size_t required_bytes = info.computeByteSize(row_bytes);
+    if (SkImageInfo::ByteSizeOverflowed(required_bytes)) return nullptr;
     if ((*data).size() < required_bytes) return nullptr;
 
     void* pixels = const_cast<void*>((*data).data());

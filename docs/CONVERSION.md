@@ -1024,6 +1024,10 @@ fails. The public API and large-image regressions are recorded in
 ../results/2026-10-26/IMAGE_PATH_REVIEW.md. This review does not complete the
 remaining image, canvas, or pixel pipeline conversion.
 
+The data-backed pixel-reference factory now validates its owner and aligned
+stride before constructing a reference. The boundary check and fixture are
+recorded in ../results/2026-10-26/BITMAP_PIXEL_REF.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
