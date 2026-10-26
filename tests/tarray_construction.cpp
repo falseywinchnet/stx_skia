@@ -589,6 +589,38 @@ bool inline_swap_contract() {
     return Element::live == 0;
 }
 
+bool interrupted_inline_swap_contract(size_t& total) {
+    for (int failure = 1; failure <= 5; ++failure) {
+        {
+            STArray<4, MovingElement, false> left;
+            STArray<4, MovingElement, false> right;
+            left.reset(3);
+            right.reset(2);
+            MovingElement::failAt = MovingElement::moves + failure;
+            bool caught = false;
+            try {
+                left.swap(right);
+            } catch (const ConstructionFailure&) {
+                caught = true;
+            }
+            MovingElement::failAt = 0;
+            if (!caught || left.size() != 3 || !unused_capacity_guarded(left) ||
+                !unused_capacity_guarded(right)) return false;
+            if (failure <= 2) {
+                if (right.size() != 2 || MovingElement::live != 5) return false;
+            } else {
+                if (!right.empty() || MovingElement::live != 3) return false;
+            }
+            left.emplace_back();
+            right.emplace_back();
+            if (MovingElement::live != left.size() + right.size()) return false;
+            ++total;
+        }
+        if (MovingElement::live != 0) return false;
+    }
+    return true;
+}
+
 template <typename Array> bool alias_reset(size_t& total) {
     for (int count = 1; count <= 32; ++count) {
         for (int offset = 0; offset < count; ++offset) {
@@ -675,18 +707,20 @@ int main(int argc, char** argv) {
     size_t aliases = 0;
     size_t interruptedMoves = 0;
     size_t appendCases = 0;
+    size_t interruptedSwaps = 0;
     valid = failed_construction<TArray<Element>>(failures) && valid;
     valid = failed_construction<STArray<4, Element>>(failures) && valid;
     valid = failed_move_relocation(interruptedMoves) && valid;
     valid = append_construction_contract(appendCases) && valid;
     valid = move_and_swap_contract() && valid;
     valid = inline_swap_contract() && valid;
+    valid = interrupted_inline_swap_contract(interruptedSwaps) && valid;
     valid = alias_reset<TArray<Element>>(aliases) && valid;
     valid = alias_reset<STArray<4, Element>>(aliases) && valid;
     valid = trivial_alias_reset<TArray<uint32_t>>(aliases) && valid;
     valid = trivial_alias_reset<STArray<4, uint32_t>>(aliases) && valid;
-    if (valid) std::printf("candidate: %zu construction failures, %zu interrupted moves, %zu append cases, %zu alias resets PASS\n",
-                           failures, interruptedMoves, appendCases, aliases);
+    if (valid) std::printf("candidate: %zu construction failures, %zu interrupted moves, %zu interrupted swaps, %zu append cases, %zu alias resets PASS\n",
+                           failures, interruptedMoves, interruptedSwaps, appendCases, aliases);
 #endif
     if (!valid || Element::live != 0) {
         std::fputs("TArray construction: contract mismatch\n", stderr);
