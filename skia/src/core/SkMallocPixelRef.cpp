@@ -72,6 +72,7 @@ sk_sp<SkPixelRef> SkMallocPixelRef::MakeWithData(const SkImageInfo& info,
     const size_t required_bytes = info.computeByteSize(row_bytes);
     if (SkImageInfo::ByteSizeOverflowed(required_bytes)) return nullptr;
     if ((*data).size() < required_bytes) return nullptr;
+    if (required_bytes != 0 && (*data).data() == nullptr) return nullptr;
 
     void* pixels = const_cast<void*>((*data).data());
     sk_sp<SkPixelRef> result(new DataPixelRef(info.width(), info.height(), pixels,

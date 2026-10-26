@@ -25,8 +25,9 @@ These checks establish this boundary fix, not a repository-wide security claim.
 The next boundary pass found that `SkMallocPixelRef::MakeWithData` dereferenced
 a null `SkData` owner in Release and accepted a row stride that
 `SkImageInfo::validRowBytes` rejects. It now checks the owner, aligned stride,
-and byte-size overflow before reading the data length or constructing the
-reference. The focused fixture passes a null owner and a 13-byte stride for a
-four-byte pixel format; both return null. On the M4 Mini, the candidate suite
+byte-size overflow, and presence of nonempty storage before constructing the
+reference. The focused fixture passes a null owner, a 13-byte stride for a
+four-byte pixel format, and a length-bearing data object with a null address;
+all return null. On the M4 Mini, the candidate suite
 passes 49/49 tests and the sanitizer runner reports `PASS`. Both touched C++
 files pass the house-style spelling and lifetime-rule checks with no findings.

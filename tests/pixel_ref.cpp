@@ -72,6 +72,8 @@ bool allocations() {
     if (SkMallocPixelRef::MakeWithData(info, 16, absent)) return false;
     data = SkData::MakeZeroInitialized(28);
     if (SkMallocPixelRef::MakeWithData(info, 13, data)) return false;
+    sk_sp<SkData> missingBytes = SkData::MakeWithProc(nullptr, 28, nullptr, nullptr);
+    if (SkMallocPixelRef::MakeWithData(info, 16, missingBytes)) return false;
 #endif
     return true;
 }
