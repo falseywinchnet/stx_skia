@@ -82,6 +82,22 @@ bool move_only_case() {
     return *target.front() == 37;
 }
 
+#ifdef SK_SANITIZE_ADDRESS
+bool shrunk_range_is_poisoned() {
+    SkSBlockAllocator<256> allocator;
+    SkBlockAllocator::ByteRange range = (*allocator.allocator()).allocate<8>(64);
+    // The retained and released ranges meet at an eight-byte ASan shadow boundary.
+    const int shortenedEnd = range.fEnd - 32;
+    void* retainedByte = (*range.fBlock).ptr(shortenedEnd - 1);
+    void* releasedByte = (*range.fBlock).ptr(shortenedEnd);
+    if (sk_asan_address_is_poisoned(releasedByte) != 0) return false;
+    const bool shrunk = (*range.fBlock).resize(range.fStart, range.fEnd, -32);
+    if (!shrunk) return false;
+    return sk_asan_address_is_poisoned(retainedByte) == 0 &&
+           sk_asan_address_is_poisoned(releasedByte) != 0;
+}
+#endif
+
 bool interrupted_append_case() {
     Element::live = 0;
     Element::attempts = 0;
@@ -177,6 +193,9 @@ int main(int argc, char** argv) {
     bool valid = ordinary_case() && nontrivial_case();
 #ifndef STX_SKIA_REFERENCE
     valid = move_only_case() && valid;
+#ifdef SK_SANITIZE_ADDRESS
+    valid = shrunk_range_is_poisoned() && valid;
+#endif
     valid = interrupted_append_case() && valid;
     valid = interrupted_concat_case() && valid;
 #endif

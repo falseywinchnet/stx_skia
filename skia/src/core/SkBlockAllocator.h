@@ -658,7 +658,7 @@ bool SkBlockAllocator::Block::resize(int start, int end, int deltaBytes) {
         if (nextCursor <= fSize && nextCursor >= start) {
             if (nextCursor < fCursor) {
                 // The allocation got smaller; poison the space that can no longer be used.
-                this->poisonRange(nextCursor + 1, end);
+                this->poisonRange(nextCursor, end);
             } else {
                 // The allocation got larger; unpoison the space that can now be used.
                 this->unpoisonRange(end, nextCursor);

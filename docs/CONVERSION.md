@@ -945,6 +945,10 @@ rejection cases and validation record are in
 ../results/2026-10-26/BLOCK_ALLOCATOR.md. This fixes the constructor boundary;
 the remaining block allocation and release algorithms still need conversion.
 
+The block allocator's resize path now poisons the complete released suffix,
+including its first byte. A focused ASan shadow-boundary check verifies the
+retained/released boundary. See ../results/2026-10-26/BLOCK_RESIZE.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
