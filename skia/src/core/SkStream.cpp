@@ -565,6 +565,12 @@ size_t SkDynamicMemoryWStream::bytesWritten() const {
 bool SkDynamicMemoryWStream::write(const void* buffer, size_t count) {
     if (count > 0) {
         SkASSERT(buffer);
+        const size_t maximum = std::numeric_limits<size_t>::max();
+        const size_t currentLength = this->bytesWritten();
+        // A new block needs its header and up to three alignment bytes.
+        if (count > maximum - currentLength || count > maximum - sizeof(Block) - 3) {
+            return false;
+        }
         size_t size;
 
         if (fTail && fTail->avail() > 0) {

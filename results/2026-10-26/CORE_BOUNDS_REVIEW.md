@@ -62,3 +62,11 @@ no-partial-write failure result. Candidate-only `data_contract` cases check
 these boundaries. The M4 candidate Release suite passed 50/50 tests, the
 candidate sanitizer runner returned `PASS`, and ten candidate/reference render
 and serialization artifacts matched byte for byte.
+
+`SkDynamicMemoryWStream::write` also aligned a requested block length before
+checking whether the alignment and block header fit in `size_t`. A near-maximum
+count could wrap to a small allocation size. It now rejects that count and a
+total stream-length overflow before writing into the existing tail or
+allocating a new block. `data_contract` checks that the rejected write leaves
+the stream unchanged. The candidate Release suite again passed 50/50, the
+sanitizer runner returned `PASS`, and the ten reference artifacts matched.

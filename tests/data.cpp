@@ -141,7 +141,11 @@ bool memory_stream_move() {
 bool block_stream_bounds() {
     const std::array<std::uint8_t, 7> bytes = {3, 5, 7, 11, 13, 17, 19};
     SkDynamicMemoryWStream writer;
+    if (writer.write(bytes.data(), std::numeric_limits<std::size_t>::max()) ||
+        writer.bytesWritten() != 0) return false;
     if (!writer.write(bytes.data(), bytes.size())) return false;
+    if (writer.write(bytes.data(), std::numeric_limits<std::size_t>::max()) ||
+        writer.bytesWritten() != bytes.size()) return false;
 
     std::array<std::uint8_t, 7> untouched{};
     untouched.fill(0xa5);
