@@ -35,28 +35,31 @@ enum {
     kNeedNewImageUniqueID_SpecialImage = 0
 };
 
-/**
- * This is a restricted form of SkImage solely intended for internal use. It
- * differs from SkImage in that:
- *      - it can only be backed by raster or gpu (no generators)
- *      - it can be backed by a GrTextureProxy larger than its nominal bounds
- *      - it can't be drawn tiled
- *      - it can't be drawn with MIPMAPs
- * It is similar to SkImage in that it abstracts how the pixels are stored/represented.
- *
- * Note: the contents of the backing storage outside of the subset rect are undefined.
- */
+// An internal image view retaining a rectangular part of a shared raster backing store.
+// Strict sampling is confined to that view. Non-strict callers must establish that
+// adjacent pixels are valid and may contribute to filtering.
 class SkSpecialImage : public SkRefCnt {
 public:
-    typedef void* ReleaseContext;
-    typedef void(*RasterReleaseProc)(void* pixels, ReleaseContext);
+    using ReleaseContext = void*;
+    using RasterReleaseProc = void (*)(void* pixels, ReleaseContext);
 
-    const SkSurfaceProps& props() const { return fProps; }
+    const SkSurfaceProps& props() const & { return fProps; }
+    const SkSurfaceProps& props() const && = delete;
 
-    int width() const { return fSubset.width(); }
-    int height() const { return fSubset.height(); }
-    SkISize dimensions() const { return { this->width(), this->height() }; }
-    const SkIRect& subset() const { return fSubset; }
+    int width() const {
+        const int value = fSubset.width();
+        return value;
+    }
+    int height() const {
+        const int value = fSubset.height();
+        return value;
+    }
+    SkISize dimensions() const {
+        const SkISize size{width(), height()};
+        return size;
+    }
+    const SkIRect& subset() const & { return fSubset; }
+    const SkIRect& subset() const && = delete;
 
     uint32_t uniqueID() const { return fUniqueID; }
 
@@ -64,12 +67,28 @@ public:
 
     virtual size_t getSize() const = 0;
 
-    bool isExactFit() const { return fSubset == SkIRect::MakeSize(this->backingStoreDimensions()); }
+    bool isExactFit() const {
+        const SkISize dimensions = backingStoreDimensions();
+        const SkIRect bounds = SkIRect::MakeSize(dimensions);
+        const bool exact = fSubset == bounds;
+        return exact;
+    }
 
-    const SkColorInfo& colorInfo() const { return fColorInfo; }
-    SkAlphaType alphaType() const { return fColorInfo.alphaType(); }
-    SkColorType colorType() const { return fColorInfo.colorType(); }
-    SkColorSpace* getColorSpace() const { return fColorInfo.colorSpace(); }
+    const SkColorInfo& colorInfo() const & { return fColorInfo; }
+    const SkColorInfo& colorInfo() const && = delete;
+    SkAlphaType alphaType() const {
+        const SkAlphaType value = fColorInfo.alphaType();
+        return value;
+    }
+    SkColorType colorType() const {
+        const SkColorType value = fColorInfo.colorType();
+        return value;
+    }
+    SkColorSpace* getColorSpace() const & {
+        SkColorSpace* space = fColorInfo.colorSpace();
+        return space;
+    }
+    SkColorSpace* getColorSpace() const && = delete;
 
     /**
      *  Draw this SpecialImage into the canvas, automatically taking into account the image's subset
@@ -80,7 +99,8 @@ public:
               const SkPaint* paint,
               bool strict = true) const;
     void draw(SkCanvas* canvas, SkScalar x, SkScalar y) const {
-        this->draw(canvas, x, y, SkSamplingOptions(), nullptr);
+        const SkSamplingOptions sampling{};
+        draw(canvas, x, y, sampling, nullptr);
     }
 
     /**
@@ -89,8 +109,10 @@ public:
      * special image's content rect.
      */
     sk_sp<SkSpecialImage> makeSubset(const SkIRect& subset) const {
-        SkIRect absolute = subset.makeOffset(this->subset().topLeft());
-        return this->onMakeBackingStoreSubset(absolute);
+        const SkIPoint origin = fSubset.topLeft();
+        const SkIRect absolute = subset.makeOffset(origin);
+        sk_sp<SkSpecialImage> image = onMakeBackingStoreSubset(absolute);
+        return image;
     }
 
     /**
@@ -98,16 +120,14 @@ public:
      * This should only be used when it's externally known that those outer pixels are valid.
      */
     sk_sp<SkSpecialImage> makePixelOutset() const {
-        return this->onMakeBackingStoreSubset(this->subset().makeOutset(1, 1));
+        const SkIRect expanded = fSubset.makeOutset(1, 1);
+        sk_sp<SkSpecialImage> image = onMakeBackingStoreSubset(expanded);
+        return image;
     }
 
     /**
-     * Create an SkImage view of the contents of this special image, pointing to the same
-     * underlying memory.
-     *
-     * TODO: If SkImages::MakeFiltered were to return an SkShader that accounted for the subset
-     * constraint and offset, then this could move to a private virtual for use in draw() and
-     * asShader().
+     * Return the full backing image, without applying the content subset. Immutable
+     * raster pixels can be shared; mutable bitmap pixels are copied by SkBitmap::asImage.
      */
     virtual sk_sp<SkImage> asImage() const = 0;
 
@@ -115,11 +135,8 @@ public:
      * Create an SkShader that samples the contents of this special image, applying tile mode for
      * any sample that falls outside its internal subset.
      *
-     * 'strict' defaults to true and applies shader-based tiling to the subset. If the subset is
-     * the same as the backing store dimensions, it is automatically degraded to non-strict
-     * (HW tiling and sampling). 'strict' can be set to false if it's known that the subset
-     * boundaries aren't visible AND the texel data in adjacent rows/cols is valid to be included
-     * by the given sampling options.
+     * Strict sampling uses an extracted pixel view. Non-strict sampling keeps the
+     * full backing store; the caller must allow filtering through adjacent pixels.
      */
     virtual sk_sp<SkShader> asShader(SkTileMode,
                                      const SkSamplingOptions&,
@@ -157,10 +174,14 @@ private:
 
 namespace SkSpecialImages {
 
+// Callers supply a nonempty subset within the backing image. Bitmap factories
+// retain pixels; CopyFromRaster allocates an independent, tightly bounded image.
 sk_sp<SkSpecialImage> MakeFromRaster(const SkIRect& subset, sk_sp<SkImage>, const SkSurfaceProps&);
 sk_sp<SkSpecialImage> MakeFromRaster(const SkIRect& subset, const SkBitmap&, const SkSurfaceProps&);
 sk_sp<SkSpecialImage> CopyFromRaster(const SkIRect& subset, const SkBitmap&, const SkSurfaceProps&);
 
+// On success, writes a view retaining the source pixels. Output must be non-null.
+// A null or incompatible source fails without replacing the output bitmap.
 bool AsBitmap(const SkSpecialImage* img, SkBitmap*);
 
 }  // namespace SkSpecialImages

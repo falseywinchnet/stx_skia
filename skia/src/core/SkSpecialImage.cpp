@@ -31,11 +31,13 @@ void SkSpecialImage::draw(SkCanvas* canvas,
                           SkScalar x, SkScalar y,
                           const SkSamplingOptions& sampling,
                           const SkPaint* paint, bool strict) const {
-    SkRect dst = SkRect::MakeXYWH(x, y, this->subset().width(), this->subset().height());
-
-    canvas->drawImageRect(this->asImage(), SkRect::Make(this->subset()), dst,
-                          sampling, paint, strict ? SkCanvas::kStrict_SrcRectConstraint
-                                                  : SkCanvas::kFast_SrcRectConstraint);
+    const SkIRect& content = subset();
+    const SkRect destination = SkRect::MakeXYWH(x, y, content.width(), content.height());
+    const SkRect source = SkRect::Make(content);
+    const SkCanvas::SrcRectConstraint constraint = strict ? SkCanvas::kStrict_SrcRectConstraint
+                                                        : SkCanvas::kFast_SrcRectConstraint;
+    const sk_sp<SkImage> image = asImage();
+    (*canvas).drawImageRect(image, source, destination, sampling, paint, constraint);
 }
 
 class SkSpecialImage_Raster final : public SkSpecialImage {
@@ -48,18 +50,29 @@ public:
     }
 
     bool getROPixels(SkBitmap* bm) const {
-        return fBitmap.extractSubset(bm, this->subset());
+        const bool extracted = fBitmap.extractSubset(bm, subset());
+        return extracted;
     }
 
-    SkISize backingStoreDimensions() const override { return fBitmap.dimensions(); }
+    SkISize backingStoreDimensions() const override {
+        const SkISize dimensions = fBitmap.dimensions();
+        return dimensions;
+    }
 
-    size_t getSize() const override { return fBitmap.computeByteSize(); }
+    size_t getSize() const override {
+        const size_t bytes = fBitmap.computeByteSize();
+        return bytes;
+    }
 
-    sk_sp<SkImage> asImage() const override { return fBitmap.asImage(); }
+    sk_sp<SkImage> asImage() const override {
+        sk_sp<SkImage> image = fBitmap.asImage();
+        return image;
+    }
 
     sk_sp<SkSpecialImage> onMakeBackingStoreSubset(const SkIRect& subset) const override {
-        // No need to extract subset, onGetROPixels handles that when needed
-        return SkSpecialImages::MakeFromRaster(subset, fBitmap, this->props());
+        // Retain the backing pixels; getROPixels extracts the requested view on demand.
+        sk_sp<SkSpecialImage> image = SkSpecialImages::MakeFromRaster(subset, fBitmap, props());
+        return image;
     }
 
     sk_sp<SkShader> asShader(SkTileMode tileMode,
@@ -68,21 +81,24 @@ public:
                              bool strict) const override {
         if (strict) {
             // Bound every sample to the pixel view, including filter taps and mip generation.
-            SkBitmap subsetBM;
-            if (!this->getROPixels(&subsetBM)) {
+            SkBitmap subsetBitmap{};
+            if (!getROPixels(&subsetBitmap)) {
                 return nullptr;
             }
-            return subsetBM.makeShader(tileMode, tileMode, sampling, lm);
-        } else {
-            // The special image's logical (0,0) is at its subset's topLeft() so we need to
-            // account for that in the local matrix used when sampling.
-            SkMatrix subsetOrigin = SkMatrix::Translate(-this->subset().topLeft());
-            subsetOrigin.postConcat(lm);
-            return fBitmap.makeShader(tileMode, tileMode, sampling, subsetOrigin);
+            sk_sp<SkShader> shader = subsetBitmap.makeShader(tileMode, tileMode, sampling, lm);
+            return shader;
         }
+
+        // Content coordinates start at the subset origin, even when sampling the backing image.
+        const SkIPoint origin = subset().topLeft();
+        SkMatrix subsetOrigin = SkMatrix::Translate(-origin);
+        subsetOrigin.postConcat(lm);
+        sk_sp<SkShader> shader = fBitmap.makeShader(tileMode, tileMode, sampling, subsetOrigin);
+        return shader;
     }
 
 private:
+    // The copied bitmap retains its pixel reference; caller-owned bitmap metadata may expire.
     SkBitmap fBitmap;
 };
 
@@ -96,7 +112,8 @@ sk_sp<SkSpecialImage> MakeFromRaster(const SkIRect& subset,
     if (!bm.pixelRef()) {
         return nullptr;
     }
-    return sk_make_sp<SkSpecialImage_Raster>(subset, bm, props);
+    sk_sp<SkSpecialImage> image = sk_make_sp<SkSpecialImage_Raster>(subset, bm, props);
+    return image;
 }
 
 sk_sp<SkSpecialImage> CopyFromRaster(const SkIRect& subset,
@@ -107,19 +124,21 @@ sk_sp<SkSpecialImage> CopyFromRaster(const SkIRect& subset,
     if (!bm.pixelRef()) {
         return nullptr;
     }
-    SkBitmap tmp;
-    SkImageInfo info = bm.info().makeDimensions(subset.size());
-    if (!tmp.tryAllocPixels(info)) {
+    SkBitmap copy{};
+    const SkISize dimensions = subset.size();
+    const SkImageInfo info = bm.info().makeDimensions(dimensions);
+    if (!copy.tryAllocPixels(info)) {
         return nullptr;
     }
-    if (!bm.readPixels(tmp.info(), tmp.getPixels(), tmp.rowBytes(), subset.x(), subset.y())) {
+    if (!bm.readPixels(copy.info(), copy.getPixels(), copy.rowBytes(), subset.x(), subset.y())) {
         return nullptr;
     }
     // Since we're making a copy of the raster, the resulting special image is the exact size
     // of the requested subset of the original and no longer needs to be offset by subset's left
     // and top, since those were relative to the original's buffer.
-    return sk_make_sp<SkSpecialImage_Raster>(
-            SkIRect::MakeWH(subset.width(), subset.height()), tmp, props);
+    const SkIRect bounds = SkIRect::MakeSize(dimensions);
+    sk_sp<SkSpecialImage> image = sk_make_sp<SkSpecialImage_Raster>(bounds, copy, props);
+    return image;
 }
 
 sk_sp<SkSpecialImage> MakeFromRaster(const SkIRect& subset,
@@ -129,22 +148,24 @@ sk_sp<SkSpecialImage> MakeFromRaster(const SkIRect& subset,
         return nullptr;
     }
 
-    SkASSERT(image->bounds().contains(subset));
+    SkASSERT((*image).bounds().contains(subset));
 
-    // This will not work if the image is uploaded to a GPU render target.
-    SkBitmap bm;
-    if (as_IB(image)->getROPixels(&bm)) {
-        return MakeFromRaster(subset, bm, props);
+    SkBitmap bitmap{};
+    SkImage_Base& rasterSource = *as_IB(image);
+    if (!rasterSource.getROPixels(&bitmap)) {
+        return nullptr;
     }
-    return nullptr;
+    sk_sp<SkSpecialImage> result = MakeFromRaster(subset, bitmap, props);
+    return result;
 }
 
 bool AsBitmap(const SkSpecialImage* img, SkBitmap* result) {
-    if (!img || img->isGaneshBacked() || img->isGraphiteBacked()) {
+    if (!img || (*img).isGaneshBacked() || (*img).isGraphiteBacked()) {
         return false;
     }
-    auto rasterImg = static_cast<const SkSpecialImage_Raster*>(img);
-    return rasterImg->getROPixels(result);
+    const SkSpecialImage_Raster& rasterImage = *static_cast<const SkSpecialImage_Raster*>(img);
+    const bool extracted = rasterImage.getROPixels(result);
+    return extracted;
 }
 
 }  // namespace SkSpecialImages

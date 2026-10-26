@@ -1159,6 +1159,17 @@ The full instrumented suite returns PASS.
 See ../results/2026-10-26/CPU_SUBSET_PATH.md. This resolves the prior strict-subset
 follow-up; the broader canvas/device implementation still needs conversion.
 
+## Raster special-image views
+
+The retained special-image interface and raster implementation now name their
+pixel owners, bounded views and copy results. Metadata borrows reject temporary
+owners. Expanded tests check sharing versus copy isolation, nested coordinates,
+source-handle release and 48 additional special-image shader renders. Candidate/
+reference suites pass 58/58 and 57/57, all fifteen common artifacts match, and
+the full instrumented suite returns PASS. See
+../results/2026-10-26/SPECIAL_IMAGE_CONVERSION.md. The surrounding canvas/device
+and lower-level sampling implementation remain separate conversion work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
