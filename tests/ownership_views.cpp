@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <variant>
 
 namespace {
 struct Events {
@@ -163,6 +164,14 @@ constexpr bool constexpr_view() {
 }
 static_assert(constexpr_view());
 #ifndef STX_SKIA_REFERENCE
+struct NotAContainer { int value = 0; };
+static_assert(!std::is_constructible_v<SkSpan<int>, NotAContainer&>);
+static_assert(!std::is_convertible_v<NotAContainer&, SkSpan<int>>);
+static_assert(!std::is_constructible_v<SkSpan<int>, const std::vector<int>&>);
+static_assert(!std::is_constructible_v<SkSpan<int>, std::vector<float>&>);
+static_assert(!std::is_constructible_v<SkSpan<int>, std::vector<bool>&>);
+static_assert(std::is_constructible_v<SkSpan<const int>, const std::vector<int>&>);
+static_assert(std::is_constructible_v<std::variant<NotAContainer, SkSpan<int>>, NotAContainer&>);
 static_assert(!std::is_constructible_v<SkSpan<int>, std::vector<int>&&>);
 static_assert(!std::is_constructible_v<SkSpan<const int>, std::vector<int>&&>);
 static_assert(std::is_constructible_v<SkSpan<int>, std::vector<int>&>);

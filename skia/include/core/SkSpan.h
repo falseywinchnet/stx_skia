@@ -51,6 +51,25 @@
 #define SK_CHECK_IL_LIFETIME
 #endif
 
+namespace skia_private {
+// Keep non-containers out of overload resolution, including variant's conversion
+// probes. Validate element access here rather than failing inside the constructor.
+template <typename Container, typename Element, typename = void>
+struct SpanContainerTraits {
+    static constexpr bool compatible = false;
+};
+
+template <typename Container, typename Element>
+struct SpanContainerTraits<Container, Element,
+        std::void_t<decltype(std::data(std::declval<Container&>())),
+                    decltype(std::size(std::declval<Container&>()))>> {
+    using DataPointer = decltype(std::data(std::declval<Container&>()));
+    using Size = decltype(std::size(std::declval<Container&>()));
+    static constexpr bool compatible = std::is_convertible_v<DataPointer, Element*> &&
+                                       std::is_integral_v<Size>;
+};
+}
+
 /**
  * SkSpan holds a reference to contiguous data of type T along with a count. SkSpan does not own
  * the data itself but is merely a reference, therefore you must take care with the lifetime of
@@ -97,6 +116,7 @@ public:
     constexpr SkSpan(const SkSpan& o) = default;
     template<size_t N> constexpr SkSpan(T(&a)[N]) : SkSpan(a, N) { }
     template<typename Container>
+        requires skia_private::SpanContainerTraits<Container, T>::compatible
     constexpr SkSpan(Container& c) : SkSpan(std::data(c), std::size(c)) { }
     // Borrowed views may be temporary; owning containers must be lvalues.
     template<typename U, size_t Extent,
