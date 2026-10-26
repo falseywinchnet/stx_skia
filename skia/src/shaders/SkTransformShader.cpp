@@ -50,6 +50,6 @@ bool SkTransformShader::appendStages(const SkStageRec& rec,
                                   : SkRasterPipelineOp::matrix_2x3;
     rec.fPipeline->append(type, fMatrixStorage);
 
-    fShader.appendStages(rec, *childMRec);
-    return true;
+    const bool appended = fShader.appendStages(rec, *childMRec);
+    return appended;
 }

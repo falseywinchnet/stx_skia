@@ -439,3 +439,7 @@ endforeach()
 # Shader facade retains its pre-conversion ownership and matrix composition.
 list(REMOVE_ITEM stx_sources skia/src/shaders/SkShader.cpp)
 list(APPEND stx_sources baseline/skia/src/shaders/SkShader.cpp)
+
+# Mutable shader transforms retain the original child-failure behavior.
+list(REMOVE_ITEM stx_sources skia/src/shaders/SkTransformShader.cpp)
+list(APPEND stx_sources baseline/skia/src/shaders/SkTransformShader.cpp)

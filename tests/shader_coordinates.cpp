@@ -4,6 +4,7 @@
 #include "include/core/SkShader.h"
 #include "include/core/SkSurface.h"
 #include "src/shaders/SkLocalMatrixShader.h"
+#include "src/shaders/SkTransformShader.h"
 #include "src/core/SkArenaAlloc.h"
 #include "src/core/SkEffectPriv.h"
 #include "src/core/SkRasterPipeline.h"
@@ -134,6 +135,25 @@ bool coordinate_cases(std::vector<uint32_t>& output) {
     return true;
 }
 
+bool transform_child_failure() {
+    const sk_sp<SkShader> empty = SkShaders::Empty();
+    const SkShaderBase& child = *as_SB(empty);
+    const SkTransformShader transform(child, false);
+    SkSTArenaAlloc<2048> arena{};
+    const SkSurfaceProps props{};
+    SkRasterPipeline pipeline(&arena);
+    const SkStageRec rec{&pipeline, &arena, kRGBA_8888_SkColorType, nullptr,
+                         SkColors::kWhite, props, SkRect::MakeEmpty()};
+    const SkShaders::MatrixRec identity{};
+    const bool appended = transform.appendStages(rec, identity);
+#ifdef STX_SKIA_REFERENCE
+    // Preserve evidence that the original wrapper masks its child's failure.
+    return appended;
+#else
+    return !appended;
+#endif
+}
+
 bool matrix_state() {
     SkSTArenaAlloc<2048> arena{};
     const SkSurfaceProps props{};
@@ -195,6 +215,7 @@ int main(int argc, char** argv) {
     if (!coordinate_cases(output)) return 1;
     if (!empty_and_singular()) return 2;
     if (!matrix_state()) return 4;
+    if (!transform_child_failure()) return 5;
     if (argc == 2) {
         FILE* file = std::fopen(argv[1], "wb");
         if (file == nullptr) return 3;
