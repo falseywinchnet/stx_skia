@@ -3,6 +3,7 @@
 #include "src/core/SkAAClip.h"
 #include "src/core/SkBase64.h"
 #include "src/core/SkMask.h"
+#include "src/core/SkPathRaw.h"
 
 #include <array>
 #include <cstddef>
@@ -141,6 +142,23 @@ bool aliased_path_points() {
     for (int index = 0; index < 32; ++index) {
         const SkPoint expected = lineOutput[index];
         const SkPoint actual = lineOutput[index + 32];
+        if (actual.fX != expected.fX || actual.fY != expected.fY) return false;
+    }
+
+    SkPathBuilder rawBuilder;
+    rawBuilder.moveTo(0, 0);
+    for (int index = 1; index < 32; ++index) {
+        rawBuilder.lineTo(static_cast<float>(index), static_cast<float>(index + 1));
+    }
+    const SkPathRaw raw = {rawBuilder.points(), rawBuilder.verbs(),
+        rawBuilder.conicWeights(), SkRect::MakeWH(32, 33),
+        SkPathFillType::kWinding, SkPathConvexity::kUnknown, 0};
+    rawBuilder.addRaw(raw, SkPathBuilder::Reserve::kGrow);
+    const SkSpan<const SkPoint> rawOutput = rawBuilder.points();
+    if (rawOutput.size() != 64) return false;
+    for (int index = 0; index < 32; ++index) {
+        const SkPoint expected = rawOutput[index];
+        const SkPoint actual = rawOutput[index + 32];
         if (actual.fX != expected.fX || actual.fY != expected.fY) return false;
     }
     return true;

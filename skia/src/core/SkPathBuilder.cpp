@@ -35,15 +35,16 @@
 
 namespace {
 
-// The input may borrow this builder's points. Preserve it before an append can
-// move the array; disjoint callers keep the direct copy path.
-bool points_overlap(SkSpan<const SkPoint> source, SkSpan<const SkPoint> stored) {
+// A borrowed input may point into a builder array. Preserve it before an
+// append can move the array; disjoint callers keep the direct copy path.
+template <typename T>
+bool spans_overlap(SkSpan<const T> source, SkSpan<const T> stored) {
     if (source.empty() || stored.empty()) {
         return false;
     }
-    std::less<const SkPoint*> less;
-    const SkPoint* sourceEnd = source.data() + source.size();
-    const SkPoint* storedEnd = stored.data() + stored.size();
+    std::less<const T*> less;
+    const T* sourceEnd = source.data() + source.size();
+    const T* storedEnd = stored.data() + stored.size();
     const bool overlaps = less(source.data(), storedEnd) && less(stored.data(), sourceEnd);
     return overlaps;
 }
@@ -709,15 +710,34 @@ SkPathIter SkPathBuilder::iter() const {
 }
 
 SkPathBuilder& SkPathBuilder::addRaw(const SkPathRaw& raw, Reserve reserve) {
-    if (reserve == Reserve::kGrow) {
-        this->incReserve(raw.points().size(), raw.verbs().size(), raw.conics().size());
-    } else {
-        fPts         .reserve_exact(Sk32_sat_add(fPts.size()         , raw.points().size()));
-        fVerbs       .reserve_exact(Sk32_sat_add(fVerbs.size()       , raw.verbs().size()));
-        fConicWeights.reserve_exact(Sk32_sat_add(fConicWeights.size(), raw.conics().size()));
+    // The raw view can borrow this builder's arrays. Capture each aliased
+    // range before reserve or the replayed verbs can invalidate its inputs.
+    SkPathRaw input = raw;
+    PointsArray stablePoints;
+    VerbsArray stableVerbs;
+    ConicWeightsArray stableConics;
+    if (spans_overlap(raw.points(), SkSpan<const SkPoint>(fPts))) {
+        stablePoints = PointsArray(raw.points());
+        input.fPoints = stablePoints;
+    }
+    if (spans_overlap(raw.verbs(), SkSpan<const SkPathVerb>(fVerbs))) {
+        stableVerbs = VerbsArray(raw.verbs());
+        input.fVerbs = stableVerbs;
+    }
+    if (spans_overlap(raw.conics(), SkSpan<const float>(fConicWeights))) {
+        stableConics = ConicWeightsArray(raw.conics());
+        input.fConics = stableConics;
     }
 
-    for (auto iter = raw.iter(); auto rec = iter.next();) {
+    if (reserve == Reserve::kGrow) {
+        this->incReserve(input.points().size(), input.verbs().size(), input.conics().size());
+    } else {
+        fPts         .reserve_exact(Sk32_sat_add(fPts.size()         , input.points().size()));
+        fVerbs       .reserve_exact(Sk32_sat_add(fVerbs.size()       , input.verbs().size()));
+        fConicWeights.reserve_exact(Sk32_sat_add(fConicWeights.size(), input.conics().size()));
+    }
+
+    for (auto iter = input.iter(); auto rec = iter.next();) {
         const auto pts = rec->fPoints;
         switch (rec->fVerb) {
             case SkPathVerb::kMove:  this->moveTo( pts[0]); break;
@@ -734,8 +754,8 @@ SkPathBuilder& SkPathBuilder::addRaw(const SkPathRaw& raw, Reserve reserve) {
     };
 
     // if the iterator 'trimmed' off a trialing move, we restore it here
-    if (has_trailing_move(raw.verbs()) && !has_trailing_move(this->verbs())) {
-        this->moveTo(raw.points().back());
+    if (has_trailing_move(input.verbs()) && !has_trailing_move(this->verbs())) {
+        this->moveTo(input.points().back());
     }
 
     return *this;
@@ -809,7 +829,7 @@ SkPathBuilder& SkPathBuilder::addPolygon(SkSpan<const SkPoint> pts, bool isClose
     }
 
     PointsArray stablePoints;
-    if (points_overlap(pts, fPts)) {
+    if (spans_overlap(pts, SkSpan<const SkPoint>(fPts))) {
         stablePoints = PointsArray(pts);
         pts = stablePoints;
     }
@@ -825,7 +845,7 @@ SkPathBuilder& SkPathBuilder::addPolygon(SkSpan<const SkPoint> pts, bool isClose
 SkPathBuilder& SkPathBuilder::polylineTo(SkSpan<const SkPoint> pts) {
     if (!pts.empty()) {
         PointsArray stablePoints;
-        if (points_overlap(pts, fPts)) {
+        if (spans_overlap(pts, SkSpan<const SkPoint>(fPts))) {
             stablePoints = PointsArray(pts);
             pts = stablePoints;
         }
