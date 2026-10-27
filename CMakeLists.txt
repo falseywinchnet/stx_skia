@@ -28,8 +28,27 @@ if(STX_SKIA_BASELINE)
 else()
     include(cmake/prune.cmake)
 endif()
+# The red/blue swap kernel links no Skia code and sees only stx_skia's own headers, so a
+# Skia include in it fails to compile and a host can link it on its own.
+add_library(stx_skia_swizzle STATIC src/swizzle.cpp)
+add_library(stx_skia::swizzle ALIAS stx_skia_swizzle)
+set_target_properties(stx_skia_swizzle PROPERTIES EXPORT_NAME swizzle
+    POSITION_INDEPENDENT_CODE ON)
+target_compile_features(stx_skia_swizzle PUBLIC cxx_std_20)
+target_include_directories(stx_skia_swizzle PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(stx_skia_swizzle PRIVATE -fno-exceptions -fno-rtti)
+endif()
+if(STX_SKIA_SANITIZE)
+    target_compile_options(stx_skia_swizzle PUBLIC -fsanitize=address,undefined
+        -fno-sanitize=vptr -fno-omit-frame-pointer)
+    target_link_options(stx_skia_swizzle PUBLIC -fsanitize=address,undefined)
+endif()
 add_library(stx_skia STATIC ${stx_sources} src/pixel_storage.cpp)
 add_library(stx_skia::stx_skia ALIAS stx_skia)
+target_link_libraries(stx_skia PUBLIC stx_skia_swizzle)
 target_compile_features(stx_skia PUBLIC cxx_std_20)
 if(STX_SKIA_BASELINE)
     target_include_directories(stx_skia BEFORE PUBLIC
@@ -527,6 +546,12 @@ if(BUILD_TESTING)
     add_executable(stx_skia_render_tests tests/render.cpp)
     target_link_libraries(stx_skia_render_tests PRIVATE stx_skia)
     add_test(NAME render_contract COMMAND stx_skia_render_tests)
+    add_executable(stx_skia_swizzle_tests tests/swizzle.cpp)
+    target_link_libraries(stx_skia_swizzle_tests PRIVATE stx_skia)
+    add_test(NAME swizzle_contract COMMAND stx_skia_swizzle_tests)
+    add_executable(stx_skia_swizzle_only tests/installed/swizzle_only.cpp)
+    target_link_libraries(stx_skia_swizzle_only PRIVATE stx_skia_swizzle)
+    add_test(NAME swizzle_without_skia COMMAND stx_skia_swizzle_only)
     add_executable(stx_skia_storage_tests tests/pixel_storage.cpp)
     target_link_libraries(stx_skia_storage_tests PRIVATE stx_skia)
     add_test(NAME pixel_storage COMMAND stx_skia_storage_tests)
@@ -654,7 +679,8 @@ if(BUILD_TESTING)
     endif()
 endif()
 
-install(TARGETS stx_skia EXPORT stx_skiaTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS stx_skia stx_skia_swizzle EXPORT stx_skiaTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(DIRECTORY skia/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/stx_skia/skia/include
     FILES_MATCHING PATTERN "*.h"

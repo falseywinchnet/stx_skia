@@ -8,6 +8,7 @@
 #endif
 
 #include <stx_skia/pixel_storage.hpp>
+#include <stx_skia/swizzle.hpp>
 #include "include/core/SkCanvas.h"
 #include "include/core/SkSurface.h"
 #include "include/core/SkImage.h"
@@ -76,6 +77,15 @@ int main() {
     ConsumerBase* base = &consumer;
     ConsumerDerived* recovered = dynamic_cast<ConsumerDerived*>(base);
     if (recovered != &consumer) return 4;
+    // The swap kernel is reachable through the full package too.
+    std::array<std::byte, 4> rgba{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4}};
+    std::array<std::byte, 4> bgra{};
+    if (stx_skia::swap_red_blue(bgra, rgba) != stx_skia::SwizzleResult::ok ||
+        bgra[0] != std::byte{3}) return 12;
+    const stx_skia::SwizzleResult rows = stx_skia::swap_red_blue_rows(
+            bgra, stx_skia::RowBytes(4), bgra, stx_skia::RowBytes(4), stx_skia::PixelCount(1),
+            stx_skia::RowCount(1));
+    if (rows != stx_skia::SwizzleResult::ok || bgra != rgba) return 13;
     std::vector<std::byte> pixels(16U * 16U * 4U, std::byte{0xFF});
     sk_sp<SkData> data = stx_skia::take_pixel_data(pixels);
     if (!data || !pixels.empty()) return 1;

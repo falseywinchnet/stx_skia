@@ -11,3 +11,4 @@ cmake -S tests/installed -B build/installed-consumer -G Ninja \
     -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_PREFIX_PATH="$root/build/install-relocated"
 cmake --build build/installed-consumer
 build/installed-consumer/consumer
+build/installed-consumer/swizzle_only

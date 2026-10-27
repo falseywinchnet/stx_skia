@@ -1,5 +1,8 @@
 # Standalone red/blue swap kernel: plan — 2026-10-27
 
+Status: implemented apart from the Windows, wasm and GUI.Forms integration steps. See
+`results/2026-10-27/SWAP_KERNEL.md`.
+
 GUI.Forms renders BGRA8 premultiplied sRGB everywhere. Several hosts must hand pixels to
 something that wants RGBA byte order, or take RGBA pixels in:
 - **Android** (planned): it copies damaged rectangles of the back buffer into an

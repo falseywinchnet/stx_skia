@@ -1528,6 +1528,27 @@ any change, both builds wrote identical bytes for a new corpus over the hooks (`
 That file is unchanged afterwards. `android-clip-reset.raw` is meant to differ. See
 ../results/2026-10-27/ANDROID_CLIP_HOOKS.md.
 
+## Standalone red/blue swap kernel
+
+New stx_skia code, not converted Skia code. `stx_skia::swap_red_blue` and
+`swap_red_blue_rows` (`include/stx_skia/swizzle.hpp`) swap RGBA and BGRA bytes for GUI.Forms'
+hosts.
+- **Design:** distinct pixel, row and byte-stride types, and full validation before any
+  write. Buffers are exact in place or disjoint.
+- **Kernel:** a 32-bit mask form that the compiler vectorizes at 128 bits on arm64, SSE2 and
+  SSE4.1.
+- **Packaging:** the `stx_skia_swizzle` library includes and links no Skia code.
+- **Evidence:** it matches `SkSwapRB` byte for byte, round-trips, and leaves the destination
+  untouched on every failure.
+- **Speed:** on the M4 it is level with Skia's NEON swap. At the x86-64 SSE2 baseline it is
+  2.6–5.1× faster than GUI.Forms' byte loops, and 3.5–5.2× faster than the candidate Skia's
+  in-place swap.
+- **Losses:** recorded as well. Skia's run-time AVX2 version is faster, and Zen 5 code
+  placement halves one path at x86-64-v2.
+
+The Windows-toolchain inspection and timing, wasm inspection and the GUI.Forms integration
+patch remain. See ../results/2026-10-27/SWAP_KERNEL.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
