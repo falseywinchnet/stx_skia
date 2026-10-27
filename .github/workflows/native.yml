@@ -40,6 +40,7 @@ jobs:
           cmake -E compare_files build/baseline/paint.raw build/candidate/paint.raw
           cmake -E compare_files build/baseline/m44.raw build/candidate/m44.raw
           cmake -E compare_files build/baseline/matrix-invert.raw build/candidate/matrix-invert.raw
+          cmake -E compare_files build/baseline/raster-clip-stack.raw build/candidate/raster-clip-stack.raw
           cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
@@ -96,6 +97,7 @@ jobs:
           cmake -E compare_files build/baseline/paint.raw build/candidate/paint.raw
           cmake -E compare_files build/baseline/m44.raw build/candidate/m44.raw
           cmake -E compare_files build/baseline/matrix-invert.raw build/candidate/matrix-invert.raw
+          cmake -E compare_files build/baseline/raster-clip-stack.raw build/candidate/raster-clip-stack.raw
           cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
