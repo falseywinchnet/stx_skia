@@ -1272,6 +1272,17 @@ artifact match, except the intentionally corrected sampling artifact; the instru
 suite reports PASS. See ../results/2026-10-26/CONTOUR_MEASURE_CONVERSION.md. Stroking and
 dashing remain.
 
+## Stroking, caps and joins, and stroke records
+
+The path stroker, cap and join procedures and stroke records are converted. Three `goto`s
+become structured control flow with the same outcomes; path records are named optional
+records in loops whose `continue` still advances; stroker, quad-construction and record
+members start initialized; factory tables become switches with defined fallbacks.
+Debug-only stroker instrumentation is removed. Candidate/reference suites pass 65/65 and
+64/64; the new corpus and every other shared artifact match, except the intentionally
+corrected sampling artifact; the instrumented suite reports PASS. See
+../results/2026-10-26/STROKE_CONVERSION.md. Dashing and path-effect composition remain.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

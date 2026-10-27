@@ -471,3 +471,9 @@ endforeach()
 list(REMOVE_ITEM stx_sources skia/src/core/SkContourMeasure.cpp skia/src/core/SkPathMeasure.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkContourMeasure.cpp
     baseline/skia/src/core/SkPathMeasure.cpp)
+
+# Stroking, caps and joins, and stroke records before conversion.
+list(REMOVE_ITEM stx_sources skia/src/core/SkStroke.cpp skia/src/core/SkStrokerPriv.cpp
+    skia/src/core/SkStrokeRec.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkStroke.cpp baseline/skia/src/core/SkStrokerPriv.cpp
+    baseline/skia/src/core/SkStrokeRec.cpp)

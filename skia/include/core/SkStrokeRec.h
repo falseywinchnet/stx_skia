@@ -42,15 +42,23 @@ public:
     Style getStyle() const;
     SkScalar getWidth() const { return fWidth; }
     SkScalar getMiter() const { return fMiterLimit; }
-    SkPaint::Cap getCap() const { return (SkPaint::Cap)fCap; }
-    SkPaint::Join getJoin() const { return (SkPaint::Join)fJoin; }
+    SkPaint::Cap getCap() const {
+        const SkPaint::Cap cap = static_cast<SkPaint::Cap>(fCap);
+        return cap;
+    }
+    SkPaint::Join getJoin() const {
+        const SkPaint::Join join = static_cast<SkPaint::Join>(fJoin);
+        return join;
+    }
 
     bool isHairlineStyle() const {
-        return kHairline_Style == this->getStyle();
+        const bool hairline = kHairline_Style == getStyle();
+        return hairline;
     }
 
     bool isFillStyle() const {
-        return kFill_Style == this->getStyle();
+        const bool fill = kFill_Style == getStyle();
+        return fill;
     }
 
     void setFillStyle();
@@ -64,8 +72,8 @@ public:
     void setStrokeStyle(SkScalar width, bool strokeAndFill = false);
 
     void setStrokeParams(SkPaint::Cap cap, SkPaint::Join join, SkScalar miterLimit) {
-        fCap = cap;
-        fJoin = join;
+        fCap = static_cast<uint32_t>(cap);
+        fJoin = static_cast<uint32_t>(join);
         fMiterLimit = miterLimit;
     }
 
@@ -83,8 +91,9 @@ public:
      *  will return true.
      */
     bool needToApply() const {
-        Style style = this->getStyle();
-        return (kStroke_Style == style) || (kStrokeAndFill_Style == style);
+        const Style style = getStyle();
+        const bool apply = (kStroke_Style == style) || (kStrokeAndFill_Style == style);
+        return apply;
     }
 
     /**
@@ -129,31 +138,33 @@ public:
      * paths does not take the ResScale parameter into account.
      */
     bool hasEqualEffect(const SkStrokeRec& other) const {
-        if (!this->needToApply()) {
-            return this->getStyle() == other.getStyle();
+        if (!needToApply()) {
+            const bool sameStyle = getStyle() == other.getStyle();
+            return sameStyle;
         }
-        return fWidth == other.fWidth &&
-               (fJoin != SkPaint::kMiter_Join || fMiterLimit == other.fMiterLimit) &&
-               fCap == other.fCap &&
-               fJoin == other.fJoin &&
-               fStrokeAndFill == other.fStrokeAndFill;
+        const bool equal = fWidth == other.fWidth &&
+                           (fJoin != SkPaint::kMiter_Join || fMiterLimit == other.fMiterLimit) &&
+                           fCap == other.fCap &&
+                           fJoin == other.fJoin &&
+                           fStrokeAndFill == other.fStrokeAndFill;
+        return equal;
     }
 
 private:
     void init(const SkPaint&, SkPaint::Style, SkScalar resScale);
 
-    SkScalar        fResScale;
-    SkScalar        fWidth;
-    SkScalar        fMiterLimit;
+    SkScalar        fResScale = 1;
+    SkScalar        fWidth = 0;
+    SkScalar        fMiterLimit = 0;
     // The following three members are packed together into a single u32.
     // This is to avoid unnecessary padding and ensure binary equality for
     // hashing (because the padded areas might contain garbage values).
     //
     // fCap and fJoin are larger than needed to avoid having to initialize
     // any pad values
-    uint32_t        fCap : 16;             // SkPaint::Cap
-    uint32_t        fJoin : 15;            // SkPaint::Join
-    uint32_t        fStrokeAndFill : 1;    // bool
+    uint32_t        fCap : 16 = 0;             // SkPaint::Cap
+    uint32_t        fJoin : 15 = 0;            // SkPaint::Join
+    uint32_t        fStrokeAndFill : 1 = 0;    // bool
 };
 SK_END_REQUIRE_DENSE
 
