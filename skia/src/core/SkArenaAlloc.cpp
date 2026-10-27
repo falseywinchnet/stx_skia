@@ -20,22 +20,29 @@
 static char* end_chain(char*) { return nullptr; }
 
 SkArenaAlloc::SkArenaAlloc(char* block, size_t size, size_t firstHeapAllocation)
-    : fDtorCursor {block}
-    , fCursor     {block}
-    , fEnd        {block}
-    , fFibonacciProgression{CheckedArenaSize(size), CheckedArenaSize(firstHeapAllocation)}
+    : fFibonacciProgression{CheckedArenaSize(size), CheckedArenaSize(firstHeapAllocation)}
 {
+    (*this).startAt(block, size);
+}
+
+void SkArenaAlloc::startAt(char* block, size_t size) {
     SkASSERT_RELEASE(block != nullptr || size == 0);
     if (size < sizeof(Footer)) {
         fEnd = fCursor = fDtorCursor = nullptr;
-    } else {
-        fEnd = block + size;
+        return;
     }
+    fDtorCursor = block;
+    fCursor = block;
+    fEnd = block + size;
+    (*this).installFooter(end_chain, 0);
+    sk_asan_poison_memory_region(fCursor, fEnd - fCursor);
+}
 
-    if (fCursor != nullptr) {
-        (*this).installFooter(end_chain, 0);
-        sk_asan_poison_memory_region(fCursor, fEnd - fCursor);
-    }
+void SkArenaAlloc::restart(char* block, size_t size, size_t firstHeapAllocation) {
+    RunDtorsOnBlock(fDtorCursor);
+    fFibonacciProgression = SkFibBlockSizes<std::numeric_limits<uint32_t>::max()>(
+            CheckedArenaSize(size), CheckedArenaSize(firstHeapAllocation));
+    (*this).startAt(block, size);
 }
 
 SkArenaAlloc::~SkArenaAlloc() {
@@ -43,7 +50,7 @@ SkArenaAlloc::~SkArenaAlloc() {
 }
 
 void SkArenaAlloc::installFooter(FooterAction* action, uint32_t padding) {
-    SkASSERT(SkTFitsIn<uint8_t>(padding));
+    AssertRelease(SkTFitsIn<uint8_t>(padding));
     (*this).installRaw(action);
     (*this).installRaw(static_cast<uint8_t>(padding));
     fDtorCursor = fCursor;
@@ -168,12 +175,12 @@ SkArenaAllocWithReset::SkArenaAllocWithReset(char* block,
         , fFirstSize{SkToU32(size)}
         , fFirstHeapAllocationSize{SkToU32(firstHeapAllocation)} {}
 
+// Reinitializes in place. Ending this object and constructing a new SkArenaAllocWithReset in its
+// storage, as the intake code did, is not a transparent replacement when this is a base-class
+// subobject (SkSTArenaAllocWithReset, or any other subclass), so the old object could not be
+// used afterwards.
 void SkArenaAllocWithReset::reset() {
-    char* const    firstBlock              = fFirstBlock;
-    const uint32_t firstSize               = fFirstSize;
-    const uint32_t firstHeapAllocationSize = fFirstHeapAllocationSize;
-    (*this).~SkArenaAllocWithReset();
-    new (this) SkArenaAllocWithReset{firstBlock, firstSize, firstHeapAllocationSize};
+    (*this).restart(fFirstBlock, fFirstSize, fFirstHeapAllocationSize);
 }
 
 bool SkArenaAllocWithReset::isEmpty() {

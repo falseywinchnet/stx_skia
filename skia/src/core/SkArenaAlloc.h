@@ -237,8 +237,21 @@ protected:
     char* cursor() { return fCursor; }
     char* end() { return fEnd; }
 
+    // Ends every object made so far, frees every heap block, and starts again as if newly
+    // constructed with these arguments, without ending this object itself.
+    void restart(char* block, size_t blockSize, size_t firstHeapAllocation);
+
 private:
     static void AssertRelease(bool cond) { if (!cond) { ::abort(); } }
+
+    // A footer records the padding before its object in one byte, so an object or array with a
+    // destructor may be aligned to at most 256 bytes (padding of at most 255). Trivially
+    // destructible allocations have no footer and no such limit.
+    static constexpr size_t kMaxFooterAlignment = 256;
+
+    // Installs the first footer in 'block', or leaves the arena without storage when the block
+    // cannot hold one.
+    void startAt(char* block, size_t blockSize);
     static uint32_t CheckedArenaSize(size_t size) {
         AssertRelease(SkTFitsIn<uint32_t>(size));
         const uint32_t checked = static_cast<uint32_t>(size);
@@ -319,6 +332,9 @@ private:
     // the footer; the object starts at SkipObject<T>(footerEnd).
     template <typename T>
     char* reserveObjectWithFooter() {
+        static_assert(alignof(T) <= kMaxFooterAlignment,
+                      "SkArenaAlloc cannot record the padding of a destructible object aligned "
+                      "beyond 256 bytes");
         const uint32_t size = SkToU32(sizeof(T));
         AssertRelease(size <= std::numeric_limits<uint32_t>::max() - sizeof(Footer));
         char* objStart = (*this).allocObjectWithFooter(size + sizeof(Footer), SkToU32(alignof(T)));
@@ -371,6 +387,9 @@ private:
             fCursor = objStart + arraySize;
             sk_asan_unpoison_memory_region(objStart, arraySize);
         } else {
+            static_assert(alignof(T) <= kMaxFooterAlignment,
+                          "SkArenaAlloc cannot record the padding of a destructible array aligned "
+                          "beyond 256 bytes");
             constexpr uint32_t overhead = sizeof(Footer) + 2 * sizeof(uint32_t);
             AssertRelease(arraySize <= std::numeric_limits<uint32_t>::max() - overhead);
             const uint32_t totalSize = arraySize + overhead;

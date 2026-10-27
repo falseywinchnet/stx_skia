@@ -18,6 +18,10 @@
 // remaining bytes and the offsets in caller storage to a second artifact
 // (arena-core-layout.raw), which differs on purpose. The second pass makes no nontrivial arrays
 // and records both in the shared artifact, so the block layouts must match exactly there.
+//
+// The candidate alone checks destructible objects and arrays at the largest alignment a footer
+// can record (256), and trivially destructible objects beyond it. Destructible types aligned
+// beyond 256 bytes no longer compile; the intake code crashed ending them.
 
 #include "differential_corpus.h"
 
@@ -402,10 +406,60 @@ void arena_cases(Output& output) {
     record_destroyed(output);
 }
 
+#ifndef STX_SKIA_REFERENCE
+int gAlignedEnded = 0;
+
+struct alignas(256) WideAligned {
+    int id = 0;
+    WideAligned() = default;
+    explicit WideAligned(int i) : id(i) {}
+    ~WideAligned() { ++gAlignedEnded; }
+};
+
+struct alignas(512) WiderPlain {
+    int id = 0;
+};
+
+struct Narrow {
+    int id = 0;
+    explicit Narrow(int i) : id(i) {}
+    ~Narrow() { ++gAlignedEnded; }
+};
+
+// Interleaves narrow and 256-aligned destructible objects and arrays, so that footers carry the
+// largest paddings, and 512-aligned trivially destructible objects; every object is aligned and
+// every destructor runs once.
+bool wide_alignments() {
+    gAlignedEnded = 0;
+    int made = 0;
+    for (int round = 0; round < 40; ++round) {
+        SkArenaAlloc arena(static_cast<size_t>(round) * 16);
+        for (int index = 0; index < 6; ++index) {
+            arena.make<Narrow>(index);
+            WideAligned* wide = arena.make<WideAligned>(index);
+            WideAligned* wideArray = arena.makeArray<WideAligned>(2);
+            WiderPlain* plain = arena.make<WiderPlain>();
+            made += 4;
+            if (reinterpret_cast<uintptr_t>(wide) % 256 != 0) return false;
+            if (reinterpret_cast<uintptr_t>(wideArray) % 256 != 0) return false;
+            if (reinterpret_cast<uintptr_t>(plain) % 512 != 0) return false;
+            (*plain).id = index;
+        }
+    }
+    return gAlignedEnded == made;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 3) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (!wide_alignments()) {
+        std::puts("arena core: a widely aligned allocation was misplaced or not ended");
+        return 1;
+    }
+#endif
     Output output{};
     gNontrivialArrays = true;
     arena_cases(output);

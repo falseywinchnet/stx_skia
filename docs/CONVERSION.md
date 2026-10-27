@@ -1627,17 +1627,27 @@ could overrun the block made for it (measured up to 9 bytes, in 88 of 1,064 case
 alignment), and a self-steal of heap blocks leaked them. The block list's byte-copying `concat`
 now names `is_trivially_copyable`. See ../results/2026-10-27/BLOCK_LIST_CONVERSION.md.
 
+## Arena
+
+`SkArenaAlloc` and its inline-storage and resetting variants keep their whole interfaces. A
+seeded corpus is identical in both builds once nontrivial arrays, which now carry a 4-byte
+constructed count, are set aside; with them only block layouts differ, on purpose. The
+respelling removes the lambdas, trailing return and goto and leaves both artifacts unchanged.
+Fixed: destructible types aligned beyond 256 bytes, whose padding a footer cannot record and
+which crashed at destruction, no longer compile; `reset()` reinitializes in place instead of
+replacing what may be a base-class subobject. See ../results/2026-10-27/ARENA_CONVERSION.md.
+
 ## Still required
 
-Refreshed 2026-10-27 after the block allocator and list. The whole-library AST inventory
-counts 339 excluded constructs in 46 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 after the arena. The whole-library AST inventory counts 309 excluded
+constructs in 44 files, almost all `->` member arrows. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
 - **Remaining tree cleanup.** Public headers that nothing compiled includes and no consumer
   uses. The unbuilt upstream test, GM, benchmark and tool trees under `skia/` are kept as
   preserved sources.
-- **Memory, containers and support code.** The arena, `SkZip`, `SkBuffer`, `SkRandom`, the
+- **Memory, containers and support code.** `SkZip`, `SkBuffer`, `SkRandom`, the
   spinlock, data tables, time, CPU detection, tracing and assertion helpers, and the OS file
   ports. Also the compatibility remnants:
   `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the `SkSpan`
