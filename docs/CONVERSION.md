@@ -1637,8 +1637,9 @@ conversion evidence. Each unit also fixes defects, as before.
 - **Remaining tree cleanup.** Public headers that nothing compiled includes and no consumer
   uses. The unbuilt upstream test, GM, benchmark and tool trees under `skia/` are kept as
   preserved sources.
-- **Memory, containers and support code.** The arena, `SkZip`, `SkBuffer`, `SkRandom`, the spinlock, data tables, time, CPU detection,
-  tracing and assertion helpers, and the OS file ports. Also the compatibility remnants:
+- **Memory, containers and support code.** The arena, `SkZip`, `SkBuffer`, `SkRandom`, the
+  spinlock, data tables, time, CPU detection, tracing and assertion helpers, and the OS file
+  ports. Also the compatibility remnants:
   `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the `SkSpan`
   traits.
 - **Shaders and colour (about 180).** skcms (`Transform_inl.h`, `skcms_public.h`),
