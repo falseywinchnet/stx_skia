@@ -20,7 +20,6 @@
 #include "include/private/SkFloatingPoint.h"
 #include "include/private/SkMath.h"
 #include "include/private/SkTPin.h"
-#include "include/private/SkTo.h"
 #include "src/core/SkArenaAlloc.h"
 #include "src/core/SkColorData.h"
 #include "src/core/SkColorSpacePriv.h"
@@ -155,32 +154,33 @@ static skvx::float4 bilerp(SkScalar tx, SkScalar ty,
     return a * (1.f - ty) + b * ty;
 }
 
-SkISize SkPatchUtils::GetLevelOfDetail(const SkPoint cubics[12], const SkMatrix* matrix) {
+SkISize SkPatchUtils::GetLevelOfDetail(const SkPoint cubics[12], const SkMatrix& matrix) {
     // Approximate length of each cubic.
     SkPoint pts[kNumPtsCubic];
     SkPatchUtils::GetTopCubic(cubics, pts);
-    (*matrix).mapPoints(pts);
+    matrix.mapPoints(pts);
     const SkScalar topLength = approx_arc_length(pts, kNumPtsCubic);
 
     SkPatchUtils::GetBottomCubic(cubics, pts);
-    (*matrix).mapPoints(pts);
+    matrix.mapPoints(pts);
     const SkScalar bottomLength = approx_arc_length(pts, kNumPtsCubic);
 
     SkPatchUtils::GetLeftCubic(cubics, pts);
-    (*matrix).mapPoints(pts);
+    matrix.mapPoints(pts);
     const SkScalar leftLength = approx_arc_length(pts, kNumPtsCubic);
 
     SkPatchUtils::GetRightCubic(cubics, pts);
-    (*matrix).mapPoints(pts);
+    matrix.mapPoints(pts);
     const SkScalar rightLength = approx_arc_length(pts, kNumPtsCubic);
 
     if (topLength < 0 || bottomLength < 0 || leftLength < 0 || rightLength < 0) {
         return {0, 0};  // negative length is a sentinel for bad length (i.e. non-finite)
     }
 
-    // Level of detail per axis, based on the larger side between top and bottom or left and right
-    const int lodX = static_cast<int>(std::max(topLength, bottomLength) / kPartitionSize);
-    const int lodY = static_cast<int>(std::max(leftLength, rightLength) / kPartitionSize);
+    // Level of detail per axis, based on the larger side between top and bottom or left and right.
+    // A finite length can still exceed int; it saturates rather than converting out of range.
+    const int lodX = sk_float_saturate2int(std::max(topLength, bottomLength) / kPartitionSize);
+    const int lodY = sk_float_saturate2int(std::max(leftLength, rightLength) / kPartitionSize);
 
     return SkISize::Make(std::max(8, lodX), std::max(8, lodY));
 }
@@ -236,33 +236,29 @@ sk_sp<SkVertices> SkPatchUtils::MakeVertices(const SkPoint cubics[12], const SkC
         return nullptr;
     }
 
-    // check for overflow in multiplication
-    const int64_t lodX64 = (lodX + 1);
-    const int64_t lodY64 = (lodY + 1);
-    const int64_t mult64 = lodX64 * lodY64;
-    if (mult64 > SK_MaxS32) {
-        return nullptr;
-    }
-
     // Treat null interpolation space as sRGB.
     if (!colorSpace) {
         colorSpace = sk_srgb_singleton();
     }
 
-    int vertexCount = SkToS32(mult64);
-    // it is recommended to generate draw calls of no more than 65536 indices, so we never generate
-    // more than 60000 indices. To accomplish that we resize the LOD and vertex count
-    if (vertexCount > 10000 || lodX > 200 || lodY > 200) {
-        float weightX = static_cast<float>(lodX) / (lodX + lodY);
-        float weightY = static_cast<float>(lodY) / (lodX + lodY);
+    // It is recommended to generate draw calls of no more than 65536 indices, so we never generate
+    // more than 60000 indices. Levels whose vertex count would pass 10000, or either of which
+    // passes 200, are reduced in proportion before any count is formed. The counts are taken in
+    // 64 bits, so every level, up to INT_MAX, is tessellated rather than refused.
+    const int64_t requestedVertices =
+            (static_cast<int64_t>(lodX) + 1) * (static_cast<int64_t>(lodY) + 1);
+    if (requestedVertices > 10000 || lodX > 200 || lodY > 200) {
+        const float total = static_cast<float>(static_cast<int64_t>(lodX) + lodY);
+        const float weightX = static_cast<float>(lodX) / total;
+        const float weightY = static_cast<float>(lodY) / total;
 
         // 200 comes from the 100 * 2 which is the max value of vertices because of the limit of
         // 60000 indices ( sqrt(60000 / 6) that comes from an index count of lodX * lodY * 6)
         // Need a min of 1 since we later divide by lod
         lodX = std::max(1, sk_float_floor2int_no_saturate(weightX * 200));
         lodY = std::max(1, sk_float_floor2int_no_saturate(weightY * 200));
-        vertexCount = (lodX + 1) * (lodY + 1);
     }
+    const int vertexCount = (lodX + 1) * (lodY + 1);
     const int indexCount = lodX * lodY * 6;
     uint32_t flags = 0;
     if (srcTexCoords) {

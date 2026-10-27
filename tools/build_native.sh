@@ -45,7 +45,7 @@ else
     "build/$profile/stx_skia_matrix_invert_tests" "build/$profile/matrix-invert.raw" "build/$profile/matrix-invert-small.raw"
     "build/$profile/stx_skia_raster_clip_stack_tests" "build/$profile/raster-clip-stack.raw" "build/$profile/raster-clip-stack-replaced.raw"
     "build/$profile/stx_skia_android_clip_tests" "build/$profile/android-clip.raw" "build/$profile/android-clip-reset.raw"
-    "build/$profile/stx_skia_patch_utils_tests" "build/$profile/patch-utils.raw"
+    "build/$profile/stx_skia_patch_utils_tests" "build/$profile/patch-utils.raw" "build/$profile/patch-utils-large.raw"
     "build/$profile/stx_skia_raster_pipeline_corpus_tests" "build/$profile/raster-pipeline.raw"
     "build/$profile/stx_skia_image_subset_tests" "build/$profile/image-subsets.raw"
     "build/$profile/stx_skia_image_sampling_tests" "build/$profile/image-sampling.raw" "build/$profile/image-sampling-corrected.raw"

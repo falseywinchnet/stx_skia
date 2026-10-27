@@ -2,8 +2,10 @@
 // random Coons patches under several matrices, including non-finite and degenerate patches,
 // and the full vertices built for computed and explicit levels, with and without colours and
 // texture coordinates, in three colour spaces. Both builds must produce identical bytes
-// (patch-utils.raw). Patches large enough to overflow the level of detail are checked by the
-// candidate alone; the reference's arithmetic is undefined there.
+// (patch-utils.raw). Levels whose vertex count passes INT_MAX go to patch-utils-large.raw,
+// which is meant to differ: the reference refuses them and the candidate reduces them like
+// any other large level. Patches large enough to overflow the level of detail itself are
+// checked by the candidate alone; the reference's arithmetic is undefined there.
 
 #include "differential_corpus.h"
 
@@ -20,6 +22,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <climits>
 #include <cstdio>
 #include <utility>
 
@@ -32,8 +35,13 @@ using corpus::append_bool;
 
 using Cubics = std::array<SkPoint, 12>;
 
+// The reference takes the matrix by pointer; the candidate by reference.
 SkISize level_of_detail(const Cubics& cubics, const SkMatrix& matrix) {
+#ifdef STX_SKIA_REFERENCE
     const SkISize lod = SkPatchUtils::GetLevelOfDetail(cubics.data(), &matrix);
+#else
+    const SkISize lod = SkPatchUtils::GetLevelOfDetail(cubics.data(), matrix);
+#endif
     return lod;
 }
 
@@ -161,15 +169,91 @@ void shared_corpus(Output& output) {
     }
 }
 
+// Levels from patches a few million units across, whose vertex counts pass INT_MAX, and explicit
+// levels up to 2^30, where the reference's arithmetic is still defined.
+void large_corpus(Output& output) {
+    Sequence sequence{};
+    const std::array<float, 3> spans{3.0e6f, 1.0e7f, 8.0e7f};
+    for (const float span : spans) {
+        for (int i = 0; i < 6; ++i) {
+            const Cubics cubics = random_cubics(sequence, span);
+            const SkISize lod = level_of_detail(cubics, SkMatrix::I());
+            append(output, lod.width());
+            append(output, lod.height());
+            const sk_sp<SkVertices> vertices = SkPatchUtils::MakeVertices(
+                    cubics.data(), nullptr, nullptr, lod.width(), lod.height(), nullptr);
+            record_vertices(output, vertices);
+            ++output.cases;
+        }
+    }
+    const std::array<std::pair<int, int>, 4> levels{std::pair{50000, 50000}, std::pair{1 << 30, 3},
+                                                    std::pair{7, 1 << 30},
+                                                    std::pair{1 << 30, 1 << 30}};
+    for (const std::pair<int, int> level : levels) {
+        const Cubics cubics = random_cubics(sequence, 100.0f);
+        const sk_sp<SkVertices> vertices = SkPatchUtils::MakeVertices(
+                cubics.data(), nullptr, nullptr, level.first, level.second, nullptr);
+        record_vertices(output, vertices);
+        ++output.cases;
+    }
+}
+
+#ifndef STX_SKIA_REFERENCE
+int vertex_count(const sk_sp<SkVertices>& vertices) {
+    return vertices == nullptr ? 0 : (*vertices).priv().vertexCount();
+}
+
+// Huge finite patches saturate their level of detail, and every level up to INT_MAX tessellates
+// into at most 200 steps in total.
+bool large_levels_tessellate() {
+    Cubics huge{};
+    for (size_t i = 0; i < huge.size(); ++i) {
+        huge[i] = SkPoint{static_cast<float>(i % 4) * 1.0e20f, static_cast<float>(i / 4) * 1.0e20f};
+    }
+    const SkISize lod = level_of_detail(huge, SkMatrix::I());
+    if (lod.width() < 8 || lod.height() < 8) return false;
+    const sk_sp<SkVertices> fromHuge = SkPatchUtils::MakeVertices(
+            huge.data(), nullptr, nullptr, lod.width(), lod.height(), nullptr);
+    if (vertex_count(fromHuge) == 0 || vertex_count(fromHuge) > 201 * 201) return false;
+    const std::array<std::pair<int, int>, 4> levels{std::pair{INT_MAX, INT_MAX},
+                                                    std::pair{INT_MAX, 1}, std::pair{1, INT_MAX},
+                                                    std::pair{INT_MAX - 1, 300}};
+    Sequence sequence{};
+    for (const std::pair<int, int> level : levels) {
+        const Cubics cubics = random_cubics(sequence, 100.0f);
+        const sk_sp<SkVertices> vertices = SkPatchUtils::MakeVertices(
+                cubics.data(), nullptr, nullptr, level.first, level.second, nullptr);
+        const int count = vertex_count(vertices);
+        if (count == 0 || count > 201 * 201) return false;
+    }
+    // A non-finite edge still gives {0, 0}, which tessellation refuses.
+    Cubics bad = huge;
+    bad[5].fY = corpus::kInf;
+    const SkISize refused = level_of_detail(bad, SkMatrix::I());
+    if (refused.width() != 0 || refused.height() != 0) return false;
+    return SkPatchUtils::MakeVertices(bad.data(), nullptr, nullptr, 0, 0, nullptr) == nullptr;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 1 || argc > 2) return 2;
+    if (argc < 1 || argc > 3) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (!large_levels_tessellate()) {
+        std::puts("patch utils: large levels did not tessellate");
+        return 1;
+    }
+#endif
     Output output{};
+    Output large{};
     shared_corpus(output);
-    if (argc == 2 && !corpus::write_file(argv[1], output)) return 2;
+    large_corpus(large);
+    if (argc >= 2 && !corpus::write_file(argv[1], output)) return 2;
+    if (argc == 3 && !corpus::write_file(argv[2], large)) return 2;
     const unsigned long long hash = corpus::fnv1a(output.bytes);
-    std::printf("patch utils: %zu cases, %zu bytes, hash=%llu PASS\n", output.cases,
-                output.bytes.size(), hash);
+    const unsigned long long largeHash = corpus::fnv1a(large.bytes);
+    std::printf("patch utils: %zu cases, %zu bytes, hash=%llu; large %zu cases, hash=%llu PASS\n",
+                output.cases, output.bytes.size(), hash, large.cases, largeHash);
     return 0;
 }

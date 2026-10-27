@@ -1563,18 +1563,29 @@ library, not GUI.Forms, and not any test except two container tests that used po
 a consumer. The originals live in baseline/skia, and every shared artifact is unchanged. See
 ../results/2026-10-27/SHADOW_REMOVAL.md.
 
+## Unused utilities and patch utilities
+
+Documents, the camera, JSON writing, distance fields, parsing, float formatting, the path
+helper and the CoreGraphics image bridge are removed: a symbol-level check found no library
+or test user. Patch utilities, which back `drawPatch`, are converted and fixed:
+- a saturating level of detail instead of an out-of-range float-to-int conversion;
+- 64-bit counts instead of `int` overflow;
+- reduction before refusal, so very large patches draw instead of vanishing.
+
+The refusal change is the intentional difference in `patch-utils-large.raw`. See
+../results/2026-10-27/UTILITY_PRUNE_AND_PATCHES.md.
+
 ## Still required
 
-Refreshed 2026-10-27 at the shadow removal. The whole-library AST inventory counts 1,055
-excluded constructs in 70 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 at the utility removal. The whole-library AST inventory counts 802
+excluded constructs in 59 files, almost all `->` member arrows. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
-- **Prune or convert, decided by link closure (about 240).** `SkJSONWriter`, `SkCamera`,
-  `SkDistanceFieldGen`, the macOS CoreGraphics image bridge, path and colour parsing,
-  `SkDocument` and its PDF stub, and patch utilities. GUI.Forms calls none of them directly.
-  Patch utilities back `drawPatch`, which the canvas corpus exercises. A missing direct
-  consumer call does not prove a facility unused.
+- **Font machinery still compiled.** `SkScalerContext`, `SkStrike`, `SkGlyph`, `SkTypeface`
+  and `SkCustomTypeface`, with `SkMatrix22`, which the scaler context uses. A link-closure
+  check decides what GUI.Forms' A8 mask path needs. Uncompiled upstream sources, such as
+  `src/xml`, still reference removed headers.
 - **Memory, containers and support code (about 510).** Streams (GUI.Forms uses `SkStream` in
   one place), strings, `TArray`, `TBlockList`, the block allocator, the arena, `SkZip`,
   `SkBuffer`, `SkRandom`, MD5, the spinlock, data tables, time, CPU detection, tracing and

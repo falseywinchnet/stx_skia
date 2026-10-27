@@ -151,7 +151,7 @@ void SkDevice::drawDRRect(const SkRRect& outer,
 void SkDevice::drawPatch(const SkPoint cubics[12], const SkColor colors[4],
                          const SkPoint texCoords[4], sk_sp<SkBlender> blender,
                          const SkPaint& paint) {
-    const SkISize lod = SkPatchUtils::GetLevelOfDetail(cubics, &(*this).localToDevice());
+    const SkISize lod = SkPatchUtils::GetLevelOfDetail(cubics, (*this).localToDevice());
     const sk_sp<SkVertices> vertices = SkPatchUtils::MakeVertices(
             cubics, colors, texCoords, lod.width(), lod.height(),
             (*this).imageInfo().colorSpace());
