@@ -5,14 +5,11 @@
  * found in the LICENSE file.
  */
 
-#include "include/core/SkString.h"
 #include "include/core/SkTypes.h"
 #include "include/private/SkTFitsIn.h"
 #include "include/private/SkTemplates.h"
 #include "src/core/SkOSFile.h"
 
-#include <dirent.h>
-#include <new>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>

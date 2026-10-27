@@ -10,10 +10,6 @@
 
 #include "include/core/SkScalar.h"
 #include "include/core/SkString.h"
-#include "include/private/SkTArray.h"
-
-#include <cstddef>
-#include <cstdint>
 
 enum SkScalarAsStringType {
     kDec_SkScalarAsStringType,
@@ -22,11 +18,11 @@ enum SkScalarAsStringType {
 
 void SkAppendScalar(SkString*, SkScalar, SkScalarAsStringType);
 
-static inline void SkAppendScalarDec(SkString* str, SkScalar value) {
+inline void SkAppendScalarDec(SkString* str, SkScalar value) {
     SkAppendScalar(str, value, kDec_SkScalarAsStringType);
 }
 
-static inline void SkAppendScalarHex(SkString* str, SkScalar value) {
+inline void SkAppendScalarHex(SkString* str, SkScalar value) {
     SkAppendScalar(str, value, kHex_SkScalarAsStringType);
 }
 

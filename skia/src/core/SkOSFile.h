@@ -13,7 +13,6 @@
 
 #include <stdio.h>
 
-#include "include/core/SkString.h"
 #include "include/private/SkTemplates.h"
 
 enum SkFILE_Flags {

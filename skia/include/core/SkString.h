@@ -9,32 +9,28 @@
 #define SkString_DEFINED
 
 #include "include/core/SkRefCnt.h"
-#include "include/core/SkScalar.h"
 #include "include/core/SkTypes.h"
 #include "include/private/SkTo.h"
 #include "include/private/SkTypeTraits.h"
 
 #include <atomic>
 #include <cstdarg>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <string>
-#include <string_view>
 #include <type_traits>
 
 /*  Some helper functions for C strings */
-static inline int SkStrFind(const char string[], const char substring[]) {
-    const char *first = strstr(string, substring);
-    if (nullptr == first) return -1;
+inline int SkStrFind(const char string[], const char substring[]) {
+    const char* first = std::strstr(string, substring);
+    if (first == nullptr) return -1;
     return SkToInt(first - &string[0]);
 }
 
-static inline bool SkStrContains(const char string[], char subchar) {
+inline bool SkStrContains(const char string[], char subchar) {
     SkASSERT(string);
-    char tmp[2];
-    tmp[0] = subchar;
-    tmp[1] = '\0';
-    return (-1 != SkStrFind(string, tmp));
+    const char text[2] = {subchar, '\0'};
+    return SkStrFind(string, text) != -1;
 }
 
 /** \class SkString
@@ -45,25 +41,25 @@ static inline bool SkStrContains(const char string[], char subchar) {
 */
 class SK_API SkString {
 public:
-                SkString();
-    explicit    SkString(size_t len);
-    explicit    SkString(const char text[]);
-                SkString(const char text[], size_t len);
-                SkString(const SkString&);
-                SkString(SkString&&);
-                ~SkString();
+    SkString();
+    explicit SkString(size_t len);
+    explicit SkString(const char text[]);
+    SkString(const char text[], size_t len);
+    SkString(const SkString&);
+    SkString(SkString&&);
+    ~SkString();
 
-    bool        isEmpty() const { return 0 == fRec->fLength; }
-    size_t      size() const { return (size_t) fRec->fLength; }
-    const char* data() const { return fRec->data(); }
-    const char* c_str() const { return fRec->data(); }
+    bool isEmpty() const { return (*fRec).fLength == 0; }
+    size_t size() const { return static_cast<size_t>((*fRec).fLength); }
+    const char* data() const { return (*fRec).data(); }
+    const char* c_str() const { return (*fRec).data(); }
 
     bool equals(const SkString&) const;
     bool equals(const char text[]) const;
     bool equals(const char text[], size_t len) const;
 
     bool contains(char subchar) const {
-        return SkStrContains(fRec->data(), subchar);
+        return SkStrContains((*fRec).data(), subchar);
     }
 
     friend bool operator==(const SkString& a, const SkString& b) {
@@ -88,16 +84,15 @@ public:
     void insert(size_t offset, const char text[], size_t len);
     void insertUnichar(size_t offset, SkUnichar);
 
-    void append(const char text[]) { this->insert((size_t)-1, text); }
-    void append(const char text[], size_t len) { this->insert((size_t)-1, text, len); }
-    void append(const SkString& str) { this->insert((size_t)-1, str.c_str(), str.size()); }
-    void appendUnichar(SkUnichar uni) { this->insertUnichar((size_t)-1, uni); }
+    void append(const char text[]) { (*this).insert(kEnd, text); }
+    void append(const char text[], size_t len) { (*this).insert(kEnd, text, len); }
+    void append(const SkString& str) { (*this).insert(kEnd, str.c_str(), str.size()); }
+    void appendUnichar(SkUnichar uni) { (*this).insertUnichar(kEnd, uni); }
 
     void printf(const char format[], ...) SK_PRINTF_LIKE(2, 3);
     void printVAList(const char format[], va_list) SK_PRINTF_LIKE(2, 0);
     void appendf(const char format[], ...) SK_PRINTF_LIKE(2, 3);
     void appendVAList(const char format[], va_list) SK_PRINTF_LIKE(2, 0);
-
 
     /**
      *  Swap contents between this and other. This function is guaranteed
@@ -108,12 +103,17 @@ public:
     using sk_is_trivially_relocatable = std::true_type;
 
 private:
+    // An insertion offset past every string: insert clamps it to the end.
+    static constexpr size_t kEnd = static_cast<size_t>(-1);
+
     struct Rec {
     public:
         constexpr Rec(uint32_t len, int32_t refCnt) : fLength(len), fRefCnt(refCnt) {}
         static sk_sp<Rec> Make(const char text[], size_t len);
+
         char* data() { return fBeginningOfData; }
         const char* data() const { return fBeginningOfData; }
+
         void ref() const;
         void unref() const;
         bool unique() const;
@@ -134,10 +134,10 @@ private:
     static_assert(::sk_is_trivially_relocatable<decltype(fRec)>::value);
 
 #ifdef SK_DEBUG
-          SkString& validate();
+    SkString& validate();
     const SkString& validate() const;
 #else
-          SkString& validate()       { return *this; }
+    SkString& validate() { return *this; }
     const SkString& validate() const { return *this; }
 #endif
 
@@ -146,6 +146,5 @@ private:
 
 /// Creates a new string and writes into it using a printf()-style format.
 SK_API SkString SkStringPrintf(const char* format, ...) SK_PRINTF_LIKE(1, 2);
-
 
 #endif

@@ -7,26 +7,22 @@
 
 #include "src/core/SkStringUtils.h"
 
+#include "include/core/SkScalar.h"
 #include "include/core/SkString.h"
-#include "include/private/SkAssert.h"
-#include "include/private/SkTArray.h"
 #include "src/core/SkFloatBits.h"
-#include "src/core/SkUTF.h"
-
-#include <cstring>
 
 void SkAppendScalar(SkString* str, SkScalar value, SkScalarAsStringType asType) {
     switch (asType) {
         case kHex_SkScalarAsStringType:
-            str->appendf("SkBits2Float(0x%08x)", SkFloat2Bits(value));
+            (*str).appendf("SkBits2Float(0x%08x)", SkFloat2Bits(value));
             break;
         case kDec_SkScalarAsStringType: {
-            SkString tmp;
+            SkString tmp{};
             tmp.printf("%.9g", value);
             if (tmp.contains('.')) {
                 tmp.appendUnichar('f');
             }
-            str->append(tmp);
+            (*str).append(tmp);
             break;
         }
     }
