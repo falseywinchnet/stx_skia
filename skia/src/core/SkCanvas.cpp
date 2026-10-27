@@ -1036,11 +1036,11 @@ bool SkCanvas::androidFramework_isClipAA() const {
 
 void SkCanvas::temporary_internal_getRgnClip(SkRegion* rgn) {
     (*rgn).setEmpty();
-    SkDevice* device = (*this).topDevice();
-    if (device && (*device).isPixelAlignedToGlobal()) {
-        (*device).android_utils_clipAsRgn(rgn);
-        const SkIPoint origin = (*device).getOrigin();
-        if (origin.x() | origin.y()) {
+    const SkDevice& device = *(*this).topDevice();
+    if (device.isPixelAlignedToGlobal()) {
+        device.android_utils_clipAsRgn(rgn);
+        const SkIPoint origin = device.getOrigin();
+        if (origin.x() != 0 || origin.y() != 0) {
             (*rgn).translate(origin.x(), origin.y());
         }
     }
