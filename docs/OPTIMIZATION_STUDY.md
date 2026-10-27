@@ -16,6 +16,25 @@ is more important to optimize than to convert, so profile the real workload befo
 - **Proof of output:** every optimization keeps the differential corpora byte-identical, or
   records an intentional difference with its reason.
 
+## Where the gains usually are (owner's guidance)
+
+Gains in these kernels usually come from giving the compiler what it needs, not from rewriting
+the arithmetic:
+- **Aliasing.** Use `restrict`, but only where the callers' contract establishes no overlap. The
+  house style allows restricted pointers in kernels whose callers satisfy the access rules,
+  never as a guess. The swap kernel gets the same effect without the keyword: it checks overlap
+  first, then calls a loop over separate buffers.
+- **Branches inside loops.** Hoist per-element conditions out of inner loops: format, alpha,
+  clipping and edge handling. Use separate interior and edge kernels instead of a branch per
+  pixel (PLAN step 4).
+- **Pipeline management and batching.** Amortize per-call costs over enough work: per-span
+  virtual blitter calls, per-row dispatch through function pointers, and per-draw setup.
+  Batch spans or rows so the inner loop runs long and stays branch-free.
+
+To check a hot loop for these, read its compiled code (`llvm-objdump -d`): look for runtime
+alias checks, a vector loop's width and unrolling, and calls or branches inside the loop.
+Then confirm with the renderer A/B.
+
 ## How to measure the real workload
 
 GUI.Forms' renderer benchmark (`benchmarks/renderer_benchmark.cpp`) renders the Gallery through

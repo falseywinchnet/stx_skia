@@ -64,11 +64,39 @@ local fixture and copied to the mirror's, and the two were checked identical by 
 The swap rewrites also apply unchanged to GUI.Forms `main` (62d8499d), so the patch should
 survive re-pinning the fixture.
 
-## Not verified
+## Windows (CI)
 
-- **Windows:** `drawing_platform_windows.cpp` and `windows_host.cpp` compile only for
-  Windows. They were not built, and the Windows DIB-lifecycle and canvas tests were not run.
-  This needs the Windows machine with the pinned MSYS2 CLANG64 toolchain.
+`.github/workflows/gui-windows.yml` covers Windows, at 5cbfe623 in run 40583645977.
+- **Toolchain:** it restores GUI.Forms' pinned MSYS2 CLANG64 toolchain (clang 22.1.8) with
+  GUI.Forms' own tool.
+- **Fixture:** it prepares the fixture and checks that both patches regenerate byte for byte.
+- **Configuration:** it configures as GUI.Forms' Windows CI does (Windows host on, Skia adapter
+  off, HarfBuzz text on), with transactional DIB tests enabled.
+- **Builds:** both Windows files compile, with every target that includes `windows_host.cpp`.
+  Six tests include it textually, and the first run failed because they were not yet linked to
+  the kernel (fixed in be5f59a3).
+
+**All ten tests pass:**
+- live-surface endpoint;
+- DIB lifecycle, which converts RGBA and BGRA live surfaces;
+- tooltip;
+- the cross-platform canvas tests, including `rgba_tiles_match_bgra_tiles`;
+- control snapshot;
+- canvas raster;
+- damage rectangles;
+- text;
+- part composite;
+- content pixels.
+
+**The drawing probe** prints `drawing-windows-rgba=pass` and `drawing-windows-hbitmap=pass`. Its
+new RGBA case reads the expected GDI pixels through a leased HDC and from a presented memory DC.
+
+**GUI.Forms bug confirmed.** The probe also prints `drawing-windows-rgba-lease-roundtrip=ff0000ff`.
+A red RGBA pixel (`0xffff0000`) comes back blue after an HDC lease, because `release_hdc` copies
+the BGRA lease back into an RGBA bitmap without swapping. This is outside the four converted
+loops and is not fixed by the patch.
+
+## Not verified
 - **Not converted:** a fifth copy of the byte loop, the BGRA-to-RGBA conversion in
   `src/core/engine/primitives/material/material_image.cpp:152`. It was not in the requested
   four.

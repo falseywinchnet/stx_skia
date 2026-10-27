@@ -203,10 +203,40 @@ No alignment hint was adopted, because none stabilized it.
 The SSE2 build that GUI.Forms ships was stable across every binary and alignment tried
 (7.3–8.8 Gpx/s). Its loop is larger and appears decode-bound in every placement.
 
-## Not done
+### Windows (CI, pinned toolchain)
 
-- **Windows:** object-code inspection and timing with the pinned MSYS2 CLANG64 toolchain.
-  The machine was not reachable.
+Measured by `.github/workflows/gui-windows.yml`, run 40583645977 at 5cbfe623.
+- **Toolchain:** GUI.Forms' pinned MSYS2 CLANG64 toolchain (clang 22.1.8), restored from its
+  release.
+- **Machine:** an AMD EPYC 7763 (Zen 3) runner with 2 cores and 4 threads.
+- **Build:** the candidate profile, at the x86-64 SSE2 baseline GUI.Forms ships.
+
+**Object code.**
+- **Standalone kernel:** `swizzle.cpp.obj` has no undefined symbols. Its loops are SSE2 128-bit:
+  `pand` ×16, `pslld` ×8, `psrld` ×8, `por` ×16, `movdqu` ×16, `movdqa` ×26, with no AVX.
+- **As the fixture builds it:** the object built inside the GUI.Forms fixture, under GUI.Forms'
+  `llvm22.cmake`, has identical instruction counts.
+
+**Timing,** in Gpx/s. `skia` equals `skia default` here, because the candidate's baseline-SIMD
+policy disables dispatch.
+
+| Case | stx d / i | skia d / i | bytes d / i | scalar d / i |
+|---|---|---|---|---|
+| 64 px | 3.28 / 4.00 | 3.99 / 1.25 | 0.96 / 1.95 | 0.96 / 1.70 |
+| row 1920 | 6.06 / 6.13 | 6.12 / 1.30 | 1.05 / 2.00 | 1.05 / 2.00 |
+| 300×200 | 3.02 / 4.56 | 3.29 / 1.15 | 0.92 / 1.73 | 0.93 / 1.69 |
+| 1920×1080 | 6.02 / 5.95 | 5.74 / 1.29 | 0.97 / 1.88 | 0.94 / 1.88 |
+| 3840×2160 | 3.86 / 4.35 | 3.73 / 1.29 | 0.94 / 1.82 | 0.92 / 1.82 |
+
+- **Against GUI.Forms' byte loops:** the kernel is 3.3–6.2× faster between separate buffers and
+  2.0–3.2× faster in place.
+- **Against Skia's in-place swap:** 3.2–4.7× faster.
+- **Against Skia between separate buffers:** about level, 0.82–1.05×. The losses are at 64
+  pixels and 300×200.
+
+This agrees with the Linux x86-64 pod.
+
+## Not done
 - **wasm32:** SIMD128 object-code inspection.
 - **GUI.Forms integration:** since done in the pinned fixture; see
   `SWAP_KERNEL_GUI_INTEGRATION.md`. Its two Windows files are not yet built.

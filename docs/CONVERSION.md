@@ -1548,10 +1548,10 @@ hosts.
 
 The GUI.Forms integration patch (`integration/gui_forms_8d1f2be0_swizzle.patch`) replaces
 GUI.Forms' four byte loops in the pinned fixture and passes `tools/verify_gui.sh`, which now
-includes canvas and CoreGraphics tests. Still open:
-- the Windows-toolchain inspection and timing;
-- the wasm inspection;
-- a Windows build of the patch's two Windows files.
+includes canvas and CoreGraphics tests. On Windows, CI uses GUI.Forms' pinned MSYS2 CLANG64
+toolchain. The patch's two Windows files build there, and all ten Windows tests of the converted
+code pass. The kernel compiles to SSE2 128-bit code, and is 3.3–6.2× faster than GUI.Forms' byte
+loops on an AMD EPYC 7763. The wasm inspection is still open.
 
 See ../results/2026-10-27/SWAP_KERNEL.md and SWAP_KERNEL_GUI_INTEGRATION.md.
 
@@ -1620,12 +1620,14 @@ conversion evidence. Each unit also fixes defects, as before.
   - `SkMatrix::normalizePerspective` mishandles infinite entries.
   - About a dozen tests have Release-check stop modes that are not registered as stop tests
     (deferred by the owner).
-- **Swap kernel.** Windows CI results with the pinned toolchain are pending on PR #1. Still
-  open:
+- **Swap kernel.** Windows results are recorded. Still open:
   - wasm SIMD128 object-code inspection;
   - GUI.Forms' `release_hdc`, which copies a BGRA lease back into an RGBA bitmap without
-    swapping;
+    swapping (confirmed on Windows CI: red comes back blue);
   - a fifth GUI.Forms byte loop, in `material_image.cpp`.
+- **Optimization.** Follow docs/OPTIMIZATION_STUDY.md: profile GUI.Forms' renderer benchmark
+  first, and record losses. The fill kernel is already near store bandwidth; the open lever
+  for fills is overdraw.
 - **Build profiles.** An Android NDK build (aarch64, and x86_64 for the emulator) and
   confirmation that GUI.Forms' wasm configuration still compiles.
 - **Audit.** Review every retained production header and build or source list, including
