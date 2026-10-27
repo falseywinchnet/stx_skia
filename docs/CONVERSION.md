@@ -1245,6 +1245,22 @@ and 61/61. The corpus and every other shared artifact match, except the intentio
 corrected sampling artifact. See ../results/2026-10-26/PATH_CONSTRUCTION_CONVERSION.md.
 Contour measurement, curve geometry, stroking and dashing remain.
 
+## Curve geometry, solvers, cubic clipping and cubic maps
+
+Quadratic, cubic and conic evaluation and chopping, the double-precision Bezier,
+quadratic and cubic solvers, the cubic clipper and the public cubic map are converted with
+formulas and operand order unchanged. Strided float views of point arrays, bit casts,
+lambdas, a variadic template, structured bindings, a macro and a `goto` become named
+fields, overloads and structured control flow; `SkConic` and the helper records start
+initialized. Routines used only by GPU tessellation, PDF, path ops, tools and upstream
+tests are removed and listed. The two-parameter cubic chop ending at 1 no longer returns
+the chop point as its end when the source is the destination; a probe reproduced the
+original defect. Candidate/reference suites pass 63/63 and 62/62; the new corpus and
+every other shared artifact match, except the intentionally corrected sampling artifact;
+the instrumented suite reports PASS. See
+../results/2026-10-26/CURVE_GEOMETRY_CONVERSION.md. Contour measurement, stroking and
+dashing remain.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

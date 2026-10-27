@@ -24,6 +24,7 @@ jobs:
           cmake -E compare_files build/baseline/geometry-primitives.raw build/candidate/geometry-primitives.raw
           cmake -E compare_files build/baseline/matrix-transforms.raw build/candidate/matrix-transforms.raw
           cmake -E compare_files build/baseline/path-construction.raw build/candidate/path-construction.raw
+          cmake -E compare_files build/baseline/curve-geometry.raw build/candidate/curve-geometry.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
@@ -63,6 +64,7 @@ jobs:
           cmake -E compare_files build/baseline/geometry-primitives.raw build/candidate/geometry-primitives.raw
           cmake -E compare_files build/baseline/matrix-transforms.raw build/candidate/matrix-transforms.raw
           cmake -E compare_files build/baseline/path-construction.raw build/candidate/path-construction.raw
+          cmake -E compare_files build/baseline/curve-geometry.raw build/candidate/curve-geometry.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw

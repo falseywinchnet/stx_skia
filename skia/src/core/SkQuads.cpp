@@ -18,16 +18,12 @@
 static int solve_linear(const double M, const double B, double solution[2]) {
     if (sk_double_nearly_zero(M)) {
         solution[0] = 0;
-        if (sk_double_nearly_zero(B)) {
-            return 1;
-        }
-        return 0;
+        const int count = sk_double_nearly_zero(B) ? 1 : 0;
+        return count;
     }
     solution[0] = -B / M;
-    if (!std::isfinite(solution[0])) {
-        return 0;
-    }
-    return 1;
+    const int count = std::isfinite(solution[0]) ? 1 : 0;
+    return count;
 }
 
 // When B >> A, then the x^2 component doesn't contribute much to the output, so the second root
@@ -37,7 +33,8 @@ static int solve_linear(const double M, const double B, double solution[2]) {
 static bool close_to_linear(double A, double B) {
     if (A != 0) {
         // Return if B is much bigger than A.
-        return std::abs(B / A) >= 1.0e+16;
+        const bool linear = std::abs(B / A) >= 1.0e+16;
+        return linear;
     }
 
     // Otherwise A is zero, and the quadratic is linear.
@@ -99,7 +96,7 @@ SkQuads::RootResult SkQuads::Roots(double A, double B, double C) {
     const double discriminant = Discriminant(A, B, C);
 
     if (A == 0) {
-        double root;
+        double root = 0;
         if (B == 0) {
             if (C == 0) {
                 root = std::numeric_limits<double>::infinity();
@@ -110,48 +107,58 @@ SkQuads::RootResult SkQuads::Roots(double A, double B, double C) {
             // Solve -2*B*x + C == 0; x = c/(2*b).
             root = C / (2 * B);
         }
-        return {discriminant, root, root};
+        const RootResult linear{discriminant, root, root};
+        return linear;
     }
 
     SkASSERT(A != 0);
     if (discriminant == 0) {
-        return {discriminant, B / A, B / A};
+        const RootResult doubleRoot{discriminant, B / A, B / A};
+        return doubleRoot;
     }
 
     if (discriminant > 0) {
         const double D = sqrt(discriminant);
         const double R = B > 0 ? B + D : B - D;
-        return {discriminant, R / A, C / R};
+        const RootResult twoRoots{discriminant, R / A, C / R};
+        return twoRoots;
     }
 
     // The discriminant is negative or is not finite.
-    return {discriminant, NAN, NAN};
+    const RootResult noRoots{discriminant, NAN, NAN};
+    return noRoots;
 }
 
 static double zero_if_tiny(double x) {
-    return sk_double_nearly_zero(x) ? 0 : x;
+    const double value = sk_double_nearly_zero(x) ? 0 : x;
+    return value;
 }
 
 int SkQuads::RootsReal(const double A, const double B, const double C, double solution[2]) {
 
     if (close_to_linear(A, B)) {
-        return solve_linear(B, C, solution);
+        const int count = solve_linear(B, C, solution);
+        return count;
     }
 
     SkASSERT(A != 0);
-    auto [discriminant, root0, root1] = Roots(A, -0.5 * B, C);
+    const RootResult result = Roots(A, -0.5 * B, C);
 
     // Handle invariants to mesh with existing code from here on.
-    if (!std::isfinite(discriminant) || discriminant < 0) {
+    if (!std::isfinite(result.discriminant) || result.discriminant < 0) {
         return 0;
     }
 
     int roots = 0;
-    if (const double r0 = zero_if_tiny(root0); std::isfinite(r0)) {
-        solution[roots++] = r0;
+    const double r0 = zero_if_tiny(result.root0);
+    if (std::isfinite(r0)) {
+        solution[roots] = r0;
+        ++roots;
     }
-    if (const double r1 = zero_if_tiny(root1); std::isfinite(r1)) {
-        solution[roots++] = r1;
+    const double r1 = zero_if_tiny(result.root1);
+    if (std::isfinite(r1)) {
+        solution[roots] = r1;
+        ++roots;
     }
 
     if (roots == 2 && sk_doubles_nearly_equal_ulps(solution[0], solution[1])) {
@@ -163,5 +170,6 @@ int SkQuads::RootsReal(const double A, const double B, const double C, double so
 
 double SkQuads::EvalAt(double A, double B, double C, double t) {
     // Use fused-multiply-add to reduce the amount of round-off error between terms.
-    return std::fma(std::fma(A, t, B), t, C);
+    const double value = std::fma(std::fma(A, t, B), t, C);
+    return value;
 }

@@ -460,3 +460,9 @@ foreach(unit IN ITEMS SkPath SkPathBuilder SkPathPriv SkPathData SkPathRaw SkPat
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
+
+# Curve evaluation, chopping, root finding, cubic clipping and cubic maps before conversion.
+foreach(unit IN ITEMS SkGeometry SkBezierCurves SkQuads SkCubics SkCubicClipper SkCubicMap)
+    list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
+    list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
+endforeach()
