@@ -227,7 +227,6 @@ public:
     virtual bool isClipWideOpen() const = 0;
 
     virtual void android_utils_clipAsRgn(SkRegion*) const = 0;
-    virtual bool android_utils_clipWithStencil() { return false; }
 
     // -- Device reflection
 

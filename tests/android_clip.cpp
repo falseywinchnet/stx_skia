@@ -23,6 +23,7 @@
 #include "include/core/SkSurface.h"
 #include "include/utils/SkNoDrawCanvas.h"
 #include "src/core/SkCanvasPriv.h"
+#include "src/core/SkDevice.h"
 
 #include <array>
 #include <cstddef>
@@ -40,6 +41,15 @@ public:
     static bool IsClipAA(const SkCanvas& canvas) { return canvas.androidFramework_isClipAA(); }
 };
 }  // namespace skiatest
+
+// Stencil clipping was a GPU device hook; no CPU device overrode or called it.
+template <typename T>
+concept HasStencilClip = requires(T& device) { device.android_utils_clipWithStencil(); };
+#ifndef STX_SKIA_REFERENCE
+static_assert(!HasStencilClip<SkDevice>);
+#else
+static_assert(HasStencilClip<SkDevice>);
+#endif
 
 namespace {
 
