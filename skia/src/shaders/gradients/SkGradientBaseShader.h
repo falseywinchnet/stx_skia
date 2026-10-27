@@ -34,10 +34,12 @@ struct SkStageRec;
 
 class SkGradientScope {
 public:
-    std::optional<SkGradient> unflatten(SkReadBuffer&, SkMatrix* legacyLocalMatrix);
+    // Returned stop spans borrow this scope until its next unflatten or destruction.
+    std::optional<SkGradient> unflatten(SkReadBuffer&, SkMatrix* legacyLocalMatrix) &;
+    std::optional<SkGradient> unflatten(SkReadBuffer&, SkMatrix*) && = delete;
 private:
-    skia_private::STArray<16, SkColor4f> fColorStorage;
-    skia_private::STArray<16, SkScalar> fPositionStorage;
+    skia_private::STArray<16, SkColor4f> fColorStorage{};
+    skia_private::STArray<16, SkScalar> fPositionStorage{};
 };
 
 class SkGradientBaseShader : public SkShaderBase {
@@ -52,14 +54,18 @@ public:
     bool isOpaque() const override;
 
     bool interpolateInPremul() const {
-        return fInterpolation.fInPremul == Interpolation::InPremul::kYes;
+        const bool premul = fInterpolation.fInPremul == Interpolation::InPremul::kYes;
+        return premul;
     }
 
-    const SkMatrix& getGradientMatrix() const { return fPtsToUnit; }
+    const SkMatrix& getGradientMatrix() const & { return fPtsToUnit; }
+    const SkMatrix& getGradientMatrix() const && = delete;
     size_t getColorCount() const { return fColorCount; }
-    const float* getPositions() const { return fPositions; }
+    const float* getPositions() const & { return fPositions; }
+    const float* getPositions() const && = delete;
 
-    const Interpolation& getInterpolation() const { return fInterpolation; }
+    const Interpolation& getInterpolation() const & { return fInterpolation; }
+    const Interpolation& getInterpolation() const && = delete;
 
     static bool ValidGradient(SkSpan<const SkColor4f>,
                               SkTileMode tileMode,
@@ -85,7 +91,7 @@ protected:
                                       SkRasterPipeline* postPipeline) const = 0;
 
     const SkMatrix fPtsToUnit;
-    SkTileMode fTileMode;
+    SkTileMode fTileMode = SkTileMode::kClamp;
 
 public:
     static void AppendGradientFillStages(SkRasterPipeline* p,
@@ -103,82 +109,77 @@ public:
 
     float getPos(size_t i) const {
         SkASSERT(i < fColorCount);
-        return fPositions ? fPositions[i] : SkIntToScalar(i) / (fColorCount - 1);
+        const float position = fPositions ? fPositions[i] : SkIntToScalar(i) / (fColorCount - 1);
+        return position;
     }
 
     SkColor getLegacyColor(size_t i) const {
         SkASSERT(i < fColorCount);
-        return fColors[i].toSkColor();
+        const SkColor color = fColors[i].toSkColor();
+        return color;
     }
 
-    SkSpan<const SkColor4f> colors() const { return {fColors, fColorCount}; }
-    SkSpan<const float> positions() const {
-        return {fPositions, fPositions ? fColorCount : 0};
+    SkSpan<const SkColor4f> colors() const & {
+        const SkSpan<const SkColor4f> view(fColors, fColorCount);
+        return view;
     }
+    SkSpan<const SkColor4f> colors() const && = delete;
+    SkSpan<const float> positions() const & {
+        const size_t count = fPositions ? fColorCount : 0;
+        const SkSpan<const float> view(fPositions, count);
+        return view;
+    }
+    SkSpan<const float> positions() const && = delete;
 
     bool firstStopIsImplicit() const { return fFirstStopIsImplicit; }
     bool lastStopIsImplicit() const { return fLastStopIsImplicit; }
 
-    const sk_sp<SkColorSpace>& colorSpace() const { return fColorSpace; }
-    const Interpolation& interpolation() const { return fInterpolation; }
+    const sk_sp<SkColorSpace>& colorSpace() const & { return fColorSpace; }
+    const sk_sp<SkColorSpace>& colorSpace() const && = delete;
+    const Interpolation& interpolation() const & { return fInterpolation; }
+    const Interpolation& interpolation() const && = delete;
 
     bool colorsAreOpaque() const { return fColorsAreOpaque; }
 
     SkTileMode getTileMode() const { return fTileMode; }
 
-    const SkBitmap& cachedBitmap() const { return fColorsAndOffsetsBitmap; }
-    void setCachedBitmap(SkBitmap b) const { fColorsAndOffsetsBitmap = b; }
-
 private:
-    SkColor4f* fColors;               // points into fStorage
-    SkScalar* fPositions;             // points into fStorage, or nullptr
-    sk_sp<SkColorSpace> fColorSpace;  // color space of gradient stops
-    Interpolation fInterpolation;
-    size_t fColorCount;               // length of fColors (and fPositions, if not nullptr)
-    bool fFirstStopIsImplicit;
-    bool fLastStopIsImplicit;
-
-    // When the number of stops exceeds Graphite's uniform-based limit the colors and offsets
-    // are stored in this bitmap. It is stored in the shader so it can be cached with a stable
-    // id and easily regenerated if purged.
-    // TODO(b/293160919) remove this field when we can store bitmaps in the cache by id.
-    mutable SkBitmap fColorsAndOffsetsBitmap;
-
     // Reserve inline space for up to 4 stops.
     inline static constexpr size_t kInlineStopCount = 4;
     inline static constexpr size_t kInlineStorageSize =
             (sizeof(SkColor4f) + sizeof(SkScalar)) * kInlineStopCount;
     skia_private::AutoSTMalloc<kInlineStorageSize, uint8_t> fStorage;
 
-    bool fColorsAreOpaque;
+    SkColor4f* fColors = nullptr;               // points into fStorage
+    SkScalar* fPositions = nullptr;             // points into fStorage, or nullptr
+    sk_sp<SkColorSpace> fColorSpace{};  // color space of gradient stops
+    Interpolation fInterpolation{};
+    size_t fColorCount = 0;               // length of fColors (and fPositions, if not nullptr)
+    bool fFirstStopIsImplicit = false;
+    bool fLastStopIsImplicit = false;
+
+    bool fColorsAreOpaque = true;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 
 struct SkColor4fXformer {
-    SkColor4fXformer(const SkGradientBaseShader* shader,
-                     SkColorSpace* dst,
-                     bool forceExplicitPositions = false);
+    // Original positions borrow shader; replacement positions belong to this transform.
+    // The caller keeps shader alive while using fPositions. Pipeline setup copies the values.
+    SkColor4fXformer(const SkGradientBaseShader* shader, SkColorSpace* dst);
+    SkColor4fXformer(const SkColor4fXformer&) = delete;
+    SkColor4fXformer& operator=(const SkColor4fXformer&) = delete;
+    SkColor4fXformer(SkColor4fXformer&&) = delete;
+    SkColor4fXformer& operator=(SkColor4fXformer&&) = delete;
 
     using ColorStorage = skia_private::STArray<4, SkPMColor4f>;
     using PositionStorage = skia_private::STArray<4, float>;
 
-    ColorStorage fColors;
-    PositionStorage fPositionStorage;
-    const float* fPositions;
-    sk_sp<SkColorSpace> fIntermediateColorSpace;
+    ColorStorage fColors{};
+    PositionStorage fPositionStorage{};
+    const float* fPositions = nullptr;
+    sk_sp<SkColorSpace> fIntermediateColorSpace{};
 };
-
-
-#define MAKE_COLORS_POS_SPANS(colorPtr, posPtr, count)      \
-    SkSpan<const SkColor4f> colors{colorPtr, (size_t)count};\
-    SkSpan<const float> pos{};                              \
-    do {                                                    \
-        if (posPtr) {                                       \
-            pos = {posPtr, (size_t)count};                  \
-        }                                                   \
-    } while (0)
-
 
 
 #endif

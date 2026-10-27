@@ -1182,6 +1182,19 @@ instrumented suite returns PASS. See
 ../results/2026-10-26/GRADIENT_GEOMETRY_CONVERSION.md. The shared gradient base,
 color-stop storage, interpolation builder and raster kernels remain unconverted.
 
+## Shared gradient base
+
+The shared stop storage, interpolation transform and pipeline builder are
+converted. Owners precede borrowed views; temporary views are rejected; allocation
+counts are checked; powerless-hue expansion reserves its output before emission.
+Unused Graphite bitmap caching and Ganesh-only position forcing are removed under
+the CPU-only scope, preserving all CPU explicit-stop behavior. The expanded corpus
+has 34,200 renders across all fifteen interpolation spaces and four hue methods.
+Candidate/reference suites pass 59/59 and 58/58, sixteen common artifacts match,
+and the full instrumented suite returns PASS. See
+../results/2026-10-26/GRADIENT_BASE_CONVERSION.md. Public gradient descriptors and
+raster gradient kernels remain separate conversion work.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
