@@ -12,7 +12,6 @@
 #include "include/core/SkColorFilter.h"
 #include "include/core/SkFlattenable.h"
 #include "include/core/SkFourByteTag.h"
-#include "include/core/SkPaint.h"
 #include "include/core/SkPathEffect.h"
 #include "include/core/SkPoint.h"
 #include "include/core/SkRect.h"
@@ -26,7 +25,6 @@
 #include "include/private/SkAssert.h"
 #include "src/core/SkBlenderBase.h"
 #include "src/core/SkMaskFilterBase.h"
-#include "src/core/SkPaintPriv.h"
 #include "src/core/SkPicturePriv.h"
 #include "src/core/SkSamplingPriv.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
@@ -149,11 +147,6 @@ public:
     void readRRect(SkRRect* rrect);
     void readRegion(SkRegion* region);
     std::optional<SkPath> readPath();
-
-    SkPaint readPaint() {
-        SkPaint paint = SkPaintPriv::Unflatten(*this);
-        return paint;
-    }
 
     // Only the null-effect marker is admitted. Any other token invalidates the reader.
     SkFlattenable* readRawFlattenable();

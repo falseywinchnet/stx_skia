@@ -35,31 +35,12 @@ static_assert(!HasStreamInput<SkBinaryWriteBuffer>);
 
 namespace {
 bool reader_contract() {
-    // A null effect consumes exactly one word; following paint/primitive data remains readable.
+    // A null effect consumes exactly one word; following primitive data remains readable.
     const std::array<uint32_t, 2> sentinel{0, 0x12345678U};
     SkReadBuffer reader(sentinel.data(), sizeof(sentinel));
     if (reader.readRawFlattenable() != nullptr || !reader.isValid()) return false;
     if (reader.offset() != sizeof(uint32_t) || reader.readUInt() != sentinel[1]) return false;
     if (!reader.isValid() || !reader.eof()) return false;
-    const SkSerialProcs procs{};
-    for (int style = 0; style <= static_cast<int>(SkPaint::kStrokeAndFill_Style); ++style) {
-        SkPaint paint{};
-        paint.setColor(0x80563412U);
-        paint.setAntiAlias(true);
-        paint.setStrokeWidth(2.5f);
-        paint.setStyle(static_cast<SkPaint::Style>(style));
-        SkBinaryWriteBuffer writer(procs);
-        writer.writePaint(paint);
-        writer.writeUInt(sentinel[1]);
-        const size_t bytes = writer.bytesWritten();
-        if (bytes % sizeof(uint32_t) != 0) return false;
-        std::vector<uint32_t> storage(bytes / sizeof(uint32_t));
-        writer.writeToMemory(storage.data());
-        SkReadBuffer paintReader(storage.data(), bytes);
-        const SkPaint decoded = paintReader.readPaint();
-        if (decoded != paint || paintReader.readUInt() != sentinel[1]) return false;
-        if (!paintReader.isValid() || !paintReader.eof()) return false;
-    }
 #ifndef STX_SKIA_REFERENCE
     const std::array<uint32_t, 5> tokens{1, 0x100U, 0x10000U, 0x80000000U, 0xffffffffU};
     for (const uint32_t token : tokens) {

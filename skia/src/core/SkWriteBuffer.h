@@ -26,7 +26,6 @@ class SkFlattenable;
 class SkImage;
 class SkM44;
 class SkMatrix;
-class SkPaint;
 class SkPath;
 class SkRegion;
 class SkWStream;
@@ -80,7 +79,6 @@ public:
     virtual void writeSampling(const SkSamplingOptions&) = 0;
     virtual void writePath(const SkPath& path) = 0;
     virtual void writeImage(const SkImage*) = 0;
-    virtual void writePaint(const SkPaint& paint) = 0;
 
     // The copied procedure record borrows its callback context for synchronous writes.
     const SkSerialProcs& serialProcs() const & { return fProcs; }
@@ -143,7 +141,6 @@ public:
     void writeSampling(const SkSamplingOptions&) override;
     void writePath(const SkPath& path) override;
     void writeImage(const SkImage*) override;
-    void writePaint(const SkPaint& paint) override;
 
     bool writeToStream(SkWStream*) const;
     // Destination supplies bytesWritten() disjoint writable bytes. Null is valid

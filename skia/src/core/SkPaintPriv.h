@@ -12,8 +12,6 @@
 #include "include/core/SkPaint.h"
 
 class SkColorSpace;
-class SkReadBuffer;
-class SkWriteBuffer;
 enum SkColorType : int;
 
 class SkPaintPriv {
@@ -33,25 +31,6 @@ public:
     static bool Overwrites(const SkPaint* paint, ShaderOverrideOpacity);
 
     static bool ShouldDither(const SkPaint&, SkColorType);
-
-    /*
-     * The luminance color is used to determine which Gamma Canonical color to map to.  This is
-     * really only used by backends which want to cache glyph masks, and need some way to know if
-     * they need to generate new masks based off a given color.
-     */
-    static SkColor ComputeLuminanceColor(const SkPaint&);
-
-    /** Serializes SkPaint into a buffer. A companion unflatten() call
-    can reconstitute the paint at a later time.
-
-    @param buffer  SkWriteBuffer receiving the flattened SkPaint data
-    */
-    static void Flatten(const SkPaint& paint, SkWriteBuffer& buffer);
-
-    /** Populates SkPaint, typically from a serialized stream, created by calling
-        flatten() at an earlier time.
-    */
-    static SkPaint Unflatten(SkReadBuffer& buffer);
 
     // If this paint has any color filter, fold it into the shader and/or paint color
     // so that it draws the same but getColorFilter() returns nullptr.

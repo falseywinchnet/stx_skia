@@ -19,7 +19,6 @@
 #include "src/core/SkSafeMath.h"
 #include "src/core/SkMatrixPriv.h"
 #include "src/core/SkMipmap.h"
-#include "src/core/SkPaintPriv.h"
 #include "src/image/SkImage_Base.h"
 
 #include <cstring>
@@ -27,7 +26,6 @@
 #include <utility>
 
 class SkMatrix;
-class SkPaint;
 class SkRegion;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -277,10 +275,6 @@ void SkBinaryWriteBuffer::writeImage(const SkImage* image) {
 }
 
 
-
-void SkBinaryWriteBuffer::writePaint(const SkPaint& paint) {
-    SkPaintPriv::Flatten(paint, *this);
-}
 
 void SkBinaryWriteBuffer::writeFlattenable(const SkFlattenable* flattenable) {
     if (nullptr == flattenable) {
