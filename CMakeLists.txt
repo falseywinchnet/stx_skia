@@ -484,6 +484,14 @@ if(BUILD_TESTING)
     add_executable(stx_skia_raster_clip_stack_tests tests/raster_clip_stack.cpp)
     target_link_libraries(stx_skia_raster_clip_stack_tests PRIVATE stx_skia)
     add_test(NAME raster_clip_stack_contract COMMAND stx_skia_raster_clip_stack_tests)
+    if(NOT STX_SKIA_BASELINE)
+        # Each mode violates one Release-checked precondition and must stop the program.
+        foreach(mode IN ITEMS resize-saved negative-size negative-construction unmatched-restore)
+            add_test(NAME raster_clip_stack_stops_${mode}
+                     COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_raster_clip_stack_tests>
+                             -DMODE=--${mode} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+        endforeach()
+    endif()
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         target_compile_options(stx_skia_raster_clip_stack_tests PRIVATE -ffp-contract=off)
     endif()

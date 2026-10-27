@@ -318,6 +318,25 @@ bool aa_translation_preserves_bounds_case() {
     return true;
 }
 
+// A null shader clip restricts nothing, so it leaves an earlier shader clip in place.
+bool null_shader_keeps_clip_case() {
+    SkRasterClipStack stack(8, 8);
+    const sk_sp<SkShader> shader = SkShaders::Color(SkColorSetARGB(128, 0, 0, 0));
+    stack.clipShader(shader);
+    stack.clipShader(nullptr);
+    if (stack.rc().clipShader() != shader) return false;
+    // Without an earlier shader clip it still adds none.
+    SkRasterClipStack plain(8, 8);
+    plain.clipShader(nullptr);
+    if (plain.rc().clipShader() != nullptr || plain.rc().isEmpty()) return false;
+    // Deferred saves and their restores leave the clip and its shader as they were.
+    stack.save();
+    stack.save();
+    stack.restore();
+    stack.restore();
+    return stack.rc().clipShader() == shader;
+}
+
 bool bw_translation_preserves_bounds_case() {
     const SkIRect original = SkIRect::MakeLTRB(-5, -5, 0, 0);
     const SkRasterClip source(original);
@@ -344,6 +363,19 @@ int main(int argc, char** argv) {
         invalid.setNewSize(-1, 16);
         return 0;
     }
+    if (argc == 2 && std::strcmp(argv[1], "--negative-construction") == 0) {
+        SkRasterClipStack invalid(16, -1);
+        return invalid.rc().isEmpty() ? 0 : 1;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--unmatched-restore") == 0) {
+        // A save that changed the clip, its restore, and one restore too many.
+        SkRasterClipStack invalid(16, 16);
+        invalid.save();
+        invalid.clipRect(SkMatrix::I(), SkRect::MakeWH(4, 4), SkClipOp::kIntersect, false);
+        invalid.restore();
+        invalid.restore();
+        return invalid.rc().isEmpty() ? 0 : 1;
+    }
 #endif
     bool valid = ordinary_clip_case();
 #ifndef STX_SKIA_REFERENCE
@@ -351,6 +383,7 @@ int main(int argc, char** argv) {
     valid = replacement_drops_shader_case() && valid;
     valid = aa_translation_preserves_bounds_case() && valid;
     valid = bw_translation_preserves_bounds_case() && valid;
+    valid = null_shader_keeps_clip_case() && valid;
 #endif
     if (!valid) {
         std::fputs("raster clip stack mismatch\n", stderr);

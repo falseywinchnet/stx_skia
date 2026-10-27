@@ -1487,6 +1487,19 @@ XPS backends used them; the CPU canvas clips through SkRasterClipStack. The orig
 baseline/skia. Both profiles build and every shared artifact is unchanged. See
 ../results/2026-10-27/CLIP_STACK_REMOVAL.md.
 
+## Raster clip stack audit
+
+The CPU canvas's clip stack was already converted; this audit found four latent defects:
+- an unmatched restore emptied the stack in Release;
+- the deferred save count could overflow;
+- the constructor accepted negative sizes;
+- a null shader clip erased an earlier shader clip.
+
+All four now hold in Release, or no longer happen. A new sequence corpus matches the reference
+once two earlier, intended shader-clip differences are set apart. The stack's abort modes now
+run as CTest death tests through `cmake/expect_stop.cmake`. See
+../results/2026-10-27/RASTER_CLIP_STACK_AUDIT.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded

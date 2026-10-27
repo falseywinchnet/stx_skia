@@ -235,6 +235,12 @@ bool SkRasterClip::op(const SkPath& path, const SkMatrix& matrix, SkClipOp op, b
 bool SkRasterClip::op(sk_sp<SkShader> sh) {
     const SkAutoRasterClipValidate validateOnExit(*this);
 
+    // A clip can only shrink. A null shader restricts nothing; composing it with an earlier
+    // shader clip would yield null and erase that clip.
+    if (!sh) {
+        const bool nonEmpty = !(*this).isEmpty();
+        return nonEmpty;
+    }
     if (!fShader) {
         fShader = std::move(sh);
     } else {

@@ -13,11 +13,15 @@
 #include "src/core/SkScan.h"
 #include "src/core/SkTBlockList.h"
 
+#include <climits>
+
 class SkRasterClipStack : SkNoncopyable {
 public:
+    // Sizes must not be negative, as for setNewSize().
     SkRasterClipStack(int width, int height)
             : fRootBounds(SkIRect::MakeWH(width, height))
             , fDisableAA(SkScan::PathRequiresTiling(fRootBounds)) {
+        SkASSERT_RELEASE(width >= 0 && height >= 0);
         fStack.emplace_back(SkRasterClip(fRootBounds));
         SkASSERT(fStack.count() == 1);
     }
@@ -39,26 +43,24 @@ public:
     const SkRasterClip& rc() const& { return fStack.back().fRC; }
     const SkRasterClip& rc() const&& = delete;
 
+    // Saves that have not changed the clip are counted on the current record; a count that would
+    // overflow stops the program in every build.
     void save() {
-#ifdef SK_DEBUG
-        fCounter += 1;
-#endif
         SkASSERT(fStack.back().fDeferredCount >= 0);
+        SkASSERT_RELEASE(fStack.back().fDeferredCount < INT_MAX);
         fStack.back().fDeferredCount += 1;
     }
 
+    // Every restore must match an earlier save. An unmatched restore would pop the root record
+    // and leave the stack empty, so it stops the program in every build.
     void restore() {
-#ifdef SK_DEBUG
-        fCounter -= 1;
-        SkASSERT(fCounter >= 0);
-#endif
-
-        fStack.back().fDeferredCount -= 1;
-        if (fStack.back().fDeferredCount < 0) {
-            SkASSERT(fStack.back().fDeferredCount == -1);
-            SkASSERT(fStack.count() > 1);
-            fStack.pop_back();
+        Rec& rec = fStack.back();
+        if (rec.fDeferredCount > 0) {
+            rec.fDeferredCount -= 1;
+            return;
         }
+        SkASSERT_RELEASE(fStack.count() > 1);
+        fStack.pop_back();
     }
 
     void clipRect(const SkMatrix& ctm, const SkRect& rect, SkClipOp op, bool aa) {
@@ -93,6 +95,7 @@ public:
         } else {
             (*this).writable_rc().setRect(devRect);
         }
+        (*this).validate();
     }
 
     void validate() const {
@@ -118,9 +121,6 @@ private:
     SkTBlockList<Rec, 16> fStack;
     SkIRect fRootBounds = {0, 0, 0, 0};
     bool fDisableAA = false;
-#ifdef SK_DEBUG
-    int fCounter = 0;
-#endif
 
     SkRasterClip& writable_rc() {
         SkASSERT(fStack.back().fDeferredCount >= 0);
