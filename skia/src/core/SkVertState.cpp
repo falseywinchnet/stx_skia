@@ -92,6 +92,10 @@ bool VertState::TriangleFanX(VertState* state) {
     return true;
 }
 
+bool VertState::NoTriangles(VertState*) {
+    return false;
+}
+
 VertState::Proc VertState::chooseProc(SkVertices::VertexMode mode) {
     switch (mode) {
         case SkVertices::kTriangles_VertexMode:
@@ -101,6 +105,7 @@ VertState::Proc VertState::chooseProc(SkVertices::VertexMode mode) {
         case SkVertices::kTriangleFan_VertexMode:
             return fIndices ? TriangleFanX : TriangleFan;
         default:
-            return nullptr;
+            // A mode outside the enumeration yields no triangles.
+            return NoTriangles;
     }
 }

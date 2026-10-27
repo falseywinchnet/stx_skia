@@ -43,6 +43,15 @@ struct SkVertices::Desc {
 // colors and indices, in that order. An invalid description has all sizes zero.
 struct SkVertices::Sizes {
     explicit Sizes(const Desc& desc) {
+        // Negative counts and modes outside the enumeration describe nothing drawable; refusing
+        // them here also keeps the fan arithmetic below from overflowing.
+        const bool validMode = desc.fMode == kTriangles_VertexMode ||
+                               desc.fMode == kTriangleStrip_VertexMode ||
+                               desc.fMode == kTriangleFan_VertexMode;
+        if (!validMode || desc.fVertexCount < 0 || desc.fIndexCount < 0) {
+            invalidate();
+            return;
+        }
         SkSafeMath safe;
 
         fVSize = safe.mul(desc.fVertexCount, sizeof(SkPoint));
@@ -122,6 +131,44 @@ SkVertices::Builder::Builder(const Desc& desc) {
     init(desc);
 }
 
+// Clamps count indices from source into destination, which may be source itself, to maxIndex.
+static void clamp_indices(uint16_t* destination, const uint16_t* source, size_t count,
+                          uint16_t maxIndex) {
+    size_t i = 0;
+    for (; i + 8 <= count; i += 8) {
+        const skvx::ushort8 ind8 = skvx::ushort8::Load(source + i);
+        const skvx::ushort8 clamped_ind8 = skvx::min(ind8, maxIndex);
+        clamped_ind8.store(destination + i);
+    }
+    if (i + 4 <= count) {
+        const skvx::ushort4 ind4 = skvx::ushort4::Load(source + i);
+        const skvx::ushort4 clamped_ind4 = skvx::min(ind4, maxIndex);
+        clamped_ind4.store(destination + i);
+
+        i += 4;
+    }
+    if (i + 2 <= count) {
+        const skvx::ushort2 ind2 = skvx::ushort2::Load(source + i);
+        const skvx::ushort2 clamped_ind2 = skvx::min(ind2, maxIndex);
+        clamped_ind2.store(destination + i);
+
+        i += 2;
+    }
+    if (i < count) {
+        destination[i] = std::min(source[i], maxIndex);
+        i += 1;
+    }
+    SkASSERT(i == count);
+}
+
+// The largest index valid for vertexCount (at least 1) vertices; uint16_t indices cannot name
+// more than 65,536.
+static uint16_t max_index_for(int vertexCount) {
+    const int largest = std::min(vertexCount - 1, static_cast<int>(UINT16_MAX));
+    const uint16_t maxIndex = static_cast<uint16_t>(largest);
+    return maxIndex;
+}
+
 // Returns the array at *cursor, or null for an empty array, and advances the cursor past it.
 static char* take_array(char** cursor, size_t bytes) {
     char* array = bytes ? *cursor : nullptr;
@@ -166,10 +213,19 @@ sk_sp<SkVertices> SkVertices::Builder::detach() {
     const SkSpan<const SkPoint> positions(vertices.fPositions,
                                           static_cast<size_t>(vertices.fVertexCount));
     vertices.fBounds = SkRect::BoundsOrEmpty(positions);
+    // Builder users write indices directly; draws index the vertex arrays with them, so every
+    // index is clamped to the vertex range before the vertices are published.
+    const uint16_t maxIndex = max_index_for(vertices.fVertexCount);
+    if (vertices.fMode != kTriangleFan_VertexMode && vertices.fIndexCount > 0) {
+        clamp_indices(vertices.fIndices, vertices.fIndices,
+                      static_cast<size_t>(vertices.fIndexCount), maxIndex);
+    }
     if (vertices.fMode == kTriangleFan_VertexMode) {
         if (fIntermediateFanIndices) {
             SkASSERT(vertices.fIndexCount);
-            const uint16_t* tempIndices = indices();
+            uint16_t* tempIndices = indices();
+            clamp_indices(tempIndices, tempIndices, static_cast<size_t>(vertices.fIndexCount),
+                          maxIndex);
             for (int t = 0; t < vertices.fIndexCount - 2; ++t) {
                 vertices.fIndices[3 * t + 0] = tempIndices[0];
                 vertices.fIndices[3 * t + 1] = tempIndices[t + 1];
@@ -242,36 +298,9 @@ sk_sp<SkVertices> SkVertices::MakeCopy(VertexMode mode, int vertexCount,
                                                            : sizes.fISize;
     const size_t icount = isize / sizeof(uint16_t);
 
-    // Ensure that indices are valid for the given vertex count.
+    // detach() clamps the copied indices to the vertex range.
     SkASSERT(vertexCount > 0);
-    const uint16_t max_index = SkToU16(vertexCount - 1);
-
-    uint16_t* destination = builder.indices();
-    size_t i = 0;
-    for (; i + 8 <= icount; i += 8) {
-        const skvx::ushort8 ind8 = skvx::ushort8::Load(indices + i);
-        const skvx::ushort8 clamped_ind8 = skvx::min(ind8, max_index);
-        clamped_ind8.store(destination + i);
-    }
-    if (i + 4 <= icount) {
-        const skvx::ushort4 ind4 = skvx::ushort4::Load(indices + i);
-        const skvx::ushort4 clamped_ind4 = skvx::min(ind4, max_index);
-        clamped_ind4.store(destination + i);
-
-        i += 4;
-    }
-    if (i + 2 <= icount) {
-        const skvx::ushort2 ind2 = skvx::ushort2::Load(indices + i);
-        const skvx::ushort2 clamped_ind2 = skvx::min(ind2, max_index);
-        clamped_ind2.store(destination + i);
-
-        i += 2;
-    }
-    if (i < icount) {
-        destination[i] = std::min(indices[i], max_index);
-        i += 1;
-    }
-    SkASSERT(i == icount);
+    sk_careful_memcpy(builder.indices(), indices, icount * sizeof(uint16_t));
 
     return builder.detach();
 }

@@ -55,6 +55,8 @@
 #include "src/utils/SkPatchUtils.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <new>
 #include <optional>
@@ -1322,11 +1324,12 @@ void SkCanvas::drawAtlas(const SkImage* atlas, SkSpan<const SkRSXform> xform,
     if (!colors.empty()) {
         count = std::min(count, colors.size());
     }
-    if (count == 0) {
+    // onDrawAtlas2 counts sprites in an int; a larger count draws nothing rather than wrapping.
+    if (count == 0 || count > static_cast<size_t>(INT32_MAX)) {
         return;
     }
-    (*this).onDrawAtlas2(atlas, xform.data(), tex.data(), colors.data(), count, mode, sampling,
-                       cull, paint);
+    (*this).onDrawAtlas2(atlas, xform.data(), tex.data(), colors.data(), static_cast<int>(count),
+                       mode, sampling, cull, paint);
 }
 
 void SkCanvas::drawAnnotation(const SkRect& rect, const char key[], SkData* value) {

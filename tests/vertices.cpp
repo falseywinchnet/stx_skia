@@ -176,11 +176,79 @@ void fan_limit_corpus(Output& output) {
     }
 }
 
+#ifndef STX_SKIA_REFERENCE
+// Builder users write indices directly; detach() clamps them to the vertex range.
+bool builder_indices_are_clamped() {
+    SkVertices::Builder triangles(SkVertices::kTriangles_VertexMode, 4, 6, 0);
+    const std::array<uint16_t, 6> raw{0, 1, 9, 3, 65535, 2};
+    for (size_t i = 0; i < raw.size(); ++i) triangles.indices()[i] = raw[i];
+    for (int i = 0; i < 4; ++i) triangles.positions()[i] = SkPoint{static_cast<float>(i), 0};
+    const sk_sp<SkVertices> clamped = triangles.detach();
+    const std::array<uint16_t, 6> expected{0, 1, 3, 3, 3, 2};
+    for (size_t i = 0; i < expected.size(); ++i) {
+        if ((*clamped).priv().indices()[i] != expected[i]) return false;
+    }
+    // An indexed fan's indices are clamped before it becomes indexed triangles.
+    SkVertices::Builder fan(SkVertices::kTriangleFan_VertexMode, 3, 4, 0);
+    const std::array<uint16_t, 4> fanRaw{0, 7, 1, 2};
+    for (size_t i = 0; i < fanRaw.size(); ++i) fan.indices()[i] = fanRaw[i];
+    for (int i = 0; i < 3; ++i) fan.positions()[i] = SkPoint{0, static_cast<float>(i)};
+    const sk_sp<SkVertices> fanVertices = fan.detach();
+    const std::array<uint16_t, 6> fanExpected{0, 2, 1, 0, 1, 2};
+    if ((*fanVertices).priv().indexCount() != 6) return false;
+    for (size_t i = 0; i < fanExpected.size(); ++i) {
+        if ((*fanVertices).priv().indices()[i] != fanExpected[i]) return false;
+    }
+    return true;
+}
+
+// With more than 65,536 vertices every uint16_t index is valid; none is clamped.
+bool large_vertex_counts_keep_indices() {
+    const int vertexCount = 70000;
+    const std::vector<SkPoint> positions = make_points(vertexCount, 0.01f);
+    const std::array<uint16_t, 3> indices{65535, 4464, 4463};
+    const sk_sp<SkVertices> vertices = SkVertices::MakeCopy(
+            SkVertices::kTriangles_VertexMode, vertexCount, positions.data(), nullptr, nullptr, 3,
+            indices.data());
+    if (vertices == nullptr) return false;
+    for (size_t i = 0; i < indices.size(); ++i) {
+        if ((*vertices).priv().indices()[i] != indices[i]) return false;
+    }
+    return true;
+}
+
+// Modes outside the enumeration and negative counts describe nothing. The enumeration has no
+// fixed underlying type, so its values are 0 to 3; 3 is the one value it can hold that names no
+// mode (forming a larger one is undefined).
+bool invalid_descriptions_are_refused() {
+    const SkVertices::VertexMode badMode = static_cast<SkVertices::VertexMode>(3);
+    const std::array<SkPoint, 3> points{SkPoint{0, 0}, SkPoint{1, 0}, SkPoint{0, 1}};
+    if (SkVertices::Builder(badMode, 3, 0, 0).isValid()) return false;
+    if (SkVertices::MakeCopy(badMode, 3, points.data(), nullptr, nullptr) != nullptr) return false;
+    if (SkVertices::Builder(SkVertices::kTriangles_VertexMode, -3, 0, 0).isValid()) return false;
+    if (SkVertices::Builder(SkVertices::kTriangleFan_VertexMode, 3, INT32_MIN, 0).isValid()) {
+        return false;
+    }
+    if (SkVertices::Builder(SkVertices::kTriangleFan_VertexMode, INT32_MIN, 0, 0).isValid()) {
+        return false;
+    }
+    VertState state(3, nullptr, 0);
+    const VertState::Proc proc = state.chooseProc(badMode);
+    const bool noTriangles = proc != nullptr && !proc(&state);
+    return noTriangles;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc != 1 && argc != 2) return 2;
     Output output{};
+#ifndef STX_SKIA_REFERENCE
+    if (!builder_indices_are_clamped()) { std::puts("vertices: builder clamping failed"); return 1; }
+    if (!large_vertex_counts_keep_indices()) { std::puts("vertices: large counts failed"); return 1; }
+    if (!invalid_descriptions_are_refused()) { std::puts("vertices: refusals failed"); return 1; }
+#endif
     copy_corpus(output);
     builder_corpus(output);
     fan_limit_corpus(output);

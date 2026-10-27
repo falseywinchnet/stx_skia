@@ -37,7 +37,8 @@ struct VertState {
 
     /**
      *  Choose an appropriate function to traverse the vertices.
-     *  @param mode    Specifies the SkCanvas::VertexMode.
+     *  @param mode    Specifies the SkCanvas::VertexMode. A mode outside the enumeration
+     *                 yields a function that produces no triangles.
      */
     Proc chooseProc(SkVertices::VertexMode mode);
 
@@ -52,6 +53,7 @@ private:
     static bool TriangleStripX(VertState*);
     static bool TriangleFan(VertState*);
     static bool TriangleFanX(VertState*);
+    static bool NoTriangles(VertState*);
 };
 
 #endif

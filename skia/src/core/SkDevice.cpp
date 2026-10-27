@@ -209,13 +209,20 @@ void SkDevice::drawAtlas(SkSpan<const SkRSXform> xform,
                          sk_sp<SkBlender> blender,
                          const SkPaint& paint) {
     const size_t quadCount = xform.size();
-    const size_t triCount = quadCount << 1;
-    const size_t vertexCount = triCount * 3;
+    // Each quad becomes six vertices, counted in an int by SkVertices; a larger atlas, or one the
+    // builder cannot allocate, draws nothing.
+    if (quadCount > static_cast<size_t>(INT32_MAX) / 6) {
+        return;
+    }
+    const int vertexCount = static_cast<int>(quadCount * 6);
     uint32_t flags = SkVertices::kHasTexCoords_BuilderFlag;
     if (!colors.empty()) {
         flags |= SkVertices::kHasColors_BuilderFlag;
     }
     SkVertices::Builder builder(SkVertices::kTriangles_VertexMode, vertexCount, 0, flags);
+    if (!builder.isValid()) {
+        return;
+    }
 
     // Each quad fills six consecutive vertices of the builder's arrays.
     SkPoint* vPos = builder.positions();

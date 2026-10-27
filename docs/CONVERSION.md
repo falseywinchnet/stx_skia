@@ -1443,6 +1443,15 @@ is unchanged on eight ISA configurations, except one AVX2 instruction reordering
 functions. Four kernels that declared mutable contexts they only read now take them const. See
 ../results/2026-10-27/RASTER_KERNEL_MACROS.md.
 
+## Vertices and VertState
+
+SkVertices, its private window and VertState are converted. The unused vertices serialization
+is removed. Builder indices are now clamped to the vertex range before publication; they reached
+the draw unchecked before. The clamp limit no longer wraps above 65,536 vertices. Unknown modes
+yield no triangles instead of a null procedure call. Atlas counts no longer narrow silently in
+the canvas or the base device. A new 879-case vertices corpus matches the reference. See
+../results/2026-10-27/VERTICES_CONVERSION.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
@@ -1457,9 +1466,9 @@ code this arm64 configuration does not compile, and zero findings is not convers
   count the kernel header's remaining configuration macros, or its LoongArch and 32-bit-ARM
   blocks, which this machine cannot compile and which keep their casts and declarations. Imported optimized code stays the baseline. New SIMD
   work follows the 128-bit portable policy and needs measurements.
-- **Canvas-adjacent state.** Clip stack and its device, paint and paint helpers, vertices and
-  vertex state, 4x4 matrices, drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`,
-  `SkMatrix22`, path utilities, lattice iteration and shadow info.
+- **Canvas-adjacent state.** Clip stack and its device, paint and paint helpers, 4x4 matrices,
+  drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`, `SkMatrix22`, path
+  utilities, lattice iteration and shadow info.
 - **Shaders and color.** Triangle-color and Perlin-noise shaders, `SkColorSpace`, `SkColor`, and
   skcms (`Transform_inl.h`, `skcms_public.h`).
 - **Memory, containers and support code.** TArray, TBlockList, the block allocator, the arena,
