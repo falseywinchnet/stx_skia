@@ -95,6 +95,14 @@ static_assert(!HasAnnotations<SkCanvas>);
     __has_include("src/utils/SkFloatToDecimal.h") || __has_include("src/utils/SkOSPath.h")
 #error Document, camera, parsing and other unused utility headers must not be part of the candidate.
 #endif
+// The 2x2 matrix helper served only the font scaler, and the Windows COM, stream and
+// DirectWrite helpers only the removed codecs and font backends.
+#if __has_include("src/utils/SkMatrix22.h") || __has_include("src/utils/win/SkHRESULT.h") || \
+    __has_include("src/utils/win/SkIStream.h") || __has_include("src/utils/win/SkTScopedComPtr.h") || \
+    __has_include("src/utils/win/SkAutoCoInitialize.h") || \
+    __has_include("src/utils/win/SkDWriteGeometrySink.h")
+#error Font-scaler and Windows helper headers must not be part of the candidate.
+#endif
 #endif
 // The canvas's shadow entry point, detected by expression so that overloads count.
 struct SkDrawShadowRec;

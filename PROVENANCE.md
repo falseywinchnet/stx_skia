@@ -299,3 +299,12 @@ found no library object or test referencing them apart from each other, and GUI.
 none of them. The reference build compiles the baseline sources. SkUniqueCFRef.h stays; a
 template-helper test uses it. tests/canvas_device.cpp and the installed-consumer test check
 the absence.
+
+## Font-scaler and Windows helper removal
+
+SkMatrix22.cpp/.h and every file in src/utils/win (SkAutoCoInitialize, SkDWriteGeometrySink,
+SkDWriteNTDDI_VERSION.h, SkHRESULT, SkIStream, SkObjBase.h, SkTScopedComPtr.h) now live only
+in baseline/skia, unchanged with their notices. SkMatrix22 served only the font scaler context,
+and the Windows helpers only the WIC codecs, XPS and DirectWrite font backends, none of which
+the candidate compiles. The reference build compiles the baseline sources. tests/canvas_device.cpp
+checks the absence.

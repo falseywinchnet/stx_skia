@@ -443,7 +443,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/utils/SkCustomTypeface.cpp
     skia/src/utils/SkDashPath.cpp
     skia/src/utils/SkEventTracer.cpp
-    skia/src/utils/SkMatrix22.cpp
     skia/src/utils/SkMultiPictureDocument.cpp
     skia/src/utils/SkOrderedFontMgr.cpp
     skia/src/utils/SkPatchUtils.cpp
@@ -451,10 +450,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/utils/SkTextUtils.cpp
     skia/src/utils/mac/SkCTFont.cpp
     skia/src/utils/mac/SkCTFontCreateExactCopy.cpp
-    skia/src/utils/win/SkAutoCoInitialize.cpp
     skia/src/utils/win/SkDWrite.cpp
     skia/src/utils/win/SkDWriteFontFileStream.cpp
-    skia/src/utils/win/SkDWriteGeometrySink.cpp
-    skia/src/utils/win/SkHRESULT.cpp
-    skia/src/utils/win/SkIStream.cpp
 )

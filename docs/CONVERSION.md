@@ -1575,17 +1575,29 @@ or test user. Patch utilities, which back `drawPatch`, are converted and fixed:
 The refusal change is the intentional difference in `patch-utils-large.raw`. See
 ../results/2026-10-27/UTILITY_PRUNE_AND_PATCHES.md.
 
+## Font machinery and Windows helpers
+
+GUI.Forms uses no Skia font API. Its text reaches Skia as A8 images drawn with a paint, so the
+A8 path needs image drawing, mask filters and mask blitting, and no font machinery. The
+scaler context, strikes, glyphs and typefaces were already not compiled. `SkMatrix22` and the
+Windows COM, stream and DirectWrite helpers had no user and are removed. See
+../results/2026-10-27/FONT_MACHINERY.md.
+
 ## Still required
 
-Refreshed 2026-10-27 at the utility removal. The whole-library AST inventory counts 802
-excluded constructs in 59 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 at the font-machinery check. The whole-library AST inventory counts 801
+excluded constructs in 58 files, almost all `->` member arrows. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
-- **Font machinery still compiled.** `SkScalerContext`, `SkStrike`, `SkGlyph`, `SkTypeface`
-  and `SkCustomTypeface`, with `SkMatrix22`, which the scaler context uses. A link-closure
-  check decides what GUI.Forms' A8 mask path needs. Uncompiled upstream sources, such as
-  `src/xml`, still reference removed headers.
+- **Dead upstream source in the candidate tree.** The candidate compiles only from
+  `src/{core,shaders,image,effects,utils,ports,lazy}`. These directories in `skia/src`
+  contribute nothing, and some still reference removed headers:
+  - `gpu` (647 files), `codec` (94), `pathops` (58) and `pdf` (47);
+  - `encode` (22), `partition_alloc` (8), `xml` (7), `xps` (4), `svg` (4), `android` (3) and
+    `capture` (1).
+
+  Upstream headers that only these used are dead too.
 - **Memory, containers and support code (about 510).** Streams (GUI.Forms uses `SkStream` in
   one place), strings, `TArray`, `TBlockList`, the block allocator, the arena, `SkZip`,
   `SkBuffer`, `SkRandom`, MD5, the spinlock, data tables, time, CPU detection, tracing and
