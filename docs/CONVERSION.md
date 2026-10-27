@@ -30,6 +30,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Mipmap selection, storage and builder | `src/core/SkMipmapAccessor.cpp/.h`, `src/core/SkMipmap.cpp/.h`, `src/core/SkMipmapBuilder.cpp/.h` | Attached/generated level selection, checked allocation layout, discard/relock, builder lifetime and 1,152 byte-exact mip chains; downsampling kernels remain separate |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 | Points, rectangles and rounded rectangles | `include/core/SkPoint.h`, `include/core/SkRect.h`, `include/core/SkRRect.h`, `src/core/SkPoint.cpp`, `src/core/SkRect.cpp`, `src/core/SkRRect.cpp`, `src/core/SkPointPriv.h`, `src/core/SkRectPriv.h`, `src/core/SkRRectPriv.h` | 24,217-case byte-exact corpus over extreme integers, signed zeros, denormals, infinities and NaN; saturation corrections; field-wise serialization; borrow rejection |
+| 3x3 matrices | `include/core/SkMatrix.h`, `src/core/SkMatrix.cpp`, `src/core/SkMatrixPriv.h`, `src/core/SkMatrixUtils.h` | 2,794-case byte-exact corpus over classification, mapping at every kernel count, concatenation, inversion, fitting and serialization; defined sprite translation test |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
 arithmetic, callback order and atomic memory ordering. It replaces procedure-local
@@ -1211,6 +1212,21 @@ and 59/59, the 9.2 MB corpus and every other shared artifact match except the
 intentionally corrected sampling artifact. See
 ../results/2026-10-26/GEOMETRY_PRIMITIVES_CONVERSION.md. Matrices, paths and
 curve geometry remain separate conversion work.
+
+## 3x3 matrices
+
+The public matrix header, its implementation and private helpers are converted.
+A mechanical AST pointer rewrite is kept separate from the review. Tiny
+dot-product wrappers become formulas with unchanged grouping; precision-naming
+helpers remain. Equality no longer claims `restrict` for possibly identical
+matrices, own-value `set9` is defined, homogeneous mapping works directly over
+spans, and the single-point affine kernel no longer computes from uninitialized
+lanes. `SkTreatAsSprite` no longer converts NaN, infinite or out-of-range
+translations to `int`. GPU-only and dead private helpers are removed; no public
+matrix API is removed. The lazily cached type mask still requires a precomputed
+type before cross-thread sharing, now documented. Candidate/reference suites pass
+61/61 and 60/60 and every shared artifact matches except the intentionally
+corrected sampling artifact. See ../results/2026-10-26/MATRIX_CONVERSION.md.
 
 ## Still required
 
