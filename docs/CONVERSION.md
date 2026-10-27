@@ -31,6 +31,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
 | Points, rectangles and rounded rectangles | `include/core/SkPoint.h`, `include/core/SkRect.h`, `include/core/SkRRect.h`, `src/core/SkPoint.cpp`, `src/core/SkRect.cpp`, `src/core/SkRRect.cpp`, `src/core/SkPointPriv.h`, `src/core/SkRectPriv.h`, `src/core/SkRRectPriv.h` | 24,217-case byte-exact corpus over extreme integers, signed zeros, denormals, infinities and NaN; saturation corrections; field-wise serialization; borrow rejection |
 | 3x3 matrices | `include/core/SkMatrix.h`, `src/core/SkMatrix.cpp`, `src/core/SkMatrixPriv.h`, `src/core/SkMatrixUtils.h` | 2,794-case byte-exact corpus over classification, mapping at every kernel count, concatenation, inversion, fitting and serialization; defined sprite translation test |
+| Path storage, construction, iteration and serialization | `include/core/SkPath.h`, `SkPathBuilder.h`, `SkPathIter.h`, `SkPathTypes.h`; `src/core/SkPath.cpp`, `SkPathBuilder.cpp`, `SkPathPriv.cpp/.h`, `SkPathData.cpp/.h`, `SkPathRaw.cpp/.h`, `SkPathIter.cpp`, `SkPath_serial.cpp`, `SkPathRawShapes.cpp/.h`, `SkPathMakers.h`, `SkPathEnums.h`, `SkPath_interpolate.cpp`, `SkPathDump.cpp` | 4,905-case, 22.5 MB byte-exact corpus over every factory, all 30 builder operations, queries, iterators, transforms and the binary form; defined reversal and conic-weight access, checked allocation, aligned reads |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
 arithmetic, callback order and atomic memory ordering. It replaces procedure-local
@@ -1227,6 +1228,22 @@ matrix API is removed. The lazily cached type mask still requires a precomputed
 type before cross-thread sharing, now documented. Candidate/reference suites pass
 61/61 and 60/60 and every shared artifact matches except the intentionally
 corrected sampling artifact. See ../results/2026-10-26/MATRIX_CONVERSION.md.
+
+## Path storage, construction, iteration and serialization
+
+The public path, builder and iterator headers and the path implementation family are
+converted. Tuples and pairs become named records, so no structured binding remains;
+builder lambdas, dump `std::function` callbacks and three `goto`s become named
+functions and structured control flow with the same iteration counts. Reversal no
+longer forms a pointer before the point array, and both path iterators no longer start
+their conic-weight pointer before the weight array. Allocation failure in path data
+construction is reported instead of dereferenced; misaligned serialized input is
+rejected; self-referential raw shapes cannot be copied; borrowing accessors reject
+temporaries. The original iterator also left its close-line flag uninitialized after
+non-line verbs, which the corpus avoids reading. Candidate/reference suites pass 62/62
+and 61/61. The corpus and every other shared artifact match, except the intentionally
+corrected sampling artifact. See ../results/2026-10-26/PATH_CONSTRUCTION_CONVERSION.md.
+Contour measurement, curve geometry, stroking and dashing remain.
 
 ## Still required
 

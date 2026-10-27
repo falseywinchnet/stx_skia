@@ -17,6 +17,7 @@
 #include "src/core/SkPathEnums.h"
 #include "src/core/SkPathPriv.h"
 #include "src/core/SkPathRawShapes.h"
+#include "src/core/SkPointPriv.h"
 #include "src/core/SkSafeMath.h"
 #include "src/core/SkSpanPriv.h"
 
@@ -24,19 +25,21 @@
 #include <optional>
 #include <type_traits>
 
+// The shared empty path data; intentionally never released.
 SkPathData* SkPathData::PeekEmptySingleton() {
     static SkPathData* gEmpty = SkPathData::MakeNoCheck({}, {}, {}, {}, {}).release();
     return gEmpty;
 }
 
+// Returns a nonzero identity whose top two bits are clear, leaving room for a fill type.
 static uint32_t next_pathdata_unique_id() {
     constexpr int kHighBitsToMakeRoomForFillType = 2;
 
     static std::atomic<int32_t> nextID{1};
 
-    uint32_t id;
+    uint32_t id = 0;
     do {
-        id = nextID.fetch_add(1, std::memory_order_relaxed);
+        id = static_cast<uint32_t>(nextID.fetch_add(1, std::memory_order_relaxed));
         // clear the high bits to make room for filltype
         id <<= kHighBitsToMakeRoomForFillType;
         id >>= kHighBitsToMakeRoomForFillType;
@@ -44,47 +47,45 @@ static uint32_t next_pathdata_unique_id() {
     return id;
 }
 
-class SkSafeAccumulator {
-public:
-    SkSafeAccumulator(size_t n = 0) : fTotal(n) {}
-
-    bool ok() const { return fSafe.ok(); }
-    explicit operator bool() const { return fSafe.ok(); }
-
-    SkSafeAccumulator& add(size_t n) {
-        fTotal = fSafe.add(fTotal, n);
-        return *this;
-    }
-
-    SkSafeAccumulator& addMul(size_t a, size_t b) {
-        fTotal = fSafe.add(fTotal, fSafe.mul(a, b));
-        return *this;
-    }
-
-    std::optional<size_t> total() const {
-        if (fSafe.ok()) {
-            return fTotal;
-        }
+// Size of one allocation holding SkPathData followed by its points, conic weights and verbs.
+// Returns nullopt when the size is not representable.
+static std::optional<size_t> path_data_allocation_size(size_t npts, size_t nvbs, size_t ncns) {
+    SkSafeMath safe{};
+    size_t total = sizeof(SkPathData);
+    total = safe.add(total, safe.mul(npts, sizeof(SkPoint)));
+    total = safe.add(total, safe.mul(ncns, sizeof(float)));
+    total = safe.add(total, safe.mul(nvbs, sizeof(SkPathVerb)));
+    if (!safe.ok()) {
         return {};
     }
-private:
-    SkSafeMath fSafe;
-    size_t     fTotal;
-};
-
-const uint8_t gPtsPerVerb[] = {
-    1, 1, 2, 2, 3, 0,  // move, line, quad, conic, cubic, close
-};
-
-static inline bool valid_conic_weight(float w) {
-    return w >= 0 && SkIsFinite(w);
+    return total;
 }
 
+// Points following each verb, indexed by the verb's value.
+static size_t points_per_verb(SkPathVerb verb) {
+    switch (verb) {
+        case SkPathVerb::kMove:  return 1;
+        case SkPathVerb::kLine:  return 1;
+        case SkPathVerb::kQuad:  return 2;
+        case SkPathVerb::kConic: return 2;
+        case SkPathVerb::kCubic: return 3;
+        case SkPathVerb::kClose: return 0;
+    }
+    return 0;
+}
+
+static inline bool valid_conic_weight(float w) {
+    const bool valid = w >= 0 && SkIsFinite(w);
+    return valid;
+}
+
+// Returns true when the verbs form a valid sequence and the point and weight counts match it.
 static bool valid_path_data(SkSpan<const SkPoint> pts,
                             SkSpan<const SkPathVerb> vbs,
                             SkSpan<const float> conics) {
     if (vbs.empty()) {
-        return pts.empty() && conics.empty();
+        const bool empty = pts.empty() && conics.empty();
+        return empty;
     }
 
     // We must begin with a Move (unless we're empty)
@@ -92,12 +93,12 @@ static bool valid_path_data(SkSpan<const SkPoint> pts,
         return false;
     }
     SkPathVerb prev = SkPathVerb::kMove;
-    size_t point_count = 1,
-           conic_count = 0;
+    size_t point_count = 1;
+    size_t conic_count = 0;
 
     // Check that we have a valid sequence.
     for (size_t i = 1; i < vbs.size(); ++i) {
-        SkPathVerb curr = vbs[i];
+        const SkPathVerb curr = vbs[i];
 
         if (static_cast<unsigned>(curr) > static_cast<unsigned>(SkPathVerb::kLast_Verb)) {
             return false;
@@ -116,7 +117,7 @@ static bool valid_path_data(SkSpan<const SkPoint> pts,
             return false;
         }
 
-        point_count += gPtsPerVerb[SkToSizeT(curr)];
+        point_count += points_per_verb(curr);
         conic_count += (curr == SkPathVerb::kConic);
 
         prev = curr;
@@ -126,7 +127,7 @@ static bool valid_path_data(SkSpan<const SkPoint> pts,
         return false;
     }
 
-    for (auto w : conics) {
+    for (const float w : conics) {
         if (!valid_conic_weight(w)) {
             return false;
         }
@@ -135,47 +136,32 @@ static bool valid_path_data(SkSpan<const SkPoint> pts,
     return true;
 }
 
-// Handing in debugging, to set a break-point here if you want to know why we
-// failed to create a pathdta
-//
-static void report_pathdata_make_failure(const char reason[]) {
-//  `    SkDEBUGF("SkPathData::Make failed: %s\n", reason);
-}
-
-// This just sets-up the spans to point inside our allocation
+// This just sets-up the spans to point inside our allocation: the storage that Alloc reserved
+// directly after this object holds npts points, then ncns weights, then nvbs verbs.
 //
 SkPathData::SkPathData(size_t npts, size_t nvbs, size_t ncns)
     : fUniqueID(next_pathdata_unique_id())
-    , fConvexity((uint8_t)SkPathConvexity::kUnknown)
+    , fConvexity(static_cast<uint8_t>(SkPathConvexity::kUnknown))
     , fType(SkPathIsAType::kGeneral)
 {
     SkASSERT((npts == 0 && nvbs == 0 && ncns == 0) ||
              (npts != 0 && nvbs != 0));
-
-#ifdef SK_DEBUG
-    {
-        SkSafeAccumulator accum(sizeof(*this));
-        accum.addMul(npts, sizeof(SkPoint))
-             .addMul(ncns, sizeof(float))
-             .addMul(nvbs, sizeof(SkPathVerb));
-        SkASSERT(accum.ok());
-    }
-#endif
+    SkASSERT(path_data_allocation_size(npts, nvbs, ncns).has_value());
 
     if (nvbs == 0) {
         SkASSERT(fPoints.empty());
         SkASSERT(fVerbs.empty());
         SkASSERT(fConics.empty());
     } else {
-        auto data = reinterpret_cast<std::byte*>(this + 1);
+        std::byte* data = reinterpret_cast<std::byte*>(this + 1);
 
-        fPoints = {reinterpret_cast<SkPoint*>(data), npts};
+        fPoints = SkSpan<SkPoint>(reinterpret_cast<SkPoint*>(data), npts);
         data += fPoints.size_bytes();
 
-        fConics = {reinterpret_cast<float*>(data), ncns};
+        fConics = SkSpan<float>(reinterpret_cast<float*>(data), ncns);
         data += fConics.size_bytes();
 
-        fVerbs = {reinterpret_cast<SkPathVerb*>(data), nvbs};
+        fVerbs = SkSpan<SkPathVerb>(reinterpret_cast<SkPathVerb*>(data), nvbs);
     }
 
     // fBounds is initialized in finishInit()
@@ -187,6 +173,7 @@ SkPathData::~SkPathData() {
     SkDEBUGCODE(fUniqueID = 0xEEEEEEEE;)
 }
 
+// Releases the single allocation made by Alloc.
 void SkPathData::operator delete(void* p) {
     ::operator delete(p);
 }
@@ -202,24 +189,18 @@ void SkPathData::addGenIDChangeListener(sk_sp<SkIDChangeListener> listener) cons
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 // NOTE: This only allocates and initializes the span pointers (points, verbs),
-//       it does NOT set the other fields
+//       it does NOT set the other fields. Returns null when the size is unrepresentable.
 sk_sp<SkPathData> SkPathData::Alloc(size_t npts, size_t nvbs, size_t ncns) {
-    SkSafeAccumulator accum(sizeof(SkPathData));
-
-    accum.addMul(npts, sizeof(SkPoint))
-         .addMul(ncns, sizeof(float))
-         .addMul(nvbs, sizeof(SkPathVerb));
-
-    if (auto size = accum.total()) {
-        // This trick allows us to just make one allocation, for us and our buffer
-        // rather than allocating us and also allocating the buffer (via malloc or new[])
-        // We have the corresponding operator delete() specified as well.
-        void* storage = ::operator new (*size);
-        sk_sp<SkPathData> path(new (storage) SkPathData(npts, nvbs, ncns));
-
-        return path;
+    const std::optional<size_t> size = path_data_allocation_size(npts, nvbs, ncns);
+    if (!size.has_value()) {
+        return nullptr;
     }
-    return nullptr;
+    // This trick allows us to just make one allocation, for us and our buffer
+    // rather than allocating us and also allocating the buffer (via malloc or new[])
+    // We have the corresponding operator delete() specified as well.
+    void* storage = ::operator new (size.value());
+    sk_sp<SkPathData> path(new (storage) SkPathData(npts, nvbs, ncns));
+    return path;
 }
 
 bool SkPathData::finishInit(std::optional<SkRect> bounds, std::optional<uint8_t> segmentMask) {
@@ -239,14 +220,14 @@ bool SkPathData::finishInit(std::optional<SkRect> bounds, std::optional<uint8_t>
 
     if (bounds.has_value()) {
         fBounds = bounds.value().makeSorted();
-        SkASSERT(SkIsFinite(&fPoints.data()->fX, fPoints.size() * 2));
+        SkASSERT(SkPointPriv::AreFinite(fPoints.data(), SkToInt(fPoints.size())));
     } else {
-        if (auto r = SkPathPriv::TrimmedBounds(fPoints, fVerbs)) {
-            fBounds = r.value();
-        } else {
-            report_pathdata_make_failure("non-finite bounds");
+        const std::optional<SkRect> r = SkPathPriv::TrimmedBounds(fPoints, fVerbs);
+        if (!r.has_value()) {
+            // non-finite bounds
             return false;
         }
+        fBounds = r.value();
     }
 
     SkASSERT(fBounds.isSorted());
@@ -255,66 +236,76 @@ bool SkPathData::finishInit(std::optional<SkRect> bounds, std::optional<uint8_t>
 
 sk_sp<SkPathData> SkPathData::MakeTransform(const SkPathRaw& src, const SkMatrix& mx) {
     if (src.empty()) {
-        return SkPathData::Empty();
+        sk_sp<SkPathData> empty = SkPathData::Empty();
+        return empty;
     }
 
     if (mx.hasPerspective()) {
-        return SkPathBuilder()
-            .addRaw(src, SkPathBuilder::Reserve::kExact)
-            .transform(mx)
-            .detachData();
+        SkPathBuilder builder{};
+        builder.addRaw(src, SkPathBuilder::Reserve::kExact);
+        builder.transform(mx);
+        sk_sp<SkPathData> projected = builder.detachData();
+        return projected;
     }
 
     // Allocate our result, so we can map the new points directly into it
-    auto result = Alloc(src.points().size(), src.verbs().size(), src.conics().size());
-    mx.mapPoints(result->fPoints, src.points());
-    SkSpanPriv::Copy(result->fConics, src.conics());
-    SkSpanPriv::Copy(result->fVerbs,  src.verbs());
+    sk_sp<SkPathData> result = Alloc(src.points().size(), src.verbs().size(),
+                                     src.conics().size());
+    if (!result) {
+        return nullptr;
+    }
+    SkPathData& data = *result;
+    mx.mapPoints(data.fPoints, src.points());
+    SkSpanPriv::Copy(data.fConics, src.conics());
+    SkSpanPriv::Copy(data.fVerbs,  src.verbs());
 
-    std::optional<SkRect> transformedBounds;
+    std::optional<SkRect> transformedBounds{};
     if (mx.rectStaysRect()) {
         // safe us from having to compute our transformed bounds in finishInit()
         transformedBounds = mx.mapRect(src.bounds());
         if (!transformedBounds.value().isFinite()) {
-            report_pathdata_make_failure("transform created non-finite bounds");
+            // transform created non-finite bounds
             return nullptr;
         }
     }
 
-    if (!result->finishInit(transformedBounds, src.fSegmentMask)) {
+    if (!data.finishInit(transformedBounds, src.fSegmentMask)) {
         return nullptr;
     }
 
-    result->setConvexity(SkPathPriv::TransformConvexity(mx, src.fPoints, src.fConvexity));
+    data.setConvexity(SkPathPriv::TransformConvexity(mx, src.fPoints, src.fConvexity));
 
     return result;
 }
 
 sk_sp<SkPathData> SkPathData::makeTransform(const SkMatrix& mx) const {
     if (mx.isIdentity()) {
-        return sk_ref_sp(this);
+        sk_sp<SkPathData> same = sk_ref_sp(this);
+        return same;
     }
 
     // not important for transform, just need a value
     const SkPathFillType ft = SkPathFillType::kDefault;
 
-    if (auto result = MakeTransform(this->raw(ft, SkResolveConvexity::kNo), mx)) {
-        // See if we can maintian our IsA status ...
-        if ((fType == SkPathIsAType::kOval || fType == SkPathIsAType::kRRect) &&
-            mx.rectStaysRect() && SkPathPriv::IsAxisAligned(fPoints))
-        {
-            auto [dir, start] =
-            SkPathPriv::TransformDirAndStart(mx, fType == SkPathIsAType::kRRect,
-                                             fIsA.fDirection, fIsA.fStartIndex);
-            result->setupIsA(fType, dir, start);
-        }
-        return result;
+    sk_sp<SkPathData> result = MakeTransform(raw(ft, SkResolveConvexity::kNo), mx);
+    if (!result) {
+        return nullptr;
     }
-    return nullptr;
+    // See if we can maintian our IsA status ...
+    if ((fType == SkPathIsAType::kOval || fType == SkPathIsAType::kRRect) &&
+        mx.rectStaysRect() && SkPathPriv::IsAxisAligned(fPoints))
+    {
+        const SkPathPriv::DirAndStart mapped =
+                SkPathPriv::TransformDirAndStart(mx, fType == SkPathIsAType::kRRect,
+                                                 fIsA.fDirection, fIsA.fStartIndex);
+        (*result).setupIsA(fType, mapped.fDirection, mapped.fStartIndex);
+    }
+    return result;
 }
 
 sk_sp<SkPathData> SkPathData::makeOffset(SkVector v) const {
-    return this->makeTransform(SkMatrix::Translate(v));
+    sk_sp<SkPathData> moved = makeTransform(SkMatrix::Translate(v));
+    return moved;
 }
 
 bool operator==(const SkPathData& a, const SkPathData& b) {
@@ -322,13 +313,15 @@ bool operator==(const SkPathData& a, const SkPathData& b) {
         return true;
     }
 
-    return  SkSpanPriv::EQ(a.fPoints, b.fPoints) &&
-            SkSpanPriv::EQ(a.fConics, b.fConics) &&
-            SkSpanPriv::EQ(a.fVerbs,  b.fVerbs);
+    const bool equal = SkSpanPriv::EQ(a.fPoints, b.fPoints) &&
+                       SkSpanPriv::EQ(a.fConics, b.fConics) &&
+                       SkSpanPriv::EQ(a.fVerbs,  b.fVerbs);
+    return equal;
 }
 
 /////////////////////////////////////
 
+// Returns null when the storage cannot be allocated or the points are not finite.
 sk_sp<SkPathData> SkPathData::MakeNoCheck(SkSpan<const SkPoint> pts,
                                           SkSpan<const SkPathVerb> vbs,
                                           SkSpan<const float> conics,
@@ -336,25 +329,39 @@ sk_sp<SkPathData> SkPathData::MakeNoCheck(SkSpan<const SkPoint> pts,
                                           std::optional<unsigned> segmentMask) {
     SkASSERT(valid_path_data(pts, vbs, conics));
 
-    auto path = Alloc(pts.size(), vbs.size(), conics.size());
+    sk_sp<SkPathData> path = Alloc(pts.size(), vbs.size(), conics.size());
+    if (!path) {
+        return nullptr;
+    }
+    SkPathData& data = *path;
 
-    SkSpanPriv::Copy(path->fPoints, pts);
-    SkSpanPriv::Copy(path->fConics, conics);
-    SkSpanPriv::Copy(path->fVerbs,  vbs);
+    SkSpanPriv::Copy(data.fPoints, pts);
+    SkSpanPriv::Copy(data.fConics, conics);
+    SkSpanPriv::Copy(data.fVerbs,  vbs);
 
-    return path->finishInit(bounds, segmentMask) ? path : nullptr;
+    std::optional<uint8_t> mask{};
+    if (segmentMask.has_value()) {
+        mask = SkTo<uint8_t>(segmentMask.value());
+    }
+    if (!data.finishInit(bounds, mask)) {
+        return nullptr;
+    }
+    return path;
 }
 
 sk_sp<SkPathData> SkPathData::MakeNoCheck(const SkPathRaw& raw) {
-    return MakeNoCheck(raw.points(), raw.verbs(), raw.conics(), raw.fBounds, raw.fSegmentMask);
+    sk_sp<SkPathData> path = MakeNoCheck(raw.points(), raw.verbs(), raw.conics(), raw.fBounds,
+                                         raw.fSegmentMask);
+    return path;
 }
 
 sk_sp<SkPathData> SkPathData::Empty() {
-    return sk_ref_sp(PeekEmptySingleton());
+    sk_sp<SkPathData> empty = sk_ref_sp(PeekEmptySingleton());
+    return empty;
 }
 
 void SkPathData::setupIsA(SkPathIsAType type, SkPathDirection dir, unsigned index) {
-    this->setConvexity(SkPathDirection_ToConvexity(dir));
+    setConvexity(SkPathDirection_ToConvexity(dir));
 
     SkASSERT(type == SkPathIsAType::kOval || type == SkPathIsAType::kRRect);
     fType = type;
@@ -370,18 +377,23 @@ sk_sp<SkPathData> SkPathData::Rect(const SkRect& r, SkPathDirection dir, unsigne
     if (!r.isFinite()) {
         return nullptr;
     }
-    SkPathRawShapes::Rect raw(r, dir, index);
-    return MakeNoCheck(raw.points(), raw.verbs(), raw.conics(), raw.fBounds, raw.fSegmentMask);
+    const SkPathRawShapes::Rect raw(r, dir, index);
+    sk_sp<SkPathData> path = MakeNoCheck(raw.points(), raw.verbs(), raw.conics(), raw.fBounds,
+                                         raw.fSegmentMask);
+    return path;
 }
 
 sk_sp<SkPathData> SkPathData::Oval(const SkRect& r, SkPathDirection dir, unsigned index) {
     if (!r.isFinite()) {
         return nullptr;
     }
-    SkPathRawShapes::Oval raw(r, dir, index);
-    auto path = MakeNoCheck(raw.points(), raw.verbs(), raw.conics(), raw.fBounds, raw.fSegmentMask);
-
-    path->setupIsA(SkPathIsAType::kOval, dir, index);
+    const SkPathRawShapes::Oval raw(r, dir, index);
+    sk_sp<SkPathData> path = MakeNoCheck(raw.points(), raw.verbs(), raw.conics(), raw.fBounds,
+                                         raw.fSegmentMask);
+    if (!path) {
+        return nullptr;
+    }
+    (*path).setupIsA(SkPathIsAType::kOval, dir, index);
     return path;
 }
 
@@ -389,75 +401,92 @@ sk_sp<SkPathData> SkPathData::RRect(const SkRRect& r, SkPathDirection dir, unsig
     if (!r.isValid()) {
         return nullptr;
     }
-    SkPathRawShapes::RRect raw(r, dir, index);
+    const SkPathRawShapes::RRect raw(r, dir, index);
     // we use Make, not MakeNoCheck, to confirm all points an conics are finite
-    if (auto path = Make(raw.points(), raw.verbs(), raw.conics())) {
-        path->setupIsA(SkPathIsAType::kRRect, dir, index);
-        return path;
+    sk_sp<SkPathData> path = Make(raw.points(), raw.verbs(), raw.conics());
+    if (!path) {
+        return nullptr;
     }
-    return nullptr;
+    (*path).setupIsA(SkPathIsAType::kRRect, dir, index);
+    return path;
 }
 
 sk_sp<SkPathData> SkPathData::Polygon(SkSpan<const SkPoint> pts, bool isClosed) {
     if (pts.size() == 0 || (pts.size() == 1 && !isClosed)) {
-        return Empty();
+        sk_sp<SkPathData> empty = Empty();
+        return empty;
     }
 
     const size_t nverbs = pts.size() + isClosed;    // +1 for the kClose verb
     const size_t nconics = 0;
-    auto path = Alloc(pts.size(), nverbs, nconics);
+    sk_sp<SkPathData> path = Alloc(pts.size(), nverbs, nconics);
+    if (!path) {
+        return nullptr;
+    }
+    SkPathData& data = *path;
 
-    SkSpanPriv::Copy(path->fPoints, pts);
+    SkSpanPriv::Copy(data.fPoints, pts);
 
-    path->fVerbs[0] = SkPathVerb::kMove;
+    data.fVerbs[0] = SkPathVerb::kMove;
     for (size_t i = 1; i < pts.size(); ++i) {
-        path->fVerbs[i] = SkPathVerb::kLine;
+        data.fVerbs[i] = SkPathVerb::kLine;
     }
     if (isClosed) {
-        path->fVerbs.back() = SkPathVerb::kClose;
+        data.fVerbs.back() = SkPathVerb::kClose;
     }
 
-    return path->finishInit({}, kLine_SkPathSegmentMask) ? path : nullptr;
+    if (!data.finishInit({}, kLine_SkPathSegmentMask)) {
+        return nullptr;
+    }
+    return path;
 }
 
 /////////////////////////////////////
 
 SkPathConvexity SkPathData::getConvexityOrUnknown() const {
-    return static_cast<SkPathConvexity>(fConvexity.load(std::memory_order_relaxed));
+    const SkPathConvexity convexity =
+            static_cast<SkPathConvexity>(fConvexity.load(std::memory_order_relaxed));
+    return convexity;
 }
 
+// Computes and caches convexity on first use. Concurrent first uses compute the same value;
+// the cache is a relaxed atomic.
 SkPathConvexity SkPathData::getResolvedConvexity() const {
-    auto convexity = this->getConvexityOrUnknown();
+    SkPathConvexity convexity = getConvexityOrUnknown();
     if (convexity == SkPathConvexity::kUnknown) {
         convexity = SkPathPriv::ComputeConvexity(fPoints, fVerbs, fConics);
-        this->setConvexity(convexity);
+        setConvexity(convexity);
     }
     return convexity;
 }
 
 void SkPathData::setConvexity(SkPathConvexity convexity) const {
-    fConvexity.store((uint8_t)convexity, std::memory_order_relaxed);
+    fConvexity.store(static_cast<uint8_t>(convexity), std::memory_order_relaxed);
 }
 
 bool SkPathData::isConvex() const {
-    return SkPathConvexity_IsConvex(this->getResolvedConvexity());
+    const bool convex = SkPathConvexity_IsConvex(getResolvedConvexity());
+    return convex;
 }
 
 SkRect SkPathData::computeTightBounds() const {
-    return SkPathPriv::ComputeTightBounds(this->points(), this->verbs(), this->conics());
+    const SkRect bounds = SkPathPriv::ComputeTightBounds(points(), verbs(), conics());
+    return bounds;
 }
 
 SkPathRaw SkPathData::raw(SkPathFillType ft, SkResolveConvexity rc) const {
-    return {
+    const SkPathConvexity convexity = rc == SkResolveConvexity::kYes ? getResolvedConvexity()
+                                                                     : getConvexityOrUnknown();
+    const SkPathRaw view{
         fPoints,
         fVerbs,
         fConics,
         fBounds,
         ft,
-        rc == SkResolveConvexity::kYes ? this->getResolvedConvexity()
-                                       : this->getConvexityOrUnknown(),
+        convexity,
         fSegmentMask,
     };
+    return view;
 }
 
 std::optional<std::array<SkPoint, 2>> SkPathData::asLine() const {
@@ -465,47 +494,54 @@ std::optional<std::array<SkPoint, 2>> SkPathData::asLine() const {
         fVerbs[1] == SkPathVerb::kLine)
     {
         SkASSERT(fVerbs[0] == SkPathVerb::kMove);
-        return {{ fPoints[0], fPoints[1] }};
+        const std::array<SkPoint, 2> line{fPoints[0], fPoints[1]};
+        return line;
     }
     return {};
 }
 
 std::optional<SkPathRectInfo> SkPathData::asRect() const {
-    if (auto rc = SkPathPriv::IsRectContour(fPoints, fVerbs, fSegmentMask, false)) {
-        SkASSERT(rc->fRect == fBounds);
-        return {{
-            fBounds,
-            rc->fDirection,
-            0, // start index???
-        }};
+    const std::optional<SkPathPriv::RectContour> rc =
+            SkPathPriv::IsRectContour(fPoints, fVerbs, fSegmentMask, false);
+    if (!rc.has_value()) {
+        return {};
     }
-    return {};
+    SkASSERT(rc.value().fRect == fBounds);
+    const SkPathRectInfo info{
+        fBounds,
+        rc.value().fDirection,
+        0, // start index???
+    };
+    return info;
 }
 
 std::optional<SkPathOvalInfo> SkPathData::asOval() const {
-    if (fType == SkPathIsAType::kOval) {
-        return {{
-            fBounds,
-            fIsA.fDirection,
-            fIsA.fStartIndex,
-        }};
+    if (fType != SkPathIsAType::kOval) {
+        return {};
     }
-    return {};
+    const SkPathOvalInfo info{
+        fBounds,
+        fIsA.fDirection,
+        fIsA.fStartIndex,
+    };
+    return info;
 }
 
 std::optional<SkPathRRectInfo> SkPathData::asRRect() const {
-    if (fType == SkPathIsAType::kRRect) {
-        return {{
-            SkPathPriv::DeduceRRectFromContour(fBounds, fPoints, fVerbs),
-            fIsA.fDirection,
-            fIsA.fStartIndex,
-        }};
+    if (fType != SkPathIsAType::kRRect) {
+        return {};
     }
-    return {};
+    const SkPathRRectInfo info{
+        SkPathPriv::DeduceRRectFromContour(fBounds, fPoints, fVerbs),
+        fIsA.fDirection,
+        fIsA.fStartIndex,
+    };
+    return info;
 }
 
 bool SkPathData::contains(SkPoint p, SkPathFillType ft) const {
-    return SkPathPriv::Contains(this->raw(ft, SkResolveConvexity::kNo), p);
+    const bool inside = SkPathPriv::Contains(raw(ft, SkResolveConvexity::kNo), p);
+    return inside;
 }
 
 /////////////////
@@ -514,10 +550,11 @@ sk_sp<SkPathData> SkPathData::Make(SkSpan<const SkPoint> pts,
                                    SkSpan<const SkPathVerb> vbs,
                                    SkSpan<const float> conics) {
     if (!valid_path_data(pts, vbs, conics)) {
-        report_pathdata_make_failure("invalid path data");
+        // invalid path data
         return nullptr;
     }
 
     // MakeNoCheck *does* compute/check bounds if we don't pass them in
-    return MakeNoCheck(pts, vbs, conics, {}, {});
+    sk_sp<SkPathData> path = MakeNoCheck(pts, vbs, conics, {}, {});
+    return path;
 }

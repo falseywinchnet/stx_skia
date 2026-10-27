@@ -101,16 +101,21 @@ public:
     static sk_sp<SkPathData> RRect(const SkRRect&, SkPathDirection, unsigned startIndex);
     static sk_sp<SkPathData> RRect(const SkRRect& rrect,
                                    SkPathDirection dir = SkPathDirection::kDefault) {
-        return RRect(rrect, dir, dir == SkPathDirection::kCW ? 6 : 7);
+        const unsigned start = dir == SkPathDirection::kCW ? 6 : 7;
+        sk_sp<SkPathData> data = RRect(rrect, dir, start);
+        return data;
     }
     static sk_sp<SkPathData> Polygon(SkSpan<const SkPoint> pts, bool isClosed);
     static sk_sp<SkPathData> Line(SkPoint a, SkPoint b) {
-        return Polygon({{a, b}}, false);
+        const SkPoint endpoints[2] = {a, b};
+        sk_sp<SkPathData> data = Polygon(endpoints, false);
+        return data;
     }
 
     friend bool operator==(const SkPathData& a, const SkPathData& b);
     friend bool operator!=(const SkPathData& a, const SkPathData& b) {
-        return !(a == b);
+        const bool different = !(a == b);
+        return different;
     }
 
     SkSpan<const SkPoint> points() const { return fPoints; }
@@ -127,7 +132,10 @@ public:
     /**
      * Return true if the path contains no points or verbs
      */
-    bool empty() const { return fVerbs.empty(); }
+    bool empty() const {
+        const bool none = fVerbs.empty();
+        return none;
+    }
 
     SkRect computeTightBounds() const;
 
@@ -175,7 +183,10 @@ public:
     bool contains(SkPoint, SkPathFillType) const;
 
     void addGenIDChangeListener(sk_sp<SkIDChangeListener>) const;
-    int genIDChangeListenerCount() const { return fGenIDChangeListeners.count(); }
+    int genIDChangeListenerCount() const {
+        const int count = fGenIDChangeListeners.count();
+        return count;
+    }
 
 private:
     friend class SkNVRefCnt<SkPathData>;
@@ -200,7 +211,7 @@ private:
      *  in an atomic.
      */
     mutable std::atomic<uint8_t> fConvexity;    // SkPathConvexity
-    uint8_t                      fSegmentMask;  // SkPathSegmentMask
+    uint8_t                      fSegmentMask = 0;  // SkPathSegmentMask
     SkPathIsAType                fType;
     SkPathIsAData                fIsA {};
 

@@ -26,19 +26,23 @@ enum class SkPathFillType : uint8_t {
 };
 
 static inline bool SkPathFillType_IsEvenOdd(SkPathFillType ft) {
-    return (static_cast<int>(ft) & 1) != 0;
+    const bool evenOdd = (static_cast<int>(ft) & 1) != 0;
+    return evenOdd;
 }
 
 static inline bool SkPathFillType_IsInverse(SkPathFillType ft) {
-    return (static_cast<int>(ft) & 2) != 0;
+    const bool inverse = (static_cast<int>(ft) & 2) != 0;
+    return inverse;
 }
 
 static inline SkPathFillType SkPathFillType_ToggleInverse(SkPathFillType ft) {
-    return static_cast<SkPathFillType>(static_cast<int>(ft) ^ 2);
+    const SkPathFillType toggled = static_cast<SkPathFillType>(static_cast<int>(ft) ^ 2);
+    return toggled;
 }
 
 static inline SkPathFillType SkPathFillType_ConvertToNonInverse(SkPathFillType ft) {
-    return static_cast<SkPathFillType>(static_cast<int>(ft) & 1);
+    const SkPathFillType nonInverse = static_cast<SkPathFillType>(static_cast<int>(ft) & 1);
+    return nonInverse;
 }
 
 enum class SkPathDirection : uint8_t {

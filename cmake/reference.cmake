@@ -452,3 +452,11 @@ list(APPEND stx_sources baseline/skia/src/shaders/gradients/SkGradientBaseShader
 list(REMOVE_ITEM stx_sources skia/src/core/SkPoint.cpp skia/src/core/SkRect.cpp skia/src/core/SkRRect.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkPoint.cpp baseline/skia/src/core/SkRect.cpp
     baseline/skia/src/core/SkRRect.cpp)
+
+# Path storage, construction, iteration and serialization before conversion. The
+# builder copy includes the two earlier aliasing corrections (c420bc8, 0d1ed74).
+foreach(unit IN ITEMS SkPath SkPathBuilder SkPathPriv SkPathData SkPathRaw SkPathIter SkPath_serial
+        SkPathRawShapes SkPath_interpolate SkPathDump)
+    list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
+    list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
+endforeach()

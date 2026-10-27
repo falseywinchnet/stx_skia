@@ -30,9 +30,10 @@ enum class SkResolveConvexity {
 };
 
 static inline bool SkPathConvexity_IsConvex(SkPathConvexity cv) {
-    return cv == SkPathConvexity::kConvex_CW
-        || cv == SkPathConvexity::kConvex_CCW
-        || cv == SkPathConvexity::kConvex_Degenerate;
+    const bool convex = cv == SkPathConvexity::kConvex_CW
+                     || cv == SkPathConvexity::kConvex_CCW
+                     || cv == SkPathConvexity::kConvex_Degenerate;
+    return convex;
 }
 
 static inline SkPathConvexity SkPathConvexity_OppositeConvexDirection(SkPathConvexity cv) {
@@ -56,7 +57,8 @@ static inline SkPathConvexity SkPathDirection_ToConvexity(SkPathDirection dir) {
         case SkPathDirection::kCW:  return SkPathConvexity::kConvex_CW;
         case SkPathDirection::kCCW: return SkPathConvexity::kConvex_CCW;
     }
-    SkUNREACHABLE;
+    // An out-of-range direction carries no winding.
+    return SkPathConvexity::kUnknown;
 }
 
 static inline SkPathConvexity SkPathFirstDirection_ToConvexity(SkPathFirstDirection dir) {
@@ -65,7 +67,8 @@ static inline SkPathConvexity SkPathFirstDirection_ToConvexity(SkPathFirstDirect
         case SkPathFirstDirection::kCCW:     return SkPathConvexity::kConvex_CCW;
         case SkPathFirstDirection::kUnknown: return SkPathConvexity::kConvex_Degenerate;
     }
-    SkUNREACHABLE;
+    // An out-of-range direction carries no winding.
+    return SkPathConvexity::kUnknown;
 }
 
 static inline std::optional<SkPathDirection> SkPathConvexity_ToDirection(SkPathConvexity cv) {
@@ -89,8 +92,9 @@ static inline SkPathFirstDirection SkPathConvexity_ToFirstDirection(SkPathConvex
 }
 
 static inline SkPathFirstDirection SkPathDirectionToFirst(SkPathDirection dir) {
-    return dir == SkPathDirection::kCW ? SkPathFirstDirection::kCW
-                                       : SkPathFirstDirection::kCCW;
+    const SkPathFirstDirection first = dir == SkPathDirection::kCW ? SkPathFirstDirection::kCW
+                                                                   : SkPathFirstDirection::kCCW;
+    return first;
 }
 
 #endif

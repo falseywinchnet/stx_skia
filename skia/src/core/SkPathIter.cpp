@@ -20,29 +20,37 @@ std::optional<SkPathIter::Rec> SkPathIter::next() {
     }
 
     size_t n = 0;
-
     float w = -1;
-    SkPathVerb v;
-    switch (v = fVerbs[vIndex++]) {
-        case SkPathVerb::kMove:
-            fClosePointStorage[1] = fPoints[pIndex++]; // remember for close
-            return Rec{{&fClosePointStorage[1], 1}, w, v};
+    const SkPathVerb v = fVerbs[vIndex];
+    ++vIndex;
+    switch (v) {
+        case SkPathVerb::kMove: {
+            fClosePointStorage[1] = fPoints[pIndex]; // remember for close
+            ++pIndex;
+            const Rec move{SkSpan<const SkPoint>(&fClosePointStorage[1], 1), w, v};
+            return move;
+        }
         case SkPathVerb::kLine:  n = 1; break;
         case SkPathVerb::kQuad:  n = 2; break;
-        case SkPathVerb::kConic: n = 2; w = fConics[cIndex++]; break;
+        case SkPathVerb::kConic:
+            n = 2;
+            w = fConics[cIndex];
+            ++cIndex;
+            break;
         case SkPathVerb::kCubic: n = 3; break;
-        case SkPathVerb::kClose:
+        case SkPathVerb::kClose: {
             SkASSERT(pIndex > 0);
             fClosePointStorage[0] = fPoints[pIndex-1];   // the last point we saw
-            return Rec{fClosePointStorage, w, v};
+            const Rec close{SkSpan<const SkPoint>(fClosePointStorage), w, v};
+            return close;
+        }
     }
-
     SkASSERT(pIndex > 0);
-    auto start = pIndex - 1;
+    const size_t start = pIndex - 1;
     SkASSERT(n >= 1 && n <= 3);
     pIndex += n;
-    return Rec{{&fPoints[start], n+1}, w, v};
-
+    const Rec segment{fPoints.subspan(start, n + 1), w, v};
+    return segment;
 }
 
 ///////////////////////////////////////////////
@@ -53,21 +61,28 @@ std::optional<SkPathContourIter::Rec> SkPathContourIter::next() {
     }
 
     SkASSERT(fVerbs[0] == SkPathVerb::kMove);
-    size_t npts = 1, nvbs = 1, nws = 0;
-
-    for (size_t i = 1; i < fVerbs.size(); ++i) {
+    size_t npts = 1;
+    size_t nvbs = 1;
+    size_t nws = 0;
+    // Count the verbs of this contour: through a close, or up to the next move.
+    bool contourEnded = false;
+    for (size_t i = 1; i < fVerbs.size() && !contourEnded; ++i) {
         switch (fVerbs[i]) {
-            case SkPathVerb::kMove: goto DONE;
-            case SkPathVerb::kLine:  npts += 1; break;
-            case SkPathVerb::kQuad:  npts += 2; break;
-            case SkPathVerb::kConic: npts += 2; nws += 1; break;
-            case SkPathVerb::kCubic: npts += 3; break;
-            case SkPathVerb::kClose: nvbs += 1; goto DONE;
+            case SkPathVerb::kMove:
+                contourEnded = true;
+                break;
+            case SkPathVerb::kLine:  npts += 1; nvbs += 1; break;
+            case SkPathVerb::kQuad:  npts += 2; nvbs += 1; break;
+            case SkPathVerb::kConic: npts += 2; nws += 1; nvbs += 1; break;
+            case SkPathVerb::kCubic: npts += 3; nvbs += 1; break;
+            case SkPathVerb::kClose:
+                nvbs += 1;
+                contourEnded = true;
+                break;
         }
-        nvbs += 1;
     }
-DONE:
-    Rec rec = {
+
+    const Rec rec = {
         fPoints.subspan(0, npts),
         fVerbs.subspan(0, nvbs),
         fConics.subspan(0, nws),

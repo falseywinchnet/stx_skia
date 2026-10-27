@@ -10,28 +10,34 @@
 #include "src/core/SkPathPriv.h"
 #include "src/core/SkPathRaw.h"
 
-const uint8_t gVerbToSegmentMask[] = {
-    0,  // move
-    kLine_SkPathSegmentMask,
-    kQuad_SkPathSegmentMask,
-    kConic_SkPathSegmentMask,
-    kCubic_SkPathSegmentMask,
-    0,  // close
-};
+// The segment-mask bit contributed by each verb; moves and closes contribute none.
+static unsigned verb_segment_mask(SkPathVerb verb) {
+    switch (verb) {
+        case SkPathVerb::kMove:  return 0;
+        case SkPathVerb::kLine:  return kLine_SkPathSegmentMask;
+        case SkPathVerb::kQuad:  return kQuad_SkPathSegmentMask;
+        case SkPathVerb::kConic: return kConic_SkPathSegmentMask;
+        case SkPathVerb::kCubic: return kCubic_SkPathSegmentMask;
+        case SkPathVerb::kClose: return 0;
+    }
+    SkASSERT(false);
+    return 0;
+}
 
 uint8_t SkPathPriv::ComputeSegmentMask(SkSpan<const SkPathVerb> verbs) {
     unsigned mask = 0;
-    for (auto v : verbs) {
-        unsigned i = static_cast<unsigned>(v);
-        SkASSERT(i < std::size(gVerbToSegmentMask));
-        mask |= gVerbToSegmentMask[i];
+    for (const SkPathVerb v : verbs) {
+        mask |= verb_segment_mask(v);
     }
-    return SkTo<uint8_t>(mask);
+    const uint8_t segmentMask = SkTo<uint8_t>(mask);
+    return segmentMask;
 }
 
 std::optional<SkRect> SkPathRaw::isRect() const {
-    if (auto rc = SkPathPriv::IsRectContour(fPoints, fVerbs, fSegmentMask, false)) {
-        return rc->fRect;
+    const std::optional<SkPathPriv::RectContour> rc =
+            SkPathPriv::IsRectContour(fPoints, fVerbs, fSegmentMask, false);
+    if (!rc.has_value()) {
+        return {};
     }
-    return {};
+    return rc.value().fRect;
 }
