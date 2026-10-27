@@ -70,6 +70,7 @@ def measure():
               f'range {min(row["seconds"]) * 1e6:.3f}-{max(row["seconds"]) * 1e6:.3f} us')
     compiler = subprocess.check_output(["clang++", "--version"], text=True).splitlines()[0]
     record = {"platform": platform.platform(), "machine": platform.machine(),
+              "processor": platform.processor(),
               "compiler": compiler, "trials": TRIALS, "measurements": rows,
               "scope": "Seven runs of one process each; per case and mode, one warm-up pass, "
                        "then about 256 MiB of pixels in repeated passes over the same buffers, "
@@ -124,6 +125,8 @@ if __name__ == "__main__":
         arguments = arguments[2:]
     if arguments == ["--code-only"]:
         emit_code()
+    elif arguments == ["--no-code"]:
+        measure()
     else:
         measure()
         emit_code()

@@ -1,0 +1,119 @@
+name: GUI.Forms fixture on Windows
+# Builds and tests the red/blue swap kernel and the GUI.Forms integration patch with GUI.Forms'
+# own pinned MSYS2 CLANG64 toolchain (LLVM 22.1.8), restored from its published release by its
+# own tool. Times the kernel on the runner and keeps its Windows object code.
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: stx_skia
+      - uses: actions/checkout@v4
+        with:
+          repository: malkuth-software/gui_forms
+          ref: 8d1f2be06a40c5da78bb75e45cbe1fecec2f6b62
+          path: gui_forms
+      # GUI.Forms' toolchain tool packs and extracts with the standard library's zstd.
+      - uses: actions/setup-python@v5
+        id: toolchain-python
+        with:
+          python-version: '3.14'
+          update-environment: false
+      - name: Restore GUI.Forms' pinned Windows toolchain
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+        # The tool finds the release through GITHUB_REPOSITORY; the toolchain is GUI.Forms'.
+        run: GITHUB_REPOSITORY=malkuth-software/gui_forms "$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py restore
+      - name: Toolchain and runner identity
+        run: |
+          clang --version | head -1
+          cmake --version | head -1
+          echo "ninja $(ninja --version)"
+          python --version
+          powershell -NoProfile -Command "Get-CimInstance Win32_Processor | Format-List Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed"
+      - name: Kernel tests, timing and object code
+        working-directory: stx_skia
+        run: |
+          set -eu
+          cmake -S . -B build/windows-candidate -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          cmake --build build/windows-candidate -j 4 --target stx_skia_swizzle_tests stx_skia_swizzle_only
+          build/windows-candidate/stx_skia_swizzle_tests
+          build/windows-candidate/stx_skia_swizzle_only
+          python tools/measure_swizzle.py --build build/windows-candidate --no-code
+          object=$(find build/windows-candidate -path '*stx_skia_swizzle.dir*' -name 'swizzle.cpp.o*' | head -1)
+          echo "object: $object"
+          echo "undefined symbols:"; llvm-nm -u "$object"
+          llvm-objdump -d --no-show-raw-insn -C "$object" > build/windows-candidate/swizzle/swizzle-windows.txt
+          echo "instruction counts:"
+          grep -oE '\b(pand|pandn|pslld|psrld|por|pshufb|movdqu|movdqa|movups|vp[a-z]+)\b' \
+            build/windows-candidate/swizzle/swizzle-windows.txt | sort | uniq -c
+      - name: Prepare the patched fixture
+        working-directory: stx_skia
+        run: |
+          set -eu
+          python tools/prepare_gui_fixture.py --gui ../gui_forms --output build/gui-fixture
+          # The patches regenerate byte for byte on Windows.
+          git diff --exit-code -- integration
+          sh build/gui-fixture/third_party/fetch_text_stack.sh
+          sh build/gui-fixture/stx_cng/tools/fetch_zstd.sh
+      - name: Configure as GUI.Forms' Windows CI does, with transactional DIB tests
+        working-directory: stx_skia
+        run: |
+          set -eu
+          root=$(cygpath -m "$PWD")
+          cmake -S build/gui-fixture -B build/gui-windows -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib \
+            -DCMAKE_TOOLCHAIN_FILE="$root/build/gui-fixture/cmake/llvm22.cmake" \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DSTX_SKIA_SOURCE_ROOT="$root" \
+            -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON -DGUI_FORMS_ENABLE_MACOS_HOST=OFF \
+            -DGUI_FORMS_ENABLE_LINUX_HOST=OFF -DGUI_FORMS_ENABLE_SKIA=OFF \
+            -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON -DGUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=ON \
+            -DGUI_FORMS_BUILD_GALLERY=OFF -DGUI_FORMS_BUILD_TESTS=ON -DGUI_FORMS_BUILD_AUDIO=OFF
+      - name: Build and run the Windows tests of the converted code
+        working-directory: stx_skia
+        run: |
+          set -eu
+          cmake --build build/gui-windows -j 4 --target gui_drawing_c_api gui_drawing_windows_probe \
+            gui_forms_host_windows gui_forms_canvas_tests gui_forms_windows_canvas_raster_tests \
+            gui_forms_windows_dib_lifecycle_tests gui_forms_windows_tooltip_tests \
+            gui_forms_windows_live_surface_endpoint_tests
+          ctest --test-dir build/gui-windows --output-on-failure -R \
+            '^(gui_forms_canvas_tests|gui_forms_windows_canvas_raster_tests|gui_forms_windows_dib_lifecycle_tests|gui_forms_windows_tooltip_tests|gui_forms_windows_live_surface_endpoint_tests)$'
+          # The drawing probe is a program, not a registered test; it needs its DLL beside it.
+          probe=$(find build/gui-windows -name 'gui_drawing_windows_probe.exe' | head -1)
+          library=$(find build/gui-windows -name '*gui_drawing_c_api*.dll' | head -1)
+          PATH="$(dirname "$library"):$PATH" "$probe"
+      - name: Inspect the kernel as the fixture built it
+        if: always()
+        working-directory: stx_skia
+        run: |
+          object=$(find build/gui-windows -path '*stx_skia_swizzle.dir*' -name 'swizzle.cpp.o*' | head -1)
+          if [ -n "$object" ]; then
+            echo "object: $object"
+            mkdir -p build/windows-candidate/swizzle
+            llvm-objdump -d --no-show-raw-insn -C "$object" > build/windows-candidate/swizzle/swizzle-fixture-windows.txt
+            grep -oE '\b(pand|pandn|pslld|psrld|por|pshufb|movdqu|movdqa|movups|vp[a-z]+)\b' \
+              build/windows-candidate/swizzle/swizzle-fixture-windows.txt | sort | uniq -c
+            grep -h 'swizzle.cpp' build/gui-windows/compile_commands.json 2>/dev/null | head -2 || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swizzle-windows
+          path: |
+            stx_skia/build/windows-candidate/swizzle/
+            stx_skia/build/gui-windows/Testing/Temporary/LastTest.log
+          if-no-files-found: warn

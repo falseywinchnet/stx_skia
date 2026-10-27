@@ -326,12 +326,57 @@ void tiled_updates_include_sampling_gutters_and_recover_resources() {''')
     return source
 
 
+def rewrite_windows_probe(source):
+    # The probe used only BGRA bitmaps, so it never reached the RGBA swap in copy_as_bgra.
+    source = replace_once(source, """    CHECK(api.bitmap_get_pixel(presented, 2, 1, &pixel) == GD_OK);
+    CHECK(pixel.argb == UINT32_C(0xff0000ff));
+""", """    CHECK(api.bitmap_get_pixel(presented, 2, 1, &pixel) == GD_OK);
+    CHECK(pixel.argb == UINT32_C(0xff0000ff));
+
+    /* An RGBA bitmap reaches GDI through the red/blue swap, both through a leased HDC and
+       when presented into the memory DC. */
+    {
+        gd_handle rgba = {0};
+        uintptr_t rgba_hdc = 0;
+        uint64_t rgba_token = 0;
+        CHECK(api.bitmap_create(3, 2, GD_PIXEL_RGBA32_PREMULTIPLIED, &rgba) == GD_OK);
+        CHECK(api.bitmap_set_pixel(rgba, 0, 0, (gd_color){UINT32_C(0xffff0000), 0}) == GD_OK);
+        CHECK(api.bitmap_set_pixel(rgba, 1, 0, (gd_color){UINT32_C(0xff00ff00), 0}) == GD_OK);
+        CHECK(api.bitmap_set_pixel(rgba, 2, 1, (gd_color){UINT32_C(0xff0000ff), 0}) == GD_OK);
+        CHECK(api.bitmap_acquire_hdc(rgba, &rgba_hdc, &rgba_token) == GD_OK);
+        CHECK(GetPixel((HDC)rgba_hdc, 0, 0) == RGB(255, 0, 0));
+        CHECK(GetPixel((HDC)rgba_hdc, 1, 0) == RGB(0, 255, 0));
+        CHECK(GetPixel((HDC)rgba_hdc, 2, 1) == RGB(0, 0, 255));
+        CHECK(api.bitmap_release_hdc(rgba, rgba_token) == GD_OK);
+        /* Reported, not checked: release_hdc copies the BGRA lease back without swapping. */
+        CHECK(api.bitmap_get_pixel(rgba, 0, 0, &pixel) == GD_OK);
+        printf("drawing-windows-rgba-lease-roundtrip=%08x\\n", (unsigned)pixel.argb);
+        CHECK(api.bitmap_set_pixel(rgba, 0, 0, (gd_color){UINT32_C(0xffff0000), 0}) == GD_OK);
+        CHECK(api.bitmap_set_pixel(rgba, 2, 1, (gd_color){UINT32_C(0xff0000ff), 0}) == GD_OK);
+        CHECK(api.native_surface_present((uintptr_t)memory, GD_NATIVE_SURFACE_HDC, rgba) == GD_OK);
+        CHECK(GetPixel(memory, 0, 0) == RGB(255, 0, 0));
+        CHECK(GetPixel(memory, 2, 1) == RGB(0, 0, 255));
+        CHECK(api.release(rgba) == GD_OK);
+        puts("drawing-windows-rgba=pass");
+    }
+""")
+    return source
+
+
 def rewrite_swizzle_links(source):
     if not source.endswith("\n"):
         raise ValueError("CMakeLists.txt must end with a newline")
     return source + """
 # stx_skia fixture: hosts swap RGBA and BGRA rows with stx_skia's standalone kernel, which
-# links no Skia code. These targets compile the four converted loops.
+# links no Skia code. The Windows host builds without the Skia adapter, so stx_skia is added
+# here when the adapter did not add it; only the targets linked below are then built.
+if(NOT TARGET stx_skia::swizzle)
+    if(NOT DEFINED STX_SKIA_SOURCE_ROOT)
+        message(FATAL_ERROR "The swap kernel requires STX_SKIA_SOURCE_ROOT")
+    endif()
+    add_subdirectory("${STX_SKIA_SOURCE_ROOT}" "${CMAKE_CURRENT_BINARY_DIR}/stx-skia" EXCLUDE_FROM_ALL)
+endif()
+# These targets compile the four converted loops.
 foreach(gui_forms_swizzle_target IN ITEMS gui_forms_controls gui_forms_coregraphics
         gui_drawing_c_api gui_forms_host_windows gui_forms_windows_dib_lifecycle_tests
         gui_forms_windows_tooltip_tests gui_forms_windows_prepared_text_tests)
@@ -352,6 +397,7 @@ SWIZZLE = [("src/controls/raster_canvas/raster_canvas.cpp", rewrite_raster_canva
            ("src/abi/drawing_platform_windows.cpp", rewrite_windows_drawing),
            ("src/host/windows/application/windows_host.cpp", rewrite_windows_host),
            ("tests/canvas_tests.cpp", rewrite_canvas_tests),
+           ("tests/drawing_windows_probe.c", rewrite_windows_probe),
            ("CMakeLists.txt", rewrite_swizzle_links)]
 
 
@@ -394,9 +440,10 @@ def main():
         if archive.wait() != 0:
             raise RuntimeError("Source archive failed")
         for name, text in files.items():
-            (args.output / name).write_text(text)
-    OPTIMIZATION_PATCH.write_text(patches[0])
-    SWIZZLE_PATCH.write_text(patches[1])
+            # Exact bytes on every host: no text-mode newline translation on Windows.
+            (args.output / name).write_text(text, encoding="utf-8", newline="")
+    OPTIMIZATION_PATCH.write_text(patches[0], encoding="utf-8", newline="")
+    SWIZZLE_PATCH.write_text(patches[1], encoding="utf-8", newline="")
     if args.patches_only:
         print("Wrote", OPTIMIZATION_PATCH, "and", SWIZZLE_PATCH)
     else:
