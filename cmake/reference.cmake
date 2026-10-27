@@ -447,3 +447,8 @@ list(APPEND stx_sources baseline/skia/src/shaders/SkTransformShader.cpp)
 # Original gradient storage, interpolation and stage construction.
 list(REMOVE_ITEM stx_sources skia/src/shaders/gradients/SkGradientBaseShader.cpp)
 list(APPEND stx_sources baseline/skia/src/shaders/gradients/SkGradientBaseShader.cpp)
+
+# Original point, rectangle and rounded-rectangle implementations.
+list(REMOVE_ITEM stx_sources skia/src/core/SkPoint.cpp skia/src/core/SkRect.cpp skia/src/core/SkRRect.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkPoint.cpp baseline/skia/src/core/SkRect.cpp
+    baseline/skia/src/core/SkRRect.cpp)

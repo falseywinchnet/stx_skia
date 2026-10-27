@@ -29,6 +29,7 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | Standard blend shaders | `src/shaders/SkBlendShader.cpp/.h` | 696 reference scenes across all 29 standard modes, local/affine transforms, opacity combinations and colored vertices; invalid-mode rejection |
 | Mipmap selection, storage and builder | `src/core/SkMipmapAccessor.cpp/.h`, `src/core/SkMipmap.cpp/.h`, `src/core/SkMipmapBuilder.cpp/.h` | Attached/generated level selection, checked allocation layout, discard/relock, builder lifetime and 1,152 byte-exact mip chains; downsampling kernels remain separate |
 | Change listeners | `src/core/SkIDChangeListener.cpp`, `include/private/SkIDChangeListener.h` | Registration cleanup, deregistration, reset, notification and destruction |
+| Points, rectangles and rounded rectangles | `include/core/SkPoint.h`, `include/core/SkRect.h`, `include/core/SkRRect.h`, `src/core/SkPoint.cpp`, `src/core/SkRect.cpp`, `src/core/SkRRect.cpp`, `src/core/SkPointPriv.h`, `src/core/SkRectPriv.h`, `src/core/SkRRectPriv.h` | 24,217-case byte-exact corpus over extreme integers, signed zeros, denormals, infinities and NaN; saturation corrections; field-wise serialization; borrow rejection |
 
 Paths in this table are relative to `skia/`. The second conversion batch preserves
 arithmetic, callback order and atomic memory ordering. It replaces procedure-local
@@ -1194,6 +1195,22 @@ Candidate/reference suites pass 59/59 and 58/58, sixteen common artifacts match,
 and the full instrumented suite returns PASS. See
 ../results/2026-10-26/GRADIENT_BASE_CONVERSION.md. Public gradient descriptors and
 raster gradient kernels remain separate conversion work.
+
+## Points, rectangles and rounded rectangles
+
+The three public geometry headers, their implementations and private helpers are
+converted. The intersection macro with a hidden return is replaced by named
+overlap helpers that keep the NaN-rejecting comparison order. Rounded-rectangle
+equality and serialization read fields instead of punning arrays or object
+bytes; the serialized bytes are unchanged. `SkIRect::outset` and integer point
+negation saturate instead of overflowing, and an empty point list is no longer
+dereferenced. GPU-only private helpers, a 32-bit bounds branch and two undefined
+compatibility branches are removed; no public geometry API is removed. Borrow
+accessors on `SkRRect` reject temporaries. Candidate/reference suites pass 60/60
+and 59/59, the 9.2 MB corpus and every other shared artifact match except the
+intentionally corrected sampling artifact. See
+../results/2026-10-26/GEOMETRY_PRIMITIVES_CONVERSION.md. Matrices, paths and
+curve geometry remain separate conversion work.
 
 ## Still required
 

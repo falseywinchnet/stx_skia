@@ -24,6 +24,7 @@ if [ "$sanitize" = ON ]; then
 else
     ctest --test-dir "build/$profile" --output-on-failure
     "build/$profile/stx_skia_gradient_geometry_tests" "build/$profile/gradient-geometry.raw"
+    "build/$profile/stx_skia_geometry_primitive_tests" "build/$profile/geometry-primitives.raw"
     "build/$profile/stx_skia_image_subset_tests" "build/$profile/image-subsets.raw"
     "build/$profile/stx_skia_image_sampling_tests" "build/$profile/image-sampling.raw" "build/$profile/image-sampling-corrected.raw"
     "build/$profile/stx_skia_shader_coordinate_tests" "build/$profile/shader-coordinates.raw"

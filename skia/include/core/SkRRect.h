@@ -78,32 +78,60 @@ public:
     };
 
     Type getType() const {
-        SkASSERT(this->isValid());
-        return static_cast<Type>(fType);
+        SkASSERT(isValid());
+        const Type type = static_cast<Type>(fType);
+        return type;
     }
 
-    Type type() const { return this->getType(); }
+    Type type() const {
+        const Type current = getType();
+        return current;
+    }
 
-    inline bool isEmpty() const { return kEmpty_Type == this->getType(); }
-    inline bool isRect() const { return kRect_Type == this->getType(); }
-    inline bool isOval() const { return kOval_Type == this->getType(); }
-    inline bool isSimple() const { return kSimple_Type == this->getType(); }
-    inline bool isNinePatch() const { return kNinePatch_Type == this->getType(); }
-    inline bool isComplex() const { return kComplex_Type == this->getType(); }
+    inline bool isEmpty() const {
+        const bool empty = kEmpty_Type == getType();
+        return empty;
+    }
+    inline bool isRect() const {
+        const bool rect = kRect_Type == getType();
+        return rect;
+    }
+    inline bool isOval() const {
+        const bool oval = kOval_Type == getType();
+        return oval;
+    }
+    inline bool isSimple() const {
+        const bool simple = kSimple_Type == getType();
+        return simple;
+    }
+    inline bool isNinePatch() const {
+        const bool ninePatch = kNinePatch_Type == getType();
+        return ninePatch;
+    }
+    inline bool isComplex() const {
+        const bool complex = kComplex_Type == getType();
+        return complex;
+    }
 
     /** Returns span on the x-axis. This does not check if result fits in 32-bit float;
         result may be infinity.
 
         @return  rect().fRight minus rect().fLeft
     */
-    SkScalar width() const { return fRect.width(); }
+    SkScalar width() const {
+        const SkScalar span = fRect.width();
+        return span;
+    }
 
     /** Returns span on the y-axis. This does not check if result fits in 32-bit float;
         result may be infinity.
 
         @return  rect().fBottom minus rect().fTop
     */
-    SkScalar height() const { return fRect.height(); }
+    SkScalar height() const {
+        const SkScalar span = fRect.height();
+        return span;
+    }
 
     /** Returns top-left corner radii. If type() returns kEmpty_Type, kRect_Type,
         kOval_Type, or kSimple_Type, returns a value representative of all corner radii.
@@ -128,14 +156,14 @@ public:
         @param rect  bounds to set
     */
     void setRect(const SkRect& rect) {
-        if (!this->initializeRect(rect)) {
+        if (!initializeRect(rect)) {
             return;
         }
 
-        memset(fRadii, 0, sizeof(fRadii));
+        clearRadii();
         fType = kRect_Type;
 
-        SkASSERT(this->isValid());
+        SkASSERT(isValid());
     }
 
     /** Initializes bounds at (0, 0), the origin, with zero width and height.
@@ -143,7 +171,10 @@ public:
 
         @return  empty SkRRect
     */
-    static SkRRect MakeEmpty() { return SkRRect(); }
+    static SkRRect MakeEmpty() {
+        const SkRRect empty{};
+        return empty;
+    }
 
     /** Initializes to copy of r bounds and zeroes corner radii.
 
@@ -286,18 +317,26 @@ public:
 
         @return  bounding box
     */
-    const SkRect& rect() const { return fRect; }
+    const SkRect& rect() const & { return fRect; }
+    const SkRect& rect() const && = delete;
 
     /** Returns scalar pair for radius of curve on x-axis and y-axis for one corner.
         Both radii may be zero. If not zero, both are positive and finite.
 
         @return        x-axis and y-axis radii for one corner
     */
-    SkVector radii(Corner corner) const { return fRadii[corner]; }
+    SkVector radii(Corner corner) const {
+        const SkVector radius = fRadii[corner];
+        return radius;
+    }
     /**
      * Returns the corner radii for all four corners, in the same order as `Corner`.
      */
-    SkSpan<const SkVector> radii() const { return SkSpan(fRadii, 4); }
+    SkSpan<const SkVector> radii() const & {
+        const SkSpan<const SkVector> corners(fRadii, 4);
+        return corners;
+    }
+    SkSpan<const SkVector> radii() const && = delete;
 
     /** Returns bounds. Bounds may have zero width or zero height. Bounds right is
         greater than or equal to left; bounds bottom is greater than or equal to top.
@@ -305,7 +344,8 @@ public:
 
         @return  bounding box
     */
-    const SkRect& getBounds() const { return fRect; }
+    const SkRect& getBounds() const & { return fRect; }
+    const SkRect& getBounds() const && = delete;
 
     /** Returns true if bounds and radii in a are equal to bounds and radii in b.
 
@@ -317,7 +357,8 @@ public:
         @return   true if members are equal
     */
     friend bool operator==(const SkRRect& a, const SkRRect& b) {
-        return a.fRect == b.fRect && SkScalarsEqual(&a.fRadii[0].fX, &b.fRadii[0].fX, 8);
+        const bool equal = a.fRect == b.fRect && RadiiEqual(a.fRadii, b.fRadii);
+        return equal;
     }
 
     /** Returns true if bounds and radii in a are not equal to bounds and radii in b.
@@ -330,7 +371,8 @@ public:
         @return   true if members are not equal
     */
     friend bool operator!=(const SkRRect& a, const SkRRect& b) {
-        return a.fRect != b.fRect || !SkScalarsEqual(&a.fRadii[0].fX, &b.fRadii[0].fX, 8);
+        const bool different = !(a == b);
+        return different;
     }
 
     /** Copies SkRRect to dst, then insets dst bounds by dx and dy, and adjusts dst
@@ -368,7 +410,7 @@ public:
         @param dy  added to rect().fTop, and subtracted from rect().fBottom
     */
     void inset(SkScalar dx, SkScalar dy) {
-        this->inset(dx, dy, this);
+        inset(dx, dy, this);
     }
 
     /** Outsets dst bounds by dx and dy, and adjusts radii by dx and dy. dx and dy may be
@@ -387,7 +429,7 @@ public:
         @param dst  outset bounds and radii
     */
     void outset(SkScalar dx, SkScalar dy, SkRRect* dst) const {
-        this->inset(-dx, -dy, dst);
+        inset(-dx, -dy, dst);
     }
 
     /** Outsets bounds by dx and dy, and adjusts radii by dx and dy. dx and dy may be
@@ -405,7 +447,7 @@ public:
         @param dy  subtracted from rect().fTop, and added to rect().fBottom
     */
     void outset(SkScalar dx, SkScalar dy) {
-        this->inset(-dx, -dy, this);
+        inset(-dx, -dy, this);
     }
 
     /** Translates SkRRect by (dx, dy).
@@ -424,7 +466,8 @@ public:
         @return    SkRRect bounds offset by (dx, dy), with unchanged corner radii
     */
     [[nodiscard]] SkRRect makeOffset(SkScalar dx, SkScalar dy) const {
-        return SkRRect(fRect.makeOffset(dx, dy), fRadii, fType);
+        const SkRRect moved(fRect.makeOffset(dx, dy), fRadii, fType);
+        return moved;
     }
 
     /** Returns true if point is inside the bounds and corner radii, and if
@@ -505,17 +548,33 @@ public:
         with limited precision; it may not be possible to reconstruct original
         SkRRect from output.
     */
-    void dump() const { this->dump(false); }
+    void dump() const { dump(false); }
 
     /** Writes text representation of SkRRect to standard output. The representation
         may be directly compiled as C++ code. Floating point values are written
         in hexadecimal to preserve their exact bit pattern. The output reconstructs the
         original SkRRect.
     */
-    void dumpHex() const { this->dump(true); }
+    void dumpHex() const { dump(true); }
 
 private:
     static bool AreRectAndRadiiValid(const SkRect&, const SkVector[4]);
+
+    // Compares the four corner radii exactly; NaN radii are never equal.
+    static bool RadiiEqual(const SkVector a[4], const SkVector b[4]) {
+        for (int i = 0; i < 4; ++i) {
+            if (a[i].fX != b[i].fX || a[i].fY != b[i].fY) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void clearRadii() {
+        for (SkVector& radius : fRadii) {
+            radius = {0, 0};
+        }
+    }
 
     SkRRect(const SkRect& rect, const SkVector radii[4], int32_t type)
         : fRect(rect)
