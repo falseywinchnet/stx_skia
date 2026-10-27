@@ -596,23 +596,23 @@ namespace SK_OPTS_NS {
     }
 
     SI void load4(const uint16_t* ptr, U16* r, U16* g, U16* b, U16* a) {
-        __m256i _0123 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr)),
-                _4567 = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 1),
-                _89ab = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 2),
-                _cdef = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 3);
+        __m256i _0123 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr));
+        __m256i _4567 = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 1);
+        __m256i _89ab = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 2);
+        __m256i _cdef = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 3);
 
-        __m256i a0 = _mm256_unpacklo_epi16(_0123, _4567),
-             a1 = _mm256_unpackhi_epi16(_0123, _4567),
-             b0 = _mm256_unpacklo_epi16(a0, a1),
-             b1 = _mm256_unpackhi_epi16(a0, a1),
-             a2 = _mm256_unpacklo_epi16(_89ab, _cdef),
-             a3 = _mm256_unpackhi_epi16(_89ab, _cdef),
-             b2 = _mm256_unpacklo_epi16(a2, a3),
-             b3 = _mm256_unpackhi_epi16(a2, a3),
-             rr = _mm256_unpacklo_epi64(b0, b2),
-             gg = _mm256_unpackhi_epi64(b0, b2),
-             bb = _mm256_unpacklo_epi64(b1, b3),
-             aa = _mm256_unpackhi_epi64(b1, b3);
+        __m256i a0 = _mm256_unpacklo_epi16(_0123, _4567);
+        __m256i a1 = _mm256_unpackhi_epi16(_0123, _4567);
+        __m256i b0 = _mm256_unpacklo_epi16(a0, a1);
+        __m256i b1 = _mm256_unpackhi_epi16(a0, a1);
+        __m256i a2 = _mm256_unpacklo_epi16(_89ab, _cdef);
+        __m256i a3 = _mm256_unpackhi_epi16(_89ab, _cdef);
+        __m256i b2 = _mm256_unpacklo_epi16(a2, a3);
+        __m256i b3 = _mm256_unpackhi_epi16(a2, a3);
+        __m256i rr = _mm256_unpacklo_epi64(b0, b2);
+        __m256i gg = _mm256_unpackhi_epi64(b0, b2);
+        __m256i bb = _mm256_unpacklo_epi64(b1, b3);
+        __m256i aa = _mm256_unpackhi_epi64(b1, b3);
 
         *r = bit_cast_lanes<U16>(_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), rr));
         *g = bit_cast_lanes<U16>(_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), gg));
@@ -620,15 +620,15 @@ namespace SK_OPTS_NS {
         *a = bit_cast_lanes<U16>(_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), aa));
     }
     SI void store4(uint16_t* ptr, U16 r, U16 g, U16 b, U16 a) {
-        __m256i rg012389ab = _mm256_unpacklo_epi16(bit_cast_lanes<__m256i>(r), bit_cast_lanes<__m256i>(g)),
-             rg4567cdef = _mm256_unpackhi_epi16(bit_cast_lanes<__m256i>(r), bit_cast_lanes<__m256i>(g)),
-             ba012389ab = _mm256_unpacklo_epi16(bit_cast_lanes<__m256i>(b), bit_cast_lanes<__m256i>(a)),
-             ba4567cdef = _mm256_unpackhi_epi16(bit_cast_lanes<__m256i>(b), bit_cast_lanes<__m256i>(a));
+        __m256i rg012389ab = _mm256_unpacklo_epi16(bit_cast_lanes<__m256i>(r), bit_cast_lanes<__m256i>(g));
+        __m256i rg4567cdef = _mm256_unpackhi_epi16(bit_cast_lanes<__m256i>(r), bit_cast_lanes<__m256i>(g));
+        __m256i ba012389ab = _mm256_unpacklo_epi16(bit_cast_lanes<__m256i>(b), bit_cast_lanes<__m256i>(a));
+        __m256i ba4567cdef = _mm256_unpackhi_epi16(bit_cast_lanes<__m256i>(b), bit_cast_lanes<__m256i>(a));
 
-        __m256i _0189 = _mm256_unpacklo_epi32(rg012389ab, ba012389ab),
-             _23ab = _mm256_unpackhi_epi32(rg012389ab, ba012389ab),
-             _45cd = _mm256_unpacklo_epi32(rg4567cdef, ba4567cdef),
-             _67ef = _mm256_unpackhi_epi32(rg4567cdef, ba4567cdef);
+        __m256i _0189 = _mm256_unpacklo_epi32(rg012389ab, ba012389ab);
+        __m256i _23ab = _mm256_unpackhi_epi32(rg012389ab, ba012389ab);
+        __m256i _45cd = _mm256_unpacklo_epi32(rg4567cdef, ba4567cdef);
+        __m256i _67ef = _mm256_unpackhi_epi32(rg4567cdef, ba4567cdef);
 
         __m256i _ab23 = _mm256_permutex_epi64(_23ab, 78),
              _0123 = _mm256_blend_epi32(_0189, _ab23, 0xf0),
@@ -644,7 +644,10 @@ namespace SK_OPTS_NS {
     }
 
     SI void load4(const float* ptr, F* r, F* g, F* b, F* a) {
-        F _048c, _159d, _26ae, _37bf;
+        F _048c;
+        F _159d;
+        F _26ae;
+        F _37bf;
 
         _048c = _mm512_castps128_ps512(_mm_loadu_ps(ptr)         );
         _048c = _mm512_insertf32x4(_048c, _mm_loadu_ps(ptr+16), 1);
@@ -663,10 +666,10 @@ namespace SK_OPTS_NS {
         _37bf = _mm512_insertf32x4(_37bf, _mm_loadu_ps(ptr+44), 2);
         _37bf = _mm512_insertf32x4(_37bf, _mm_loadu_ps(ptr+60), 3);
 
-        F rg02468acf = _mm512_unpacklo_ps(_048c, _26ae),
-          ba02468acf = _mm512_unpackhi_ps(_048c, _26ae),
-          rg13579bde = _mm512_unpacklo_ps(_159d, _37bf),
-          ba13579bde = _mm512_unpackhi_ps(_159d, _37bf);
+        F rg02468acf = _mm512_unpacklo_ps(_048c, _26ae);
+        F ba02468acf = _mm512_unpackhi_ps(_048c, _26ae);
+        F rg13579bde = _mm512_unpacklo_ps(_159d, _37bf);
+        F ba13579bde = _mm512_unpackhi_ps(_159d, _37bf);
 
         *r = bit_cast_lanes<F>(_mm512_unpacklo_ps(rg02468acf, rg13579bde));
         *g = bit_cast_lanes<F>(_mm512_unpackhi_ps(rg02468acf, rg13579bde));
@@ -675,43 +678,43 @@ namespace SK_OPTS_NS {
     }
 
     SI void store4(float* ptr, F r, F g, F b, F a) {
-        F rg014589cd = _mm512_unpacklo_ps(r, g),
-          rg2367abef = _mm512_unpackhi_ps(r, g),
-          ba014589cd = _mm512_unpacklo_ps(b, a),
-          ba2367abef = _mm512_unpackhi_ps(b, a);
+        F rg014589cd = _mm512_unpacklo_ps(r, g);
+        F rg2367abef = _mm512_unpackhi_ps(r, g);
+        F ba014589cd = _mm512_unpacklo_ps(b, a);
+        F ba2367abef = _mm512_unpackhi_ps(b, a);
 
-        F _048c = bit_cast_lanes<F>(_mm512_unpacklo_pd(bit_cast_lanes<__m512d>(rg014589cd), bit_cast_lanes<__m512d>(ba014589cd))),
-          _26ae = bit_cast_lanes<F>(_mm512_unpacklo_pd(bit_cast_lanes<__m512d>(rg2367abef), bit_cast_lanes<__m512d>(ba2367abef))),
-          _159d = bit_cast_lanes<F>(_mm512_unpackhi_pd(bit_cast_lanes<__m512d>(rg014589cd), bit_cast_lanes<__m512d>(ba014589cd))),
-          _37bf = bit_cast_lanes<F>(_mm512_unpackhi_pd(bit_cast_lanes<__m512d>(rg2367abef), bit_cast_lanes<__m512d>(ba2367abef)));
+        F _048c = bit_cast_lanes<F>(_mm512_unpacklo_pd(bit_cast_lanes<__m512d>(rg014589cd), bit_cast_lanes<__m512d>(ba014589cd)));
+        F _26ae = bit_cast_lanes<F>(_mm512_unpacklo_pd(bit_cast_lanes<__m512d>(rg2367abef), bit_cast_lanes<__m512d>(ba2367abef)));
+        F _159d = bit_cast_lanes<F>(_mm512_unpackhi_pd(bit_cast_lanes<__m512d>(rg014589cd), bit_cast_lanes<__m512d>(ba014589cd)));
+        F _37bf = bit_cast_lanes<F>(_mm512_unpackhi_pd(bit_cast_lanes<__m512d>(rg2367abef), bit_cast_lanes<__m512d>(ba2367abef)));
 
-        F _ae26 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_26ae))),
-          _bf37 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_37bf))),
-          _8c04 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_048c))),
-          _9d15 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_159d)));
+        F _ae26 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_26ae)));
+        F _bf37 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_37bf)));
+        F _8c04 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_048c)));
+        F _9d15 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_159d)));
 
         __m512i index = _mm512_setr_epi32(4,5,6,7,0,1,2,3,12,13,14,15,8,9,10,11);
         F _0426 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_048c), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
-                    bit_cast_lanes<__m512d>(_ae26))),
-          _1537 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_159d), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
-                    bit_cast_lanes<__m512d>(_bf37))),
-          _5173 = _mm512_permutexvar_ps(index, _1537),
-          _0123 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_0426), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
+                    bit_cast_lanes<__m512d>(_ae26)));
+        F _1537 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_159d), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
+                    bit_cast_lanes<__m512d>(_bf37)));
+        F _5173 = _mm512_permutexvar_ps(index, _1537);
+        F _0123 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_0426), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
                     bit_cast_lanes<__m512d>(_5173)));
 
         F _5476 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_5173), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
-                    bit_cast_lanes<__m512d>(_0426))),
-          _4567 = _mm512_permutexvar_ps(index, _5476),
-          _8cae = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_8c04), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
-                    bit_cast_lanes<__m512d>(_26ae))),
-          _9dbf = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_9d15), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
-                    bit_cast_lanes<__m512d>(_37bf))),
-          _d9fb = _mm512_permutexvar_ps(index, _9dbf),
-          _89ab = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_8cae), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
-                    bit_cast_lanes<__m512d>(_d9fb))),
-          _dcfe = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_d9fb), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
-                    bit_cast_lanes<__m512d>(_8cae))),
-          _cdef = _mm512_permutexvar_ps(index, _dcfe);
+                    bit_cast_lanes<__m512d>(_0426)));
+        F _4567 = _mm512_permutexvar_ps(index, _5476);
+        F _8cae = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_8c04), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
+                    bit_cast_lanes<__m512d>(_26ae)));
+        F _9dbf = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_9d15), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
+                    bit_cast_lanes<__m512d>(_37bf)));
+        F _d9fb = _mm512_permutexvar_ps(index, _9dbf);
+        F _89ab = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_8cae), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
+                    bit_cast_lanes<__m512d>(_d9fb)));
+        F _dcfe = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_d9fb), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
+                    bit_cast_lanes<__m512d>(_8cae)));
+        F _cdef = _mm512_permutexvar_ps(index, _dcfe);
 
         _mm512_storeu_ps(ptr+0, _0123);
         _mm512_storeu_ps(ptr+16, _4567);
@@ -871,35 +874,35 @@ namespace SK_OPTS_NS {
     #define SKRP_SUPPORTS_OPTIMIZED_DIV_UINT
 
     SI void load2(const uint16_t* ptr, U16* r, U16* g) {
-        __m128i _0123 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0),
-                _4567 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1);
+        __m128i _0123 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0);
+        __m128i _4567 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1);
         *r = bit_cast_lanes<U16>(_mm_packs_epi32(_mm_srai_epi32(_mm_slli_epi32(_0123, 16), 16),
                                   _mm_srai_epi32(_mm_slli_epi32(_4567, 16), 16)));
         *g = bit_cast_lanes<U16>(_mm_packs_epi32(_mm_srai_epi32(_0123, 16),
                                   _mm_srai_epi32(_4567, 16)));
     }
     SI void store2(uint16_t* ptr, U16 r, U16 g) {
-        __m128i _0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g)),
-             _4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g));
+        __m128i _0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g));
+        __m128i _4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g));
         _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 0, _0123);
         _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 1, _4567);
     }
 
     SI void load4(const uint16_t* ptr, U16* r, U16* g, U16* b, U16* a) {
-        __m128i _01 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0),
-                _23 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1),
-                _45 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 2),
-                _67 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 3);
+        __m128i _01 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0);
+        __m128i _23 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1);
+        __m128i _45 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 2);
+        __m128i _67 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 3);
 
-        __m128i _02 = _mm_unpacklo_epi16(_01, _23),  // r0 r2 g0 g2 b0 b2 a0 a2
-             _13 = _mm_unpackhi_epi16(_01, _23),  // r1 r3 g1 g3 b1 b3 a1 a3
-             _46 = _mm_unpacklo_epi16(_45, _67),
-             _57 = _mm_unpackhi_epi16(_45, _67);
+        __m128i _02 = _mm_unpacklo_epi16(_01, _23);  // r0 r2 g0 g2 b0 b2 a0 a2
+        __m128i _13 = _mm_unpackhi_epi16(_01, _23);  // r1 r3 g1 g3 b1 b3 a1 a3
+        __m128i _46 = _mm_unpacklo_epi16(_45, _67);
+        __m128i _57 = _mm_unpackhi_epi16(_45, _67);
 
-        __m128i rg0123 = _mm_unpacklo_epi16(_02, _13),  // r0 r1 r2 r3 g0 g1 g2 g3
-             ba0123 = _mm_unpackhi_epi16(_02, _13),  // b0 b1 b2 b3 a0 a1 a2 a3
-             rg4567 = _mm_unpacklo_epi16(_46, _57),
-             ba4567 = _mm_unpackhi_epi16(_46, _57);
+        __m128i rg0123 = _mm_unpacklo_epi16(_02, _13);  // r0 r1 r2 r3 g0 g1 g2 g3
+        __m128i ba0123 = _mm_unpackhi_epi16(_02, _13);  // b0 b1 b2 b3 a0 a1 a2 a3
+        __m128i rg4567 = _mm_unpacklo_epi16(_46, _57);
+        __m128i ba4567 = _mm_unpackhi_epi16(_46, _57);
 
         *r = bit_cast_lanes<U16>(_mm_unpacklo_epi64(rg0123, rg4567));
         *g = bit_cast_lanes<U16>(_mm_unpackhi_epi64(rg0123, rg4567));
@@ -907,15 +910,15 @@ namespace SK_OPTS_NS {
         *a = bit_cast_lanes<U16>(_mm_unpackhi_epi64(ba0123, ba4567));
     }
     SI void store4(uint16_t* ptr, U16 r, U16 g, U16 b, U16 a) {
-        __m128i rg0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g)),  // r0 g0 r1 g1 r2 g2 r3 g3
-             rg4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g)),  // r4 g4 r5 g5 r6 g6 r7 g7
-             ba0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(b), bit_cast_lanes<__m128i>(a)),
-             ba4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(b), bit_cast_lanes<__m128i>(a));
+        __m128i rg0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g));  // r0 g0 r1 g1 r2 g2 r3 g3
+        __m128i rg4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g));  // r4 g4 r5 g5 r6 g6 r7 g7
+        __m128i ba0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(b), bit_cast_lanes<__m128i>(a));
+        __m128i ba4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(b), bit_cast_lanes<__m128i>(a));
 
-        __m128i _01 = _mm_unpacklo_epi32(rg0123, ba0123),
-             _23 = _mm_unpackhi_epi32(rg0123, ba0123),
-             _45 = _mm_unpacklo_epi32(rg4567, ba4567),
-             _67 = _mm_unpackhi_epi32(rg4567, ba4567);
+        __m128i _01 = _mm_unpacklo_epi32(rg0123, ba0123);
+        __m128i _23 = _mm_unpackhi_epi32(rg0123, ba0123);
+        __m128i _45 = _mm_unpacklo_epi32(rg4567, ba4567);
+        __m128i _67 = _mm_unpackhi_epi32(rg4567, ba4567);
 
         _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 0, _01);
         _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 1, _23);
@@ -924,19 +927,19 @@ namespace SK_OPTS_NS {
     }
 
     SI void load4(const float* ptr, F* r, F* g, F* b, F* a) {
-        F _04 = _mm256_castps128_ps256(_mm_loadu_ps(ptr+ 0)),
-          _15 = _mm256_castps128_ps256(_mm_loadu_ps(ptr+ 4)),
-          _26 = _mm256_castps128_ps256(_mm_loadu_ps(ptr+ 8)),
-          _37 = _mm256_castps128_ps256(_mm_loadu_ps(ptr+12));
+        F _04 = _mm256_castps128_ps256(_mm_loadu_ps(ptr+ 0));
+        F _15 = _mm256_castps128_ps256(_mm_loadu_ps(ptr+ 4));
+        F _26 = _mm256_castps128_ps256(_mm_loadu_ps(ptr+ 8));
+        F _37 = _mm256_castps128_ps256(_mm_loadu_ps(ptr+12));
         _04 = _mm256_insertf128_ps(_04, _mm_loadu_ps(ptr+16), 1);
         _15 = _mm256_insertf128_ps(_15, _mm_loadu_ps(ptr+20), 1);
         _26 = _mm256_insertf128_ps(_26, _mm_loadu_ps(ptr+24), 1);
         _37 = _mm256_insertf128_ps(_37, _mm_loadu_ps(ptr+28), 1);
 
-        F rg0145 = _mm256_unpacklo_ps(_04,_15),  // r0 r1 g0 g1 | r4 r5 g4 g5
-          ba0145 = _mm256_unpackhi_ps(_04,_15),
-          rg2367 = _mm256_unpacklo_ps(_26,_37),
-          ba2367 = _mm256_unpackhi_ps(_26,_37);
+        F rg0145 = _mm256_unpacklo_ps(_04,_15);  // r0 r1 g0 g1 | r4 r5 g4 g5
+        F ba0145 = _mm256_unpackhi_ps(_04,_15);
+        F rg2367 = _mm256_unpacklo_ps(_26,_37);
+        F ba2367 = _mm256_unpackhi_ps(_26,_37);
 
         *r = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(rg2367)));
         *g = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(rg2367)));
@@ -944,15 +947,15 @@ namespace SK_OPTS_NS {
         *a = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(ba0145), bit_cast_lanes<__m256d>(ba2367)));
     }
     SI void store4(float* ptr, F r, F g, F b, F a) {
-        F rg0145 = _mm256_unpacklo_ps(r, g),  // r0 g0 r1 g1 | r4 g4 r5 g5
-          rg2367 = _mm256_unpackhi_ps(r, g),  // r2 ...      | r6 ...
-          ba0145 = _mm256_unpacklo_ps(b, a),  // b0 a0 b1 a1 | b4 a4 b5 a5
-          ba2367 = _mm256_unpackhi_ps(b, a);  // b2 ...      | b6 ...
+        F rg0145 = _mm256_unpacklo_ps(r, g);  // r0 g0 r1 g1 | r4 g4 r5 g5
+        F rg2367 = _mm256_unpackhi_ps(r, g);  // r2 ...      | r6 ...
+        F ba0145 = _mm256_unpacklo_ps(b, a);  // b0 a0 b1 a1 | b4 a4 b5 a5
+        F ba2367 = _mm256_unpackhi_ps(b, a);  // b2 ...      | b6 ...
 
-        F _04 = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(ba0145))),// r0 g0 b0 a0 | r4 g4 b4 a4
-          _15 = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(ba0145))),// r1 ...      | r5 ...
-          _26 = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(rg2367), bit_cast_lanes<__m256d>(ba2367))),// r2 ...      | r6 ...
-          _37 = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(rg2367), bit_cast_lanes<__m256d>(ba2367)));// r3 ...      | r7 ...
+        F _04 = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(ba0145)));  // r0 g0 b0 a0 | r4 g4 b4 a4
+        F _15 = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(ba0145)));  // r1 ...      | r5 ...
+        F _26 = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(rg2367), bit_cast_lanes<__m256d>(ba2367)));  // r2 ...      | r6 ...
+        F _37 = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(rg2367), bit_cast_lanes<__m256d>(ba2367)));// r3 ...      | r7 ...
 
         F _01 = _mm256_permute2f128_ps(_04, _15, 32),  // 32 == 0010 0000 == lo, lo
           _23 = _mm256_permute2f128_ps(_26, _37, 32),
@@ -1146,14 +1149,14 @@ namespace SK_OPTS_NS {
     }
 
     SI void load4(const uint16_t* ptr, U16* r, U16* g, U16* b, U16* a) {
-        __m128i _01 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0), // r0 g0 b0 a0 r1 g1 b1 a1
-                _23 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1); // r2 g2 b2 a2 r3 g3 b3 a3
+        __m128i _01 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0);  // r0 g0 b0 a0 r1 g1 b1 a1
+        __m128i _23 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1); // r2 g2 b2 a2 r3 g3 b3 a3
 
-        __m128i _02 = _mm_unpacklo_epi16(_01, _23),  // r0 r2 g0 g2 b0 b2 a0 a2
-             _13 = _mm_unpackhi_epi16(_01, _23);  // r1 r3 g1 g3 b1 b3 a1 a3
+        __m128i _02 = _mm_unpacklo_epi16(_01, _23);  // r0 r2 g0 g2 b0 b2 a0 a2
+        __m128i _13 = _mm_unpackhi_epi16(_01, _23);  // r1 r3 g1 g3 b1 b3 a1 a3
 
-        __m128i rg = _mm_unpacklo_epi16(_02, _13),  // r0 r1 r2 r3 g0 g1 g2 g3
-             ba = _mm_unpackhi_epi16(_02, _13);  // b0 b1 b2 b3 a0 a1 a2 a3
+        __m128i rg = _mm_unpacklo_epi16(_02, _13);  // r0 r1 r2 r3 g0 g1 g2 g3
+        __m128i ba = _mm_unpackhi_epi16(_02, _13);  // b0 b1 b2 b3 a0 a1 a2 a3
 
         *r = sk_unaligned_load<U16>(reinterpret_cast<uint16_t*>(&rg) + 0);
         *g = sk_unaligned_load<U16>(reinterpret_cast<uint16_t*>(&rg) + 4);
@@ -1162,18 +1165,18 @@ namespace SK_OPTS_NS {
     }
 
     SI void store4(uint16_t* ptr, U16 r, U16 g, U16 b, U16 a) {
-        __m128i rg = _mm_unpacklo_epi16(widen_cast<__m128i>(r), widen_cast<__m128i>(g)),
-             ba = _mm_unpacklo_epi16(widen_cast<__m128i>(b), widen_cast<__m128i>(a));
+        __m128i rg = _mm_unpacklo_epi16(widen_cast<__m128i>(r), widen_cast<__m128i>(g));
+        __m128i ba = _mm_unpacklo_epi16(widen_cast<__m128i>(b), widen_cast<__m128i>(a));
 
         _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 0, _mm_unpacklo_epi32(rg, ba));
         _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 1, _mm_unpackhi_epi32(rg, ba));
     }
 
     SI void load4(const float* ptr, F* r, F* g, F* b, F* a) {
-        F _0 = _mm_loadu_ps(ptr + 0),
-          _1 = _mm_loadu_ps(ptr + 4),
-          _2 = _mm_loadu_ps(ptr + 8),
-          _3 = _mm_loadu_ps(ptr +12);
+        F _0 = _mm_loadu_ps(ptr + 0);
+        F _1 = _mm_loadu_ps(ptr + 4);
+        F _2 = _mm_loadu_ps(ptr + 8);
+        F _3 = _mm_loadu_ps(ptr +12);
         _MM_TRANSPOSE4_PS(_0,_1,_2,_3);
         *r = _0;
         *g = _1;
@@ -1694,9 +1697,9 @@ SI F from_half(U16 h) {
 
 #else
     // Remember, a half is 1-5-10 (sign-exponent-mantissa) with 15 exponent bias.
-    U32 sem = expand(h),
-        s   = sem & 0x8000,
-         em = sem ^ s;
+    U32 sem = expand(h);
+    U32 s   = sem & 0x8000;
+    U32 em = sem ^ s;
 
     // Convert to 1-8-23 float with 127 bias, flushing denorm halfs (including zero) to zero.
     I32 denorm = bit_cast_lanes<I32>(em) < 0x0400;      // I32 comparison is often quicker, and always safe here.
@@ -1717,9 +1720,9 @@ SI U16 to_half(F f) {
 
 #else
     // Remember, a float is 1-8-23 (sign-exponent-mantissa) with 127 exponent bias.
-    U32 sem = sk_bit_cast<U32>(f),
-        s   = sem & 0x80000000,
-         em = sem ^ s;
+    U32 sem = sk_bit_cast<U32>(f);
+    U32 s   = sem & 0x80000000;
+    U32 em = sem ^ s;
 
     // Convert to 1-5-10 half with 15 bias, flushing denorm halfs (including zero) to zero.
     I32 denorm = bit_cast_lanes<I32>(em) < 0x38800000;  // I32 comparison is often quicker, and always safe here.
@@ -2001,8 +2004,8 @@ SI F clamp(F v, F limit) {
 
 // clamp to (0,limit).
 SI F clamp_ex(F v, float limit) {
-    const F inclusiveZ = F_(std::numeric_limits<float>::min()),
-            inclusiveL = sk_bit_cast<F>( sk_bit_cast<U32>(F_(limit)) - 1 );
+    const F inclusiveZ = F_(std::numeric_limits<float>::min());
+    const F inclusiveL = sk_bit_cast<F>( sk_bit_cast<U32>(F_(limit)) - 1 );
     return min(max(inclusiveZ, v), inclusiveL);
 }
 
@@ -2230,8 +2233,8 @@ HIGHP_STAGE(dither, const float* rate) {
     uint32_t iota[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
     static_assert(std::size(iota) >= SkRasterPipelineContexts::kMaxStride_highp);
 
-    U32 X = U32_(dx) + sk_unaligned_load<U32>(iota),
-        Y = U32_(dy);
+    U32 X = U32_(dx) + sk_unaligned_load<U32>(iota);
+    U32 Y = U32_(dy);
 
     // We're doing 8x8 ordered dithering, see https://en.wikipedia.org/wiki/Ordered_dithering.
     // In this case n=8 and we're using the matrix that looks like 1/64 x [ 0 48 12 60 ... ].
@@ -2403,18 +2406,18 @@ BLEND_MODE(overlay) {
 }
 
 BLEND_MODE(softlight) {
-    F m  = if_then_else(da > 0, d / da, 0.0f),
-      s2 = two(s),
-      m4 = two(two(m));
+    F m  = if_then_else(da > 0, d / da, 0.0f);
+    F s2 = two(s);
+    F m4 = two(two(m));
 
     // The logic forks three ways:
     //    1. dark src?
     //    2. light src, dark dst?
     //    3. light src, light dst?
-    F darkSrc = d*(sa + (s2 - sa)*(1.0f - m)),     // Used in case 1.
-      darkDst = (m4*m4 + m4)*(m - 1.0f) + 7.0f*m,  // Used in case 2.
-      liteDst = sqrt_(m) - m,
-      liteSrc = d*sa + da*(s2 - sa) * if_then_else(two(two(d)) <= da, darkDst, liteDst); // 2 or 3?
+    F darkSrc = d*(sa + (s2 - sa)*(1.0f - m));  // Used in case 1.
+    F darkDst = (m4*m4 + m4)*(m - 1.0f) + 7.0f*m;  // Used in case 2.
+    F liteDst = sqrt_(m) - m;
+    F liteSrc = d*sa + da*(s2 - sa) * if_then_else(two(two(d)) <= da, darkDst, liteDst); // 2 or 3?
     return s*inv(da) + d*inv(sa) + if_then_else(s2 <= sa, darkSrc, liteSrc);      // 1 or (2 or 3)?
 }
 #undef BLEND_MODE
@@ -2431,9 +2434,9 @@ SI F sat(F r, F g, F b) { return max(r, max(g,b)) - min(r, min(g,b)); }
 SI F lum(F r, F g, F b) { return mad(r, 0.30f, mad(g, 0.59f, b*0.11f)); }
 
 SI void set_sat(F* r, F* g, F* b, F s) {
-    F mn  = min(*r, min(*g,*b)),
-      mx  = max(*r, max(*g,*b)),
-      sat = mx - mn;
+    F mn  = min(*r, min(*g,*b));
+    F mx  = max(*r, max(*g,*b));
+    F sat = mx - mn;
 
     // Map min channel to 0, max channel to s, and scale the middle proportionally.
     s = if_then_else(sat == 0.0f, 0.0f, s * rcp_fast(sat));
@@ -2454,13 +2457,13 @@ SI F clip_channel(F c, F l, I32 clip_low, I32 clip_high, F mn_scale, F mx_scale)
     return c;
 }
 SI void clip_color(F* r, F* g, F* b, F a) {
-    F   mn        = min(*r, min(*g, *b)),
-        mx        = max(*r, max(*g, *b)),
-        l         = lum(*r, *g, *b),
-        mn_scale  = (    l) * rcp_fast(l - mn),
-        mx_scale  = (a - l) * rcp_fast(mx - l);
-    I32 clip_low  = cond_to_mask(mn < 0 && l != mn),
-        clip_high = cond_to_mask(mx > a && l != mx);
+    F   mn        = min(*r, min(*g, *b));
+    F   mx        = max(*r, max(*g, *b));
+    F   l         = lum(*r, *g, *b);
+    F   mn_scale  = (    l) * rcp_fast(l - mn);
+    F   mx_scale  = (a - l) * rcp_fast(mx - l);
+    I32 clip_low  = cond_to_mask(mn < 0 && l != mn);
+    I32 clip_high = cond_to_mask(mx > a && l != mx);
 
     *r = clip_channel(*r, l, clip_low, clip_high, mn_scale, mx_scale);
     *g = clip_channel(*g, l, clip_low, clip_high, mn_scale, mx_scale);
@@ -2468,9 +2471,9 @@ SI void clip_color(F* r, F* g, F* b, F a) {
 }
 
 HIGHP_STAGE(hue, NoCtx) {
-    F R = r*a,
-      G = g*a,
-      B = b*a;
+    F R = r*a;
+    F G = g*a;
+    F B = b*a;
 
     set_sat(&R, &G, &B, sat(dr,dg,db)*a);
     set_lum(&R, &G, &B, lum(dr,dg,db)*a);
@@ -2482,9 +2485,9 @@ HIGHP_STAGE(hue, NoCtx) {
     a = a + nmad(a, da, da);
 }
 HIGHP_STAGE(saturation, NoCtx) {
-    F R = dr*a,
-      G = dg*a,
-      B = db*a;
+    F R = dr*a;
+    F G = dg*a;
+    F B = db*a;
 
     set_sat(&R, &G, &B, sat( r, g, b)*da);
     set_lum(&R, &G, &B, lum(dr,dg,db)* a);  // (This is not redundant.)
@@ -2496,9 +2499,9 @@ HIGHP_STAGE(saturation, NoCtx) {
     a = a + nmad(a, da, da);
 }
 HIGHP_STAGE(color, NoCtx) {
-    F R = r*da,
-      G = g*da,
-      B = b*da;
+    F R = r*da;
+    F G = g*da;
+    F B = b*da;
 
     set_lum(&R, &G, &B, lum(dr,dg,db)*a);
     clip_color(&R,&G,&B, a*da);
@@ -2509,9 +2512,9 @@ HIGHP_STAGE(color, NoCtx) {
     a = a + nmad(a, da, da);
 }
 HIGHP_STAGE(luminosity, NoCtx) {
-    F R = dr*a,
-      G = dg*a,
-      B = db*a;
+    F R = dr*a;
+    F G = dg*a;
+    F B = db*a;
 
     set_lum(&R, &G, &B, lum(r,g,b)*da);
     clip_color(&R,&G,&B, a*da);
@@ -2637,10 +2640,10 @@ HIGHP_STAGE(force_opaque    , NoCtx) {  a = F1; }
 HIGHP_STAGE(force_opaque_dst, NoCtx) { da = F1; }
 
 HIGHP_STAGE(rgb_to_hsl, NoCtx) {
-    F mx = max(r, max(g,b)),
-      mn = min(r, min(g,b)),
-      d = mx - mn,
-      d_rcp = 1.0f / d;
+    F mx = max(r, max(g,b));
+    F mn = min(r, min(g,b));
+    F d = mx - mn;
+    F d_rcp = 1.0f / d;
 
     F h = (1/6.0f) *
           if_then_else(mx == mn, 0.0f,
@@ -2665,10 +2668,10 @@ SI F hsl_hue_to_rgb(F hue, F c, F l) {
 HIGHP_STAGE(hsl_to_rgb, NoCtx) {
     // See GrRGBToHSLFilterEffect.fp
 
-    F h = r,
-      s = g,
-      l = b,
-      c = (1.0f - abs_(2.0f * l - 1)) * s;
+    F h = r;
+    F s = g;
+    F l = b;
+    F c = (1.0f - abs_(2.0f * l - 1)) * s;
 
     r = hsl_hue_to_rgb(h + 0.0f/3.0f, c, l);
     g = hsl_hue_to_rgb(h + 2.0f/3.0f, c, l);
@@ -2701,13 +2704,13 @@ HIGHP_STAGE(css_lab_to_xyz, NoCtx) {
 }
 
 HIGHP_STAGE(css_oklab_to_linear_srgb, NoCtx) {
-    F l_ = r + 0.3963377774f * g + 0.2158037573f * b,
-      m_ = r - 0.1055613458f * g - 0.0638541728f * b,
-      s_ = r - 0.0894841775f * g - 1.2914855480f * b;
+    F l_ = r + 0.3963377774f * g + 0.2158037573f * b;
+    F m_ = r - 0.1055613458f * g - 0.0638541728f * b;
+    F s_ = r - 0.0894841775f * g - 1.2914855480f * b;
 
-    F l = l_*l_*l_,
-      m = m_*m_*m_,
-      s = s_*s_*s_;
+    F l = l_*l_*l_;
+    F m = m_*m_*m_;
+    F s = s_*s_*s_;
 
     r = +4.0767416621f * l - 3.3077115913f * m + 0.2309699292f * s;
     g = -1.2684380046f * l + 2.6097574011f * m - 0.3413193965f * s;
@@ -2717,13 +2720,13 @@ HIGHP_STAGE(css_oklab_to_linear_srgb, NoCtx) {
 HIGHP_STAGE(css_oklab_gamut_map_to_linear_srgb, NoCtx) {
     // TODO(https://crbug.com/1508329): Add support for gamut mapping.
     // Return a greyscale value, so that accidental use is obvious.
-    F l_ = r,
-      m_ = r,
-      s_ = r;
+    F l_ = r;
+    F m_ = r;
+    F s_ = r;
 
-    F l = l_*l_*l_,
-      m = m_*m_*m_,
-      s = s_*s_*s_;
+    F l = l_*l_*l_;
+    F m = m_*m_*m_;
+    F s = s_*s_*s_;
 
     r = +4.0767416621f * l - 3.3077115913f * m + 0.2309699292f * s;
     g = -1.2684380046f * l + 2.6097574011f * m - 0.3413193965f * s;
@@ -2734,9 +2737,9 @@ HIGHP_STAGE(css_oklab_gamut_map_to_linear_srgb, NoCtx) {
 // actually takes "HCL". This is also used to do the same polar transform for OkHCL to OkLAB.
 // See similar comments & logic in SkGradientBaseShader.cpp.
 HIGHP_STAGE(css_hcl_to_lab, NoCtx) {
-    F H = r,
-      C = g,
-      L = b;
+    F H = r;
+    F C = g;
+    F L = b;
 
     F hueRadians = H * (SK_FloatPI / 180);
 
@@ -2821,7 +2824,9 @@ HIGHP_STAGE(scale_u8, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(scale_565, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint16_t* ptr = ptr_at_xy<const uint16_t>(ctx, dx,dy);
 
-    F cr,cg,cb;
+    F cr;
+    F cg;
+    F cb;
     from_565(load<U16>(ptr), &cr, &cg, &cb);
 
     F ca = alpha_coverage_from_rgb_coverage(a,da, cr,cg,cb);
@@ -2870,7 +2875,9 @@ HIGHP_STAGE(lerp_u8, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(lerp_565, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint16_t* ptr = ptr_at_xy<const uint16_t>(ctx, dx,dy);
 
-    F cr,cg,cb;
+    F cr;
+    F cg;
+    F cb;
     from_565(load<U16>(ptr), &cr, &cg, &cb);
 
     F ca = alpha_coverage_from_rgb_coverage(a,da, cr,cg,cb);
@@ -2885,8 +2892,8 @@ HIGHP_STAGE(emboss, const SkRasterPipelineContexts::EmbossCtx* ctx) {
     const uint8_t* mptr = ptr_at_xy<const uint8_t>(&(*ctx).mul, dx,dy);
     const uint8_t* aptr = ptr_at_xy<const uint8_t>(&(*ctx).add, dx,dy);
 
-    F mul = from_byte(load<U8>(mptr)),
-      add = from_byte(load<U8>(aptr));
+    F mul = from_byte(load<U8>(mptr));
+    F add = from_byte(load<U8>(aptr));
 
     r = mad(r, mul, add);
     g = mad(g, mul, add);
@@ -2965,9 +2972,12 @@ SI F HLGish_channel(F v, const skcms_TransferFunction* ctx) {
     U32 sign;
     v = strip_sign(v, &sign);
 
-    const float R = (*ctx).a, G = (*ctx).b,
-                a = (*ctx).c, b = (*ctx).d, c = (*ctx).e,
-                K = (*ctx).f + 1.0f;
+    const float R = (*ctx).a;
+    const float G = (*ctx).b;
+    const float a = (*ctx).c;
+    const float b = (*ctx).d;
+    const float c = (*ctx).e;
+    const float K = (*ctx).f + 1.0f;
 
     F r = if_then_else(v*R <= 1, approx_powf(v*R, G)
                                , approx_exp((v-c)*a) + b);
@@ -2985,9 +2995,12 @@ SI F HLGinvish_channel(F v, const skcms_TransferFunction* ctx) {
     U32 sign;
     v = strip_sign(v, &sign);
 
-    const float R = (*ctx).a, G = (*ctx).b,
-                a = (*ctx).c, b = (*ctx).d, c = (*ctx).e,
-                K = (*ctx).f + 1.0f;
+    const float R = (*ctx).a;
+    const float G = (*ctx).b;
+    const float a = (*ctx).c;
+    const float b = (*ctx).d;
+    const float c = (*ctx).e;
+    const float K = (*ctx).f + 1.0f;
 
     v /= K;
     F r = if_then_else(v <= 1, R * approx_powf(v, G)
@@ -3233,10 +3246,10 @@ HIGHP_STAGE(gather_16161616, const SkRasterPipelineContexts::GatherCtx* ctx) {
 HIGHP_STAGE(store_16161616, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     uint16_t* ptr = ptr_at_xy<uint16_t>(ctx, 4*dx,4*dy);
 
-    U16 R = pack(to_unorm(r, 65535)),
-        G = pack(to_unorm(g, 65535)),
-        B = pack(to_unorm(b, 65535)),
-        A = pack(to_unorm(a, 65535));
+    U16 R = pack(to_unorm(r, 65535));
+    U16 G = pack(to_unorm(g, 65535));
+    U16 B = pack(to_unorm(b, 65535));
+    U16 A = pack(to_unorm(a, 65535));
 
     store4(ptr, R,G,B,A);
 }
@@ -3257,10 +3270,10 @@ HIGHP_STAGE(gather_10x6, const SkRasterPipelineContexts::GatherCtx* ctx) {
 HIGHP_STAGE(store_10x6, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     uint16_t* ptr = ptr_at_xy<uint16_t>(ctx, 4*dx,4*dy);
 
-    U16 R = pack(to_unorm(r, 1023)) << 6,
-        G = pack(to_unorm(g, 1023)) << 6,
-        B = pack(to_unorm(b, 1023)) << 6,
-        A = pack(to_unorm(a, 1023)) << 6;
+    U16 R = pack(to_unorm(r, 1023)) << 6;
+    U16 G = pack(to_unorm(g, 1023)) << 6;
+    U16 B = pack(to_unorm(b, 1023)) << 6;
+    U16 A = pack(to_unorm(a, 1023)) << 6;
 
     store4(ptr, R,G,B,A);
 }
@@ -3308,10 +3321,10 @@ HIGHP_STAGE(store_10101010_xr, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     uint16_t* ptr = ptr_at_xy<uint16_t>(ctx, 4*dx,4*dy);
 
     // This is the inverse of from_10101010_xr, e.g. (v * 510 + 384)
-    U16 R = pack(to_unorm(r, /*scale=*/510, /*bias=*/384, /*maxI=*/1023)) << 6,
-        G = pack(to_unorm(g, /*scale=*/510, /*bias=*/384, /*maxI=*/1023)) << 6,
-        B = pack(to_unorm(b, /*scale=*/510, /*bias=*/384, /*maxI=*/1023)) << 6,
-        A = pack(to_unorm(a, /*scale=*/510, /*bias=*/384, /*maxI=*/1023)) << 6;
+    U16 R = pack(to_unorm(r, /*scale=*/510, /*bias=*/384, /*maxI=*/1023)) << 6;
+    U16 G = pack(to_unorm(g, /*scale=*/510, /*bias=*/384, /*maxI=*/1023)) << 6;
+    U16 B = pack(to_unorm(b, /*scale=*/510, /*bias=*/384, /*maxI=*/1023)) << 6;
+    U16 A = pack(to_unorm(a, /*scale=*/510, /*bias=*/384, /*maxI=*/1023)) << 6;
 
     store4(ptr, R,G,B,A);
 }
@@ -3338,7 +3351,10 @@ HIGHP_STAGE(store_1010102_xr, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(load_f16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint64_t* ptr = ptr_at_xy<const uint64_t>(ctx, dx,dy);
 
-    U16 R,G,B,A;
+    U16 R;
+    U16 G;
+    U16 B;
+    U16 A;
     load4(reinterpret_cast<const uint16_t*>(ptr), &R,&G,&B,&A);
     r = from_half(R);
     g = from_half(G);
@@ -3348,7 +3364,10 @@ HIGHP_STAGE(load_f16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(load_f16_dst, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint64_t* ptr = ptr_at_xy<const uint64_t>(ctx, dx,dy);
 
-    U16 R,G,B,A;
+    U16 R;
+    U16 G;
+    U16 B;
+    U16 A;
     load4(reinterpret_cast<const uint16_t*>(ptr), &R,&G,&B,&A);
     dr = from_half(R);
     dg = from_half(G);
@@ -3360,7 +3379,10 @@ HIGHP_STAGE(gather_f16, const SkRasterPipelineContexts::GatherCtx* ctx) {
     U32 ix = ix_and_ptr(&ptr, ctx, r,g);
     U64 px = gather_unaligned(ptr, ix);
 
-    U16 R,G,B,A;
+    U16 R;
+    U16 G;
+    U16 B;
+    U16 A;
     load4(reinterpret_cast<const uint16_t*>(&px), &R,&G,&B,&A);
     r = from_half(R);
     g = from_half(G);
@@ -3433,7 +3455,8 @@ HIGHP_STAGE(store_rf16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(load_rgf16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint32_t* ptr = ptr_at_xy<const uint32_t>(ctx, dx, dy);
 
-    U16 R,G;
+    U16 R;
+    U16 G;
     load2(reinterpret_cast<const uint16_t*>(ptr), &R, &G);
     r = from_half(R);
     g = from_half(G);
@@ -3443,7 +3466,8 @@ HIGHP_STAGE(load_rgf16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(load_rgf16_dst, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint32_t* ptr = ptr_at_xy<const uint32_t>(ctx, dx, dy);
 
-    U16 R,G;
+    U16 R;
+    U16 G;
     load2(reinterpret_cast<const uint16_t*>(ptr), &R, &G);
     dr = from_half(R);
     dg = from_half(G);
@@ -3455,7 +3479,8 @@ HIGHP_STAGE(gather_rgf16, const SkRasterPipelineContexts::GatherCtx* ctx) {
     U32 ix = ix_and_ptr(&ptr, ctx, r, g);
     U32 px = gather_unaligned(ptr, ix);
 
-    U16 R,G;
+    U16 R;
+    U16 G;
     load2(reinterpret_cast<const uint16_t*>(&px), &R, &G);
     r = from_half(R);
     g = from_half(G);
@@ -3603,40 +3628,40 @@ HIGHP_STAGE(matrix_scale_translate, const float* m) {
     g = mad(g,m[1], m[3]);
 }
 HIGHP_STAGE(matrix_2x3, const float* m) {
-    F R = mad(r,m[0], mad(g,m[1], m[2])),
-         G = mad(r,m[3], mad(g,m[4], m[5]));
+    F R = mad(r,m[0], mad(g,m[1], m[2]));
+    F G = mad(r,m[3], mad(g,m[4], m[5]));
     r = R;
     g = G;
 }
 HIGHP_STAGE(matrix_3x3, const float* m) {
-    F R = mad(r,m[0], mad(g,m[3], b*m[6])),
-         G = mad(r,m[1], mad(g,m[4], b*m[7])),
-         B = mad(r,m[2], mad(g,m[5], b*m[8]));
+    F R = mad(r,m[0], mad(g,m[3], b*m[6]));
+    F G = mad(r,m[1], mad(g,m[4], b*m[7]));
+    F B = mad(r,m[2], mad(g,m[5], b*m[8]));
     r = R;
     g = G;
     b = B;
 }
 HIGHP_STAGE(matrix_3x4, const float* m) {
-    F R = mad(r,m[0], mad(g,m[3], mad(b,m[6], m[ 9]))),
-         G = mad(r,m[1], mad(g,m[4], mad(b,m[7], m[10]))),
-         B = mad(r,m[2], mad(g,m[5], mad(b,m[8], m[11])));
+    F R = mad(r,m[0], mad(g,m[3], mad(b,m[6], m[ 9])));
+    F G = mad(r,m[1], mad(g,m[4], mad(b,m[7], m[10])));
+    F B = mad(r,m[2], mad(g,m[5], mad(b,m[8], m[11])));
     r = R;
     g = G;
     b = B;
 }
 HIGHP_STAGE(matrix_4x5, const float* m) {
-    F R = mad(r,m[ 0], mad(g,m[ 1], mad(b,m[ 2], mad(a,m[ 3], m[ 4])))),
-         G = mad(r,m[ 5], mad(g,m[ 6], mad(b,m[ 7], mad(a,m[ 8], m[ 9])))),
-         B = mad(r,m[10], mad(g,m[11], mad(b,m[12], mad(a,m[13], m[14])))),
-         A = mad(r,m[15], mad(g,m[16], mad(b,m[17], mad(a,m[18], m[19]))));
+    F R = mad(r,m[ 0], mad(g,m[ 1], mad(b,m[ 2], mad(a,m[ 3], m[ 4]))));
+    F G = mad(r,m[ 5], mad(g,m[ 6], mad(b,m[ 7], mad(a,m[ 8], m[ 9]))));
+    F B = mad(r,m[10], mad(g,m[11], mad(b,m[12], mad(a,m[13], m[14]))));
+    F A = mad(r,m[15], mad(g,m[16], mad(b,m[17], mad(a,m[18], m[19]))));
     r = R;
     g = G;
     b = B;
     a = A;
 }
 HIGHP_STAGE(matrix_4x3, const float* m) {
-    F X = r,
-         Y = g;
+    F X = r;
+    F Y = g;
 
     r = mad(X, m[0], mad(Y, m[4], m[ 8]));
     g = mad(X, m[1], mad(Y, m[5], m[ 9]));
@@ -3645,16 +3670,23 @@ HIGHP_STAGE(matrix_4x3, const float* m) {
 }
 HIGHP_STAGE(matrix_perspective, const float* m) {
     // N.B. Unlike the other matrix_ stages, this matrix is row-major.
-    F R = mad(r,m[0], mad(g,m[1], m[2])),
-         G = mad(r,m[3], mad(g,m[4], m[5])),
-         Z = mad(r,m[6], mad(g,m[7], m[8]));
+    F R = mad(r,m[0], mad(g,m[1], m[2]));
+    F G = mad(r,m[3], mad(g,m[4], m[5]));
+    F Z = mad(r,m[6], mad(g,m[7], m[8]));
     r = R * rcp_precise(Z);
     g = G * rcp_precise(Z);
 }
 
 SI void gradient_lookup(const SkRasterPipelineContexts::GradientCtx* c, U32 idx, F t,
                         F* r, F* g, F* b, F* a) {
-    F fr, br, fg, bg, fb, bb, fa, ba;
+    F fr;
+    F br;
+    F fg;
+    F bg;
+    F fb;
+    F bb;
+    F fa;
+    F ba;
 #if defined(SKRP_CPU_AVX2)
     if ((*c).stopCount <=8) {
         fr = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[0]), bit_cast_lanes<__m256i>(idx));
@@ -3751,10 +3783,10 @@ HIGHP_STAGE(evenly_spaced_2_stop_gradient,
 }
 
 HIGHP_STAGE(xy_to_unit_angle, NoCtx) {
-    F X = r,
-      Y = g;
-    F xabs = abs_(X),
-      yabs = abs_(Y);
+    F X = r;
+    F Y = g;
+    F xabs = abs_(X);
+    F yabs = abs_(Y);
 
     F slope = min(xabs, yabs)/max(xabs, yabs);
     F s = slope * slope;
@@ -3777,8 +3809,8 @@ HIGHP_STAGE(xy_to_unit_angle, NoCtx) {
 }
 
 HIGHP_STAGE(xy_to_radius, NoCtx) {
-    F X2 = r * r,
-      Y2 = g * g;
+    F X2 = r * r;
+    F Y2 = g * g;
     r = sqrt_(X2 + Y2);
 }
 
@@ -3787,27 +3819,37 @@ HIGHP_STAGE(xy_to_radius, NoCtx) {
 HIGHP_STAGE(negate_x, NoCtx) { r = -r; }
 
 HIGHP_STAGE(xy_to_2pt_conical_strip, const SkRasterPipelineContexts::Conical2PtCtx* ctx) {
-    F x = r, y = g, &t = r;
+    F x = r;
+    F y = g;
+    F& t = r;
     t = x + sqrt_((*ctx).fP0 - y*y); // (*ctx).fP0 = r0 * r0
 }
 
 HIGHP_STAGE(xy_to_2pt_conical_focal_on_circle, NoCtx) {
-    F x = r, y = g, &t = r;
+    F x = r;
+    F y = g;
+    F& t = r;
     t = x + y*y / x; // (x^2 + y^2) / x
 }
 
 HIGHP_STAGE(xy_to_2pt_conical_well_behaved, const SkRasterPipelineContexts::Conical2PtCtx* ctx) {
-    F x = r, y = g, &t = r;
+    F x = r;
+    F y = g;
+    F& t = r;
     t = sqrt_(x*x + y*y) - x * (*ctx).fP0; // (*ctx).fP0 = 1/r1
 }
 
 HIGHP_STAGE(xy_to_2pt_conical_greater, const SkRasterPipelineContexts::Conical2PtCtx* ctx) {
-    F x = r, y = g, &t = r;
+    F x = r;
+    F y = g;
+    F& t = r;
     t = sqrt_(x*x - y*y) - x * (*ctx).fP0; // (*ctx).fP0 = 1/r1
 }
 
 HIGHP_STAGE(xy_to_2pt_conical_smaller, const SkRasterPipelineContexts::Conical2PtCtx* ctx) {
-    F x = r, y = g, &t = r;
+    F x = r;
+    F y = g;
+    F& t = r;
     t = -sqrt_(x*x - y*y) - x * (*ctx).fP0; // (*ctx).fP0 = 1/r1
 }
 
@@ -3848,8 +3890,8 @@ SI void save_xy(F* r, F* g, SkRasterPipelineContexts::SamplerCtx* c) {
     // Whether bilinear or bicubic, all sample points are at the same fractional offset (fx,fy).
     // They're either the 4 corners of a logical 1x1 pixel or the 16 corners of a 3x3 grid
     // surrounding (x,y) at (0.5,0.5) off-center.
-    F fx = fract(*r + 0.5f),
-      fy = fract(*g + 0.5f);
+    F fx = fract(*r + 0.5f);
+    F fy = fract(*g + 0.5f);
 
     // Samplers will need to load x and fx, or y and fy.
     sk_unaligned_store((*c).x,  *r);
@@ -4135,13 +4177,13 @@ HIGHP_STAGE(gauss_a_to_rgba, NoCtx) {
 SI void bilerp_clamp_large(const SkRasterPipelineContexts::GatherCtx* ctx,
                            F* r, F* g, F* b, F* a) {
     // (cx,cy) are the center of our sample.
-    F cx = *r,
-      cy = *g;
+    F cx = *r;
+    F cy = *g;
 
     // All sample points are at the same fractional offset (fx,fy).
     // They're the 4 corners of a logical 1x1 pixel surrounding (x,y) at (0.5,0.5) offsets.
-    F fx = fract(cx + 0.5f),
-      fy = fract(cy + 0.5f);
+    F fx = fract(cx + 0.5f);
+    F fy = fract(cy + 0.5f);
 
     // We'll accumulate the color of all four samples into {r,g,b,a} directly.
     *r = *g = *b = *a = F0;
@@ -4149,23 +4191,26 @@ SI void bilerp_clamp_large(const SkRasterPipelineContexts::GatherCtx* ctx,
     for (float py = -0.5f; py <= +0.5f; py += 1.0f)
     for (float px = -0.5f; px <= +0.5f; px += 1.0f) {
         // (x,y) are the coordinates of this sample point.
-        F x = cx + px,
-          y = cy + py;
+        F x = cx + px;
+        F y = cy + py;
 
         // ix_and_ptr() will clamp to the image's bounds for us.
         const uint32_t* ptr;
         U32 ix = ix_and_ptr(&ptr, ctx, x,y);
 
-        F sr,sg,sb,sa;
+        F sr;
+        F sg;
+        F sb;
+        F sa;
         from_8888(gather_unaligned(ptr, ix), &sr,&sg,&sb,&sa);
 
         // In bilinear interpolation, the 4 pixels at +/- 0.5 offsets from the sample pixel center
         // are combined in direct proportion to their area overlapping that logical query pixel.
         // At positive offsets, the x-axis contribution to that rectangle is fx,
         // or (1-fx) at negative x.  Same deal for y.
-        F sx = (px > 0) ? fx : 1.0f - fx,
-          sy = (py > 0) ? fy : 1.0f - fy,
-          area = sx * sy;
+        F sx = (px > 0) ? fx : 1.0f - fx;
+        F sy = (py > 0) ? fy : 1.0f - fy;
+        F area = sx * sy;
 
         *r += sr * area;
         *g += sg * area;
@@ -4188,13 +4233,13 @@ HIGHP_STAGE(bilerp_clamp_8888_force_highp, const SkRasterPipelineContexts::Gathe
 // A specialized fused image shader for clamp-x, clamp-y, non-sRGB sampling.
 HIGHP_STAGE(bicubic_clamp_8888, const SkRasterPipelineContexts::GatherCtx* ctx) {
     // (cx,cy) are the center of our sample.
-    F cx = r,
-      cy = g;
+    F cx = r;
+    F cy = g;
 
     // All sample points are at the same fractional offset (fx,fy).
     // They're the 4 corners of a logical 1x1 pixel surrounding (x,y) at (0.5,0.5) offsets.
-    F fx = fract(cx + 0.5f),
-      fy = fract(cy + 0.5f);
+    F fx = fract(cx + 0.5f);
+    F fy = fract(cy + 0.5f);
 
     // We'll accumulate the color of all four samples into {r,g,b,a} directly.
     r = g = b = a = F0;
@@ -4219,7 +4264,10 @@ HIGHP_STAGE(bicubic_clamp_8888, const SkRasterPipelineContexts::GatherCtx* ctx) 
             const uint32_t* ptr;
             U32 ix = ix_and_ptr(&ptr, ctx, sample_x, sample_y);
 
-            F sr,sg,sb,sa;
+            F sr;
+            F sg;
+            F sb;
+            F sa;
             from_8888(gather_unaligned(ptr, ix), &sr,&sg,&sb,&sa);
 
             r = mad(scale, sr, r);
@@ -4236,7 +4284,10 @@ HIGHP_STAGE(bicubic_clamp_8888, const SkRasterPipelineContexts::GatherCtx* ctx) 
 // ~~~~~~ skgpu::Swizzle stage ~~~~~~ //
 
 HIGHP_STAGE(swizzle, void* ctx) {
-    F ir = r, ig = g, ib = b, ia = a;
+    F ir = r;
+    F ig = g;
+    F ib = b;
+    F ia = a;
     F* o[] = {&r, &g, &b, &a};
     char swiz[4];
     memcpy(swiz, &ctx, sizeof(swiz));
@@ -4614,25 +4665,37 @@ SI U16 max_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm256_max_epu16(bit_
 SI U16 min_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm256_min_epu16(bit_cast_lanes<__m256i>(x), bit_cast_lanes<__m256i>(y))); }
 #elif defined(SKRP_CPU_AVX2)
 SI F max_intr(F x, F y) {
-    __m256 x_lo, x_hi, y_lo, y_hi;
+    __m256 x_lo;
+    __m256 x_hi;
+    __m256 y_lo;
+    __m256 y_hi;
     split(x, &x_lo, &x_hi);
     split(y, &y_lo, &y_hi);
     return join<F>(_mm256_max_ps(x_lo, y_lo), _mm256_max_ps(x_hi, y_hi));
 }
 SI F min_intr(F x, F y) {
-    __m256 x_lo, x_hi, y_lo, y_hi;
+    __m256 x_lo;
+    __m256 x_hi;
+    __m256 y_lo;
+    __m256 y_hi;
     split(x, &x_lo, &x_hi);
     split(y, &y_lo, &y_hi);
     return join<F>(_mm256_min_ps(x_lo, y_lo), _mm256_min_ps(x_hi, y_hi));
 }
 SI I32 max_intr(I32 x, I32 y) {
-    __m256i x_lo, x_hi, y_lo, y_hi;
+    __m256i x_lo;
+    __m256i x_hi;
+    __m256i y_lo;
+    __m256i y_hi;
     split(x, &x_lo, &x_hi);
     split(y, &y_lo, &y_hi);
     return join<I32>(_mm256_max_epi32(x_lo, y_lo), _mm256_max_epi32(x_hi, y_hi));
 }
 SI I32 min_intr(I32 x, I32 y) {
-    __m256i x_lo, x_hi, y_lo, y_hi;
+    __m256i x_lo;
+    __m256i x_hi;
+    __m256i y_lo;
+    __m256i y_hi;
     split(x, &x_lo, &x_hi);
     split(y, &y_lo, &y_hi);
     return join<I32>(_mm256_min_epi32(x_lo, y_lo), _mm256_min_epi32(x_hi, y_hi));
@@ -4641,26 +4704,38 @@ SI U16 max_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm256_max_epu16(bit_
 SI U16 min_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm256_min_epu16(bit_cast_lanes<__m256i>(x), bit_cast_lanes<__m256i>(y))); }
 #elif defined(SKRP_CPU_SSE2) || defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
 SI F max_intr(F x, F y) {
-    __m128 x_lo, x_hi, y_lo, y_hi;
+    __m128 x_lo;
+    __m128 x_hi;
+    __m128 y_lo;
+    __m128 y_hi;
     split(x, &x_lo, &x_hi);
     split(y, &y_lo, &y_hi);
     return join<F>(_mm_max_ps(x_lo, y_lo), _mm_max_ps(x_hi, y_hi));
 }
 SI F min_intr(F x, F y) {
-    __m128 x_lo, x_hi, y_lo, y_hi;
+    __m128 x_lo;
+    __m128 x_hi;
+    __m128 y_lo;
+    __m128 y_hi;
     split(x, &x_lo, &x_hi);
     split(y, &y_lo, &y_hi);
     return join<F>(_mm_min_ps(x_lo, y_lo), _mm_min_ps(x_hi, y_hi));
 }
 #if defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
 SI I32 max_intr(I32 x, I32 y) {
-    __m128i x_lo, x_hi, y_lo, y_hi;
+    __m128i x_lo;
+    __m128i x_hi;
+    __m128i y_lo;
+    __m128i y_hi;
     split(x, &x_lo, &x_hi);
     split(y, &y_lo, &y_hi);
     return join<I32>(_mm_max_epi32(x_lo, y_lo), _mm_max_epi32(x_hi, y_hi));
 }
 SI I32 min_intr(I32 x, I32 y) {
-    __m128i x_lo, x_hi, y_lo, y_hi;
+    __m128i x_lo;
+    __m128i x_hi;
+    __m128i y_lo;
+    __m128i y_hi;
     split(x, &x_lo, &x_hi);
     split(y, &y_lo, &y_hi);
     return join<I32>(_mm_min_epi32(x_lo, y_lo), _mm_min_epi32(x_hi, y_hi));
@@ -4736,15 +4811,18 @@ SI F rcp_precise(F x) {
     F e = _mm512_rcp14_ps(x);
     return _mm512_fnmadd_ps(x, e, _mm512_set1_ps(2.0f)) * e;
 #elif defined(SKRP_CPU_AVX2)
-    __m256 lo,hi;
+    __m256 lo;
+    __m256 hi;
     split(x, &lo,&hi);
     return join<F>(SK_OPTS_NS::rcp_precise(lo), SK_OPTS_NS::rcp_precise(hi));
 #elif defined(SKRP_CPU_SSE2) || defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
-    __m128 lo,hi;
+    __m128 lo;
+    __m128 hi;
     split(x, &lo,&hi);
     return join<F>(SK_OPTS_NS::rcp_precise(lo), SK_OPTS_NS::rcp_precise(hi));
 #elif defined(SKRP_CPU_NEON)
-    float32x4_t lo,hi;
+    float32x4_t lo;
+    float32x4_t hi;
     split(x, &lo,&hi);
     return join<F>(SK_OPTS_NS::rcp_precise(lo), SK_OPTS_NS::rcp_precise(hi));
 #elif defined(SKRP_CPU_LASX)
@@ -4763,15 +4841,18 @@ SI F sqrt_(F x) {
 #if defined(SKRP_CPU_ML4)
     return _mm512_sqrt_ps(x);
 #elif defined(SKRP_CPU_AVX2)
-    __m256 lo,hi;
+    __m256 lo;
+    __m256 hi;
     split(x, &lo,&hi);
     return join<F>(_mm256_sqrt_ps(lo), _mm256_sqrt_ps(hi));
 #elif defined(SKRP_CPU_SSE2) || defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
-    __m128 lo,hi;
+    __m128 lo;
+    __m128 hi;
     split(x, &lo,&hi);
     return join<F>(_mm_sqrt_ps(lo), _mm_sqrt_ps(hi));
 #elif defined(SK_CPU_ARM64)
-    float32x4_t lo,hi;
+    float32x4_t lo;
+    float32x4_t hi;
     split(x, &lo,&hi);
     return join<F>(vsqrtq_f32(lo), vsqrtq_f32(hi));
 #elif defined(SKRP_CPU_NEON)
@@ -4802,17 +4883,20 @@ SI F sqrt_(F x) {
 
 SI F floor_(F x) {
 #if defined(SK_CPU_ARM64)
-    float32x4_t lo,hi;
+    float32x4_t lo;
+    float32x4_t hi;
     split(x, &lo,&hi);
     return join<F>(vrndmq_f32(lo), vrndmq_f32(hi));
 #elif defined(SKRP_CPU_ML4)
     return _mm512_floor_ps(x);
 #elif defined(SKRP_CPU_AVX2)
-    __m256 lo,hi;
+    __m256 lo;
+    __m256 hi;
     split(x, &lo,&hi);
     return join<F>(_mm256_floor_ps(lo), _mm256_floor_ps(hi));
 #elif defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
-    __m128 lo,hi;
+    __m128 lo;
+    __m128 hi;
     split(x, &lo,&hi);
     return join<F>(_mm_floor_ps(lo), _mm_floor_ps(hi));
 #elif defined(SKRP_CPU_LASX)
@@ -4918,16 +5002,16 @@ LOWP_STAGE_GG(matrix_scale_translate, const float* m) {
     y = mad(y,m[1], m[3]);
 }
 LOWP_STAGE_GG(matrix_2x3, const float* m) {
-    F X = mad(x,m[0], mad(y,m[1], m[2])),
-         Y = mad(x,m[3], mad(y,m[4], m[5]));
+    F X = mad(x,m[0], mad(y,m[1], m[2]));
+    F Y = mad(x,m[3], mad(y,m[4], m[5]));
     x = X;
     y = Y;
 }
 LOWP_STAGE_GG(matrix_perspective, const float* m) {
     // N.B. Unlike the other matrix_ stages, this matrix is row-major.
-    F X = mad(x,m[0], mad(y,m[1], m[2])),
-         Y = mad(x,m[3], mad(y,m[4], m[5])),
-         Z = mad(x,m[6], mad(y,m[7], m[8]));
+    F X = mad(x,m[0], mad(y,m[1], m[2]));
+    F Y = mad(x,m[3], mad(y,m[4], m[5]));
+    F Z = mad(x,m[6], mad(y,m[7], m[8]));
     x = X * rcp_precise(Z);
     y = Y * rcp_precise(Z);
 }
@@ -5100,8 +5184,8 @@ SI T* ptr_at_xy(const SkRasterPipelineContexts::MemoryCtx* ctx, const size_t dx,
 template <typename T>
 SI U32 ix_and_ptr(T** ptr, const SkRasterPipelineContexts::GatherCtx* ctx, F x, F y) {
     // Exclusive -> inclusive.
-    const F w = F_(sk_bit_cast<float>( sk_bit_cast<uint32_t>((*ctx).width ) - 1)),
-            h = F_(sk_bit_cast<float>( sk_bit_cast<uint32_t>((*ctx).height) - 1));
+    const F w = F_(sk_bit_cast<float>( sk_bit_cast<uint32_t>((*ctx).width ) - 1));
+    const F h = F_(sk_bit_cast<float>( sk_bit_cast<uint32_t>((*ctx).height) - 1));
 
     const F z = F_(std::numeric_limits<float>::min());
 
@@ -5120,11 +5204,11 @@ SI U32 ix_and_ptr(T** ptr, const SkRasterPipelineContexts::GatherCtx* ctx, I32 x
     // This flag doesn't make sense when the coords are integers.
     SkASSERT((*ctx).roundDownAtInteger == 0);
     // Exclusive -> inclusive.
-    const I32 w = I32_( (*ctx).width - 1),
-              h = I32_((*ctx).height - 1);
+    const I32 w = I32_( (*ctx).width - 1);
+    const I32 h = I32_((*ctx).height - 1);
 
-    U32 ax = cast<U32>(min_intr(max_intr(0, x), w)),
-        ay = cast<U32>(min_intr(max_intr(0, y), h));
+    U32 ax = cast<U32>(min_intr(max_intr(0, x), w));
+    U32 ay = cast<U32>(min_intr(max_intr(0, y), h));
 
     *ptr = static_cast<const T*>((*ctx).pixels);
     return ay * (*ctx).stride + ax;
@@ -5175,7 +5259,8 @@ SI void store(T* ptr, V v) {
 
     template<>
     F gather(const float* ptr, U32 ix) {
-        __m256i lo, hi;
+        __m256i lo;
+        __m256i hi;
         split(ix, &lo, &hi);
 
         return join<F>(_mm256_i32gather_ps(ptr, lo, 4),
@@ -5184,7 +5269,8 @@ SI void store(T* ptr, V v) {
 
     template<>
     U32 gather(const uint32_t* ptr, U32 ix) {
-        __m256i lo, hi;
+        __m256i lo;
+        __m256i hi;
         split(ix, &lo, &hi);
 
         return join<U32>(_mm256_i32gather_epi32(reinterpret_cast<const int*>(ptr), lo, 4),
@@ -5248,7 +5334,8 @@ SI void store(T* ptr, V v) {
 // pairs of 128-bit lanes, so from_8888() first swaps its middle 128-bit lanes for them.
 #if defined(SKRP_CPU_AVX2)
     SI U16 from_8888_cast_U16(U32 v) {
-        __m256i _02,_13;
+        __m256i _02;
+        __m256i _13;
         split(v, &_02,&_13);
         return bit_cast_lanes<U16>(_mm256_packus_epi32(_02,_13));
     }
@@ -5292,7 +5379,8 @@ SI void from_8888(U32 rgba, U16* r, U16* g, U16* b, U16* a) {
 #else
     #if defined(SKRP_CPU_AVX2)
         // Swap the middle 128-bit lanes to make _mm256_packus_epi32() in cast_U16() work out nicely.
-        __m256i _01,_23;
+        __m256i _01;
+        __m256i _23;
         split(rgba, &_01, &_23);
         __m256i _02 = _mm256_permute2x128_si256(_01,_23, 0x20),
                 _13 = _mm256_permute2x128_si256(_01,_23, 0x31);
@@ -5387,9 +5475,9 @@ LOWP_STAGE_GP(gather_8888, const SkRasterPipelineContexts::GatherCtx* ctx) {
 
 SI void from_565(U16 rgb, U16* r, U16* g, U16* b) {
     // Format for 565 buffers: 15|rrrrr gggggg bbbbb|0
-    U16 R = (rgb >> 11) & 31,
-        G = (rgb >>  5) & 63,
-        B = (rgb >>  0) & 31;
+    U16 R = (rgb >> 11) & 31;
+    U16 G = (rgb >>  5) & 63;
+    U16 B = (rgb >>  0) & 31;
 
     // These bit replications are the same as multiplying by 255/31 or 255/63 to scale to 8-bit.
     *r = (R << 3) | (R >> 2);
@@ -5407,9 +5495,9 @@ SI void store_565_(uint16_t* ptr, U16 r, U16 g, U16 b) {
     // Round from [0,255] to [0,31] or [0,63], as if x * (31/255.0f) + 0.5f.
     // (Don't feel like you need to find some fundamental truth in these...
     // they were brute-force searched.)
-    U16 R = (r *  9 + 36) / 74,   //  9/74 ≈ 31/255, plus 36/74, about half.
-        G = (g * 21 + 42) / 85,   // 21/85 = 63/255 exactly.
-        B = (b *  9 + 36) / 74;
+    U16 R = (r *  9 + 36) / 74;  //  9/74 ≈ 31/255, plus 36/74, about half.
+    U16 G = (g * 21 + 42) / 85;  // 21/85 = 63/255 exactly.
+    U16 B = (b *  9 + 36) / 74;
     // Pack them back into 15|rrrrr gggggg bbbbb|0.
     store(ptr, R << 11
              | G <<  5
@@ -5436,10 +5524,10 @@ LOWP_STAGE_GP(gather_565, const SkRasterPipelineContexts::GatherCtx* ctx) {
 
 SI void from_4444(U16 rgba, U16* r, U16* g, U16* b, U16* a) {
     // Format for 4444 buffers: 15|rrrr gggg bbbb aaaa|0.
-    U16 R = (rgba >> 12) & 15,
-        G = (rgba >>  8) & 15,
-        B = (rgba >>  4) & 15,
-        A = (rgba >>  0) & 15;
+    U16 R = (rgba >> 12) & 15;
+    U16 G = (rgba >>  8) & 15;
+    U16 B = (rgba >>  4) & 15;
+    U16 A = (rgba >>  0) & 15;
 
     // Scale [0,15] to [0,255].
     *r = (R << 4) | R;
@@ -5457,10 +5545,10 @@ SI void store_4444_(uint16_t* ptr, U16 r, U16 g, U16 b, U16 a) {
     a = min(a, 255);
 
     // Round from [0,255] to [0,15], producing the same value as (x*(15/255.0f) + 0.5f).
-    U16 R = (r + 8) / 17,
-        G = (g + 8) / 17,
-        B = (b + 8) / 17,
-        A = (a + 8) / 17;
+    U16 R = (r + 8) / 17;
+    U16 G = (g + 8) / 17;
+    U16 B = (b + 8) / 17;
+    U16 A = (a + 8) / 17;
     // Pack them back into 15|rrrr gggg bbbb aaaa|0.
     store(ptr, R << 12
              | G <<  8
@@ -5673,7 +5761,9 @@ SI U16 alpha_coverage_from_rgb_coverage(U16 a, U16 da, U16 cr, U16 cg, U16 cb) {
                               , max_intr(cr, max_intr(cg,cb)));
 }
 LOWP_STAGE_PP(scale_565, const SkRasterPipelineContexts::MemoryCtx* ctx) {
-    U16 cr,cg,cb;
+    U16 cr;
+    U16 cg;
+    U16 cb;
     load_565_(ptr_at_xy<const uint16_t>(ctx, dx,dy), &cr,&cg,&cb);
     U16 ca = alpha_coverage_from_rgb_coverage(a,da, cr,cg,cb);
 
@@ -5683,7 +5773,9 @@ LOWP_STAGE_PP(scale_565, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     a = div255( a * ca );
 }
 LOWP_STAGE_PP(lerp_565, const SkRasterPipelineContexts::MemoryCtx* ctx) {
-    U16 cr,cg,cb;
+    U16 cr;
+    U16 cg;
+    U16 cb;
     load_565_(ptr_at_xy<const uint16_t>(ctx, dx,dy), &cr,&cg,&cb);
     U16 ca = alpha_coverage_from_rgb_coverage(a,da, cr,cg,cb);
 
@@ -5694,8 +5786,8 @@ LOWP_STAGE_PP(lerp_565, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 }
 
 LOWP_STAGE_PP(emboss, const SkRasterPipelineContexts::EmbossCtx* ctx) {
-    U16 mul = load_8(ptr_at_xy<const uint8_t>(&(*ctx).mul, dx,dy)),
-        add = load_8(ptr_at_xy<const uint8_t>(&(*ctx).add, dx,dy));
+    U16 mul = load_8(ptr_at_xy<const uint8_t>(&(*ctx).mul, dx,dy));
+    U16 add = load_8(ptr_at_xy<const uint8_t>(&(*ctx).add, dx,dy));
 
     r = min(div255(r*mul) + add, a);
     g = min(div255(g*mul) + add, a);
@@ -5760,10 +5852,18 @@ SI void gradient_lookup(const SkRasterPipelineContexts::GradientCtx* c,
                         U16* g,
                         U16* b,
                         U16* a) {
-    F fr, fg, fb, fa, br, bg, bb, ba;
+    F fr;
+    F fg;
+    F fb;
+    F fa;
+    F br;
+    F bg;
+    F bb;
+    F ba;
 #if defined(SKRP_CPU_AVX2)
     if ((*c).stopCount <=8) {
-        __m256i lo, hi;
+        __m256i lo;
+        __m256i hi;
         split(idx, &lo, &hi);
 
         fr = join<F>(_mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[0]), lo),
@@ -5933,13 +6033,13 @@ LOWP_STAGE_GP(bilerp_clamp_8888, const SkRasterPipelineContexts::GatherCtx* ctx)
     I32 qx = cast<I32>((join<F>(__lsx_vfrintrm_s(val1), __lsx_vfrintrm_s(val2)))) - 32768,
     qy = cast<I32>((join<F>(__lsx_vfrintrm_s(val3), __lsx_vfrintrm_s(val4)))) - 32768;
 #else
-    I32 qx = cast<I32>(floor_(65536.0f * x + 0.5f)) - 32768,
-        qy = cast<I32>(floor_(65536.0f * y + 0.5f)) - 32768;
+    I32 qx = cast<I32>(floor_(65536.0f * x + 0.5f)) - 32768;
+    I32 qy = cast<I32>(floor_(65536.0f * y + 0.5f)) - 32768;
 #endif
 
     // Calculate screen coordinates sx & sy by flooring qx and qy.
-    I32 sx = qx >> 16,
-        sy = qy >> 16;
+    I32 sx = qx >> 16;
+    I32 sy = qy >> 16;
 
     // We are going to perform a change of parameters for qx on [0, 1) to tx on [-1, 1).
     // This will put tx in Q15 format for use with q_mult.
@@ -5964,24 +6064,30 @@ LOWP_STAGE_GP(bilerp_clamp_8888, const SkRasterPipelineContexts::GatherCtx* ctx)
     I16 tx = __lsx_vpickev_h(qx_hi, qx_lo);
     I16 ty = __lsx_vpickev_h(qy_hi, qy_lo);
 #else
-    I16 tx = cast<I16>(qx ^ 0x8000),
-        ty = cast<I16>(qy ^ 0x8000);
+    I16 tx = cast<I16>(qx ^ 0x8000);
+    I16 ty = cast<I16>(qy ^ 0x8000);
 #endif
 
 
     const uint32_t* ptr;
     U32 ix = ix_and_ptr(&ptr, ctx, sx, sy);
-    U16 leftR, leftG, leftB, leftA;
+    U16 leftR;
+    U16 leftG;
+    U16 leftB;
+    U16 leftA;
     from_8888(gather_unaligned<U32>(ptr, ix), &leftR,&leftG,&leftB,&leftA);
 
     ix = ix_and_ptr(&ptr, ctx, sx+1, sy);
-    U16 rightR, rightG, rightB, rightA;
+    U16 rightR;
+    U16 rightG;
+    U16 rightB;
+    U16 rightA;
     from_8888(gather_unaligned<U32>(ptr, ix), &rightR,&rightG,&rightB,&rightA);
 
-    U16 topR = bilerp_lerp_x(leftR, rightR, tx),
-        topG = bilerp_lerp_x(leftG, rightG, tx),
-        topB = bilerp_lerp_x(leftB, rightB, tx),
-        topA = bilerp_lerp_x(leftA, rightA, tx);
+    U16 topR = bilerp_lerp_x(leftR, rightR, tx);
+    U16 topG = bilerp_lerp_x(leftG, rightG, tx);
+    U16 topB = bilerp_lerp_x(leftB, rightB, tx);
+    U16 topA = bilerp_lerp_x(leftA, rightA, tx);
 
     ix = ix_and_ptr(&ptr, ctx, sx, sy+1);
     from_8888(gather_unaligned<U32>(ptr, ix), &leftR,&leftG,&leftB,&leftA);
@@ -5989,10 +6095,10 @@ LOWP_STAGE_GP(bilerp_clamp_8888, const SkRasterPipelineContexts::GatherCtx* ctx)
     ix = ix_and_ptr(&ptr, ctx, sx+1, sy+1);
     from_8888(gather_unaligned<U32>(ptr, ix), &rightR,&rightG,&rightB,&rightA);
 
-    U16 bottomR = bilerp_lerp_x(leftR, rightR, tx),
-        bottomG = bilerp_lerp_x(leftG, rightG, tx),
-        bottomB = bilerp_lerp_x(leftB, rightB, tx),
-        bottomA = bilerp_lerp_x(leftA, rightA, tx);
+    U16 bottomR = bilerp_lerp_x(leftR, rightR, tx);
+    U16 bottomG = bilerp_lerp_x(leftG, rightG, tx);
+    U16 bottomB = bilerp_lerp_x(leftB, rightB, tx);
+    U16 bottomA = bilerp_lerp_x(leftA, rightA, tx);
 
 
     r = bilerp_lerp_y(topR, bottomR, ty);
@@ -6002,8 +6108,8 @@ LOWP_STAGE_GP(bilerp_clamp_8888, const SkRasterPipelineContexts::GatherCtx* ctx)
 }
 
 LOWP_STAGE_GG(xy_to_unit_angle, NoCtx) {
-    F xabs = abs_(x),
-      yabs = abs_(y);
+    F xabs = abs_(x);
+    F yabs = abs_(y);
 
     F slope = min(xabs, yabs)/max(xabs, yabs);
     F s = slope * slope;
@@ -6044,7 +6150,10 @@ LOWP_STAGE_PP(srcover_rgba_8888, const SkRasterPipelineContexts::MemoryCtx* ctx)
 // ~~~~~~ skgpu::Swizzle stage ~~~~~~ //
 
 LOWP_STAGE_PP(swizzle, void* ctx) {
-    U16 ir = r, ig = g, ib = b, ia = a;
+    U16 ir = r;
+    U16 ig = g;
+    U16 ib = b;
+    U16 ia = a;
     U16* o[] = {&r, &g, &b, &a};
     char swiz[4];
     memcpy(swiz, &ctx, sizeof(swiz));
