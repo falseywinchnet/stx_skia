@@ -59,3 +59,8 @@ rectangles, best of five runs:
 
 At 45% of Skia time, that would cut GUI.Forms' Skia render time by roughly 10–20%. That
 estimate is not yet confirmed by the benchmark itself.
+
+**Correction (same day).** The scratch "Skia loop" was not the library's compiled code: the
+library's `skvx` loop is already re-vectorized into 64-byte iterations at about 80 GB/s. A
+plain-loop replacement then slowed GUI.Forms' full-window repaints, and was not adopted. See
+`FILL_KERNEL.md`.

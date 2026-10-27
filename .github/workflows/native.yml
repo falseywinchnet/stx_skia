@@ -61,6 +61,10 @@ jobs:
           cmake -E compare_files build/baseline/mask-filter.raw build/candidate/mask-filter.raw
           cmake -E compare_files build/baseline/flattenable.raw build/candidate/flattenable.raw
           sh tools/verify_installed.sh
+      - name: Fill kernel timings (informational)
+        run: |
+          grep -m1 "model name" /proc/cpuinfo || true
+          python3 tools/measure_fill.py build/baseline build/candidate
       - name: Instrumented deterministic suite
         run: sh tools/build_native.sh candidate-sanitize
   windows:
@@ -74,7 +78,7 @@ jobs:
         with:
           msystem: CLANG64
           update: true
-          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-python
       - name: Configure and test
         run: |
           set -eu
@@ -121,3 +125,7 @@ jobs:
           cmake -E compare_files build/baseline/mask-filter.raw build/candidate/mask-filter.raw
           cmake -E compare_files build/baseline/flattenable.raw build/candidate/flattenable.raw
           sh tools/verify_installed.sh
+      - name: Fill kernel timings (informational)
+        run: |
+          powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name"
+          python tools/measure_fill.py build/baseline build/candidate
