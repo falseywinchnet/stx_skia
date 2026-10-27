@@ -18,17 +18,25 @@ public:
 
     explicit SkGaussFilter(double sigma);
 
-    size_t size()   const { return fN; }
+    size_t size() const {
+        const size_t count = static_cast<size_t>(fN);
+        return count;
+    }
     int radius() const { return fN - 1; }
-    int width()  const { return 2 * this->radius() + 1; }
+    int width() const {
+        const int extent = 2 * radius() + 1;
+        return extent;
+    }
 
-    // Allow a filter to be used in a C++ ranged-for loop.
-    const double* begin() const { return &fBasis[0];  }
-    const double* end()   const { return &fBasis[fN]; }
+    // Allow a filter to be used in a C++ ranged-for loop over its fN live factors.
+    const double* begin() const { return &fBasis[0]; }
+    const double* end() const { return &fBasis[fN]; }
 
 private:
-    double fBasis[kGaussArrayMax];
-    int    fN;
+    // fBasis[0, fN) holds the normalized factors from the center outward; the factor at fN
+    // is the first one below the cutoff, computed only to stop the recurrence.
+    double fBasis[kGaussArrayMax] = {};
+    int    fN = 0;
 };
 
 #endif  // SkGaussFilter_DEFINED

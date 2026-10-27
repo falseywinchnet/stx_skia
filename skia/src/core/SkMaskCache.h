@@ -23,9 +23,11 @@ class SkMaskCache {
 public:
     /**
      * On success, return a ref to the SkCachedData that holds the pixels, and have mask
-     * already point to that memory.
+     * already point to that memory. The caller adopts that client reference; the mask
+     * borrows its pixels for as long as the reference is held.
      *
-     * On failure, return nullptr.
+     * On failure, return nullptr and leave mask unchanged. A null localCache selects the
+     * process-wide cache. The rectangle forms take one or two rectangles.
      */
     static SkCachedData* FindAndRef(SkScalar sigma, SkBlurStyle style,
                                     const SkRRect& rrect, SkTLazy<SkMask>* mask,
@@ -37,7 +39,8 @@ public:
                                     SkResourceCache* localCache = nullptr);
 
     /**
-     * Add a mask and its pixel-data to the cache.
+     * Add a mask and its pixel-data to the cache. data must be non-null; the new record
+     * takes its own cache reference, and the mask's image pointer is not retained.
      */
     static void Add(SkScalar sigma, SkBlurStyle style,
                     const SkRRect& rrect, const SkMask& mask, SkCachedData* data,

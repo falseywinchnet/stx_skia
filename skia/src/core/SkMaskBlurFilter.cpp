@@ -316,7 +316,8 @@ static void argb32_to_a8(uint8_t* a8, const uint8_t* from, int width) {
         a8[i] = static_cast<uint8_t>(SkGetPackedA32(rgba));
     }
 }
-using ToA8 = decltype(bw_to_a8);
+// Converts width (1 to 8) source pixels to A8 coverage; bw_to_a8, lcd_to_a8 or argb32_to_a8.
+using ToA8 = void(uint8_t* a8, const uint8_t* from, int width);
 
 using fp88 = skvx::Vec<8, uint16_t>; // 8-wide fixed point 8.8
 
@@ -569,7 +570,9 @@ static void blur_x_radius_4(
     *d8 += v4;
 }
 
-using BlurX = decltype(blur_x_radius_1);
+using BlurX = void(const fp88& s0,
+                   const fp88& g0, const fp88& g1, const fp88& g2, const fp88& g3, const fp88& g4,
+                   fp88* d0, fp88* d8);
 
 // BlurX will only be one of the functions blur_x_radius_(1|2|3|4).
 static void blur_row(
@@ -788,7 +791,10 @@ static fp88 blur_y_radius_4(
     return answer;
 }
 
-using BlurY = decltype(blur_y_radius_1);
+using BlurY = fp88(const fp88& s0,
+                   const fp88& g0, const fp88& g1, const fp88& g2, const fp88& g3, const fp88& g4,
+                   fp88* d01, fp88* d12, fp88* d23, fp88* d34,
+                   fp88* d45, fp88* d56, fp88* d67, fp88* d78);
 
 // Store two live tail rows without constructing a strided one-past pointer.
 static void store_pair(uint8_t* dst, size_t stride, int row, int width,

@@ -155,7 +155,7 @@ are recorded in BLUR_STYLES.md. Blur-filter dispatch and remaining mask
 rasterizers are still unconverted; this does not mark the subsystem complete.
 (Superseded: blur-filter dispatch was converted afterwards in e15c498 and a09364d; see the
 mask-filter and blur-filter notes below and ../results/2026-10-27/HOUSE_POLICY_INVENTORY.md.
-Mask caching and the Gaussian filter helper remain.)
+Mask caching and the Gaussian filter helper were converted afterwards; see their section below.)
 
 ## Cached storage conversion notes
 
@@ -1406,18 +1406,30 @@ and half-pixel point draws stay blurred. The mask corpus adds 144 narrow rectang
 saturated margin queries. Both corpora match the reference byte for byte. See
 ../results/2026-10-27/BLURRED_PATH_DIVERGENCE.md.
 
+## Mask cache and Gaussian filter helper
+
+The mask cache's local/global dispatch macro becomes named functions with an explicit record
+ownership transfer. Its visitors, keys and records keep their layout, byte charges and
+stale-storage behavior. The Gaussian helper's Bessel lambdas become named functions with the
+same expressions. The three blur-kernel `decltype` aliases are spelled as function types. The
+rectangle key's one-or-two-rectangle precondition and the Gaussian recurrence's array bound are
+now Release checks. A new 2,290-case corpus matches the reference byte for byte. It covers
+2,006 filter sigmas, rounded-rectangle and rectangle-set keys, replacement, purging, discarded
+storage and the process-wide cache. Candidate/reference suites pass 74/74 and 73/73, and the
+instrumented suite reports PASS. See ../results/2026-10-27/MASK_CACHE_GAUSS_CONVERSION.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
 constructs in 106 files; per-file counts are in
-../results/2026-10-27/HOUSE_POLICY_INVENTORY.md. The counts show spelling work only. They omit
+../results/2026-10-27/HOUSE_POLICY_INVENTORY.md. The mask cache and Gaussian filter unit since
+leaves 2,680 constructs in 102 files. The counts show spelling work only. They omit
 code this arm64 configuration does not compile, and zero findings is not conversion evidence.
 
-- **Raster pipeline and pixel kernels (about 770 findings).** `SkRasterPipeline.cpp/.h` and
+- **Raster pipeline and pixel kernels (about 720 findings).** `SkRasterPipeline.cpp/.h` and
   `SkRasterPipeline_opts.h`, the bitmap-sampling procedures and their shader, row blending and
   swizzles (`SkBlitRow_opts.h`, `SkSwizzler_opts.inc`, `Sk4px.h`, `SkVx.h`), and blend modes and
-  blenders. Also the remaining mask pieces: `SkMaskCache.cpp`, `SkGaussFilter`, and three
-  `decltype` uses in `SkMaskBlurFilter.cpp`. Imported optimized code stays the baseline. New
+  blenders. Imported optimized code stays the baseline. New
   SIMD work follows the 128-bit portable policy and needs measurements.
 - **Canvas-adjacent state.** Clip stack and its device, paint and paint helpers, vertices and
   vertex state, 4x4 matrices, drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`,
