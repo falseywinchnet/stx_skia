@@ -6,10 +6,9 @@
 // the number of live elements. Both builds must produce identical bytes (tarray-core.raw).
 //
 // Sizes with exact capacities go to a second artifact (tarray-core-capacity.raw), which differs
-// on purpose:
-// the intake move constructor builds its storage from SkSpan(that), recording the size as the
-// capacity, so a moved array under-reports the storage it owns. The candidate (since 40875c9c)
-// moves the real capacity. The shared artifact keeps capacity >= size.
+// on purpose: the intake move constructor builds its storage from SkSpan(that), recording the
+// size as the capacity, so a moved array under-reports the storage it owns. The candidate (since
+// 40875c9c) moves the real capacity. The shared artifact keeps capacity >= size.
 //
 // Only inputs both builds define are used: no element of an array is passed back into it, and
 // default-initialized trivial elements are assigned before they are read.
