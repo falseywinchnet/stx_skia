@@ -30,7 +30,7 @@ class SkPathBuilder;
     rectangles contained by it, optionally intersecting a bounding rectangle.
 */
 class SK_API SkRegion {
-    typedef int32_t RunType;
+    using RunType = int32_t;
 public:
 
     /** Constructs an empty SkRegion. SkRegion is set to empty bounds
@@ -122,7 +122,7 @@ public:
     */
     bool set(const SkRegion& src) {
         *this = src;
-        return !this->isEmpty();
+        return !(*this).isEmpty();
     }
 
     /** Exchanges SkIRect array of SkRegion and other. swap() internally exchanges pointers,
@@ -157,7 +157,7 @@ public:
 
         @return  true if SkRegion contains more than one SkIRect
     */
-    bool isComplex() const { return !this->isEmpty() && !this->isRect(); }
+    bool isComplex() const { return !(*this).isEmpty() && !(*this).isRect(); }
 
     /** Returns minimum and maximum axes values of SkIRect array.
         Returns (0, 0, 0, 0) if SkRegion is empty.
@@ -228,7 +228,7 @@ public:
     bool setRects(SkSpan<const SkIRect> rects);
 #if !defined(SK_DISABLE_LEGACY_SKREGION_UNSPANNED_APIS)
     bool setRects(const SkIRect rects[], int count) {
-        return this->setRects({rects, count});
+        return (*this).setRects({rects, count});
     }
 #endif
 
@@ -320,13 +320,13 @@ public:
         @return   true quickly if r points are equal or inside
     */
     bool quickContains(const SkIRect& r) const {
-        SkASSERT(this->isEmpty() == fBounds.isEmpty()); // valid region
+        SkASSERT((*this).isEmpty() == fBounds.isEmpty()); // valid region
 
-        return  r.fLeft < r.fRight && r.fTop < r.fBottom &&
-                fRunHead == kRectRunHeadPtr &&  // this->isRect()
-                /* fBounds.contains(left, top, right, bottom); */
-                fBounds.fLeft <= r.fLeft   && fBounds.fTop <= r.fTop &&
-                fBounds.fRight >= r.fRight && fBounds.fBottom >= r.fBottom;
+        const bool contained = r.fLeft < r.fRight && r.fTop < r.fBottom &&
+                               (*this).isRect() &&
+                               fBounds.fLeft <= r.fLeft && fBounds.fTop <= r.fTop &&
+                               fBounds.fRight >= r.fRight && fBounds.fBottom >= r.fBottom;
+        return contained;
     }
 
     /** Returns true if SkRegion does not intersect rect.
@@ -337,8 +337,9 @@ public:
         @return      true if rect does not intersect
     */
     bool quickReject(const SkIRect& rect) const {
-        return this->isEmpty() || rect.isEmpty() ||
-                !SkIRect::Intersects(fBounds, rect);
+        const bool rejected = (*this).isEmpty() || rect.isEmpty() ||
+                              !SkIRect::Intersects(fBounds, rect);
+        return rejected;
     }
 
     /** Returns true if SkRegion does not intersect rgn.
@@ -349,8 +350,9 @@ public:
         @return     true if rgn does not intersect
     */
     bool quickReject(const SkRegion& rgn) const {
-        return this->isEmpty() || rgn.isEmpty() ||
-               !SkIRect::Intersects(fBounds, rgn.fBounds);
+        const bool rejected = (*this).isEmpty() || rgn.isEmpty() ||
+                              !SkIRect::Intersects(fBounds, rgn.fBounds);
+        return rejected;
     }
 
     /** Offsets SkRegion by ivector (dx, dy). Has no effect if SkRegion is empty.
@@ -358,7 +360,7 @@ public:
         @param dx  x-axis offset
         @param dy  y-axis offset
     */
-    void translate(int dx, int dy) { this->translate(dx, dy, this); }
+    void translate(int dx, int dy) { (*this).translate(dx, dy, this); }
 
     /** Offsets SkRegion by ivector (dx, dy), writing result to dst. SkRegion may be passed
         as dst parameter, translating SkRegion in place. Has no effect if dst is nullptr.
@@ -394,13 +396,14 @@ public:
         @return      false if result is empty
     */
     bool op(const SkIRect& rect, Op op) {
-        if (this->isRect() && kIntersect_Op == op) {
+        if ((*this).isRect() && kIntersect_Op == op) {
             if (!fBounds.intersect(rect)) {
-                return this->setEmpty();
+                return (*this).setEmpty();
             }
             return true;
         }
-        return this->op(*this, rect, op);
+        const bool nonEmpty = (*this).op(*this, rect, op);
+        return nonEmpty;
     }
 
     /** Replaces SkRegion with the result of SkRegion op rgn.
@@ -409,7 +412,10 @@ public:
         @param rgn  SkRegion operand
         @return     false if result is empty
     */
-    bool op(const SkRegion& rgn, Op op) { return this->op(*this, rgn, op); }
+    bool op(const SkRegion& rgn, Op op) {
+        const bool nonEmpty = (*this).op(*this, rgn, op);
+        return nonEmpty;
+    }
 
     /** Replaces SkRegion with the result of rect op rgn.
         Returns true if replaced SkRegion is not empty.
@@ -444,14 +450,6 @@ public:
     */
     bool op(const SkRegion& rgna, const SkRegion& rgnb, Op op);
 
-#ifdef SK_BUILD_FOR_ANDROID_FRAMEWORK
-    /** Private. Android framework only.
-
-        @return  string representation of SkRegion
-    */
-    char* toString();
-#endif
-
     /** \class SkRegion::Iterator
         Goes through the region one rectangle at a time. For each "strip" of one or more contiguous
         Y values (scanlines) in ascending order, the iterator returns each rectangle in that strip
@@ -466,7 +464,7 @@ public:
 
             @return  empty SkRegion iterator
         */
-        Iterator() : fRgn(nullptr), fDone(true) {}
+        Iterator() = default;
 
         /** Sets SkRegion::Iterator to return elements of SkIRect array in region.
 
@@ -523,11 +521,13 @@ public:
         const SkRegion* rgn() const { return fRgn; }
 
     private:
-        const SkRegion* fRgn;
-        // See top of SkRegion.cpp for more on the RLE encoding
-        const SkRegion::RunType*  fRuns;
-        SkIRect         fRect = {0, 0, 0, 0};
-        bool            fDone;
+        // Borrowed: the region must outlive the iterator and stay unmodified while it is used.
+        const SkRegion* fRgn = nullptr;
+        // Borrowed from the region's runs; see top of SkRegion.cpp for the RLE encoding.
+        // nullptr while iterating a rectangle.
+        const SkRegion::RunType* fRuns = nullptr;
+        SkIRect fRect = {0, 0, 0, 0};
+        bool fDone = true;
     };
 
     /** \class SkRegion::Cliperator
@@ -551,7 +551,7 @@ public:
 
             @return  true if data parsing is complete
         */
-        bool done() { return fDone; }
+        bool done() const { return fDone; }
 
         /** Advances iterator to next SkIRect in SkRegion contained by clip.
 
@@ -568,10 +568,10 @@ public:
         const SkIRect& rect() const { return fRect; }
 
     private:
-        Iterator    fIter;
-        SkIRect     fClip;
-        SkIRect     fRect = {0, 0, 0, 0};
-        bool        fDone;
+        Iterator fIter;
+        SkIRect fClip = {0, 0, 0, 0};
+        SkIRect fRect = {0, 0, 0, 0};
+        bool fDone = true;
     };
 
     /** \class SkRegion::Spanerator
@@ -604,9 +604,11 @@ public:
         bool next(int* left, int* right);
 
     private:
-        const SkRegion::RunType* fRuns;
-        int     fLeft, fRight;
-        bool    fDone;
+        // Borrowed from the region's runs; nullptr while spanning a rectangle.
+        const SkRegion::RunType* fRuns = nullptr;
+        int fLeft = 0;
+        int fRight = 0;
+        bool fDone = true;
     };
 
     /** Writes SkRegion to buffer, and returns number of bytes written.
@@ -642,7 +644,11 @@ private:
 
     struct RunHead;
 
-    static RunHead* emptyRunHeadPtr() { return (SkRegion::RunHead*) -1; }
+    // The empty state is a distinguished address that is never dereferenced or freed.
+    static RunHead* emptyRunHeadPtr() {
+        RunHead* const empty = reinterpret_cast<RunHead*>(static_cast<intptr_t>(-1));
+        return empty;
+    }
     static constexpr const RunHead* const kRectRunHeadPtr = nullptr;
 
     // allocate space for count runs
@@ -650,13 +656,17 @@ private:
     void allocateRuns(int count, int ySpanCount, int intervalCount);
     void allocateRuns(const RunHead& src);
 
-    SkDEBUGCODE(void dump() const;)
+#ifdef SK_DEBUG
+    void dump() const;
+#endif
 
-    SkIRect     fBounds;
-    RunHead*    fRunHead;
+    SkIRect fBounds = {0, 0, 0, 0};
+    // Empty: emptyRunHeadPtr(). Rectangle: kRectRunHeadPtr. Complex: shared, reference-counted
+    // runs released by freeRuns().
+    RunHead* fRunHead = emptyRunHeadPtr();
 
-    static_assert(::sk_is_trivially_relocatable<decltype(fBounds)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fRunHead)>::value);
+    static_assert(::sk_is_trivially_relocatable<SkIRect>::value);
+    static_assert(::sk_is_trivially_relocatable<RunHead*>::value);
 
     void freeRuns();
 

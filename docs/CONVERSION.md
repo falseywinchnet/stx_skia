@@ -1351,6 +1351,18 @@ Candidate/reference suites pass 70/70 and 69/69; the new corpus and every other 
 artifact match, except the intentionally corrected sampling artifact; the instrumented suite
 reports PASS. See ../results/2026-10-26/AA_SCAN_CONVERSION.md.
 
+## Regions and raster clips
+
+Regions, region path filling, antialiased clips with their clipping blitter, raster clips and
+the raster clip stack are converted. Run heads holding atomic reference counts are now
+constructed in place; the region builder indexes its run storage instead of casting a struct
+over it; antialiased clip rows have owners. The mask blitter no longer forms source addresses
+past the mask or calls a null merge function for unsupported formats; raster clip assignment
+releases the representation it no longer uses; region and clip run writes and searches are
+bounded in Release. Candidate/reference suites pass 71/71 and 70/70; the new corpus and every
+other shared artifact match, except the intentionally corrected sampling artifact; the
+instrumented suite reports PASS. See ../results/2026-10-26/REGION_CLIP_CONVERSION.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
