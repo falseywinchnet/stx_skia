@@ -133,8 +133,9 @@ public:
     std::optional<DirectBlit> canDirectBlit()                       override;
 
 private:
-    void appendLoadDst      (SkRasterPipeline*) const;
-    void appendStore        (SkRasterPipeline*) const;
+    // These append fDstPtr, which pipelines repoint during their runs.
+    void appendLoadDst      (SkRasterPipeline*);
+    void appendStore        (SkRasterPipeline*);
 
     // these check internally, and only append if there was a native clipShader
     void appendClipScale    (SkRasterPipeline*) const;
@@ -532,14 +533,14 @@ SkBlitter* SkRasterPipelineBlitter::Create(const SkPixmap& dst,
     return blitter;
 }
 
-void SkRasterPipelineBlitter::appendLoadDst(SkRasterPipeline* p) const {
+void SkRasterPipelineBlitter::appendLoadDst(SkRasterPipeline* p) {
     (*p).appendLoadDst(fDst.info().colorType(), &fDstPtr);
     if (fDst.info().alphaType() == kUnpremul_SkAlphaType) {
         (*p).append(SkRasterPipelineOp::premul_dst);
     }
 }
 
-void SkRasterPipelineBlitter::appendStore(SkRasterPipeline* p) const {
+void SkRasterPipelineBlitter::appendStore(SkRasterPipeline* p) {
     if (fDst.info().alphaType() == kUnpremul_SkAlphaType) {
         (*p).append(SkRasterPipelineOp::unpremul);
     }

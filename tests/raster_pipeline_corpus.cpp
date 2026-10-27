@@ -27,6 +27,28 @@
 
 extern bool gForceHighPrecisionRasterPipeline;
 
+#ifndef STX_SKIA_REFERENCE
+// run() repoints memory contexts for row tails, so the load and store helpers refuse const ones.
+template <typename Context>
+concept LoadsFrom = requires(SkRasterPipeline& pipeline, Context context) {
+    pipeline.appendLoad(kRGBA_8888_SkColorType, context);
+};
+template <typename Context>
+concept StoresTo = requires(SkRasterPipeline& pipeline, Context context) {
+    pipeline.appendStore(kRGBA_8888_SkColorType, context);
+};
+template <typename Context>
+concept LoadsDstFrom = requires(SkRasterPipeline& pipeline, Context context) {
+    pipeline.appendLoadDst(kRGBA_8888_SkColorType, context);
+};
+static_assert(LoadsFrom<SkRasterPipelineContexts::MemoryCtx*>);
+static_assert(!LoadsFrom<const SkRasterPipelineContexts::MemoryCtx*>);
+static_assert(StoresTo<SkRasterPipelineContexts::MemoryCtx*>);
+static_assert(!StoresTo<const SkRasterPipelineContexts::MemoryCtx*>);
+static_assert(LoadsDstFrom<SkRasterPipelineContexts::MemoryCtx*>);
+static_assert(!LoadsDstFrom<const SkRasterPipelineContexts::MemoryCtx*>);
+#endif
+
 namespace {
 
 using corpus::Output;

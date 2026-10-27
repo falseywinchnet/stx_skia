@@ -1428,6 +1428,11 @@ corpus matches the reference. This is the mechanical step; the defects it found 
 contexts written during runs, shared compiled-pipeline state, the any-pointer context adapter)
 are fixed separately. See ../results/2026-10-27/RASTER_PIPELINE_SPELLING.md.
 
+Fixed since: memory-context helpers take mutable contexts. The const overload refuses ops whose
+contexts `run()` repoints, and the raster blitter's dst helpers are no longer `const`. Shared
+compiled-pipeline state and the any-pointer stage-context adapter remain open. See
+../results/2026-10-27/RASTER_PIPELINE_FIXES.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded

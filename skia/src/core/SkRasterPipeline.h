@@ -82,10 +82,12 @@ public:
 
     void reset();
 
+    // Ops that load or store through a MemoryCtx (including emboss's pair) need a mutable
+    // context: run() and compiled thunks repoint its pixels at scratch storage for a row's
+    // tail, and restore them before returning.
     void append(SkRasterPipelineOp, void* = nullptr);
-    // Stage contexts are passed as mutable pointers; a stage that only reads a const
-    // context does not write through it.
-    void append(SkRasterPipelineOp op, const void* ctx) { append(op, const_cast<void*>(ctx)); }
+    // For read-only contexts. A memory-context op passed here fails in Release.
+    void append(SkRasterPipelineOp op, const void* ctx);
     void append(SkRasterPipelineOp, uintptr_t ctx);
 
     // Append all stages to this pipeline.
@@ -131,9 +133,9 @@ public:
         appendSetRGB(alloc, color.vec());
     }
 
-    void appendLoad(SkColorType, const SkRasterPipelineContexts::MemoryCtx*);
-    void appendLoadDst(SkColorType, const SkRasterPipelineContexts::MemoryCtx*);
-    void appendStore(SkColorType, const SkRasterPipelineContexts::MemoryCtx*);
+    void appendLoad(SkColorType, SkRasterPipelineContexts::MemoryCtx*);
+    void appendLoadDst(SkColorType, SkRasterPipelineContexts::MemoryCtx*);
+    void appendStore(SkColorType, SkRasterPipelineContexts::MemoryCtx*);
 
     void appendClampIfNormalized(const SkImageInfo&);
 

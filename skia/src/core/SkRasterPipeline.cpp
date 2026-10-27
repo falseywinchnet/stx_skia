@@ -29,6 +29,235 @@ using Op = SkRasterPipelineOp;
 
 bool gForceHighPrecisionRasterPipeline = false;
 
+namespace {
+
+// How an op uses its context as pixel memory: the pixels' color type, and whether the op loads
+// or stores them. Ops outside this table do not treat their context as a MemoryCtx. The emboss
+// op holds two contexts and is handled separately.
+struct MemoryUse {
+    SkColorType colorType = kUnknown_SkColorType;
+    bool load = false;
+    bool store = false;
+};
+
+MemoryUse memory_use(SkRasterPipelineOp op) {
+    MemoryUse use;
+    switch (op) {
+        case Op::load_a8:
+        case Op::load_a8_dst:
+            use.colorType = kAlpha_8_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_a8:
+            use.colorType = kAlpha_8_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_565:
+        case Op::load_565_dst:
+            use.colorType = kRGB_565_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_565:
+            use.colorType = kRGB_565_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_4444:
+        case Op::load_4444_dst:
+            use.colorType = kARGB_4444_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_4444:
+            use.colorType = kARGB_4444_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_8888:
+        case Op::load_8888_dst:
+            use.colorType = kRGBA_8888_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_8888:
+            use.colorType = kRGBA_8888_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_rg88:
+        case Op::load_rg88_dst:
+            use.colorType = kR8G8_unorm_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_rg88:
+            use.colorType = kR8G8_unorm_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_16161616:
+        case Op::load_16161616_dst:
+            use.colorType = kR16G16B16A16_unorm_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_16161616:
+            use.colorType = kR16G16B16A16_unorm_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_a16:
+        case Op::load_a16_dst:
+            use.colorType = kA16_unorm_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_a16:
+            use.colorType = kA16_unorm_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_r16:
+        case Op::load_r16_dst:
+            use.colorType = kR16_unorm_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_r16:
+            use.colorType = kR16_unorm_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_rg1616:
+        case Op::load_rg1616_dst:
+            use.colorType = kR16G16_unorm_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_rg1616:
+            use.colorType = kR16G16_unorm_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_f16:
+        case Op::load_f16_dst:
+            use.colorType = kRGBA_F16_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_f16:
+            use.colorType = kRGBA_F16_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_af16:
+        case Op::load_af16_dst:
+            use.colorType = kA16_float_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_af16:
+            use.colorType = kA16_float_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_rf16:
+        case Op::load_rf16_dst:
+            use.colorType = kR16_float_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_rf16:
+            use.colorType = kR16_float_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_rgf16:
+        case Op::load_rgf16_dst:
+            use.colorType = kR16G16_float_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_rgf16:
+            use.colorType = kR16G16_float_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_f32:
+        case Op::load_f32_dst:
+            use.colorType = kRGBA_F32_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_f32:
+            use.colorType = kRGBA_F32_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_1010102:
+        case Op::load_1010102_dst:
+            use.colorType = kRGBA_1010102_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_1010102:
+            use.colorType = kRGBA_1010102_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_1010102_xr:
+        case Op::load_1010102_xr_dst:
+            use.colorType = kBGR_101010x_XR_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_1010102_xr:
+            use.colorType = kBGR_101010x_XR_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_10101010_xr:
+        case Op::load_10101010_xr_dst:
+            use.colorType = kBGRA_10101010_XR_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_10101010_xr:
+            use.colorType = kBGRA_10101010_XR_SkColorType;
+            use.store = true;
+            break;
+        case Op::load_10x6:
+        case Op::load_10x6_dst:
+            use.colorType = kRGBA_10x6_SkColorType;
+            use.load = true;
+            break;
+        case Op::store_10x6:
+            use.colorType = kRGBA_10x6_SkColorType;
+            use.store = true;
+            break;
+        case Op::debug_r:
+        case Op::debug_g:
+        case Op::debug_b:
+        case Op::debug_a:
+        case Op::debug_r_255:
+        case Op::debug_g_255:
+        case Op::debug_b_255:
+        case Op::debug_a_255:
+        case Op::debug_x:
+        case Op::debug_y: {
+            use.colorType = kRGBA_8888_SkColorType;
+            use.store = true;
+            break;
+        }
+        // Odd stage that doesn't have a load variant (appendLoad uses load_a8 + alpha_to_red)
+        case Op::store_r8: {
+            use.colorType = kR8_unorm_SkColorType;
+            use.store = true;
+            break;
+        }
+        case Op::srcover_rgba_8888: {
+            use.colorType = kRGBA_8888_SkColorType;
+            use.load = true;
+            use.store = true;
+            break;
+        }
+        case Op::scale_u8:
+        case Op::lerp_u8: {
+            use.colorType = kAlpha_8_SkColorType;
+            use.load = true;
+            break;
+        }
+        case Op::scale_565:
+        case Op::lerp_565: {
+            use.colorType = kRGB_565_SkColorType;
+            use.load = true;
+            break;
+        }
+        default:
+            break;
+    }
+    return use;
+}
+
+// Ops whose contexts run() patches for a row's tail, and so must be mutable.
+bool patches_context(SkRasterPipelineOp op) {
+    const MemoryUse use = memory_use(op);
+    const bool patched = use.load || use.store || op == Op::emboss;
+    return patched;
+}
+
+}  // namespace
+
 SkRasterPipeline::SkRasterPipeline(SkArenaAlloc* alloc) : fAlloc(alloc) {
     reset();
 }
@@ -53,238 +282,35 @@ void SkRasterPipeline::append(SkRasterPipelineOp op, void* ctx) {
     uncheckedAppend(op, ctx);
 }
 
-void SkRasterPipeline::uncheckedAppend(SkRasterPipelineOp op, void* ctx) {
-    bool isLoad = false;
-    bool isStore = false;
-    SkColorType ct = kUnknown_SkColorType;
+void SkRasterPipeline::append(SkRasterPipelineOp op, const void* ctx) {
+    // run() writes the pixel pointer of every memory context; those must arrive mutable.
+    SkASSERT_RELEASE(!patches_context(op));
+    append(op, const_cast<void*>(ctx));
+}
 
-    switch (op) {
-        // Loads (including _dst variants) and stores record their memory context's pixel size.
-        case Op::load_a8:
-        case Op::load_a8_dst:
-            ct = kAlpha_8_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_a8:
-            ct = kAlpha_8_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_565:
-        case Op::load_565_dst:
-            ct = kRGB_565_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_565:
-            ct = kRGB_565_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_4444:
-        case Op::load_4444_dst:
-            ct = kARGB_4444_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_4444:
-            ct = kARGB_4444_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_8888:
-        case Op::load_8888_dst:
-            ct = kRGBA_8888_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_8888:
-            ct = kRGBA_8888_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_rg88:
-        case Op::load_rg88_dst:
-            ct = kR8G8_unorm_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_rg88:
-            ct = kR8G8_unorm_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_16161616:
-        case Op::load_16161616_dst:
-            ct = kR16G16B16A16_unorm_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_16161616:
-            ct = kR16G16B16A16_unorm_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_a16:
-        case Op::load_a16_dst:
-            ct = kA16_unorm_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_a16:
-            ct = kA16_unorm_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_r16:
-        case Op::load_r16_dst:
-            ct = kR16_unorm_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_r16:
-            ct = kR16_unorm_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_rg1616:
-        case Op::load_rg1616_dst:
-            ct = kR16G16_unorm_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_rg1616:
-            ct = kR16G16_unorm_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_f16:
-        case Op::load_f16_dst:
-            ct = kRGBA_F16_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_f16:
-            ct = kRGBA_F16_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_af16:
-        case Op::load_af16_dst:
-            ct = kA16_float_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_af16:
-            ct = kA16_float_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_rf16:
-        case Op::load_rf16_dst:
-            ct = kR16_float_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_rf16:
-            ct = kR16_float_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_rgf16:
-        case Op::load_rgf16_dst:
-            ct = kR16G16_float_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_rgf16:
-            ct = kR16G16_float_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_f32:
-        case Op::load_f32_dst:
-            ct = kRGBA_F32_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_f32:
-            ct = kRGBA_F32_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_1010102:
-        case Op::load_1010102_dst:
-            ct = kRGBA_1010102_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_1010102:
-            ct = kRGBA_1010102_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_1010102_xr:
-        case Op::load_1010102_xr_dst:
-            ct = kBGR_101010x_XR_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_1010102_xr:
-            ct = kBGR_101010x_XR_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_10101010_xr:
-        case Op::load_10101010_xr_dst:
-            ct = kBGRA_10101010_XR_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_10101010_xr:
-            ct = kBGRA_10101010_XR_SkColorType;
-            isStore = true;
-            break;
-        case Op::load_10x6:
-        case Op::load_10x6_dst:
-            ct = kRGBA_10x6_SkColorType;
-            isLoad = true;
-            break;
-        case Op::store_10x6:
-            ct = kRGBA_10x6_SkColorType;
-            isStore = true;
-            break;
-        case Op::debug_r:
-        case Op::debug_g:
-        case Op::debug_b:
-        case Op::debug_a:
-        case Op::debug_r_255:
-        case Op::debug_g_255:
-        case Op::debug_b_255:
-        case Op::debug_a_255:
-        case Op::debug_x:
-        case Op::debug_y: {
-            ct = kRGBA_8888_SkColorType;
-            isStore = true;
-            break;
-        }
-        // Odd stage that doesn't have a load variant (appendLoad uses load_a8 + alpha_to_red)
-        case Op::store_r8: {
-            ct = kR8_unorm_SkColorType;
-            isStore = true;
-            break;
-        }
-        case Op::srcover_rgba_8888: {
-            ct = kRGBA_8888_SkColorType;
-            isLoad = true;
-            isStore = true;
-            break;
-        }
-        case Op::scale_u8:
-        case Op::lerp_u8: {
-            ct = kAlpha_8_SkColorType;
-            isLoad = true;
-            break;
-        }
-        case Op::scale_565:
-        case Op::lerp_565: {
-            ct = kRGB_565_SkColorType;
-            isLoad = true;
-            break;
-        }
-        case Op::emboss: {
-            // Special-case, this op uses a context that holds *two* MemoryCtxs
-            SkRasterPipelineContexts::EmbossCtx& embossCtx =
-                    *static_cast<SkRasterPipelineContexts::EmbossCtx*>(ctx);
-            addMemoryContext(&embossCtx.add,
-                             SkColorTypeBytesPerPixel(kAlpha_8_SkColorType),
-                             /*load=*/true, /*store=*/false);
-            addMemoryContext(&embossCtx.mul,
-                             SkColorTypeBytesPerPixel(kAlpha_8_SkColorType),
-                             /*load=*/true, /*store=*/false);
-            break;
-        }
-        default:
-            break;
+void SkRasterPipeline::uncheckedAppend(SkRasterPipelineOp op, void* ctx) {
+    if (op == Op::emboss) {
+        // This op's context holds *two* MemoryCtxs.
+        SkRasterPipelineContexts::EmbossCtx& embossCtx =
+                *static_cast<SkRasterPipelineContexts::EmbossCtx*>(ctx);
+        addMemoryContext(&embossCtx.add,
+                         SkColorTypeBytesPerPixel(kAlpha_8_SkColorType),
+                         /*load=*/true, /*store=*/false);
+        addMemoryContext(&embossCtx.mul,
+                         SkColorTypeBytesPerPixel(kAlpha_8_SkColorType),
+                         /*load=*/true, /*store=*/false);
     }
+    const MemoryUse use = memory_use(op);
 
     fStages = (*fAlloc).make<StageList>(StageList{fStages, op, ctx});
     fNumStages += 1;
 
-    if (isLoad || isStore) {
-        SkASSERT(ct != kUnknown_SkColorType);
+    if (use.load || use.store) {
+        SkASSERT(use.colorType != kUnknown_SkColorType);
         addMemoryContext(static_cast<SkRasterPipelineContexts::MemoryCtx*>(ctx),
-                         SkColorTypeBytesPerPixel(ct),
-                         isLoad,
-                         isStore);
+                         SkColorTypeBytesPerPixel(use.colorType),
+                         use.load,
+                         use.store);
     }
 }
 
@@ -426,7 +452,7 @@ void SkRasterPipeline::appendMatrix(SkArenaAlloc* alloc, const SkMatrix& matrix)
     }
 }
 
-void SkRasterPipeline::appendLoad(SkColorType ct, const SkRasterPipelineContexts::MemoryCtx* ctx) {
+void SkRasterPipeline::appendLoad(SkColorType ct, SkRasterPipelineContexts::MemoryCtx* ctx) {
     switch (ct) {
         case kUnknown_SkColorType: SkASSERT(false); break;
 
@@ -496,8 +522,7 @@ void SkRasterPipeline::appendLoad(SkColorType ct, const SkRasterPipelineContexts
     }
 }
 
-void SkRasterPipeline::appendLoadDst(SkColorType ct,
-                                     const SkRasterPipelineContexts::MemoryCtx* ctx) {
+void SkRasterPipeline::appendLoadDst(SkColorType ct, SkRasterPipelineContexts::MemoryCtx* ctx) {
     switch (ct) {
         case kUnknown_SkColorType: SkASSERT(false); break;
 
@@ -570,7 +595,7 @@ void SkRasterPipeline::appendLoadDst(SkColorType ct,
     }
 }
 
-void SkRasterPipeline::appendStore(SkColorType ct, const SkRasterPipelineContexts::MemoryCtx* ctx) {
+void SkRasterPipeline::appendStore(SkColorType ct, SkRasterPipelineContexts::MemoryCtx* ctx) {
     switch (ct) {
         case kUnknown_SkColorType: SkASSERT(false); break;
 
