@@ -25,12 +25,14 @@
 
 #include <cstdint>
 #include <optional>
+#include <utility>
 
 class SkColorSpace;
 
 static bool changes_alpha(const SkPaint& paint) {
-    SkColorFilter* cf = paint.getColorFilter();
-    return cf && !as_CFB(cf)->isAlphaUnchanged();
+    const SkColorFilter* cf = paint.getColorFilter();
+    const bool changes = cf && !(*as_CFB(cf)).isAlphaUnchanged();
+    return changes;
 }
 
 enum SrcColorOpacity {
@@ -45,7 +47,8 @@ enum SrcColorOpacity {
 };
 
 static bool blend_mode_is_opaque(SkBlendMode mode, SrcColorOpacity opacityType) {
-    SkBlendModeCoeff src, dst;
+    SkBlendModeCoeff src = SkBlendModeCoeff::kZero;
+    SkBlendModeCoeff dst = SkBlendModeCoeff::kZero;
     if (!SkBlendMode_AsCoeff(mode, &src, &dst)) {
         return false;
     }
@@ -85,12 +88,13 @@ bool SkPaintPriv::Overwrites(const SkPaint* paint, ShaderOverrideOpacity overrid
     SrcColorOpacity opacityType = kUnknown_SrcColorOpacity;
 
     if (!changes_alpha(*paint)) {
-        const unsigned paintAlpha = paint->getAlpha();
+        const unsigned paintAlpha = (*paint).getAlpha();
+        const SkShader* shader = (*paint).getShader();
         if (0xff == paintAlpha && overrideOpacity != kNotOpaque_ShaderOverrideOpacity &&
-            (!paint->getShader() || paint->getShader()->isOpaque())) {
+            (!shader || (*shader).isOpaque())) {
             opacityType = kOpaque_SrcColorOpacity;
         } else if (0 == paintAlpha) {
-            if (overrideOpacity == kNone_ShaderOverrideOpacity && !paint->getShader()) {
+            if (overrideOpacity == kNone_ShaderOverrideOpacity && !shader) {
                 opacityType = kTransparentBlack_SrcColorOpacity;
             } else {
                 opacityType = kTransparentAlpha_SrcColorOpacity;
@@ -98,7 +102,7 @@ bool SkPaintPriv::Overwrites(const SkPaint* paint, ShaderOverrideOpacity overrid
         }
     }
 
-    const auto bm = paint->asBlendMode();
+    const std::optional<SkBlendMode> bm = (*paint).asBlendMode();
     if (!bm) {
         return false;   // don't know for sure, so we play it safe and return false.
     }
@@ -121,22 +125,28 @@ bool SkPaintPriv::ShouldDither(const SkPaint& p, SkColorType dstCT) {
     }
 
     // Otherwise, dither is only needed for non-const paints.
-    return p.getMaskFilter() ||
-           (p.getShader() && !as_SB(p.getShader())->isConstant());
+    const bool dither = p.getMaskFilter() ||
+                        (p.getShader() && !(*as_SB(p.getShader())).isConstant());
+    return dither;
 }
 
 void SkPaintPriv::RemoveColorFilter(SkPaint* p, SkColorSpace* dstCS) {
-    if (SkColorFilter* filter = p->getColorFilter()) {
-        if (SkShader* shader = p->getShader()) {
-            // SkColorFilterShader will modulate the shader color by paint alpha
-            // before applying the filter, so we'll reset it to opaque.
-            p->setShader(SkColorFilterShader::Make(sk_ref_sp(shader),
-                                                   p->getAlphaf(),
-                                                   sk_ref_sp(filter)));
-            p->setAlphaf(1.0f);
-        } else {
-            p->setColor(filter->filterColor4f(p->getColor4f(), sk_srgb_singleton(), dstCS), dstCS);
-        }
-        p->setColorFilter(nullptr);
+    SkPaint& paint = *p;
+    SkColorFilter* filter = paint.getColorFilter();
+    if (!filter) {
+        return;
     }
+    if (SkShader* shader = paint.getShader()) {
+        // SkColorFilterShader will modulate the shader color by paint alpha
+        // before applying the filter, so we'll reset it to opaque.
+        sk_sp<SkShader> filtered = SkColorFilterShader::Make(sk_ref_sp(shader), paint.getAlphaf(),
+                                                             sk_ref_sp(filter));
+        paint.setShader(std::move(filtered));
+        paint.setAlphaf(1.0f);
+    } else {
+        const SkColor4f color = (*filter).filterColor4f(paint.getColor4f(), sk_srgb_singleton(),
+                                                         dstCS);
+        paint.setColor(color, dstCS);
+    }
+    paint.setColorFilter(nullptr);
 }

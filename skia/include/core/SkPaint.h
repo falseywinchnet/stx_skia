@@ -159,7 +159,7 @@ public:
         @return  antialiasing state
     */
     bool isAntiAlias() const {
-        return SkToBool(fBitfields.fAntiAlias);
+        return fBitfields.fAntiAlias != 0;
     }
 
     /** Requests, but does not require, that edge pixels draw opaque or with
@@ -172,7 +172,7 @@ public:
         @return  dithering state
     */
     bool isDither() const {
-        return SkToBool(fBitfields.fDither);
+        return fBitfields.fDither != 0;
     }
 
     /** Requests, but does not require, to distribute color error.
@@ -200,7 +200,7 @@ public:
 
     /** Returns whether the geometry is filled, stroked, or filled and stroked.
     */
-    Style getStyle() const { return (Style)fBitfields.fStyle; }
+    Style getStyle() const { return static_cast<Style>(fBitfields.fStyle); }
 
     /** Sets whether the geometry is filled, stroked, or filled and stroked.
         Has no effect if style is not a legal SkPaint::Style value.
@@ -250,7 +250,7 @@ public:
     void setColor(const SkColor4f& color, SkColorSpace* colorSpace = nullptr);
 
     void setColor4f(const SkColor4f& color, SkColorSpace* colorSpace = nullptr) {
-        this->setColor(color, colorSpace);
+        setColor(color, colorSpace);
     }
 
     /** Retrieves alpha from the color used when stroking and filling.
@@ -261,7 +261,7 @@ public:
 
     // Helper that scales the alpha by 255.
     uint8_t getAlpha() const {
-        return static_cast<uint8_t>(sk_float_round2int(this->getAlphaf() * 255));
+        return static_cast<uint8_t>(sk_float_round2int(getAlphaf() * 255));
     }
 
     /** Replaces alpha, leaving RGB
@@ -276,7 +276,7 @@ public:
 
     // Helper that accepts an int between 0 and 255, and divides it by 255.0
     void setAlpha(U8CPU a) {
-        this->setAlphaf(a * (1.0f / 255));
+        setAlphaf(a * (1.0f / 255));
     }
 
     /** Sets color used when drawing solid fills. The color components range from 0 to 255.
@@ -371,7 +371,7 @@ public:
 
     /** Returns the geometry drawn at the beginning and end of strokes.
     */
-    Cap getStrokeCap() const { return (Cap)fBitfields.fCapType; }
+    Cap getStrokeCap() const { return static_cast<Cap>(fBitfields.fCapType); }
 
     /** Sets the geometry drawn at the beginning and end of strokes.
 
@@ -382,7 +382,7 @@ public:
 
     /** Returns the geometry drawn at the corners of strokes.
     */
-    Join getStrokeJoin() const { return (Join)fBitfields.fJoinType; }
+    Join getStrokeJoin() const { return static_cast<Join>(fBitfields.fJoinType); }
 
     /** Sets the geometry drawn at the corners of strokes.
 
@@ -613,7 +613,7 @@ public:
     */
     const SkRect& computeFastStrokeBounds(const SkRect& orig,
                                           SkRect* storage) const {
-        return this->doComputeFastBounds(orig, storage, kStroke_Style);
+        return doComputeFastBounds(orig, storage, kStroke_Style);
     }
 
     /**     (to be made private)
