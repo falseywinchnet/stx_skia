@@ -1418,19 +1418,30 @@ now Release checks. A new 2,290-case corpus matches the reference byte for byte.
 storage and the process-wide cache. Candidate/reference suites pass 74/74 and 73/73, and the
 instrumented suite reports PASS. See ../results/2026-10-27/MASK_CACHE_GAUSS_CONVERSION.md.
 
+## Raster pipeline construction and kernel respelling
+
+SkRasterPipeline.cpp/.h are converted, and their op-table indexing is now checked in Release.
+SkRasterPipeline_opts.h is respelled without arrows, `auto` or lambdas, except one lambda for
+32-bit ARM only. Its object code is identical, function by function, on eight arm64 and x86-64
+configurations. Its macros, casts and multi-name declarations remain. A new 2,720-case pipeline
+corpus matches the reference. This is the mechanical step; the defects it found (const memory
+contexts written during runs, shared compiled-pipeline state, the any-pointer context adapter)
+are fixed separately. See ../results/2026-10-27/RASTER_PIPELINE_SPELLING.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
 constructs in 106 files; per-file counts are in
 ../results/2026-10-27/HOUSE_POLICY_INVENTORY.md. The mask cache and Gaussian filter unit since
-leaves 2,680 constructs in 102 files. The counts show spelling work only. They omit
+leaves 2,680 constructs in 102 files, and the raster pipeline step 2,076 in 99. The counts show spelling work only. They omit
 code this arm64 configuration does not compile, and zero findings is not conversion evidence.
 
-- **Raster pipeline and pixel kernels (about 720 findings).** `SkRasterPipeline.cpp/.h` and
-  `SkRasterPipeline_opts.h`, the bitmap-sampling procedures and their shader, row blending and
-  swizzles (`SkBlitRow_opts.h`, `SkSwizzler_opts.inc`, `Sk4px.h`, `SkVx.h`), and blend modes and
-  blenders. Imported optimized code stays the baseline. New
-  SIMD work follows the 128-bit portable policy and needs measurements.
+- **Raster pipeline and pixel kernels (about 115 findings).** These are the bitmap-sampling
+  procedures and their shader, row blending and swizzles (`SkBlitRow_opts.h`,
+  `SkSwizzler_opts.inc`, `Sk4px.h`, `SkVx.h`), and blend modes and blenders. The checkers do not
+  count the kernel header's macros, casts and multi-name declarations, or the defects recorded
+  with its respelling; those remain too. Imported optimized code stays the baseline. New SIMD
+  work follows the 128-bit portable policy and needs measurements.
 - **Canvas-adjacent state.** Clip stack and its device, paint and paint helpers, vertices and
   vertex state, 4x4 matrices, drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`,
   `SkMatrix22`, path utilities, lattice iteration and shadow info.

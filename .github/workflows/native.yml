@@ -36,6 +36,7 @@ jobs:
           cmake -E compare_files build/baseline/blitters.raw build/candidate/blitters.raw
           cmake -E compare_files build/baseline/canvas-device.raw build/candidate/canvas-device.raw
           cmake -E compare_files build/baseline/mask-cache.raw build/candidate/mask-cache.raw
+          cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
@@ -87,6 +88,7 @@ jobs:
           cmake -E compare_files build/baseline/blitters.raw build/candidate/blitters.raw
           cmake -E compare_files build/baseline/canvas-device.raw build/candidate/canvas-device.raw
           cmake -E compare_files build/baseline/mask-cache.raw build/candidate/mask-cache.raw
+          cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw

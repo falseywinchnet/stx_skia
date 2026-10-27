@@ -52,6 +52,8 @@ struct skcms_TransferFunction;
  */
 
 // Raster pipeline programs are stored as a contiguous array of SkRasterPipelineStages.
+// The stage stays trivially constructible: run() assembles programs in uninitialized
+// storage, and buildPipeline() writes every stage it reads.
 SK_BEGIN_REQUIRE_DENSE
 struct SkRasterPipelineStage {
     // `fn` holds a function pointer from `ops_lowp` or `ops_highp` in SkOpts.cpp. These functions
@@ -81,7 +83,9 @@ public:
     void reset();
 
     void append(SkRasterPipelineOp, void* = nullptr);
-    void append(SkRasterPipelineOp op, const void* ctx) { this->append(op,const_cast<void*>(ctx)); }
+    // Stage contexts are passed as mutable pointers; a stage that only reads a const
+    // context does not write through it.
+    void append(SkRasterPipelineOp op, const void* ctx) { append(op, const_cast<void*>(ctx)); }
     void append(SkRasterPipelineOp, uintptr_t ctx);
 
     // Append all stages to this pipeline.
@@ -90,14 +94,15 @@ public:
     // Runs the pipeline in 2d from (x,y) inclusive to (x+w,y+h) exclusive.
     void run(size_t x, size_t y, size_t w, size_t h) const;
 
-    // Allocates a thunk which amortizes run() setup cost in alloc.
+    // Allocates a thunk which amortizes run() setup cost in alloc. The thunk borrows the
+    // program and memory-context patches from alloc, so it must not outlive it.
     std::function<void(size_t, size_t, size_t, size_t)> compile() const;
 
     // Callers can inspect the stage list for debugging purposes.
     struct StageList {
-        StageList*          prev;
-        SkRasterPipelineOp  stage;
-        void*               ctx;
+        StageList*          prev = nullptr;
+        SkRasterPipelineOp  stage{};
+        void*               ctx = nullptr;
     };
 
     static const char* GetOpName(SkRasterPipelineOp op);
@@ -116,14 +121,14 @@ public:
     void appendConstantColor(SkArenaAlloc*, const float rgba[4]);
 
     void appendConstantColor(SkArenaAlloc* alloc, const SkColor4f& color) {
-        this->appendConstantColor(alloc, color.vec());
+        appendConstantColor(alloc, color.vec());
     }
 
     // Like appendConstantColor() but only affecting r,g,b, ignoring the alpha channel.
     void appendSetRGB(SkArenaAlloc*, const float rgb[3]);
 
     void appendSetRGB(SkArenaAlloc* alloc, const SkColor4f& color) {
-        this->appendSetRGB(alloc, color.vec());
+        appendSetRGB(alloc, color.vec());
     }
 
     void appendLoad(SkColorType, const SkRasterPipelineContexts::MemoryCtx*);
@@ -154,16 +159,19 @@ private:
                           bool load,
                           bool store);
 
-    SkArenaAlloc*                        fAlloc;
+    // Borrowed; stage lists, contexts and compiled programs live in it.
+    SkArenaAlloc*               fAlloc = nullptr;
     // A linked list of stages. fStages and getStageList() return the latest stage.
-    StageList*                  fStages;
-    int                         fNumStages;
+    StageList*                  fStages = nullptr;
+    int                         fNumStages = 0;
 
     // Only 1 in 2 million CPU-backend pipelines used more than two MemoryCtxs.
     // (See the comment in SkRasterPipelineOpContexts.h for how MemoryCtx patching works)
     skia_private::STArray<2, SkRasterPipelineContexts::MemoryCtxInfo> fMemoryCtxInfos;
 };
 
+// The base class receives the built-in arena's address before the arena is constructed; it
+// only stores the address, and nothing allocates until the arena exists.
 template <size_t bytes>
 class SkRasterPipeline_ : public SkRasterPipeline {
 public:
