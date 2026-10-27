@@ -308,3 +308,16 @@ in baseline/skia, unchanged with their notices. SkMatrix22 served only the font 
 and the Windows helpers only the WIC codecs, XPS and DirectWrite font backends, none of which
 the candidate compiles. The reference build compiles the baseline sources. tests/canvas_device.cpp
 checks the absence.
+
+## Uncompiled upstream directory removal
+
+src/gpu, src/codec, src/pathops, src/pdf, src/encode, src/partition_alloc, src/xml, src/xps,
+src/svg, src/android and src/capture, and the 58 headers outside them that only they included
+(include/gpu, include/codec and include/encode headers, codec metadata headers in
+include/private, the Chromium codec headers, SkSVGCanvas.h, SkAnimatedImage.h, and
+SkArenaAllocList.h, SkBitmaskEnum.h, SkIPoint16.h, SkRandom.h and SkScopeExit.h in src/core),
+now live only in baseline/skia: 952 files, unchanged since intake, with their notices. The
+candidate's modified copy of src/image/SkImageGeneratorPriv.h is deleted; its intake original
+was already in baseline/skia. The candidate build compiled no source from these directories and
+read none of these headers (its Ninja dependency records). The reference build takes its
+sources from them in baseline/skia. tests/canvas_device.cpp probes one header of each.

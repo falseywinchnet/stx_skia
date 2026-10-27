@@ -103,6 +103,16 @@ static_assert(!HasAnnotations<SkCanvas>);
     __has_include("src/utils/win/SkDWriteGeometrySink.h")
 #error Font-scaler and Windows helper headers must not be part of the candidate.
 #endif
+// Upstream directories the candidate never compiled, and the headers only they used, live in
+// baseline/skia: GPU, codecs, path ops, PDF, encoders, PartitionAlloc, XML, XPS, SVG, the
+// Android utilities and capture. One header from each is probed.
+#if __has_include("src/gpu/ganesh/GrCaps.h") || __has_include("src/codec/SkCodecPriv.h") || \
+    __has_include("src/pathops/SkPathOpsTypes.h") || __has_include("src/pdf/SkPDFDevice.h") || \
+    __has_include("src/encode/SkImageEncoderPriv.h") || __has_include("src/xml/SkXMLWriter.h") || \
+    __has_include("include/codec/SkCodec.h") || __has_include("include/gpu/ganesh/GrDirectContext.h") || \
+    __has_include("src/core/SkRandom.h")
+#error Uncompiled upstream directories must not be part of the candidate.
+#endif
 #endif
 // The canvas's shadow entry point, detected by expression so that overloads count.
 struct SkDrawShadowRec;

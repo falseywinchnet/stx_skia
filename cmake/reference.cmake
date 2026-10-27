@@ -520,3 +520,9 @@ foreach(unit IN ITEMS SkScan_Antihair SkScan_AntiPath SkScan_AAAPath)
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
+
+# Upstream directories the candidate never compiled moved to baseline/skia on 2026-10-27; the
+# reference keeps compiling its sources from them there.
+list(TRANSFORM stx_sources REPLACE
+    "^skia/src/(gpu|codec|pathops|pdf|encode|partition_alloc|xml|xps|svg|android|capture)/"
+    "baseline/skia/src/\\1/")
