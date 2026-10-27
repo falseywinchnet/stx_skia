@@ -182,6 +182,9 @@ void SkBlockAllocator::releaseBlock(Block* block) {
 }
 
 void SkBlockAllocator::stealHeapBlocks(SkBlockAllocator* other) {
+    // Stealing from itself would detach every heap block, leaking them with their live
+    // reservations and leaving only the head block.
+    SkASSERT_RELEASE(other != nullptr && other != this);
     Block* toSteal = (*other).fHead.fNext;
     if (toSteal) {
         // The other's next block connects back to this allocator's current tail, and its new tail

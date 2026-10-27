@@ -430,6 +430,14 @@ private:
         static constexpr size_t kAddressAlign = alignof(std::max_align_t);
     #endif
 
+    // A new block's address is only guaranteed kAddressAlign. For a larger Align, the first
+    // aligned offset depends on that address and can exceed BlockOverhead<Align, Padding>() by
+    // up to Align - kAddressAlign bytes, so a new block for such a request needs that much more.
+    template <size_t Align>
+    static constexpr int AddressSlack() {
+        return Align > kAddressAlign ? static_cast<int>(Align - kAddressAlign) : 0;
+    }
+
     // Calculates the size of a new Block required to store a kMaxAllocationSize request for the
     // given alignment and padding bytes. Also represents maximum valid fCursor value in a Block.
     template<size_t Align, size_t Padding>
@@ -536,7 +544,8 @@ constexpr size_t SkBlockAllocator::MaxBlockSize() {
     // Without loss of generality, assumes 'align' will be the largest encountered alignment for the
     // allocator (if it's not, the largest align will be encountered by the compiler and pass/fail
     // the same set of static asserts).
-    return BlockOverhead<Align, Padding>() + kMaxAllocationSize;
+    return BlockOverhead<Align, Padding>() + static_cast<size_t>(AddressSlack<Align>()) +
+           kMaxAllocationSize;
 }
 
 template<size_t Align, size_t Padding>
@@ -548,7 +557,8 @@ void SkBlockAllocator::reserve(size_t size, ReserveFlags flags) {
     if ((flags & kIgnoreExistingBytes_Flag) ||
         (*(*this).currentBlock()).avail<Align, Padding>() < iSize) {
 
-        const int blockSize = static_cast<int>(BlockOverhead<Align, Padding>()) + iSize;
+        const int blockSize = static_cast<int>(BlockOverhead<Align, Padding>()) +
+                              AddressSlack<Align>() + iSize;
         const int maxSize = (flags & kIgnoreGrowthPolicy_Flag)
                                     ? blockSize
                                     : static_cast<int>(MaxBlockSize<Align, Padding>());
@@ -565,8 +575,10 @@ void SkBlockAllocator::reserve(size_t size, ReserveFlags flags) {
 
 template <size_t Align, size_t Padding>
 SkBlockAllocator::ByteRange SkBlockAllocator::allocate(size_t size) {
-    // Amount of extra space for a new block to make sure the allocation can succeed.
-    static constexpr int kBlockOverhead = static_cast<int>(BlockOverhead<Align, Padding>());
+    // Amount of extra space for a new block to make sure the allocation can succeed, wherever
+    // the block's address falls.
+    static constexpr int kBlockOverhead =
+            static_cast<int>(BlockOverhead<Align, Padding>()) + AddressSlack<Align>();
 
     // Ensures 'offset' and 'end' calculations will be valid
     static_assert((kMaxAllocationSize + SkAlignTo(MaxBlockSize<Align, Padding>(), Align))
@@ -587,6 +599,8 @@ SkBlockAllocator::ByteRange SkBlockAllocator::allocate(size_t size) {
                          static_cast<int>(MaxBlockSize<Align, Padding>()));
         offset = (*fTail).cursor<Align, Padding>();
         end = offset + iSize;
+        // The new block was sized for this request; it must hold it.
+        SkASSERT_RELEASE(end <= (*fTail).fSize);
     }
 
     // Check invariants

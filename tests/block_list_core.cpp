@@ -16,6 +16,10 @@
 // number of live nontrivial items.
 //
 // Both builds must produce identical bytes (block-list-core.raw).
+//
+// The candidate alone checks what the intake code gets wrong, over-aligned allocations that
+// overrun the block made for them, and guards concatenating items with a trivial copy but a
+// nontrivial destructor. "--steal-self" selects a Release-check stop.
 
 #include "differential_corpus.h"
 
@@ -26,6 +30,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -495,10 +500,91 @@ void list_cases(Output& output) {
     }
 }
 
+#ifndef STX_SKIA_REFERENCE
+// Allocations aligned beyond the address alignment a block is guaranteed fit the block made for
+// them, wherever the heap places it, through allocate and through reserve. A fresh allocator's
+// only heap block is the one made for the request, so its size is the growth in total size.
+template <size_t Align>
+bool over_aligned_fit() {
+    std::vector<std::unique_ptr<SkBlockAllocator>> kept{};
+    for (size_t size = 1; size < 400; size += 3) {
+        for (int round = 0; round < 8; ++round) {
+            for (const bool reserved : {false, true}) {
+                kept.push_back(std::make_unique<SkBlockAllocator>(GrowthPolicy::kFixed, 1));
+                SkBlockAllocator& allocator = *kept.back();
+                if (reserved) allocator.reserve<Align>(size);
+                const SkBlockAllocator::ByteRange range = allocator.allocate<Align>(size);
+                if (range.fBlock == allocator.headBlock()) continue;
+                const size_t blockSize = allocator.totalSize() - allocator.preallocSize();
+                if (static_cast<size_t>(range.fEnd) > blockSize) return false;
+                const uintptr_t address =
+                        reinterpret_cast<uintptr_t>((*range.fBlock).ptr(range.fAlignedOffset));
+                if (address % Align != 0) return false;
+                std::memset((*range.fBlock).ptr(range.fAlignedOffset), 0x5A, size);
+            }
+        }
+    }
+    return true;
+}
+
+int gCopyDestroyed = 0;
+
+// A trivial copy with a nontrivial destructor: copying it as bytes would leave the source's
+// destructor unrun. (Clang's is_trivially_copy_constructible already counts the destructor, so
+// the intake code moves these too; this guards the condition, now is_trivially_copyable.)
+struct TrivialCopy {
+    int value = 0;
+    explicit TrivialCopy(int v) : value(v) {}
+    TrivialCopy(const TrivialCopy&) = default;
+    ~TrivialCopy() { ++gCopyDestroyed; }
+};
+static_assert(!std::is_trivially_copyable_v<TrivialCopy>);
+
+// Ten items, four of them in the source's head block. Concatenation copies those four and ends
+// the originals, so fourteen objects end in all, and the values arrive in order.
+bool trivial_copy_concat() {
+    gCopyDestroyed = 0;
+    {
+        SkTBlockList<TrivialCopy, 2> target{};
+        SkTBlockList<TrivialCopy, 4> source{};
+        for (int value = 0; value < 10; ++value) source.emplace_back(value);
+        target.concat(std::move(source));
+        if (target.count() != 10 || !source.empty()) return false;
+        for (int index = 0; index < 10; ++index) {
+            if (target.item(index).value != index) return false;
+        }
+    }
+    return gCopyDestroyed == 14;
+}
+
+// Each mode violates one Release-checked precondition and must stop the program.
+int stop_mode(const char* mode) {
+    if (std::strcmp(mode, "--steal-self") == 0) {
+        SkBlockAllocator allocator(GrowthPolicy::kFixed, 64);
+        allocator.allocate<4>(500);
+        allocator.stealHeapBlocks(&allocator);
+        return 0;
+    }
+    return 2;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 2) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (argc == 2 && std::strncmp(argv[1], "--", 2) == 0) return stop_mode(argv[1]);
+    if (!over_aligned_fit<16>() || !over_aligned_fit<32>() || !over_aligned_fit<64>() ||
+        !over_aligned_fit<128>()) {
+        std::puts("block list core: an over-aligned allocation overran its block");
+        return 1;
+    }
+    if (!trivial_copy_concat()) {
+        std::puts("block list core: concatenating trivially copied items left them unended");
+        return 1;
+    }
+#endif
     Output output{};
     allocator_cases(output);
     list_cases(output);

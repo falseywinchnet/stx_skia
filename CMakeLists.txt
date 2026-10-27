@@ -539,6 +539,12 @@ if(BUILD_TESTING)
     add_executable(stx_skia_block_list_core_tests tests/block_list_core.cpp)
     target_link_libraries(stx_skia_block_list_core_tests PRIVATE stx_skia)
     add_test(NAME block_list_core_contract COMMAND stx_skia_block_list_core_tests)
+    if(NOT STX_SKIA_BASELINE)
+        # A self-steal violates a Release-checked precondition and must stop the program.
+        add_test(NAME block_list_core_stops_steal-self
+                 COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_block_list_core_tests>
+                         -DMODE=--steal-self -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+    endif()
     add_executable(stx_skia_tarray_core_tests tests/tarray_core.cpp)
     target_link_libraries(stx_skia_tarray_core_tests PRIVATE stx_skia)
     add_test(NAME tarray_core_contract COMMAND stx_skia_tarray_core_tests)

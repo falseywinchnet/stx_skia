@@ -396,9 +396,11 @@ void SkTBlockList<T, SI1>::concat(SkTBlockList<T, SI2>&& other) {
                                                      SkBlockAllocator::kIgnoreGrowthPolicy_Flag);
         }
 
-        if constexpr (std::is_trivially_copy_constructible_v<T>) {
-            // memcpy all items at once (or twice between current and reserved space).
-            SkASSERT(std::is_trivially_destructible_v<T>);
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            // memcpy all items at once (or twice between current and reserved space). Only a
+            // trivially copyable item may be copied as bytes with its source left unended. The
+            // trait names that directly; is_trivially_copy_constructible counts the destructor
+            // in some standard libraries and not in others.
             if (avail > 0) {
                 // Copy 0 to avail items into existing tail block
                 CopyHeadItems(headBlock, headStart, *fAllocator.allocator(),

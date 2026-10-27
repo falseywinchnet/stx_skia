@@ -1618,18 +1618,26 @@ unchanged. The one remaining defect is fixed: appending a run of the array's own
 checks the run ends among the live elements even when the array does not grow, instead of
 reading the elements it is constructing. See ../results/2026-10-27/TARRAY_CONVERSION.md.
 
+## Block allocator and block list
+
+`SkBlockAllocator` and `SkTBlockList` keep their whole interfaces. A seeded corpus over both,
+using only alignments every target's block addresses satisfy, is identical in both builds; the
+respelling leaves it unchanged. Fixed: an allocation aligned beyond the block address alignment
+could overrun the block made for it (measured up to 9 bytes, in 88 of 1,064 cases at 32-byte
+alignment), and a self-steal of heap blocks leaked them. The block list's byte-copying `concat`
+now names `is_trivially_copyable`. See ../results/2026-10-27/BLOCK_LIST_CONVERSION.md.
+
 ## Still required
 
-Refreshed 2026-10-27 after TArray. The whole-library AST inventory counts 461 excluded
-constructs in 49 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 after the block allocator and list. The whole-library AST inventory
+counts 339 excluded constructs in 46 files, almost all `->` member arrows. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
 - **Remaining tree cleanup.** Public headers that nothing compiled includes and no consumer
   uses. The unbuilt upstream test, GM, benchmark and tool trees under `skia/` are kept as
   preserved sources.
-- **Memory, containers and support code.** `TBlockList`, the block allocator, the
-  arena, `SkZip`, `SkBuffer`, `SkRandom`, the spinlock, data tables, time, CPU detection,
+- **Memory, containers and support code.** The arena, `SkZip`, `SkBuffer`, `SkRandom`, the spinlock, data tables, time, CPU detection,
   tracing and assertion helpers, and the OS file ports. Also the compatibility remnants:
   `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the `SkSpan`
   traits.
