@@ -17,17 +17,18 @@ namespace SkOpts {
         raster_pipeline_lowp_stride  = SK_OPTS_NS::raster_pipeline_lowp_stride();
         raster_pipeline_highp_stride = SK_OPTS_NS::raster_pipeline_highp_stride();
 
-    #define M(st) ops_highp[(int)SkRasterPipelineOp::st] = (StageFn)SK_OPTS_NS::st;
-        SK_RASTER_PIPELINE_OPS_ALL(M)
-        just_return_highp = (StageFn)SK_OPTS_NS::just_return;
+        // The stage tables are in SkRasterPipelineOp order.
+        for (size_t i = 0; i < SK_OPTS_NS::kHighpStages.size(); ++i) {
+            ops_highp[i] = reinterpret_cast<StageFn>(SK_OPTS_NS::kHighpStages[i].stage);
+        }
+        just_return_highp = reinterpret_cast<StageFn>(SK_OPTS_NS::just_return);
         start_pipeline_highp = SK_OPTS_NS::start_pipeline;
-    #undef M
 
-    #define M(st) ops_lowp[(int)SkRasterPipelineOp::st] = (StageFn)SK_OPTS_NS::lowp::st;
-        SK_RASTER_PIPELINE_OPS_LOWP(M)
-        just_return_lowp = (StageFn)SK_OPTS_NS::lowp::just_return;
+        for (size_t i = 0; i < SK_OPTS_NS::lowp::kLowpStages.size(); ++i) {
+            ops_lowp[i] = reinterpret_cast<StageFn>(SK_OPTS_NS::lowp::kLowpStages[i].stage);
+        }
+        just_return_lowp = reinterpret_cast<StageFn>(SK_OPTS_NS::lowp::just_return);
         start_pipeline_lowp = SK_OPTS_NS::lowp::start_pipeline;
-    #undef M
     }
 }  // namespace SkOpts
 

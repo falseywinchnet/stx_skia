@@ -52,36 +52,32 @@ static_assert(!StoresTo<const SkRasterPipelineContexts::MemoryCtx*>);
 static_assert(LoadsDstFrom<SkRasterPipelineContexts::MemoryCtx*>);
 static_assert(!LoadsDstFrom<const SkRasterPipelineContexts::MemoryCtx*>);
 
-// The op context table's stage rule: the declared parameter must point to the entry's object,
-// may add const, and may not drop it; None takes NoCtx and Immediate takes void*.
+// Each precision's stage kernel receives exactly the table's pointer type: NoCtx for None,
+// void* for Immediate, and the listed object, read through const for memory contexts.
 template <SkRasterPipelineOp op, bool kHighp, typename Parameter>
-constexpr bool stage_accepts() {
-    using Spec = SkRasterPipelineOpContext<op>;
-    using Object = std::conditional_t<kHighp, typename Spec::HighpObject, typename Spec::LowpObject>;
-    const bool accepts = sk_raster_pipeline_stage_context_matches<Spec, Object, Parameter>();
-    return accepts;
+constexpr bool stage_receives() {
+    using Pointer = SkRasterPipelineStageContextPointer<SkRasterPipelineOpContext<op>, kHighp>;
+    const bool receives = std::is_same_v<Pointer, Parameter>;
+    return receives;
 }
 using MemoryCtx = SkRasterPipelineContexts::MemoryCtx;
-using GatherCtx = SkRasterPipelineContexts::GatherCtx;
 using DecalTileCtx = SkRasterPipelineContexts::DecalTileCtx;
-static_assert(stage_accepts<SkRasterPipelineOp::load_8888, true, const MemoryCtx*>());
-static_assert(stage_accepts<SkRasterPipelineOp::load_8888, true, MemoryCtx*>());
-static_assert(!stage_accepts<SkRasterPipelineOp::load_8888, true, const GatherCtx*>());
-static_assert(!stage_accepts<SkRasterPipelineOp::load_8888, true, const void*>());
-static_assert(stage_accepts<SkRasterPipelineOp::matrix_2x3, true, const float*>());
-static_assert(!stage_accepts<SkRasterPipelineOp::matrix_2x3, true, float*>());
-static_assert(stage_accepts<SkRasterPipelineOp::decal_x, false, DecalTileCtx*>());
-static_assert(stage_accepts<SkRasterPipelineOp::srcover, true, const void*>());
-static_assert(!stage_accepts<SkRasterPipelineOp::srcover, true, void*>());
-static_assert(!stage_accepts<SkRasterPipelineOp::srcover, true, const float*>());
-static_assert(stage_accepts<SkRasterPipelineOp::swizzle, true, void*>());
-static_assert(!stage_accepts<SkRasterPipelineOp::swizzle, true, const void*>());
-static_assert(stage_accepts<SkRasterPipelineOp::load_src, true, const float*>());
-static_assert(stage_accepts<SkRasterPipelineOp::load_src, false, const uint16_t*>());
-static_assert(!stage_accepts<SkRasterPipelineOp::load_src, false, const float*>());
-static_assert(stage_accepts<SkRasterPipelineOp::store_src, false, uint16_t*>());
-static_assert(stage_accepts<SkRasterPipelineOp::gamma_, true, const skcms_TransferFunction*>());
-static_assert(!stage_accepts<SkRasterPipelineOp::gamma_, true, const float*>());
+using CoordClampCtx = SkRasterPipelineContexts::CoordClampCtx;
+static_assert(stage_receives<SkRasterPipelineOp::load_8888, true, const MemoryCtx*>());
+static_assert(stage_receives<SkRasterPipelineOp::load_8888, false, const MemoryCtx*>());
+static_assert(!stage_receives<SkRasterPipelineOp::load_8888, true, MemoryCtx*>());
+static_assert(std::is_same_v<SkRasterPipelineOpContext<SkRasterPipelineOp::load_8888>::AppendObject,
+                             MemoryCtx>);
+static_assert(stage_receives<SkRasterPipelineOp::matrix_2x3, true, const float*>());
+static_assert(!stage_receives<SkRasterPipelineOp::matrix_2x3, true, float*>());
+static_assert(stage_receives<SkRasterPipelineOp::decal_x, false, DecalTileCtx*>());
+static_assert(stage_receives<SkRasterPipelineOp::clamp_x_and_y, false, const CoordClampCtx*>());
+static_assert(stage_receives<SkRasterPipelineOp::srcover, true, const void*>());
+static_assert(stage_receives<SkRasterPipelineOp::swizzle, true, void*>());
+static_assert(stage_receives<SkRasterPipelineOp::load_src, true, const float*>());
+static_assert(stage_receives<SkRasterPipelineOp::load_src, false, const uint16_t*>());
+static_assert(stage_receives<SkRasterPipelineOp::store_src, false, uint16_t*>());
+static_assert(stage_receives<SkRasterPipelineOp::gamma_, true, const skcms_TransferFunction*>());
 #endif
 
 namespace {

@@ -1436,6 +1436,13 @@ Release, which replaces the any-pointer `Ctx` adapter. Kernel object code is unc
 ISA variants. The audit fixed 33 type-punned callers, among them the tri-color shader reading
 `SkMatrix`'s private layout. See ../results/2026-10-27/RASTER_PIPELINE_FIXES.md.
 
+The kernel header has since lost its C-style casts, multi-name declarations and
+stage-generating macros. In their place are named casts, single declarations, written-out
+kernels, typed stage wrapper templates and explicit, order-checked stage tables. Its object code
+is unchanged on eight ISA configurations, except one AVX2 instruction reordering in three
+functions. Four kernels that declared mutable contexts they only read now take them const. See
+../results/2026-10-27/RASTER_KERNEL_MACROS.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
@@ -1447,8 +1454,8 @@ code this arm64 configuration does not compile, and zero findings is not convers
 - **Raster pipeline and pixel kernels (about 115 findings).** These are the bitmap-sampling
   procedures and their shader, row blending and swizzles (`SkBlitRow_opts.h`,
   `SkSwizzler_opts.inc`, `Sk4px.h`, `SkVx.h`), and blend modes and blenders. The checkers do not
-  count the kernel header's macros, casts and multi-name declarations, or the defects recorded
-  with its respelling; those remain too. Imported optimized code stays the baseline. New SIMD
+  count the kernel header's remaining configuration macros, or its LoongArch and 32-bit-ARM
+  blocks, which this machine cannot compile and which keep their casts and declarations. Imported optimized code stays the baseline. New SIMD
   work follows the 128-bit portable policy and needs measurements.
 - **Canvas-adjacent state.** Clip stack and its device, paint and paint helpers, vertices and
   vertex state, 4x4 matrices, drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`,

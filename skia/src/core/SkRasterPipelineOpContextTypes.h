@@ -17,17 +17,19 @@
 
 // Each raster pipeline op's context, as an explicit specialization of SkRasterPipelineOpContext.
 // The table says what SkRasterPipeline::append() accepts for the op and what each precision's
-// stage receives. Both sides are checked against it: append() in Release, and every stage at
-// compile time by the stage-defining macros in SkRasterPipeline_opts.h. An op without an entry
-// fails to compile wherever the table is read.
+// stage kernel receives. Both sides are checked against it: append() in Release, and every
+// kernel at compile time, because SkRasterPipeline_opts.h instantiates each stage with a kernel
+// pointer whose context parameter is the entry's type. An op without an entry fails to compile
+// wherever the table is read.
 //
 // Context kinds:
 //  - None: the stage ignores the context field.
 //  - Immediate: the field holds a value packed by append(op, uintptr_t), not an address.
-//  - Pointer to Object: callers pass an Object pointer, and both precisions read it. A const
-//    Object is read-only: callers may pass a const pointer and stages may not write it. A
-//    non-const Object must arrive mutable, because a stage writes it or run() repoints it
-//    for row tails (memory contexts); stages that only read it may still declare it const.
+//  - Pointer to Object: callers pass an Object pointer. A const Object is read-only: callers may
+//    pass a const pointer and stages may not write it. A non-const Object must arrive mutable,
+//    because a stage writes it or run() repoints it for row tails (memory contexts). Each
+//    precision's stage receives exactly its listed object type; memory contexts are read
+//    through const.
 //  - Lane storage: callers pass float storage sized for a highp program; a lowp program,
 //    lowp throughout, reads and writes the same storage as uint16_t lanes.
 
@@ -48,6 +50,11 @@ using SkRasterPipelineImmediateContext =
 template <typename Object>
 using SkRasterPipelinePointerContext =
         SkRasterPipelineContextSpec<SkRasterPipelineContextKind::kPointer, Object, Object, Object>;
+// Appended mutable, read through const by the stages: the memory contexts run() repoints.
+template <typename Object>
+using SkRasterPipelineConstStageContext =
+        SkRasterPipelineContextSpec<SkRasterPipelineContextKind::kPointer, Object, const Object,
+                                    const Object>;
 template <typename HighpLane, typename LowpLane>
 using SkRasterPipelineLaneContext =
         SkRasterPipelineContextSpec<SkRasterPipelineContextKind::kPointer, HighpLane, HighpLane,
@@ -94,62 +101,62 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::seed_shader>
         : SkRasterPipelineNoContext {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_a8>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_a8_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_a8>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_a8>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_565>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_565_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_565>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_565>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_4444>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_4444_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_4444>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_4444>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_8888>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_8888_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_8888>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_8888>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_rg88>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_rg88_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_rg88>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_rg88>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_r8>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::alpha_to_gray>
         : SkRasterPipelineNoContext {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::alpha_to_gray_dst>
@@ -176,20 +183,20 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_dst>
         : SkRasterPipelineLaneContext<float, uint16_t> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::scale_u8>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::scale_565>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::scale_1_float>
         : SkRasterPipelinePointerContext<const float> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::scale_native>
         : SkRasterPipelineLaneContext<const float, const uint16_t> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::lerp_u8>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::lerp_565>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::lerp_1_float>
         : SkRasterPipelinePointerContext<const float> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::lerp_native>
@@ -236,7 +243,7 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::overlay>
         : SkRasterPipelineNoContext {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::srcover_rgba_8888>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::matrix_translate>
         : SkRasterPipelinePointerContext<const float> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::matrix_scale_translate>
@@ -260,7 +267,7 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::mirror_x_1>
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::repeat_x_1>
         : SkRasterPipelineNoContext {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::clamp_x_and_y>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::CoordClampCtx> {};
+        : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::CoordClampCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::evenly_spaced_gradient>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GradientCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gradient>
@@ -274,39 +281,39 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::xy_to_radius>
         : SkRasterPipelineNoContext {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::emboss>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::EmbossCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::EmbossCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::swizzle>
         : SkRasterPipelineImmediateContext {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_x>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_y>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_r>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_g>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_b>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_a>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_r_255>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_g_255>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_b_255>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::debug_a_255>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::callback>
         : SkRasterPipelinePointerContext<SkRasterPipelineContexts::CallbackCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::unbounded_set_rgb>
@@ -321,151 +328,151 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::dither>
         : SkRasterPipelinePointerContext<const float> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_16161616>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_16161616_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_16161616>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_16161616>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_a16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_a16_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_a16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_a16>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_r16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_r16_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_r16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_r16>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_rg1616>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_rg1616_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_rg1616>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_rg1616>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_f16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_f16_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_f16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_f16>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_af16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_af16_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_af16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_af16>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_rf16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_rf16_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_rf16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_rf16>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_rgf16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_rgf16_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_rgf16>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_rgf16>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_f32>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_f32_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_f32>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_f32>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_1010102>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_1010102_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_1010102>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_1010102>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_1010102_xr>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_1010102_xr_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_1010102_xr>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_1010102_xr>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_10x6>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_10x6_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_10x6>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_10x6>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gather_10101010_xr>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::GatherCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_10101010_xr>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_10101010_xr_dst>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 // run() repoints this memory context for row tails.
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_10101010_xr>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MemoryCtx> {};
+        : SkRasterPipelineConstStageContext<SkRasterPipelineContexts::MemoryCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::store_src_rg>
         : SkRasterPipelinePointerContext<float> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::load_src_rg>
-        : SkRasterPipelinePointerContext<float> {};
+        : SkRasterPipelinePointerContext<const float> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::byte_tables>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::TablesCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::colorburn>
@@ -492,14 +499,14 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::matrix_4x3>
         : SkRasterPipelinePointerContext<const float> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::parametric>
         : SkRasterPipelinePointerContext<const skcms_TransferFunction> {};
+// The stage reads the transfer function's exponent, g.
+template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gamma_>
+        : SkRasterPipelinePointerContext<const skcms_TransferFunction> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::PQish>
         : SkRasterPipelinePointerContext<const skcms_TransferFunction> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::HLGish>
         : SkRasterPipelinePointerContext<const skcms_TransferFunction> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::HLGinvish>
-        : SkRasterPipelinePointerContext<const skcms_TransferFunction> {};
-// The stage reads the transfer function's exponent, g.
-template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::gamma_>
         : SkRasterPipelinePointerContext<const skcms_TransferFunction> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::ootf>
         : SkRasterPipelinePointerContext<const float> {};
@@ -566,13 +573,13 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::bicubic_p3y>
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::accumulate>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::SamplerCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::perlin_noise>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::PerlinNoiseCtx> {};
+        : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::PerlinNoiseCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::mipmap_linear_init>
         : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MipmapCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::mipmap_linear_update>
         : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MipmapCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::mipmap_linear_finish>
-        : SkRasterPipelinePointerContext<SkRasterPipelineContexts::MipmapCtx> {};
+        : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::MipmapCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::xy_to_2pt_conical_strip>
         : SkRasterPipelinePointerContext<const SkRasterPipelineContexts::Conical2PtCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::xy_to_2pt_conical_focal_on_circle>
@@ -593,26 +600,6 @@ template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::mask_2pt_conica
         : SkRasterPipelinePointerContext<SkRasterPipelineContexts::Conical2PtCtx> {};
 template <> struct SkRasterPipelineOpContext<SkRasterPipelineOp::apply_vector_mask>
         : SkRasterPipelinePointerContext<const uint32_t> {};
-
-// A stage context parameter matches the table when it has the table's form for that precision:
-// NoCtx (const void*) for None, void* for Immediate, and a pointer to the table's object,
-// possibly adding const, for Pointer.
-template <typename Spec, typename Object, typename Parameter>
-constexpr bool sk_raster_pipeline_stage_context_matches() {
-    if constexpr (Spec::kind == SkRasterPipelineContextKind::kNone) {
-        return std::is_same_v<Parameter, const void*>;
-    } else if constexpr (Spec::kind == SkRasterPipelineContextKind::kImmediate) {
-        return std::is_same_v<Parameter, void*>;
-    } else if constexpr (!std::is_pointer_v<Parameter>) {
-        return false;
-    } else {
-        using Pointee = std::remove_pointer_t<Parameter>;
-        const bool sameObject = std::is_same_v<std::remove_const_t<Pointee>,
-                                               std::remove_const_t<Object>>;
-        const bool keepsConst = !std::is_const_v<Object> || std::is_const_v<Pointee>;
-        return sameObject && keepsConst;
-    }
-}
 
 // The pointer type a stage receives for its context: const void* for None (NoCtx), void* for
 // Immediate, and a pointer to the precision's object for Pointer.
