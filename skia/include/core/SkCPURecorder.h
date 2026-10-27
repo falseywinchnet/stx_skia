@@ -8,17 +8,17 @@
 #ifndef skcpu_Recorder_DEFINED
 #define skcpu_Recorder_DEFINED
 
-#include <cstdint>
 #include "include/core/SkRecorder.h"
 #include "include/core/SkRefCnt.h"
 #include "include/private/SkAPI.h"
+
+#include <cstddef>
+#include <cstdint>
 
 class SkCanvas;
 class SkSurface;
 class SkSurfaceProps;
 struct SkImageInfo;
-
-#include <cstddef>
 
 namespace skcpu {
 
@@ -54,17 +54,17 @@ public:
                                        const SkSurfaceProps* surfaceProps);
     sk_sp<SkSurface> makeBitmapSurface(const SkImageInfo& imageInfo,
                                        const SkSurfaceProps* surfaceProps = nullptr);
-
 };
 
 inline Recorder* AsRecorder(SkRecorder* recorder) {
-    if (!recorder) {
+    if (recorder == nullptr) {
         return nullptr;
     }
-    if (recorder->type() != SkRecorder::Type::kCPU) {
+    if ((*recorder).type() != SkRecorder::Type::kCPU) {
         return nullptr;
     }
-    return static_cast<Recorder*>(recorder);
+    Recorder* cpu = static_cast<Recorder*>(recorder);
+    return cpu;
 }
 
 }  // namespace skcpu

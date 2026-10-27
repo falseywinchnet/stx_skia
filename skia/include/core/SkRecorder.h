@@ -32,7 +32,6 @@ public:
     virtual Type type() const = 0;
 
     virtual skcpu::Recorder* cpuRecorder() = 0;
-
 };
 
 #endif

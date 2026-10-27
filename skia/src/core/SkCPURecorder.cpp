@@ -13,11 +13,10 @@
 
 namespace skcpu {
 
+// The process-wide recorder lives until exit; surfaces and devices borrow it.
 Recorder* Recorder::TODO() {
-    static Recorder* gRecorder = ContextImpl::TODO()->makeRecorder().release();
+    static Recorder* gRecorder = (*ContextImpl::TODO()).makeRecorder().release();
     return gRecorder;
 }
-
-
 
 }  // namespace skcpu
