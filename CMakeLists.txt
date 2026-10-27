@@ -539,6 +539,15 @@ if(BUILD_TESTING)
     add_executable(stx_skia_tarray_core_tests tests/tarray_core.cpp)
     target_link_libraries(stx_skia_tarray_core_tests PRIVATE stx_skia)
     add_test(NAME tarray_core_contract COMMAND stx_skia_tarray_core_tests)
+    if(NOT STX_SKIA_BASELINE)
+        # Each mode violates one Release-checked precondition and must stop the program.
+        foreach(mode IN ITEMS index-past-end index-negative front-empty back-empty pop-empty
+                              append-past-live)
+            add_test(NAME tarray_core_stops_${mode}
+                     COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_tarray_core_tests>
+                             -DMODE=--${mode} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+        endforeach()
+    endif()
     add_executable(stx_skia_string_core_tests tests/string_core.cpp)
     target_link_libraries(stx_skia_string_core_tests PRIVATE stx_skia)
     add_test(NAME string_core_contract COMMAND stx_skia_string_core_tests)

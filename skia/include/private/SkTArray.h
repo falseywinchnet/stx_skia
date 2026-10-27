@@ -356,14 +356,19 @@ public:
         SkASSERT_RELEASE(t != nullptr);
         std::optional<TArray> aliasValues{};
         const T* source = t;
-        if (capacity() - fSize < n && ownsLiveElement(source)) {
+        if (ownsLiveElement(source)) {
+            // A source among the live elements must end with them, whether or not the array
+            // grows: past them it would read the elements this call is constructing.
             const size_t byteOffset = reinterpret_cast<uintptr_t>(source) -
                                       reinterpret_cast<uintptr_t>(fData);
             SkASSERT_RELEASE(byteOffset % sizeof(T) == 0);
             const size_t offset = byteOffset / sizeof(T);
             SkASSERT_RELEASE(static_cast<size_t>(n) <= static_cast<size_t>(fSize) - offset);
-            aliasValues.emplace(source, n);
-            source = (*aliasValues).data();
+            if (capacity() - fSize < n) {
+                // Growth frees the live elements, so copy them first.
+                aliasValues.emplace(source, n);
+                source = (*aliasValues).data();
+            }
         }
         checkRealloc(n, kGrowing);
         UnpoisonedCapacity construction(*this);

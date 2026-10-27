@@ -11,7 +11,9 @@
 // 40875c9c) moves the real capacity. The shared artifact keeps capacity >= size.
 //
 // Only inputs both builds define are used: no element of an array is passed back into it, and
-// default-initialized trivial elements are assigned before they are read.
+// default-initialized trivial elements are assigned before they are read. The candidate alone
+// checks appending the array's own elements and the Release stops; arguments beginning with "--"
+// select a stop.
 
 #include "differential_corpus.h"
 
@@ -22,6 +24,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <initializer_list>
 #include <type_traits>
@@ -356,10 +359,58 @@ void construction_cases(Output& output) {
     record(output, listed);
 }
 
+#ifndef STX_SKIA_REFERENCE
+// Each mode violates one Release-checked precondition and must stop the program. The first five
+// guard the existing bounds and emptiness checks, which trap through SkUNREACHABLE in the intake
+// code too. At the last, the intake code reads elements it is still constructing.
+int stop_mode(const char* mode) {
+    TArray<int> values{1, 2, 3, 4};
+    values.reserve_exact(16);
+    TArray<int> empty{};
+    if (std::strcmp(mode, "--index-past-end") == 0) {
+        std::printf("%d\n", values[4]);
+    } else if (std::strcmp(mode, "--index-negative") == 0) {
+        std::printf("%d\n", values[-1]);
+    } else if (std::strcmp(mode, "--front-empty") == 0) {
+        std::printf("%d\n", empty.front());
+    } else if (std::strcmp(mode, "--back-empty") == 0) {
+        std::printf("%d\n", empty.back());
+    } else if (std::strcmp(mode, "--pop-empty") == 0) {
+        empty.pop_back();
+    } else if (std::strcmp(mode, "--append-past-live") == 0) {
+        // Capacity suffices, so no growth: the source runs past the live elements.
+        values.push_back_n(4, values.data() + 2);
+    } else {
+        return 2;
+    }
+    return 0;
+}
+
+// Appending a run of the array's own live elements, with and without growth, copies them.
+bool own_elements_append() {
+    TArray<int> roomy{1, 2, 3, 4};
+    roomy.reserve_exact(16);
+    roomy.push_back_n(2, roomy.data() + 2);
+    TArray<int> tight{1, 2, 3, 4};
+    tight.shrink_to_fit();
+    tight.push_back_n(4, tight.data());
+    const TArray<int> roomyExpected{1, 2, 3, 4, 3, 4};
+    const TArray<int> tightExpected{1, 2, 3, 4, 1, 2, 3, 4};
+    return roomy == roomyExpected && tight == tightExpected;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 3) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (argc == 2 && std::strncmp(argv[1], "--", 2) == 0) return stop_mode(argv[1]);
+    if (!own_elements_append()) {
+        std::puts("tarray core: appending the array's own elements went wrong");
+        return 1;
+    }
+#endif
     Output output{};
     construction_cases<TArray<int>>(output);
     construction_cases<TArray<Tracked>>(output);

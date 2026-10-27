@@ -1609,17 +1609,26 @@ null text with a length gives zero bytes instead of uninitialized ones, and leng
 32 bits stop the program instead of truncating, without the wrap a 32-bit `size_t` allowed.
 See ../results/2026-10-27/STRING_CONVERSION.md.
 
+## TArray corpus and respelling
+
+`TArray` and `STArray` keep their whole interface. A seeded corpus over every public operation
+on six array types is identical in both builds. Exact capacities differ on purpose: the intake
+move constructor reports the size as the capacity. The respelling leaves both artifacts
+unchanged. The one remaining defect is fixed: appending a run of the array's own elements now
+checks the run ends among the live elements even when the array does not grow, instead of
+reading the elements it is constructing. See ../results/2026-10-27/TARRAY_CONVERSION.md.
+
 ## Still required
 
-Refreshed 2026-10-27 after the strings. The whole-library AST inventory counts 501 excluded
-constructs in 51 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 after TArray. The whole-library AST inventory counts 461 excluded
+constructs in 49 files, almost all `->` member arrows. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
 - **Remaining tree cleanup.** Public headers that nothing compiled includes and no consumer
   uses. The unbuilt upstream test, GM, benchmark and tool trees under `skia/` are kept as
   preserved sources.
-- **Memory, containers and support code.** `TArray`, `TBlockList`, the block allocator, the
+- **Memory, containers and support code.** `TBlockList`, the block allocator, the
   arena, `SkZip`, `SkBuffer`, `SkRandom`, the spinlock, data tables, time, CPU detection,
   tracing and assertion helpers, and the OS file ports. Also the compatibility remnants:
   `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the `SkSpan`
