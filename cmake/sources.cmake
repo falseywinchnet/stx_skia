@@ -121,7 +121,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkLocalMatrixImageFilter.cpp
     skia/src/core/SkLog.cpp
     skia/src/core/SkM44.cpp
-    skia/src/core/SkMD5.cpp
     skia/src/core/SkMalloc.cpp
     skia/src/core/SkMallocPixelRef.cpp
     skia/src/core/SkMask.cpp

@@ -12,6 +12,7 @@
 #include "include/core/SkRRect.h"
 #include "include/core/SkRect.h"
 #include "include/core/SkStream.h"
+#include "stream_sink.h"
 #include "src/core/SkPathPriv.h"
 #include "src/core/SkPathRawShapes.h"
 
@@ -467,16 +468,12 @@ void serialize(Output& output, const SkPath& path) {
     }
     const sk_sp<SkData> data = path.serialize();
     append(output, static_cast<uint64_t>((*data).size()));
-    SkDynamicMemoryWStream decimal{};
+    ByteSink decimal{};
     path.dump(&decimal, false);
-    SkDynamicMemoryWStream hex{};
+    ByteSink hex{};
     path.dump(&hex, true);
-    const sk_sp<SkData> decimalText = decimal.detachAsData();
-    const sk_sp<SkData> hexText = hex.detachAsData();
-    const uint8_t* decimalBytes = (*decimalText).bytes();
-    const uint8_t* hexBytes = (*hexText).bytes();
-    output.bytes.insert(output.bytes.end(), decimalBytes, decimalBytes + (*decimalText).size());
-    output.bytes.insert(output.bytes.end(), hexBytes, hexBytes + (*hexText).size());
+    output.bytes.insert(output.bytes.end(), decimal.bytes().begin(), decimal.bytes().end());
+    output.bytes.insert(output.bytes.end(), hex.bytes().begin(), hex.bytes().end());
 }
 
 void interpolate(Output& output, const SkPath& a, const SkPath& b) {

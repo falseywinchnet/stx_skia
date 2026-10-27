@@ -7,6 +7,7 @@
 #include "include/core/SkSerialProcs.h"
 #include "include/core/SkShader.h"
 #include "include/core/SkStream.h"
+#include "stream_sink.h"
 #include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkShaderMaskFilter.h"
 #include "src/core/SkWriteBuffer.h"
@@ -87,10 +88,9 @@ bool writer_reuse() {
         const bool fits = (*expected).size() <= capacity;
         if (reused.usingInitialStorage() != fits) return false;
         if (external.front() != 0xaabbccddU || external[1 + capacity / 4] != 0xaabbccddU) return false;
-        SkDynamicMemoryWStream stream{};
+        ByteSink stream{};
         if (!reused.writeToStream(&stream) || stream.bytesWritten() != (*expected).size()) return false;
-        std::vector<uint8_t> copied(stream.bytesWritten());
-        stream.copyTo(copied.data());
+        const std::vector<uint8_t>& copied = stream.bytes();
         if (std::memcmp(copied.data(), (*expected).data(), copied.size()) != 0) return false;
         reused.reset();
         sk_sp<SkData> resetEmpty = reused.snapshotAsData();

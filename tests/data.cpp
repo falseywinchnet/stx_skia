@@ -9,7 +9,25 @@
 #include <memory>
 
 namespace {
+// The candidate keeps only the abstract stream interfaces that SkData, SkPath::dump and the
+// write buffers use; the typed readers, text and packed writers and stream copying are in
+// baseline/skia, with the concrete memory and file streams. Expressions, so overloads count.
+template <typename T>
+concept HasTypedReads = requires(T& stream, int32_t* value) { stream.readS32(value); };
+template <typename T>
+concept HasTextWriters = requires(T& stream) { stream.writeDecAsText(1); };
+template <typename T>
+concept HasStreamCopy = requires(T& stream, SkStream* input) { stream.writeStream(input, 1); };
 #ifndef STX_SKIA_REFERENCE
+static_assert(!HasTypedReads<SkStream> && !HasTextWriters<SkWStream> &&
+              !HasStreamCopy<SkWStream>);
+#if __has_include("src/core/SkMD5.h")
+#error SkMD5 must not be part of the candidate.
+#endif
+#else
+static_assert(HasTypedReads<SkStream> && HasTextWriters<SkWStream> && HasStreamCopy<SkWStream>);
+#endif
+
 class ChunkedStream final : public SkStream {
 public:
     ChunkedStream(const std::uint8_t* bytes, std::size_t length, std::size_t chunk,
@@ -46,7 +64,6 @@ private:
     bool fInvalidPosition;
     std::size_t fPosition = 0;
 };
-#endif
 
 void count_release(const void*, void* context) {
     unsigned int& count = *static_cast<unsigned int*>(context);
@@ -93,10 +110,11 @@ bool ownership_and_streams() {
     if (releases != 0 || (*subset).bytes()[0] != 5) return false;
     subset.reset();
     if (releases != 1) return false;
-    SkMemoryStream stream(input.data(), input.size(), false);
-    data = SkData::MakeFromStream(&stream, input.size());
+    // A stream that reads everything at once and knows its length and position.
+    ChunkedStream whole(input.data(), input.size(), input.size());
+    data = SkData::MakeFromStream(&whole, input.size());
     if (!data || std::memcmp((*data).data(), input.data(), input.size()) != 0) return false;
-    if (SkData::MakeFromStream(&stream, 1)) return false;
+    if (SkData::MakeFromStream(&whole, 1)) return false;
 #ifndef STX_SKIA_REFERENCE
     ChunkedStream chunked(input.data(), input.size(), 1);
     data = SkData::MakeFromStream(&chunked, input.size());
@@ -118,75 +136,10 @@ bool ownership_and_streams() {
     return subset && (*subset).size() == 0;
 }
 
-bool memory_stream_move() {
-    SkMemoryStream empty;
-    std::uint8_t untouched = 0x5a;
-    if (empty.read(&untouched, 1) != 0 || untouched != 0x5a || empty.getAtPos() != nullptr) {
-        return false;
-    }
-    const std::array<std::uint8_t, 6> bytes = {1, 2, 3, 4, 5, 6};
-    SkMemoryStream stream(bytes.data(), bytes.size(), false);
-    if (!stream.seek(4) || !stream.move(-2) || stream.getPosition() != 2) return false;
-    if (!stream.move(-1) || stream.getPosition() != 1) return false;
-    if (!stream.move(-std::numeric_limits<long>::max()) || stream.getPosition() != 0) return false;
-    if (!stream.move(std::numeric_limits<long>::min()) || stream.getPosition() != 0) return false;
-    if (!stream.move(std::numeric_limits<long>::max()) ||
-        stream.getPosition() != bytes.size()) return false;
-    if (!stream.move(-1) || stream.getPosition() != bytes.size() - 1) return false;
-    if (!stream.move(1) || stream.getPosition() != bytes.size()) return false;
-    return true;
-}
-
-#ifndef STX_SKIA_REFERENCE
-bool block_stream_bounds() {
-    const std::array<std::uint8_t, 7> bytes = {3, 5, 7, 11, 13, 17, 19};
-    SkDynamicMemoryWStream writer;
-    if (writer.write(bytes.data(), std::numeric_limits<std::size_t>::max()) ||
-        writer.bytesWritten() != 0) return false;
-    if (!writer.write(bytes.data(), bytes.size())) return false;
-    if (writer.write(bytes.data(), std::numeric_limits<std::size_t>::max()) ||
-        writer.bytesWritten() != bytes.size()) return false;
-
-    std::array<std::uint8_t, 7> untouched{};
-    untouched.fill(0xa5);
-    if (writer.read(untouched.data(), 1, std::numeric_limits<std::size_t>::max())) {
-        return false;
-    }
-    for (std::uint8_t value : untouched) {
-        if (value != 0xa5) return false;
-    }
-
-    std::unique_ptr<SkStreamAsset> reader = writer.detachAsStream();
-    if (!reader || writer.bytesWritten() != 0) return false;
-    std::array<std::uint8_t, 7> output{};
-    if ((*reader).read(output.data(), std::numeric_limits<std::size_t>::max()) != bytes.size()) {
-        return false;
-    }
-    if (output != bytes || (*reader).getPosition() != bytes.size()) return false;
-    if ((*reader).read(output.data(), 1) != 0 || (*reader).read(output.data(), 0) != 0) {
-        return false;
-    }
-    if (!(*reader).move(-2) || (*reader).getPosition() != bytes.size() - 2) return false;
-    if (!(*reader).move(-std::numeric_limits<long>::max()) || (*reader).getPosition() != 0) {
-        return false;
-    }
-    if (!(*reader).move(std::numeric_limits<long>::min()) || (*reader).getPosition() != 0) {
-        return false;
-    }
-    if (!(*reader).move(std::numeric_limits<long>::max()) ||
-        (*reader).getPosition() != bytes.size()) return false;
-    if (!(*reader).seek(std::numeric_limits<std::size_t>::max()) ||
-        (*reader).getPosition() != bytes.size()) return false;
-    return true;
-}
-#endif
 }
 
 int main() {
-    if (!subsets() || !ownership_and_streams() || !memory_stream_move()) return 1;
-#ifndef STX_SKIA_REFERENCE
-    if (!block_stream_bounds()) return 1;
-#endif
+    if (!subsets() || !ownership_and_streams()) return 1;
     std::puts("data subsets, ranges, ownership and streams: PASS");
     return 0;
 }

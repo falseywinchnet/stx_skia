@@ -321,3 +321,14 @@ candidate's modified copy of src/image/SkImageGeneratorPriv.h is deleted; its in
 was already in baseline/skia. The candidate build compiled no source from these directories and
 read none of these headers (its Ninja dependency records). The reference build takes its
 sources from them in baseline/skia. tests/canvas_device.cpp probes one header of each.
+
+## Stream pruning
+
+The candidate keeps only the abstract SkStream and SkWStream interfaces that SkData::MakeFromStream,
+SkPath::dump and the write buffers use (read, skip, isAtEnd, position and length; write, flush,
+bytesWritten and writeText) and SkStreamPriv::RemainingLengthIsBelow. The concrete memory, file
+and dynamic-memory streams, SkNullWStream, the stream subclass hierarchy, typed readers, text and
+packed writers, stream copying, the other SkStreamPriv helpers and SkMD5 had no user in the library
+or GUI.Forms; only our own tests used them. baseline/skia holds the intake SkStream.h, SkStream.cpp
+and SkStreamPriv.h (taken from 490c9bd4, before the candidate's later stream fixes) and SkMD5,
+moved unchanged; the reference build compiles them. The kept parts are carried over verbatim.

@@ -24,27 +24,6 @@
 #endif
 
 namespace {
-class ShortStream final : public SkStream {
-public:
-    ShortStream(const uint8_t* bytes, size_t length) : fBytes(bytes), fLength(length) {}
-
-    size_t read(void* buffer, size_t size) override {
-        if (size == 0 || fPosition == fLength) return 0;
-        if (buffer != nullptr) {
-            std::memcpy(buffer, fBytes + fPosition, 1);
-        }
-        ++fPosition;
-        return 1;
-    }
-
-    bool isAtEnd() const override { return fPosition == fLength; }
-
-private:
-    const uint8_t* fBytes;
-    size_t fLength;
-    size_t fPosition = 0;
-};
-
 class MaskCapture final : public SkBlitter {
 public:
     void blitH(int, int, int) override { fValid = false; }
@@ -149,48 +128,6 @@ bool base64_bounds() {
         if (value != 0xa5) return false;
     }
     return true;
-}
-
-bool stream_counts() {
-    const std::array<uint8_t, 5> bytes = {11, 22, 33, 44, 55};
-    ShortStream complete(bytes.data(), bytes.size());
-    SkDynamicMemoryWStream completeOutput;
-    if (!completeOutput.writeStream(&complete, bytes.size())) return false;
-    const std::vector<uint8_t> copied = completeOutput.detachAsVector();
-    if (copied.size() != bytes.size()) return false;
-    for (size_t index = 0; index < bytes.size(); ++index) {
-        if (copied[index] != bytes[index]) return false;
-    }
-
-    ShortStream shortInput(bytes.data(), 3);
-    SkDynamicMemoryWStream shortOutput;
-    if (shortOutput.writeStream(&shortInput, bytes.size())) return false;
-    const std::vector<uint8_t> prefix = shortOutput.detachAsVector();
-    if (prefix.size() != 3) return false;
-    for (size_t index = 0; index < prefix.size(); ++index) {
-        if (prefix[index] != bytes[index]) return false;
-    }
-    return true;
-}
-
-bool file_stream_failure_states() {
-    std::array<uint8_t, 1> output = {0x5a};
-    SkFILEStream reader;
-    if (reader.isValid() || reader.read(output.data(), output.size()) != 0) return false;
-    if (output[0] != 0x5a) return false;
-    reader.close();
-    if (reader.read(output.data(), output.size()) != 0) return false;
-
-    SkFILEStream sizedReader(static_cast<FILE*>(nullptr), 8);
-    if (sizedReader.isValid() || !sizedReader.isAtEnd() || sizedReader.getLength() != 0 ||
-        sizedReader.read(output.data(), output.size()) != 0 || output[0] != 0x5a) return false;
-    std::unique_ptr<SkStreamAsset> duplicate = sizedReader.duplicate();
-    if (!(*duplicate).isAtEnd() || (*duplicate).getLength() != 0) return false;
-
-    SkFILEWStream writer(nullptr);
-    if (writer.isValid() || writer.bytesWritten() != 0) return false;
-    if (writer.write(output.data(), output.size())) return false;
-    return writer.bytesWritten() == 0;
 }
 
 bool narrow_draw_inside_wide_clip() {
@@ -345,14 +282,6 @@ int main() {
     if (!base64_bounds()) {
         std::fprintf(stderr, "Base64 bounds contract failed\n");
         return 1;
-    }
-    if (!stream_counts()) {
-        std::fprintf(stderr, "stream copy count contract failed\n");
-        return 2;
-    }
-    if (!file_stream_failure_states()) {
-        std::fprintf(stderr, "file stream failure contract failed\n");
-        return 3;
     }
     if (!narrow_draw_inside_wide_clip()) {
         std::fprintf(stderr, "narrow draw in wide AA clip failed\n");
