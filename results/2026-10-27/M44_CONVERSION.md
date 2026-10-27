@@ -151,10 +151,10 @@ for the two sources or the test.
 
 ## Open
 
-- `SkInvert4x4Matrix` returns the determinant as a float. A matrix whose double-precision
-  determinant is below about 1.4e-45 has a finite inverse but is reported as non-invertible
-  (for a 2D scale s, |s| below about 3.7e-23). `SkInvert3x3Matrix` has the same narrowing. Both
-  belong to the `SkMatrixInvert` unit.
+- Resolved in MATRIX_INVERT_CONVERSION.md: `SkInvert4x4Matrix` returned the determinant as a
+  float, so a matrix whose double-precision determinant is at most about 7e-46 had a finite
+  inverse but was reported as non-invertible (for a 2D scale s, |s| below about 2.6e-23).
+  `SkInvert3x3Matrix`, which had the same narrowing, is removed.
 - `SkMatrix::normalizePerspective` still turns a matrix with an infinite bottom-right entry
   into a finite one; that belongs to the 3x3 matrix unit.
 - `SkV3::Normalize` and `SkV4::Normalize` return NaN for a zero vector, as upstream does. No

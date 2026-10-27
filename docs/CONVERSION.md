@@ -1470,6 +1470,16 @@ in Release, vector indexing names its members, and no constructor leaves a matri
 uninitialized. A new 4x4 corpus matches the reference; changed results are kept apart in
 `m44-corrected.raw`. See ../results/2026-10-27/M44_CONVERSION.md.
 
+## 4x4 matrix inversion
+
+The 4x4 inverter is converted and the unused 2x2 and 3x3 inverters are removed; the intake files
+serve the reference profile's SkSL sources. Invertibility is now decided in double precision.
+The determinant narrowed to float used to round to zero below about 7e-46 and refuse matrices
+with finite inverses. The function takes both matrices as references to arrays of 16, so the
+finite-inverse check always runs. A new inversion corpus matches the reference, and the
+small-entry cases whose answers changed are kept apart. See
+../results/2026-10-27/MATRIX_INVERT_CONVERSION.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded

@@ -341,20 +341,34 @@ void normalize_corpus(Output& output, Output& corrected) {
     }
 }
 
-void inversion_corpus(Output& output) {
+// Matrices with a nonzero entry below 2^-10 can have a double determinant that rounds to zero
+// in float, which the reference refused and the candidate does not; they go to the corrected
+// output.
+bool has_small_entry(const SkM44& m) {
+    for (const float value : column_major(m)) {
+        if (value != 0 && std::isfinite(value) && std::fabs(value) < 0x1p-10f) return true;
+    }
+    return false;
+}
+
+void append_inversion(Output& output, const SkM44& m) {
+    SkM44 inverse = SkM44::Translate(9, 9, 9);
+    const bool invertible = m.invert(&inverse);
+    append_bool(output, invertible);
+    append_m44(output, inverse);
+    SkM44 self = m;
+    const bool selfInvertible = self.invert(&self);
+    append_bool(output, selfInvertible);
+    append_m44(output, self);
+    ++output.cases;
+}
+
+void inversion_corpus(Output& output, Output& corrected) {
     Sequence sequence{};
     for (int i = 0; i < 400; ++i) {
         const bool special = i % 5 == 4;
         const SkM44 m = make_matrix(sequence, static_cast<Shape>(sequence.pick(4)), special);
-        SkM44 inverse = SkM44::Translate(9, 9, 9);
-        const bool invertible = m.invert(&inverse);
-        append_bool(output, invertible);
-        append_m44(output, inverse);
-        SkM44 self = m;
-        const bool selfInvertible = self.invert(&self);
-        append_bool(output, selfInvertible);
-        append_m44(output, self);
-        ++output.cases;
+        append_inversion(has_small_entry(m) ? corrected : output, m);
     }
     // Singular, nearly singular and tiny-scale matrices.
     const std::array<SkM44, 6> special{SkM44::Scale(0, 1, 1), SkM44::Scale(1e-12f, 1e-12f),
@@ -362,10 +376,11 @@ void inversion_corpus(Output& output) {
                                        SkM44(1, 2, 3, 4, 2, 4, 6, 8, 0, 0, 1, 0, 0, 0, 0, 1),
                                        SkM44::Scale(corpus::kFloatMin, 1)};
     for (const SkM44& m : special) {
+        Output& destination = has_small_entry(m) ? corrected : output;
         SkM44 inverse{};
-        append_bool(output, m.invert(&inverse));
-        append_m44(output, inverse);
-        ++output.cases;
+        append_bool(destination, m.invert(&inverse));
+        append_m44(destination, inverse);
+        ++destination.cases;
     }
 }
 
@@ -614,7 +629,7 @@ int main(int argc, char** argv) {
     concat_corpus(output);
     rotation_corpus(output, corrected);
     normalize_corpus(output, corrected);
-    inversion_corpus(output);
+    inversion_corpus(output, corrected);
     map_corpus(output);
     map_rect_corpus(output);
     vector_corpus(output);

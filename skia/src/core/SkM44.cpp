@@ -262,10 +262,10 @@ void SkM44::normalizePerspective() {
     promoting our SkScalar values to double (if needed).
  */
 bool SkM44::invert(SkM44* inverse) const {
-    // The inverse is always computed: SkInvert4x4Matrix checks that it is finite only when it
-    // has somewhere to write it.
+    // The inverse is computed even without storage, so that invertibility always means a finite
+    // inverse; scratch storage keeps a refused inverse out of the caller's matrix.
     SkScalar tmp[16] = {};
-    if (SkInvert4x4Matrix(fMat, tmp) == 0.0f) {
+    if (!SkInvert4x4Matrix(fMat, tmp)) {
         return false;
     }
     if (inverse != nullptr) {

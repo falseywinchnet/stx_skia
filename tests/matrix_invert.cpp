@@ -6,11 +6,13 @@
 // Every entry of a shared matrix is zero, non-finite, or at least 2^-10 in magnitude. Such an
 // entry is a multiple of 2^-33, so every product of four is a multiple of 2^-132, and the double
 // determinant is either zero or at least 2^-132: rounding it to float cannot reach zero. Matrices
-// with smaller entries are written to the second output, whose results the determinant fix
-// changes.
+// with smaller entries are written to the second output (matrix-invert-small.raw). The
+// reference refuses those whose float determinant underflows, and the candidate does not, so
+// that output is meant to differ.
 
 #include "differential_corpus.h"
 
+#include "include/core/SkM44.h"
 #include "src/core/SkMatrixInvert.h"
 
 #include <array>
@@ -18,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 namespace {
 
@@ -28,14 +31,32 @@ using corpus::append_bool;
 
 using Matrix = std::array<float, 16>;
 
+// The reference returns the determinant narrowed to float, zero meaning not invertible; the
+// candidate returns whether the matrix is invertible and takes arrays by reference.
+bool invert_arrays(const SkScalar (&in)[16], SkScalar (&out)[16]) {
+#ifdef STX_SKIA_REFERENCE
+    const bool invertible = SkInvert4x4Matrix(in, out) != 0.0f;
+#else
+    const bool invertible = SkInvert4x4Matrix(in, out);
+#endif
+    return invertible;
+}
+
 bool invert(const Matrix& in, Matrix& out) {
-    const bool invertible = SkInvert4x4Matrix(in.data(), out.data()) != 0.0f;
+    SkScalar input[16] = {};
+    SkScalar output[16] = {};
+    std::memcpy(input, in.data(), sizeof(input));
+    const bool invertible = invert_arrays(input, output);
+    std::memcpy(out.data(), output, sizeof(output));
     return invertible;
 }
 
 // In-place inversion: the input and output arrays are the same.
 bool invert_in_place(Matrix& matrix) {
-    const bool invertible = SkInvert4x4Matrix(matrix.data(), matrix.data()) != 0.0f;
+    SkScalar values[16] = {};
+    std::memcpy(values, matrix.data(), sizeof(values));
+    const bool invertible = invert_arrays(values, values);
+    std::memcpy(matrix.data(), values, sizeof(values));
     return invertible;
 }
 
@@ -203,10 +224,55 @@ void small_corpus(Output& small) {
     }
 }
 
+#ifndef STX_SKIA_REFERENCE
+// The interface takes arrays of 16 by reference, so a null or shorter output cannot be passed.
+template <typename P>
+concept InvertsThroughPointers = requires(const P* in, P* out) { SkInvert4x4Matrix(in, out); };
+static_assert(!InvertsThroughPointers<float>);
+
+Matrix diagonal(float x, float y, float z, float w) {
+    Matrix m{};
+    m[0] = x;
+    m[5] = y;
+    m[10] = z;
+    m[15] = w;
+    return m;
+}
+
+// Scales whose determinant underflows float invert exactly, as long as the inverse fits.
+bool tiny_determinants_invert() {
+    const std::array<float, 6> scales{1e-12f, 1e-20f, 1e-23f, 0x1p-60f, 1e-30f, 3e-39f};
+    for (const float s : scales) {
+        const float expected = static_cast<float>(1.0 / static_cast<double>(s));
+        const std::array<Matrix, 2> cases{diagonal(s, s, 1, 1), diagonal(s, s, s, s)};
+        for (const Matrix& m : cases) {
+            Matrix out{};
+            if (!invert(m, out) || out[0] != expected || out[5] != expected) return false;
+        }
+    }
+    // The inverse of a denormal or 1e-39 scale does not fit in a float.
+    Matrix out{};
+    if (invert(diagonal(corpus::kDenormal, 1, 1, 1), out)) return false;
+    if (invert(diagonal(1e-39f, 1, 1, 1), out)) return false;
+    // Singular and non-finite matrices are refused.
+    if (invert(diagonal(0, 1, 1, 1), out)) return false;
+    if (invert(diagonal(corpus::kNaN, 1, 1, 1), out)) return false;
+    if (invert(diagonal(corpus::kInf, 1, 1, 1), out)) return false;
+    // SkM44 inverts a 2D scale by 1e-20, which it used to refuse.
+    SkM44 inverse{};
+    const bool scaleInverts = SkM44::Scale(1e-20f, 1e-20f).invert(&inverse);
+    return scaleInverts && inverse.rc(0, 0) == static_cast<float>(1.0 / 1e-20f) &&
+           inverse.rc(2, 2) == 1;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 3) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (!tiny_determinants_invert()) { std::puts("matrix invert: tiny determinants failed"); return 1; }
+#endif
     Output output{};
     Output small{};
     shared_corpus(output, small);
