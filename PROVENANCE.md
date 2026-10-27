@@ -253,3 +253,15 @@ unchanged with their notices. They served the PDF, SVG and XPS backends; nothing
 CPU candidate or the reference profile compiles uses them, and the CPU canvas clips
 through SkRasterClipStack. tests/canvas_device.cpp checks that the candidate cannot
 reach either header. The upstream ClipStackTest.cpp source is preserved and not built.
+
+
+## Drawable and annotation removal
+
+SkDrawable.h/.cpp leave the candidate; their original copies were already in
+baseline/skia, which the reference build compiles. SkAnnotation.h/.cpp,
+SkAnnotationKeys.h and the PDF-disabled stub SkDocument_PDF_None.cpp now live only in
+baseline/skia, unchanged with their notices. The CPU device ignored annotations, the
+stub's PDF entry points were not installed, and no consumer drew drawables. SkCanvas,
+SkDevice, the virtual enforcer and the no-draw, N-way and paint-filter canvases lose
+their drawable and annotation entry points. tests/canvas_device.cpp and the
+installed-consumer test check their absence.

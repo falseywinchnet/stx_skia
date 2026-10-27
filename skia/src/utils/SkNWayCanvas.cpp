@@ -30,7 +30,6 @@ class GlyphRunList;
 }
 
 class SkData;
-class SkDrawable;
 class SkImage;
 class SkPaint;
 class SkPath;
@@ -322,13 +321,6 @@ void SkNWayCanvas::onDrawAtlas2(const SkImage* image, const SkRSXform xform[], c
 
 
 
-void SkNWayCanvas::onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix) {
-    Iter iter(fList);
-    while (iter.next()) {
-        iter->drawDrawable(drawable, matrix);
-    }
-}
-
 void SkNWayCanvas::onDrawVerticesObject(const SkVertices* vertices,
                                         SkBlendMode bmode, const SkPaint& paint) {
     Iter iter(fList);
@@ -350,13 +342,6 @@ void SkNWayCanvas::onDrawShadowRec(const SkPath& path, const SkDrawShadowRec& re
     Iter iter(fList);
     while (iter.next()) {
         iter->private_draw_shadow_rec(path, rec);
-    }
-}
-
-void SkNWayCanvas::onDrawAnnotation(const SkRect& rect, const char key[], SkData* data) {
-    Iter iter(fList);
-    while (iter.next()) {
-        iter->drawAnnotation(rect, key, data);
     }
 }
 

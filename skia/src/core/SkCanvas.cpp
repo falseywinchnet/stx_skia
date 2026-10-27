@@ -1332,13 +1332,6 @@ void SkCanvas::drawAtlas(const SkImage* atlas, SkSpan<const SkRSXform> xform,
                        mode, sampling, cull, paint);
 }
 
-void SkCanvas::drawAnnotation(const SkRect& rect, const char key[], SkData* value) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    if (key) {
-        (*this).onDrawAnnotation(rect, key, value);
-    }
-}
-
 void SkCanvas::private_draw_shadow_rec(const SkPath& path, const SkDrawShadowRec& rec) {
     TRACE_EVENT0("skia", TRACE_FUNC);
     (*this).onDrawShadowRec(path, rec);
@@ -1784,36 +1777,6 @@ void SkCanvas::onDrawPatch(const SkPoint cubics[12], const SkColor colors[4],
     }
 }
 
-void SkCanvas::drawDrawable(SkDrawable* dr, SkScalar x, SkScalar y) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    if (nullptr == dr) {
-        return;
-    }
-    if (x || y) {
-        const SkMatrix matrix = SkMatrix::Translate(x, y);
-        (*this).onDrawDrawable(dr, &matrix);
-    } else {
-        (*this).onDrawDrawable(dr, nullptr);
-    }
-}
-
-void SkCanvas::drawDrawable(SkDrawable* dr, const SkMatrix* matrix) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    if (nullptr == dr) {
-        return;
-    }
-    const SkMatrix* drawMatrix = (matrix && (*matrix).isIdentity()) ? nullptr : matrix;
-    (*this).onDrawDrawable(dr, drawMatrix);
-}
-
-void SkCanvas::onDrawDrawable(SkDrawable* dr, const SkMatrix* matrix) {
-    // drawable bounds are no longer reliable (e.g. android displaylist)
-    // so don't use them for quick-reject
-    if ((*this).predrawNotify()) {
-        (*(*this).topDevice()).drawDrawable(this, dr, matrix);
-    }
-}
-
 void SkCanvas::onDrawAtlas2(const SkImage* atlas, const SkRSXform xform[], const SkRect tex[],
                             const SkColor colors[], int count, SkBlendMode bmode,
                             const SkSamplingOptions& sampling, const SkRect* cull,
@@ -1834,14 +1797,6 @@ void SkCanvas::onDrawAtlas2(const SkImage* atlas, const SkRSXform xform[], const
         const size_t N = SkToSizeT(count);
         (*(*this).topDevice()).drawAtlas({xform, N}, {tex, N}, {colors, colors ? N : 0},
                                      SkBlender::Mode(bmode), (*layer).paint);
-    }
-}
-
-void SkCanvas::onDrawAnnotation(const SkRect& rect, const char key[], SkData* value) {
-    SkASSERT(key);
-
-    if ((*this).predrawNotify()) {
-        (*(*this).topDevice()).drawAnnotation(rect, key, value);
     }
 }
 

@@ -20,7 +20,6 @@
 #include <optional>
 
 class SkData;
-class SkDrawable;
 class SkImage;
 class SkPath;
 class SkRRect;
@@ -177,16 +176,6 @@ void SkPaintFilterCanvas::onDrawPatch(const SkPoint cubics[12], const SkColor co
 
 
 
-void SkPaintFilterCanvas::onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix) {
-    // There is no paint to filter in this case, but we can still filter on type.
-    // Subclasses need to unroll the drawable explicity (by overriding this method) in
-    // order to actually filter nested content.
-    AutoPaintFilter apf(this, nullptr);
-    if (apf.shouldDraw()) {
-        this->SkNWayCanvas::onDrawDrawable(drawable, matrix);
-    }
-}
-
 void SkPaintFilterCanvas::onDrawAtlas2(const SkImage* image, const SkRSXform xform[],
                                        const SkRect tex[], const SkColor colors[], int count,
                                        SkBlendMode bmode, const SkSamplingOptions& sampling,
@@ -196,10 +185,6 @@ void SkPaintFilterCanvas::onDrawAtlas2(const SkImage* image, const SkRSXform xfo
         this->SkNWayCanvas::onDrawAtlas2(image, xform, tex, colors, count, bmode, sampling, cull,
                                          &apf.paint());
     }
-}
-
-void SkPaintFilterCanvas::onDrawAnnotation(const SkRect& rect, const char key[], SkData* value) {
-    this->SkNWayCanvas::onDrawAnnotation(rect, key, value);
 }
 
 void SkPaintFilterCanvas::onDrawShadowRec(const SkPath& path, const SkDrawShadowRec& rec) {

@@ -32,7 +32,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkATrace.cpp
     skia/src/core/SkAlphaRuns.cpp
     skia/src/core/SkAnalyticEdge.cpp
-    skia/src/core/SkAnnotation.cpp
     skia/src/core/SkArenaAlloc.cpp
     skia/src/core/SkAutoPixmapStorage.cpp
     skia/src/core/SkBBHFactory.cpp
@@ -97,7 +96,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkDraw_atlas.cpp
     skia/src/core/SkDraw_text.cpp
     skia/src/core/SkDraw_vertices.cpp
-    skia/src/core/SkDrawable.cpp
     skia/src/core/SkEdge.cpp
     skia/src/core/SkEdgeBuilder.cpp
     skia/src/core/SkEdgeClipper.cpp
@@ -307,7 +305,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/image/SkSurface_Raster.cpp
     skia/src/image/SkTiledImageUtils.cpp
     skia/src/lazy/SkDiscardableMemoryPool.cpp
-    skia/src/pdf/SkDocument_PDF_None.cpp
     skia/src/ports/SkDiscardableMemory_none.cpp
     skia/src/ports/SkImageGeneratorCG.cpp
     skia/src/ports/SkLog_stdio.cpp

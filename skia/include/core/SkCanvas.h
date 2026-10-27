@@ -52,7 +52,6 @@ class SkBlender;
 class SkColorSpace;
 class SkData;
 class SkDevice;
-class SkDrawable;
 class SkImage;
 class SkPaintFilterCanvas;
 class SkPath;
@@ -1733,64 +1732,6 @@ public:
                    SkSpan<const SkRect> tex, SkSpan<const SkColor> colors, SkBlendMode mode,
                    const SkSamplingOptions& sampling, const SkRect* cullRect, const SkPaint* paint);
 
-    /** Draws SkDrawable drawable using clip and SkMatrix, concatenated with
-        optional matrix.
-
-        If SkCanvas has an asynchronous implementation, as is the case
-        when it is recording into SkPicture, then drawable will be referenced,
-        so that SkDrawable::draw() can be called when the operation is finalized. To force
-        immediate drawing, call SkDrawable::draw() instead.
-
-        @param drawable  custom struct encapsulating drawing commands
-        @param matrix    transformation applied to drawing; may be nullptr
-
-        example: https://fiddle.skia.org/c/@Canvas_drawDrawable
-    */
-    void drawDrawable(SkDrawable* drawable, const SkMatrix* matrix = nullptr);
-
-    /** Draws SkDrawable drawable using clip and SkMatrix, offset by (x, y).
-
-        If SkCanvas has an asynchronous implementation, as is the case
-        when it is recording into SkPicture, then drawable will be referenced,
-        so that SkDrawable::draw() can be called when the operation is finalized. To force
-        immediate drawing, call SkDrawable::draw() instead.
-
-        @param drawable  custom struct encapsulating drawing commands
-        @param x         offset into SkCanvas writable pixels on x-axis
-        @param y         offset into SkCanvas writable pixels on y-axis
-
-        example: https://fiddle.skia.org/c/@Canvas_drawDrawable_2
-    */
-    void drawDrawable(SkDrawable* drawable, SkScalar x, SkScalar y);
-
-    /** Associates SkRect on SkCanvas with an annotation; a key-value pair, where the key is
-        a null-terminated UTF-8 string, and optional value is stored as SkData.
-
-        Only some canvas implementations, such as recording to SkPicture, or drawing to
-        document PDF, use annotations.
-
-        @param rect   SkRect extent of canvas to annotate
-        @param key    string used for lookup
-        @param value  data holding value stored in annotation
-
-        example: https://fiddle.skia.org/c/@Canvas_drawAnnotation_2
-    */
-    void drawAnnotation(const SkRect& rect, const char key[], SkData* value);
-
-    /** Associates SkRect on SkCanvas when an annotation; a key-value pair, where the key is
-        a null-terminated UTF-8 string, and optional value is stored as SkData.
-
-        Only some canvas implementations, such as recording to SkPicture, or drawing to
-        document PDF, use annotations.
-
-        @param rect   SkRect extent of canvas to annotate
-        @param key    string used for lookup
-        @param value  data holding value stored in annotation
-    */
-    void drawAnnotation(const SkRect& rect, const char key[], const sk_sp<SkData>& value) {
-        (*this).drawAnnotation(rect, key, value.get());
-    }
-
     /** Returns true if clip is empty; that is, nothing will draw.
 
         May do work when called; it should not be called
@@ -1921,10 +1862,7 @@ protected:
 
     virtual void onDrawVerticesObject(const SkVertices* vertices, SkBlendMode mode,
                                       const SkPaint& paint);
-    virtual void onDrawAnnotation(const SkRect& rect, const char key[], SkData* value);
     virtual void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&);
-
-    virtual void onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix);
 
 
     virtual void onDrawEdgeAAQuad(const SkRect& rect, const SkPoint clip[4], QuadAAFlags aaFlags,

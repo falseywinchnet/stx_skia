@@ -27,7 +27,6 @@ public:
     enum Type {
         kSkColorFilter_Type = 0,
         kSkBlender_Type = 1,
-        kSkDrawable_Type = 2,
         kSkDrawLooper_Type = 3,
         kSkImageFilter_Type = 4,
         kSkMaskFilter_Type = 5,

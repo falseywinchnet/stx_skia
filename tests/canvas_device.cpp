@@ -53,6 +53,30 @@
 #if __has_include("src/core/SkClipStack.h") || __has_include("src/core/SkClipStackDevice.h")
 #error The clip stack and its device must not be part of the candidate.
 #endif
+// Drawables and annotations are withdrawn: the CPU device ignored annotations, and no consumer
+// draws drawables. Expressions, not member pointers, so that overloads count.
+template <typename T>
+concept HasDrawableDrawing = requires(T& canvas) { canvas.drawDrawable(nullptr, 0.0f, 0.0f); };
+static_assert(!HasDrawableDrawing<SkCanvas>);
+template <typename T>
+concept HasAnnotations = requires(T& canvas, const SkRect& rect) {
+    canvas.drawAnnotation(rect, "key", nullptr);
+};
+static_assert(!HasAnnotations<SkCanvas>);
+#if __has_include("include/core/SkDrawable.h") || __has_include("include/core/SkAnnotation.h") || \
+    __has_include("src/core/SkAnnotationKeys.h")
+#error Drawable and annotation headers must not be part of the candidate.
+#endif
+#else
+// The reference canvas still has both, so the expressions above do detect them.
+template <typename T>
+concept HasDrawableDrawing = requires(T& canvas) { canvas.drawDrawable(nullptr, 0.0f, 0.0f); };
+static_assert(HasDrawableDrawing<SkCanvas>);
+template <typename T>
+concept HasAnnotations = requires(T& canvas, const SkRect& rect) {
+    canvas.drawAnnotation(rect, "key", nullptr);
+};
+static_assert(HasAnnotations<SkCanvas>);
 #endif
 
 namespace {

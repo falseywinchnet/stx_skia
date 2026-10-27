@@ -48,10 +48,8 @@ protected:
             SkCanvas::QuadAAFlags aaFlags, const SkColor4f& color, SkBlendMode mode) override = 0;
 #endif
 
-    void onDrawAnnotation(const SkRect& rect, const char key[], SkData* value) override = 0;
     void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&) override = 0;
 
-    void onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix) override = 0;
 
 };
 

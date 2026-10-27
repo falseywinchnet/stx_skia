@@ -27,7 +27,6 @@ class GlyphRunList;
 
 class SkCanvas;
 class SkData;
-class SkDrawable;
 class SkImage;
 class SkMatrix;
 class SkPaint;
@@ -103,8 +102,6 @@ protected:
     void onResetClip() override;
 
 
-    void onDrawDrawable(SkDrawable*, const SkMatrix*) override;
-    void onDrawAnnotation(const SkRect&, const char[], SkData*) override;
 
     void onDrawEdgeAAQuad(const SkRect&, const SkPoint[4], QuadAAFlags, const SkColor4f&,
                           SkBlendMode) override;

@@ -28,7 +28,6 @@ class GlyphRunList;
 
 class GrRecordingContext;
 class SkData;
-class SkDrawable;
 class SkImage;
 class SkMatrix;
 class SkPaint;
@@ -105,9 +104,7 @@ protected:
                              const SkPoint texCoords[4], SkBlendMode,
                              const SkPaint& paint) override;
 
-    void onDrawDrawable(SkDrawable*, const SkMatrix*) override;
 
-    void onDrawAnnotation(const SkRect& rect, const char key[], SkData* value) override;
     void onDrawShadowRec(const SkPath& path, const SkDrawShadowRec& rec) override;
 
     void onDrawEdgeAAQuad(const SkRect&, const SkPoint[4], QuadAAFlags, const SkColor4f&,

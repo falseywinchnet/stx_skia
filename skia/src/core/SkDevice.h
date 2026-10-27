@@ -40,7 +40,6 @@ class SkRasterHandleAllocator;
 class SkSpecialImage;
 class GrRecordingContext;
 class SkData;
-class SkDrawable;
 class SkImage;
 class SkPaint;
 class SkPath;
@@ -342,8 +341,6 @@ public:
     virtual void drawAtlas(SkSpan<const SkRSXform>, SkSpan<const SkRect>, SkSpan<const SkColor>,
                            sk_sp<SkBlender>, const SkPaint&);
 
-    virtual void drawAnnotation(const SkRect&, const char[], SkData*) {}
-
     // Default impl always calls drawRect() with a solid-color paint, setting it to anti-aliased
     // only when all edge flags are set. If there's a clip region, it draws that using drawPath,
     // or uses clipPath().
@@ -356,8 +353,6 @@ public:
                                     const SkPoint dstClips[], const SkMatrix preViewMatrices[],
                                     const SkSamplingOptions&, const SkPaint&,
                                     SkCanvas::SrcRectConstraint);
-
-    virtual void drawDrawable(SkCanvas*, SkDrawable*, const SkMatrix*);
 
     // -- "Special" drawing and image routines
 

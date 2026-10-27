@@ -30,6 +30,18 @@ static_assert(!HasImageFiltering<SkPaint>);
 template <typename T>
 concept HasProgrammableMesh = requires { &T::drawMesh; };
 static_assert(!HasProgrammableMesh<SkCanvas>);
+// Drawables and annotations are withdrawn; expressions, not member pointers, so overloads count.
+template <typename T>
+concept HasDrawableDrawing = requires(T& canvas) { canvas.drawDrawable(nullptr, 0.0f, 0.0f); };
+static_assert(!HasDrawableDrawing<SkCanvas>);
+template <typename T>
+concept HasAnnotations = requires(T& canvas, const SkRect& rect) {
+    canvas.drawAnnotation(rect, "key", nullptr);
+};
+static_assert(!HasAnnotations<SkCanvas>);
+#if __has_include("include/core/SkDrawable.h") || __has_include("include/core/SkAnnotation.h")
+#error Drawable and annotation headers must not be installed.
+#endif
 #if __has_include("include/effects/SkRuntimeEffect.h")
 #error Runtime compiler headers must not be installed.
 #endif
