@@ -47,27 +47,28 @@ Both builds wrote identical bytes before any change.
 | Defect | Before | After |
 |---|---|---|
 | `writeText(nullptr)` | `SkASSERT` only, so Release called `strlen(nullptr)` | Writes nothing and returns `false`. The stream stays usable |
-| Null stream in `RemainingLengthIsBelow` | `SkASSERT` only, so Release dereferenced null | `SkASSERT_RELEASE`: a null stream stops the program |
+| Null stream in `RemainingLengthIsBelow` | A pointer with `SkASSERT` only, so Release dereferenced null | Takes `const SkStream&`, so the type states the contract. The only caller, `SkData::MakeFromStream`, already refuses a null stream |
 | Position past the length | The intake subtraction wrapped to a huge remainder, so every request looked satisfiable | Already fixed in 34b51825: nothing remains, so every length is below it. The header comment now says so |
 
 **Checks.**
 - **Candidate only:** a null text is refused, writes no bytes, and a later write still works;
   a position past the length is refused for 0, 1 and `SIZE_MAX`.
-- **Stop test:** `stream_core_stops_null-stream` passes only if the null stream stops the
-  program.
 - **Reference:** these checks are excluded there, because the intake code is undefined at both
-  inputs.
+  inputs. The corpus calls the intake helper with a pointer and the candidate's with a
+  reference.
 
-**Not changed: the helper keeps its pointer parameter.** A reference parameter would state the
-non-null contract in the type, but the reference build compiles the candidate's `SkData.cpp`
-against the intake `SkStreamPriv.h`, which takes a pointer. Switching would need a
-reference copy of `SkData.cpp` too, and the intake `SkData` handles short reads differently
-(34b51825). That belongs to an `SkData` unit.
+**Correction.** The first fix commit (11292189) kept the pointer and made a null stream a
+Release check, with a stop test. It gave as the reason that the reference build compiles the
+candidate's `SkData.cpp`. That was wrong: the reference compiles `baseline/SkData.cpp`, the
+intake `SkData`, so the candidate's helper can change alone. The follow-up commit switches to
+the reference parameter and drops the stop test.
 
 ## Verification
 
 All on the M4 mirror, sequentially:
-- **Candidate:** 91/91, including the new stop test.
+- **Candidate:** 91/91 at the first fix commit, with the stop test. After the correction, which
+  removes it, 91/91 again, now counting the string corpus added meanwhile.
+- **Reference after the correction:** 83/83, with the string corpus.
 - **Reference:** 82/82.
 - **Corpora:** `stream-core.raw` is identical in both builds, and all shared artifacts are
   identical apart from the six intentional differences.
@@ -81,4 +82,3 @@ All on the M4 mirror, sequentially:
 ## Not done
 
 - **Windows and Linux:** run by CI on push, not locally.
-- **`SkData`:** the reference-parameter form of the helper waits for an `SkData` unit, as above.

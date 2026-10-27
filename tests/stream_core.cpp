@@ -3,8 +3,7 @@
 // lengths, positions and requests around the boundaries; SkStream::skip; and SkWStream::writeText
 // into a recording stream. Both builds must produce identical bytes (stream-core.raw). A position
 // past the length and a null text are checked by the candidate alone: the intake code wraps around
-// at the first and reads through a null pointer at the second. "--null-stream" selects a
-// Release-check stop instead.
+// at the first and reads through a null pointer at the second.
 
 #include "differential_corpus.h"
 #include "stream_sink.h"
@@ -16,7 +15,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <cstring>
 #include <limits>
 #include <string>
 
@@ -52,8 +50,13 @@ private:
     size_t fPosition;
 };
 
+// The intake helper takes a pointer; the candidate's takes a reference.
 bool below(SkStream& stream, size_t length) {
+#ifdef STX_SKIA_REFERENCE
     const bool result = SkStreamPriv::RemainingLengthIsBelow(&stream, length);
+#else
+    const bool result = SkStreamPriv::RemainingLengthIsBelow(stream, length);
+#endif
     return result;
 }
 
@@ -129,10 +132,6 @@ bool null_text_refused() {
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 2) return 2;
 #ifndef STX_SKIA_REFERENCE
-    if (argc == 2 && std::strcmp(argv[1], "--null-stream") == 0) {
-        SkStreamPriv::RemainingLengthIsBelow(nullptr, 1);
-        return 0;
-    }
     if (!null_text_refused()) {
         std::puts("stream core: a null text was not refused");
         return 1;

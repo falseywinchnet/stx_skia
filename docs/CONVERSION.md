@@ -1595,8 +1595,8 @@ compiled or read. The reference build takes the sources it needs from baseline/s
 Only the abstract `SkStream` and `SkWStream` interfaces and `RemainingLengthIsBelow` are kept;
 the concrete streams, typed readers and writers, the other private helpers and MD5 had no
 user and are removed. The kept code is respelled, then fixed: `writeText(nullptr)` writes
-nothing and returns false instead of calling `strlen` on null, and a null stream given to
-`RemainingLengthIsBelow` stops the program in Release. See
+nothing and returns false instead of calling `strlen` on null, and `RemainingLengthIsBelow`
+takes a stream reference instead of a pointer it dereferenced unchecked in Release. See
 ../results/2026-10-27/STREAM_CONVERSION.md.
 
 ## Still required

@@ -18,19 +18,18 @@ void SkWStream::flush() {}
 
 namespace SkStreamPriv {
 
-bool RemainingLengthIsBelow(SkStream* stream, size_t len) {
-    SkASSERT_RELEASE(stream != nullptr);
-    if ((*stream).hasLength()) {
-        if ((*stream).hasPosition()) {
-            const size_t total = (*stream).getLength();
-            const size_t position = (*stream).getPosition();
+bool RemainingLengthIsBelow(const SkStream& stream, size_t len) {
+    if (stream.hasLength()) {
+        if (stream.hasPosition()) {
+            const size_t total = stream.getLength();
+            const size_t position = stream.getPosition();
             if (position > total) return true;
             const size_t remainingBytes = total - position;
             return remainingBytes < len;
         }
         // We don't know the position, but we can still return true if the
         // stream's entire length is shorter than the requested length.
-        return (*stream).getLength() < len;
+        return stream.getLength() < len;
     }
     return false;
 }
