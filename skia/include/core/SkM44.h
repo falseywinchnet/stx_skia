@@ -97,13 +97,24 @@ struct SK_API SkV4 {
     const float* ptr() const { return &x; }
     float* ptr() { return &x; }
 
+    // Indices outside 0 to 3 stop the program in every build.
     float operator[](int i) const {
-        SkASSERT(i >= 0 && i < 4);
-        return ptr()[i];
+        SkASSERT_RELEASE(i >= 0 && i < 4);
+        switch (i) {
+            case 0: return x;
+            case 1: return y;
+            case 2: return z;
+            default: return w;
+        }
     }
     float& operator[](int i) {
-        SkASSERT(i >= 0 && i < 4);
-        return ptr()[i];
+        SkASSERT_RELEASE(i >= 0 && i < 4);
+        switch (i) {
+            case 0: return x;
+            case 1: return y;
+            case 2: return z;
+            default: return w;
+        }
     }
 };
 
@@ -120,21 +131,11 @@ public:
     SkM44(const SkM44& src) = default;
     SkM44& operator=(const SkM44& src) = default;
 
-    constexpr SkM44()
-        : fMat{1, 0, 0, 0,
-               0, 1, 0, 0,
-               0, 0, 1, 0,
-               0, 0, 0, 1}
-        {}
+    constexpr SkM44() = default;
 
     SkM44(const SkM44& a, const SkM44& b) {
         setConcat(a, b);
     }
-
-    enum Uninitialized_Constructor {
-        kUninitialized_Constructor
-    };
-    explicit SkM44(Uninitialized_Constructor) {}
 
     /**
      *  The constructor parameters are in row-major order.
@@ -172,7 +173,7 @@ public:
     }
 
     static SkM44 Rotate(SkV3 axis, SkScalar radians) {
-        SkM44 m(kUninitialized_Constructor);
+        SkM44 m;
         m.setRotate(axis, radians);
         return m;
     }
@@ -186,14 +187,15 @@ public:
         memcpy(v, fMat, sizeof(fMat));
     }
 
+    // Rows and columns outside 0 to 3 stop the program in every build.
     SkScalar rc(int r, int c) const {
-        SkASSERT(r >= 0 && r <= 3);
-        SkASSERT(c >= 0 && c <= 3);
+        SkASSERT_RELEASE(r >= 0 && r <= 3);
+        SkASSERT_RELEASE(c >= 0 && c <= 3);
         return fMat[c*4 + r];
     }
     void setRC(int r, int c, SkScalar value) {
-        SkASSERT(r >= 0 && r <= 3);
-        SkASSERT(c >= 0 && c <= 3);
+        SkASSERT_RELEASE(r >= 0 && r <= 3);
+        SkASSERT_RELEASE(c >= 0 && c <= 3);
         fMat[c*4 + r] = value;
     }
 
@@ -244,8 +246,9 @@ public:
      *  Set this matrix to rotate about the specified axis vector,
      *  by an angle specified in radians.
      *
-     *  Note: axis is not assumed to be unit-length, so it will be normalized internally.
-     *        If axis is already unit-length, call setRotateAboutUnitRadians() instead.
+     *  Note: axis is not assumed to be unit-length, so it will be normalized internally,
+     *        whatever its finite, nonzero length. A zero or non-finite axis sets the identity.
+     *        If axis is already unit-length, call setRotateUnit() instead.
      */
     SkM44& setRotate(SkV3 axis, SkScalar radians);
 
@@ -274,6 +277,10 @@ public:
      *  | E F G H | -> | E/X F/X G/X H/X |   for X != 0
      *  | I J K L |    | I/X J/X K/X L/X |
      *  | 0 0 0 X |    |  0   0   0   1  |
+     *
+     *  Each entry is scaled by 1/X in double precision and rounded once, as
+     *  SkMatrix::normalizePerspective() does. If X or any scaled entry is not finite, the matrix
+     *  is left unchanged.
      */
     void normalizePerspective();
 
@@ -286,6 +293,7 @@ public:
 
     /** If this is invertible, return that in inverse and return true. If it is
      *  not invertible, return false and leave the inverse parameter unchanged.
+     *  inverse may be null to test invertibility only.
      */
     [[nodiscard]] bool invert(SkM44* inverse) const;
 
@@ -337,7 +345,10 @@ private:
      *  2  6 10  14        0 0 1 trans_z
      *  3  7 11  15        0 0 0 1
      */
-    SkScalar fMat[16];
+    SkScalar fMat[16] = {1, 0, 0, 0,
+                         0, 1, 0, 0,
+                         0, 0, 1, 0,
+                         0, 0, 0, 1};
 
     friend class SkMatrixPriv;
 };

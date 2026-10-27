@@ -14,11 +14,13 @@
 #include "src/core/SkPathPriv.h"
 #include "src/core/SkVx.h"
 
-bool SkM44::operator==(const SkM44& other) const {
-    if (this == &other) {
-        return true;
-    }
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <limits>
 
+// Elementwise IEEE equality: a matrix holding NaN equals no matrix, itself included.
+bool SkM44::operator==(const SkM44& other) const {
     const skvx::float4 a0 = skvx::float4::Load(fMat +  0);
     const skvx::float4 a1 = skvx::float4::Load(fMat +  4);
     const skvx::float4 a2 = skvx::float4::Load(fMat +  8);
@@ -232,13 +234,24 @@ void SkM44::normalizePerspective() {
     // is in perspective, even though it stills behaves like its affine. If we divide everything
     // by the not_one value, then it will behave the same, but will be treated as affine,
     // and therefore faster (e.g. clients can forward-difference calculations).
-    if (fMat[15] != 1 && fMat[15] != 0 && fMat[3] == 0 && fMat[7] == 0 && fMat[11] == 0) {
-        const float inv = static_cast<float>(1.0 / fMat[15]);
-        (skvx::float4::Load(fMat +  0) * inv).store(fMat +  0);
-        (skvx::float4::Load(fMat +  4) * inv).store(fMat +  4);
-        (skvx::float4::Load(fMat +  8) * inv).store(fMat +  8);
-        (skvx::float4::Load(fMat + 12) * inv).store(fMat + 12);
-        fMat[15] = 1.0f;
+    //
+    // Like SkMatrix, each entry is scaled in double precision and rounded once. Scaling in float
+    // rounded the reciprocal and then the product, and for |X| below about 2.9e-39 the float
+    // reciprocal overflowed, so zero entries became NaN. A scaled entry that does not fit in a
+    // float leaves the matrix unchanged; it still maps points correctly as a perspective matrix.
+    // So does a non-finite X: an infinite one made every finite entry zero, so a non-finite
+    // matrix became a finite, degenerate one.
+    if (fMat[15] != 1 && fMat[15] != 0 && SkIsFinite(fMat[15]) &&
+        fMat[3] == 0 && fMat[7] == 0 && fMat[11] == 0) {
+        const double inv = 1.0 / fMat[15];
+        SkScalar scaled[16] = {};
+        for (int i = 0; i < 15; ++i) {
+            scaled[i] = static_cast<float>(fMat[i] * inv);
+        }
+        scaled[15] = 1.0f;
+        if (SkIsFinite(scaled, 16)) {
+            memcpy(fMat, scaled, sizeof(scaled));
+        }
     }
 }
 
@@ -249,11 +262,15 @@ void SkM44::normalizePerspective() {
     promoting our SkScalar values to double (if needed).
  */
 bool SkM44::invert(SkM44* inverse) const {
+    // The inverse is always computed: SkInvert4x4Matrix checks that it is finite only when it
+    // has somewhere to write it.
     SkScalar tmp[16] = {};
     if (SkInvert4x4Matrix(fMat, tmp) == 0.0f) {
         return false;
     }
-    memcpy((*inverse).fMat, tmp, sizeof(tmp));
+    if (inverse != nullptr) {
+        memcpy((*inverse).fMat, tmp, sizeof(tmp));
+    }
     return true;
 }
 
@@ -275,11 +292,23 @@ SkM44& SkM44::setRotateUnitSinCos(SkV3 axis, SkScalar sinAngle, SkScalar cosAngl
 }
 
 SkM44& SkM44::setRotate(SkV3 axis, SkScalar radians) {
-    const SkScalar len = axis.length();
-    if (len > 0 && SkIsFinite(len)) {
-        setRotateUnit(axis * (SK_Scalar1 / len), radians);
-    } else {
-        setIdentity();
+    if (!SkIsFinite(axis.x, axis.y, axis.z)) {
+        return setIdentity();
     }
-    return *this;
+    // When the squared length is a normal float, its square root and reciprocal are accurate.
+    // Otherwise it overflowed, underflowed to zero, or lost precision as a denormal; dividing by
+    // the largest component first puts the length between 1 and sqrt(3).
+    const SkScalar lengthSquared = axis.lengthSquared();
+    if (lengthSquared >= std::numeric_limits<float>::min() && SkIsFinite(lengthSquared)) {
+        const SkScalar len = SkScalarSqrt(lengthSquared);
+        return setRotateUnit(axis * (SK_Scalar1 / len), radians);
+    }
+    const SkScalar largest = std::max(std::fabs(axis.x), std::max(std::fabs(axis.y),
+                                                                  std::fabs(axis.z)));
+    if (largest == 0) {
+        return setIdentity();
+    }
+    const SkV3 scaled{axis.x / largest, axis.y / largest, axis.z / largest};
+    const SkScalar scaledLength = scaled.length();
+    return setRotateUnit(scaled * (SK_Scalar1 / scaledLength), radians);
 }

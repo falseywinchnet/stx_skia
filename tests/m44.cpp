@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 namespace {
@@ -261,49 +262,81 @@ void concat_corpus(Output& output) {
     }
 }
 
-void rotation_corpus(Output& output) {
-    const std::array<SkV3, 18> axes{SkV3{1, 0, 0}, SkV3{0, -1, 0}, SkV3{0, 0, 1},
-                                    SkV3{1, 1, 1}, SkV3{3, -4, 12}, SkV3{0, 0, 0},
-                                    SkV3{1e-20f, 0, 0}, SkV3{1e-23f, 2e-23f, 0},
-                                    SkV3{1e20f, 1e20f, 0}, SkV3{3e38f, 0, 0},
-                                    SkV3{corpus::kDenormal, 0, 0},
-                                    SkV3{corpus::kInf, 0, 0}, SkV3{corpus::kNaN, 1, 0},
-                                    SkV3{-0.0f, -0.0f, -1.0f}, SkV3{0.6f, 0.8f, 0},
-                                    SkV3{1e-30f, 1e-30f, 1e-30f}, SkV3{2e19f, -3e19f, 6e19f},
-                                    SkV3{-5, 0.25f, 9}};
-    const std::array<float, 10> angles{0.0f, 0.5f, -1.25f, 1.5707964f, 3.1415927f, 6.2831855f,
+constexpr std::array<float, 10> kAngles{0.0f, 0.5f, -1.25f, 1.5707964f, 3.1415927f, 6.2831855f,
                                        100.0f, corpus::kInf, corpus::kNaN, -0.0f};
-    for (const SkV3& axis : axes) {
-        for (const float angle : angles) {
+
+// Records the normalizing forms (Rotate and setRotate), the unit-axis forms (setRotateUnit and
+// setRotateUnitSinCos), or both, about one axis at every angle.
+void append_rotations(Output& output, const SkV3& axis, bool normalizing, bool unitForms) {
+    for (const float angle : kAngles) {
+        SkM44 set = SkM44::Translate(5, 6, 7);
+        if (normalizing) {
             append_m44(output, SkM44::Rotate(axis, angle));
-            SkM44 set = SkM44::Translate(5, 6, 7);
             set.setRotate(axis, angle);
             append_m44(output, set);
+        }
+        if (unitForms) {
             set.setRotateUnit(axis, angle);
             append_m44(output, set);
             set.setRotateUnitSinCos(axis, std::sin(angle), std::cos(angle));
             append_m44(output, set);
-            ++output.cases;
         }
+        ++output.cases;
     }
 }
 
-void normalize_corpus(Output& output) {
-    const std::array<float, 16> bottoms{1.0f, 0.0f, -0.0f, 2.0f, -3.0f, 0.1f, 7.0f, 1e-20f,
-                                        3e-39f, corpus::kDenormal, 1e30f, corpus::kInf,
-                                        -corpus::kInf, corpus::kNaN, 1.0000001f, 0.33333334f};
+// Axes whose squared length is a normal float, is zero, or is not finite rotate as they did. The
+// others now normalize through their largest component (m44-corrected.raw); the unit-axis forms
+// do not normalize and are shared for every axis.
+void rotation_corpus(Output& output, Output& corrected) {
+    const std::array<SkV3, 11> retained{SkV3{1, 0, 0}, SkV3{0, -1, 0}, SkV3{0, 0, 1},
+                                        SkV3{1, 1, 1}, SkV3{3, -4, 12}, SkV3{0, 0, 0},
+                                        SkV3{corpus::kInf, 0, 0}, SkV3{corpus::kNaN, 1, 0},
+                                        SkV3{-0.0f, -0.0f, -1.0f}, SkV3{0.6f, 0.8f, 0},
+                                        SkV3{-5, 0.25f, 9}};
+    const std::array<SkV3, 7> renormalized{SkV3{1e-20f, 0, 0}, SkV3{1e-23f, 2e-23f, 0},
+                                           SkV3{1e20f, 1e20f, 0}, SkV3{3e38f, 0, 0},
+                                           SkV3{corpus::kDenormal, 0, 0},
+                                           SkV3{1e-30f, 1e-30f, 1e-30f},
+                                           SkV3{2e19f, -3e19f, 6e19f}};
+    for (const SkV3& axis : retained) append_rotations(output, axis, true, true);
+    for (const SkV3& axis : renormalized) {
+        append_rotations(output, axis, false, true);
+        append_rotations(corrected, axis, true, false);
+    }
+}
+
+// The bottom-right entries for which scaling in float and in double agree on every ordinary
+// matrix: 1 and zero leave the matrix alone, and powers of two scale exactly.
+void normalize_corpus(Output& output, Output& corrected) {
+    const std::array<float, 6> exact{1.0f, 0.0f, -0.0f, 2.0f, -4.0f, 0.25f};
+    const std::array<float, 13> rescaled{-3.0f, 0.1f, 7.0f, 1e-20f, 3e-39f, corpus::kDenormal,
+                                         1e30f, corpus::kInf, -corpus::kInf, corpus::kNaN,
+                                         1.0000001f, 0.33333334f, 2.0f};
     Sequence sequence{};
-    for (const float bottom : bottoms) {
+    for (const float bottom : exact) {
         for (int i = 0; i < 24; ++i) {
-            const bool special = i % 3 == 2;
             std::array<float, 16> values = column_major(make_matrix(sequence, Shape::kScaledW,
-                                                                    special));
+                                                                    false));
             values[15] = bottom;
             if (i % 6 == 5) values[7] = 0.5f;  // Genuine perspective is left alone.
             SkM44 m = from_column_major(values);
             m.normalizePerspective();
             append_m44(output, m);
             ++output.cases;
+        }
+    }
+    for (size_t b = 0; b < rescaled.size(); ++b) {
+        for (int i = 0; i < 24; ++i) {
+            // The last entry repeats a power of two with non-finite and extreme entries.
+            const bool special = b + 1 == rescaled.size() || i % 3 == 2;
+            std::array<float, 16> values = column_major(make_matrix(sequence, Shape::kScaledW,
+                                                                    special));
+            values[15] = rescaled[b];
+            SkM44 m = from_column_major(values);
+            m.normalizePerspective();
+            append_m44(corrected, m);
+            ++corrected.cases;
         }
     }
 }
@@ -433,23 +466,163 @@ void vector_corpus(Output& output) {
     }
 }
 
+#ifndef STX_SKIA_REFERENCE
+bool same_bits(const SkM44& a, const SkM44& b) {
+    const std::array<float, 16> x = column_major(a);
+    const std::array<float, 16> y = column_major(b);
+    for (size_t i = 0; i < x.size(); ++i) {
+        uint32_t bx = 0;
+        uint32_t by = 0;
+        std::memcpy(&bx, &x[i], sizeof(bx));
+        std::memcpy(&by, &y[i], sizeof(by));
+        if (bx != by) return false;
+    }
+    return true;
+}
+
+// Equality is elementwise IEEE comparison, so it does not depend on object identity.
+bool nan_never_equals() {
+    std::array<float, 16> values = column_major(SkM44::Translate(1, 2));
+    values[13] = corpus::kNaN;
+    const SkM44 m = from_column_major(values);
+    const SkM44 copy = m;
+    const SkM44& same = m;
+    const bool consistent = !(m == same) && (m != same) && !(m == copy);
+    const SkM44 ordinary = SkM44::Scale(2, 3);
+    return consistent && ordinary == ordinary;
+}
+
+// A 2D matrix with a scaled bottom-right entry scales its entries exactly as SkMatrix does.
+bool normalization_matches_3x3() {
+    Sequence sequence{};
+    const std::array<float, 8> bottoms{-3.0f, 0.1f, 7.0f, 1e-20f, 1.0000001f, 0.33333334f,
+                                       -0.7f, 1e5f};
+    for (const float bottom : bottoms) {
+        for (int i = 0; i < 64; ++i) {
+            SkMatrix m3 = SkMatrix::MakeAll(pick_ordinary(sequence), pick_ordinary(sequence),
+                                            pick_ordinary(sequence), pick_ordinary(sequence),
+                                            pick_ordinary(sequence), pick_ordinary(sequence),
+                                            0, 0, bottom);
+            SkM44 m44(m3);
+            m3.normalizePerspective();
+            m44.normalizePerspective();
+            const SkMatrix converted = m44.asM33();
+            // SkM44 scales its bottom row too, so a negative X leaves -0 there where SkMatrix
+            // keeps +0; the bottom rows agree by value.
+            for (int k = 6; k < 9; ++k) {
+                if (converted[k] != m3[k]) return false;
+            }
+            for (int k = 0; k < 6; ++k) {
+                uint32_t a = 0;
+                uint32_t b = 0;
+                const float ca = converted[k];
+                const float cb = m3[k];
+                std::memcpy(&a, &ca, sizeof(a));
+                std::memcpy(&b, &cb, sizeof(b));
+                if (a != b) return false;
+            }
+        }
+    }
+    return true;
+}
+
+// A tiny bottom-right entry no longer turns zero entries into NaN; a non-finite one, or a
+// scaled entry that overflows, leaves the matrix as it was.
+bool normalization_stays_finite() {
+    SkM44 tiny = SkM44::Scale(0.5f, 0.25f);
+    tiny.setRC(3, 3, 3e-39f);
+    tiny.normalizePerspective();
+    const bool tinyScaled = tiny.isFinite() && tiny.rc(3, 3) == 1 && tiny.rc(0, 1) == 0 &&
+                            tiny.rc(0, 3) == 0 && tiny.rc(0, 0) > 1e38f;
+    SkM44 denormal = SkM44::Scale(1e-10f, 1e-10f, 1e-10f);
+    denormal.setRC(3, 3, corpus::kDenormal);
+    denormal.normalizePerspective();
+    const bool denormalScaled = denormal.isFinite() && denormal.rc(3, 3) == 1 &&
+                                denormal.rc(1, 0) == 0;
+    bool unchanged = true;
+    const std::array<float, 4> bottoms{1e-10f, corpus::kInf, -corpus::kInf, corpus::kNaN};
+    for (const float bottom : bottoms) {
+        SkM44 m = SkM44::Translate(1e30f, -2);
+        m.setRC(3, 3, bottom);
+        const SkM44 before = m;
+        m.normalizePerspective();
+        unchanged = unchanged && same_bits(m, before);
+    }
+    return tinyScaled && denormalScaled && unchanged;
+}
+
+// Finite, nonzero axes of any length rotate about their direction.
+bool rotation_axes_normalize() {
+    struct Pair {
+        SkV3 axis{};
+        SkV3 direction{};
+    };
+    const std::array<Pair, 6> pairs{Pair{SkV3{1e20f, 1e20f, 0}, SkV3{1, 1, 0}},
+                                    Pair{SkV3{3e38f, 0, 0}, SkV3{1, 0, 0}},
+                                    Pair{SkV3{1e-20f, 0, 0}, SkV3{1, 0, 0}},
+                                    Pair{SkV3{0x1p-80f, 0x1p-79f, 0}, SkV3{0.5f, 1, 0}},
+                                    Pair{SkV3{0, -corpus::kDenormal, 0}, SkV3{0, -1, 0}},
+                                    Pair{SkV3{-0x1p100f, 0x1p101f, 0x1p102f},
+                                         SkV3{-0.25f, 0.5f, 1}}};
+    for (const Pair& pair : pairs) {
+        for (const float angle : kAngles) {
+            if (!same_bits(SkM44::Rotate(pair.axis, angle),
+                           SkM44::Rotate(pair.direction, angle))) {
+                return false;
+            }
+        }
+    }
+    const bool zero = same_bits(SkM44::Rotate(SkV3{0, 0, 0}, 1), SkM44());
+    const bool infinite = same_bits(SkM44::Rotate(SkV3{corpus::kInf, 1, 0}, 1), SkM44());
+    return zero && infinite;
+}
+
+// A null inverse asks only whether the matrix is invertible, and gets the same answer.
+bool invertibility_without_storage() {
+    Sequence sequence{};
+    for (int i = 0; i < 256; ++i) {
+        const SkM44 m = make_matrix(sequence, static_cast<Shape>(sequence.pick(4)), i % 4 == 3);
+        SkM44 inverse{};
+        if (m.invert(nullptr) != m.invert(&inverse)) return false;
+    }
+    const std::array<SkM44, 4> edges{SkM44::Scale(0, 1), SkM44::Scale(1e-20f, 1e-20f),
+                                     SkM44::Scale(corpus::kFloatMin, corpus::kFloatMin),
+                                     SkM44::Scale(1e30f, 1e30f, 1e30f)};
+    for (const SkM44& m : edges) {
+        SkM44 inverse{};
+        if (m.invert(nullptr) != m.invert(&inverse)) return false;
+    }
+    return true;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 1 && argc != 2) return 2;
+    if (argc < 1 || argc > 3) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (!nan_never_equals()) { std::puts("m44: NaN equality failed"); return 1; }
+    if (!normalization_matches_3x3()) { std::puts("m44: 3x3 agreement failed"); return 1; }
+    if (!normalization_stays_finite()) { std::puts("m44: finite normalization failed"); return 1; }
+    if (!rotation_axes_normalize()) { std::puts("m44: axis normalization failed"); return 1; }
+    if (!invertibility_without_storage()) { std::puts("m44: null inverse failed"); return 1; }
+#endif
     Output output{};
+    Output corrected{};
     construction_corpus(output);
     equality_corpus(output);
     concat_corpus(output);
-    rotation_corpus(output);
-    normalize_corpus(output);
+    rotation_corpus(output, corrected);
+    normalize_corpus(output, corrected);
     inversion_corpus(output);
     map_corpus(output);
     map_rect_corpus(output);
     vector_corpus(output);
-    if (argc == 2 && !corpus::write_file(argv[1], output)) return 2;
+    if (argc >= 2 && !corpus::write_file(argv[1], output)) return 2;
+    if (argc == 3 && !corpus::write_file(argv[2], corrected)) return 2;
     const unsigned long long hash = corpus::fnv1a(output.bytes);
-    std::printf("m44: %zu cases, %zu bytes, hash=%llu PASS\n", output.cases, output.bytes.size(),
-                hash);
+    const unsigned long long correctedHash = corpus::fnv1a(corrected.bytes);
+    std::printf("m44: %zu cases, %zu bytes, hash=%llu; corrected %zu cases, hash=%llu PASS\n",
+                output.cases, output.bytes.size(), hash, corrected.cases, correctedHash);
     return 0;
 }

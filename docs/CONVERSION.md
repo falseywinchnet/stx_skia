@@ -1459,12 +1459,23 @@ are removed. Paint equality no longer reads an inactive union member, and the fa
 preconditions are now Release checks. A new 482-case paint corpus matches the reference. See
 ../results/2026-10-27/PAINT_CONVERSION.md.
 
+## 4x4 matrices
+
+SkM44 and its vectors are converted. Unused 4x4 surface such as `SkV2`, `LookAt`, `Perspective`
+and `RectToRect` is removed, and the intake files serve the reference profile. Perspective
+normalization now scales in double precision exactly as SkMatrix does, and no longer creates
+NaN for a tiny bottom-right entry or makes a non-finite matrix finite. Rotation normalizes axes
+of any finite nonzero length. Equality no longer depends on object identity. Index checks hold
+in Release, vector indexing names its members, and no constructor leaves a matrix
+uninitialized. A new 4x4 corpus matches the reference; changed results are kept apart in
+`m44-corrected.raw`. See ../results/2026-10-27/M44_CONVERSION.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
 constructs in 106 files; per-file counts are in
 ../results/2026-10-27/HOUSE_POLICY_INVENTORY.md. The mask cache and Gaussian filter unit since
-leaves 2,680 constructs in 102 files, and the raster pipeline step 2,076 in 99. The counts show spelling work only. They omit
+leaves 2,680 constructs in 102 files, the raster pipeline step 2,076 in 99, and the units through the 4x4 matrices 1,839 in 91. The counts show spelling work only. They omit
 code this arm64 configuration does not compile, and zero findings is not conversion evidence.
 
 - **Raster pipeline and pixel kernels (about 115 findings).** These are the bitmap-sampling
@@ -1473,7 +1484,7 @@ code this arm64 configuration does not compile, and zero findings is not convers
   count the kernel header's remaining configuration macros, or its LoongArch and 32-bit-ARM
   blocks, which this machine cannot compile and which keep their casts and declarations. Imported optimized code stays the baseline. New SIMD
   work follows the 128-bit portable policy and needs measurements.
-- **Canvas-adjacent state.** Clip stack and its device, 4x4 matrices,
+- **Canvas-adjacent state.** Clip stack and its device,
   drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`, `SkMatrix22`, path
   utilities, lattice iteration and shadow info.
 - **Shaders and color.** Triangle-color and Perlin-noise shaders, `SkColorSpace`, `SkColor`, and
