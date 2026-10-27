@@ -83,7 +83,7 @@ public:
                   const SkMatrix* paintMatrix,
                   const SkRect* postPaintRect) const;
     void drawRect(const SkRect& rect, const SkPaint& paint) const {
-        this->drawRect(rect, paint, nullptr, nullptr);
+        (*this).drawRect(rect, paint, nullptr, nullptr);
     }
     void drawOval(const SkRect&, const SkPaint&) const;
     void drawRRect(const SkRRect&, const SkPaint&) const;
@@ -98,7 +98,7 @@ public:
     void drawPath(const SkPath& path,
                   const SkPaint& paint,
                   const SkMatrix* prePathMatrix) const {
-        this->drawPath(path, paint, prePathMatrix, SkDrawCoverage::kNo);
+        (*this).drawPath(path, paint, prePathMatrix, SkDrawCoverage::kNo);
     }
 
     /**
@@ -110,8 +110,9 @@ public:
     void drawPathCoverage(const SkPath& src,
                           const SkPaint& paint,
                           SkBlitter* customBlitter = nullptr) const {
-        bool isHairline = paint.getStyle() == SkPaint::kStroke_Style && paint.getStrokeWidth() == 0;
-        this->drawPath(src,
+        const bool isHairline =
+                paint.getStyle() == SkPaint::kStroke_Style && paint.getStrokeWidth() == 0;
+        (*this).drawPath(src,
                        paint,
                        nullptr,
                        isHairline ? SkDrawCoverage::kNo : SkDrawCoverage::kYes,

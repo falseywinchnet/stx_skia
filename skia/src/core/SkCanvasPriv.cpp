@@ -31,58 +31,60 @@
 SkAutoCanvasMatrixPaint::SkAutoCanvasMatrixPaint(SkCanvas* canvas, const SkMatrix* matrix,
                                                  const SkPaint* paint, const SkRect& bounds)
         : fCanvas(canvas)
-        , fSaveCount(canvas->getSaveCount()) {
+        , fSaveCount((*canvas).getSaveCount()) {
     if (paint) {
         SkRect newBounds = bounds;
         if (matrix) {
-            matrix->mapRect(&newBounds);
+            (*matrix).mapRect(&newBounds);
         }
-        canvas->saveLayer(&newBounds, paint);
+        (*canvas).saveLayer(&newBounds, paint);
     } else if (matrix) {
-        canvas->save();
+        (*canvas).save();
     }
 
     if (matrix) {
-        canvas->concat(*matrix);
+        (*canvas).concat(*matrix);
     }
 }
 
 SkAutoCanvasMatrixPaint::~SkAutoCanvasMatrixPaint() {
-    fCanvas->restoreToCount(fSaveCount);
+    (*fCanvas).restoreToCount(fSaveCount);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool SkCanvasPriv::ReadLattice(SkReadBuffer& buffer, SkCanvas::Lattice* lattice) {
-    lattice->fXCount = buffer.readInt();
-    if (lattice->fXCount < 0) {
+    (*lattice).fXCount = buffer.readInt();
+    if ((*lattice).fXCount < 0) {
         return false;
     }
-    lattice->fXDivs = buffer.skipT<int32_t>(lattice->fXCount);
-    lattice->fYCount = buffer.readInt();
-    if (lattice->fYCount < 0) {
+    (*lattice).fXDivs = buffer.skipT<int32_t>((*lattice).fXCount);
+    (*lattice).fYCount = buffer.readInt();
+    if ((*lattice).fYCount < 0) {
         return false;
     }
-    lattice->fYDivs = buffer.skipT<int32_t>(lattice->fYCount);
-    int flagCount = buffer.readInt();
-    lattice->fRectTypes = nullptr;
-    lattice->fColors = nullptr;
+    (*lattice).fYDivs = buffer.skipT<int32_t>((*lattice).fYCount);
+    const int flagCount = buffer.readInt();
+    (*lattice).fRectTypes = nullptr;
+    (*lattice).fColors = nullptr;
     // flagCount was serialized as (xCount + 1) * (yCount + 1) if there were rect types and colors,
     // so if that isn't still the case the buffer is invalid.
     if (flagCount) {
-        if (flagCount < 0 || (uint64_t) flagCount != ((uint64_t) lattice->fXCount + 1) *
-                                                     ((uint64_t) lattice->fYCount + 1)) {
+        const uint64_t expected = (static_cast<uint64_t>((*lattice).fXCount) + 1) *
+                                  (static_cast<uint64_t>((*lattice).fYCount) + 1);
+        if (flagCount < 0 || static_cast<uint64_t>(flagCount) != expected) {
             return false;
         }
-        lattice->fRectTypes = buffer.skipT<SkCanvas::Lattice::RectType>(flagCount);
-        lattice->fColors = buffer.skipT<SkColor>(flagCount);
+        (*lattice).fRectTypes = buffer.skipT<SkCanvas::Lattice::RectType>(flagCount);
+        (*lattice).fColors = buffer.skipT<SkColor>(flagCount);
     }
-    lattice->fBounds = buffer.skipT<SkIRect>();
-    return buffer.isValid();
+    (*lattice).fBounds = buffer.skipT<SkIRect>();
+    const bool valid = buffer.isValid();
+    return valid;
 }
 
 size_t SkCanvasPriv::WriteLattice(void* buffer, const SkCanvas::Lattice& lattice) {
-    int flagCount = lattice.fRectTypes ? (lattice.fXCount + 1) * (lattice.fYCount + 1) : 0;
+    const int flagCount = lattice.fRectTypes ? (lattice.fXCount + 1) * (lattice.fYCount + 1) : 0;
 
     const size_t size = (1 + lattice.fXCount + 1 + lattice.fYCount + 1) * sizeof(int32_t) +
                         SkAlign4(flagCount * sizeof(SkCanvas::Lattice::RectType)) +
@@ -117,7 +119,7 @@ void SkCanvasPriv::GetDstClipAndMatrixCounts(const SkCanvas::ImageSetEntry set[]
     int dstClipCount = 0;
     int maxMatrixIndex = -1;
     for (int i = 0; i < count; ++i) {
-        dstClipCount += 4 * set[i].fHasClip;
+        dstClipCount += set[i].fHasClip ? 4 : 0;
         if (set[i].fMatrixIndex > maxMatrixIndex) {
             maxMatrixIndex = set[i].fMatrixIndex;
         }

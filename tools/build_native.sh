@@ -37,6 +37,7 @@ else
     "build/$profile/stx_skia_aa_scan_converter_tests" "build/$profile/aa-scan-converters.raw"
     "build/$profile/stx_skia_region_clip_tests" "build/$profile/region-clips.raw"
     "build/$profile/stx_skia_blitter_tests" "build/$profile/blitters.raw"
+    "build/$profile/stx_skia_canvas_device_tests" "build/$profile/canvas-device.raw"
     "build/$profile/stx_skia_image_subset_tests" "build/$profile/image-subsets.raw"
     "build/$profile/stx_skia_image_sampling_tests" "build/$profile/image-sampling.raw" "build/$profile/image-sampling-corrected.raw"
     "build/$profile/stx_skia_shader_coordinate_tests" "build/$profile/shader-coordinates.raw"

@@ -1375,6 +1375,18 @@ row kernels are retained unchanged. Candidate/reference suites pass 72/72 and 71
 corpus and every other shared artifact match, except the intentionally corrected sampling
 artifact; the instrumented suite reports PASS. See ../results/2026-10-26/BLITTER_CONVERSION.md.
 
+## Canvas, device and CPU draw
+
+The canvas, the device base class and no-pixels device, the bitmap device with its tiler, and
+skcpu::Draw with its atlas and vertex paths are converted. Macros, gotos and lambdas become
+explicit code; rectangles are no longer reinterpreted as point pairs; the device-path draw no
+longer calls an uninitialized procedure for an unknown cap; point-procedure and triangle-clip
+indexing is bounded in Release; dead Android, legacy and fuzzer configuration is removed.
+Candidate/reference suites pass 73/73 and 72/72; the new corpus and every other shared artifact
+match, except the intentionally corrected sampling artifact; the instrumented suite reports
+PASS. Blurred paths already differed from the reference before this unit and are recorded
+there. See ../results/2026-10-26/CANVAS_DEVICE_CONVERSION.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

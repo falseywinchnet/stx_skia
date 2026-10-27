@@ -18,16 +18,9 @@
 class SkBitmap;
 class SkSurfaceProps;
 
-#if defined(SK_BUILD_FOR_ANDROID_FRAMEWORK)
-#include "include/core/SkBitmap.h"
-#include "include/core/SkColorSpace.h"
-#include "include/core/SkImageInfo.h"
-
-#endif
-
 SkCanvas::SkCanvas(const SkBitmap& bitmap, const SkSurfaceProps& props)
         : fMCStack(sizeof(MCRec), fMCRecStorage, sizeof(fMCRecStorage)), fProps(props) {
-    this->init(sk_make_sp<SkBitmapDevice>(bitmap, fProps));
+    (*this).init(sk_make_sp<SkBitmapDevice>(bitmap, fProps));
 }
 
 SkCanvas::SkCanvas(const SkBitmap& bitmap,
@@ -37,17 +30,8 @@ SkCanvas::SkCanvas(const SkBitmap& bitmap,
         : fMCStack(sizeof(MCRec), fMCRecStorage, sizeof(fMCRecStorage))
         , fProps(SkSurfacePropsCopyOrDefault(props))
         , fAllocator(std::move(alloc)) {
-    this->init(sk_make_sp<SkBitmapDevice>(bitmap, fProps, hndl));
+    (*this).init(sk_make_sp<SkBitmapDevice>(bitmap, fProps, hndl));
 }
 
 SkCanvas::SkCanvas(const SkBitmap& bitmap) : SkCanvas(bitmap, nullptr, nullptr, nullptr) {}
-
-#if defined(SK_BUILD_FOR_ANDROID_FRAMEWORK)
-SkCanvas::SkCanvas(const SkBitmap& bitmap, ColorBehavior)
-        : fMCStack(sizeof(MCRec), fMCRecStorage, sizeof(fMCRecStorage)) {
-    SkBitmap tmp(bitmap);
-    *const_cast<SkImageInfo*>(&tmp.info()) = tmp.info().makeColorSpace(nullptr);
-    this->init(sk_make_sp<SkBitmapDevice>(tmp, fProps));
-}
-#endif
 

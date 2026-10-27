@@ -30,8 +30,9 @@ public:
     ~SkAutoCanvasMatrixPaint();
 
 private:
-    SkCanvas*   fCanvas;
-    int         fSaveCount;
+    // Borrowed: the canvas outlives this object.
+    SkCanvas*   fCanvas = nullptr;
+    int         fSaveCount = 0;
 };
 
 class SkCanvasPriv {
@@ -46,19 +47,19 @@ public:
     static size_t WriteLattice(void* storage, const SkCanvas::Lattice&);
 
     static int SaveBehind(SkCanvas* canvas, const SkRect* subset) {
-        return canvas->only_axis_aligned_saveBehind(subset);
+        return (*canvas).only_axis_aligned_saveBehind(subset);
     }
     static void DrawBehind(SkCanvas* canvas, const SkPaint& paint) {
-        canvas->drawClippedToSaveBehind(paint);
+        (*canvas).drawClippedToSaveBehind(paint);
     }
 
     // Exposed for testing on non-Android framework builds
     static void ResetClip(SkCanvas* canvas) {
-        canvas->internal_private_resetClip();
+        (*canvas).internal_private_resetClip();
     }
 
     static SkDevice* TopDevice(const SkCanvas* canvas) {
-        return canvas->topDevice();
+        return (*canvas).topDevice();
     }
 
     // The experimental_DrawEdgeAAImageSet API accepts separate dstClips and preViewMatrices arrays,

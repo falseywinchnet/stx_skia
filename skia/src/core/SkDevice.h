@@ -87,14 +87,14 @@ public:
      */
     const SkImageInfo& imageInfo() const { return fInfo; }
 
-    int width() const { return this->imageInfo().width(); }
-    int height() const { return this->imageInfo().height(); }
+    int width() const { return (*this).imageInfo().width(); }
+    int height() const { return (*this).imageInfo().height(); }
 
-    bool isOpaque() const { return this->imageInfo().isOpaque(); }
+    bool isOpaque() const { return (*this).imageInfo().isOpaque(); }
 
     // NOTE: Image dimensions as a rect, *not* the current restricted clip bounds.
-    SkIRect bounds() const { return SkIRect::MakeWH(this->width(), this->height()); }
-    SkISize size() const { return this->imageInfo().dimensions(); }
+    SkIRect bounds() const { return SkIRect::MakeWH((*this).width(), (*this).height()); }
+    SkISize size() const { return (*this).imageInfo().dimensions(); }
 
     /**
      *  Return SurfaceProps for this device.
@@ -109,13 +109,13 @@ public:
      *  Write the pixels in 'src' into this Device at the specified x,y offset. The caller is
      *  responsible for "pre-clipping" the src.
      */
-    bool writePixels(const SkPixmap& src, int x, int y) { return this->onWritePixels(src, x, y); }
+    bool writePixels(const SkPixmap& src, int x, int y) { return (*this).onWritePixels(src, x, y); }
 
     /**
      *  Read pixels from this Device at the specified x,y offset into dst. The caller is
      *  responsible for "pre-clipping" the dst
      */
-    bool readPixels(const SkPixmap& dst, int x, int y) { return this->onReadPixels(dst, x, y); }
+    bool readPixels(const SkPixmap& dst, int x, int y) { return (*this).onReadPixels(dst, x, y); }
 
     /**
      *  Try to get write-access to the pixels behind the device. If successful, this returns true
@@ -188,12 +188,12 @@ public:
      */
     void getGlobalBounds(SkIRect* bounds) const {
         SkASSERT(bounds);
-        *bounds = SkMatrixPriv::MapRect(fDeviceToGlobal, SkRect::Make(this->bounds())).roundOut();
+        *bounds = SkMatrixPriv::MapRect(fDeviceToGlobal, SkRect::Make((*this).bounds())).roundOut();
     }
 
     SkIRect getGlobalBounds() const {
-        SkIRect bounds;
-        this->getGlobalBounds(&bounds);
+        SkIRect bounds = SkIRect::MakeEmpty();
+        (*this).getGlobalBounds(&bounds);
         return bounds;
     }
 
@@ -213,11 +213,11 @@ public:
     virtual void clipRegion(const SkRegion& region, SkClipOp op) = 0;
 
     void clipShader(sk_sp<SkShader> sh, SkClipOp op) {
-        sh = as_SB(sh)->makeWithCTM(this->localToDevice());
+        sh = (*as_SB(sh)).makeWithCTM((*this).localToDevice());
         if (op == SkClipOp::kDifference) {
-            sh = as_SB(sh)->makeInvertAlpha();
+            sh = (*as_SB(sh)).makeInvertAlpha();
         }
-        this->onClipShader(std::move(sh));
+        (*this).onClipShader(std::move(sh));
     }
 
     virtual void replaceClip(const SkIRect& rect) = 0;
@@ -413,7 +413,7 @@ protected:
     // Convenience to configure the device to be axis-aligned with the root canvas, but with a
     // unique origin.
     void setOrigin(const SkM44& globalCTM, int x, int y) {
-        this->setDeviceCoordinateSystem(SkM44(), SkM44(), globalCTM, x, y);
+        (*this).setDeviceCoordinateSystem(SkM44(), SkM44(), globalCTM, x, y);
     }
 
     // Returns whether or not localToDevice() has changed since the last call to this function.
@@ -478,17 +478,21 @@ public:
     void clipPath(const SkPath& path, SkClipOp op, bool aa) override;
     void clipRegion(const SkRegion& globalRgn, SkClipOp op) override;
     void replaceClip(const SkIRect& rect) override;
-    bool isClipAntiAliased() const override { return this->clip().fIsAA; }
-    bool isClipEmpty() const override { return this->devClipBounds().isEmpty(); }
-    bool isClipRect() const override { return this->clip().fIsRect && !this->isClipEmpty(); }
+    bool isClipAntiAliased() const override { return (*this).clip().fIsAA; }
+    bool isClipEmpty() const override { return (*this).devClipBounds().isEmpty(); }
+    bool isClipRect() const override {
+        const bool rect = (*this).clip().fIsRect && !(*this).isClipEmpty();
+        return rect;
+    }
     bool isClipWideOpen() const override {
-        return this->clip().fIsRect &&
-               this->devClipBounds() == this->bounds();
+        const bool wideOpen = (*this).clip().fIsRect &&
+                              (*this).devClipBounds() == (*this).bounds();
+        return wideOpen;
     }
     void android_utils_clipAsRgn(SkRegion* rgn) const override {
-        rgn->setRect(this->devClipBounds());
+        (*rgn).setRect((*this).devClipBounds());
     }
-    SkIRect devClipBounds() const override { return this->clip().fClipBounds; }
+    SkIRect devClipBounds() const override { return (*this).clip().fClipBounds; }
 
 protected:
 
@@ -508,14 +512,13 @@ protected:
 
 private:
     struct ClipState {
-        SkIRect fClipBounds;
-        int fDeferredSaveCount;
-        bool fIsAA;
-        bool fIsRect;
+        SkIRect fClipBounds = SkIRect::MakeEmpty();
+        int fDeferredSaveCount = 0;
+        bool fIsAA = false;
+        bool fIsRect = true;
 
         ClipState(const SkIRect& bounds, bool isAA, bool isRect)
                 : fClipBounds(bounds)
-                , fDeferredSaveCount(0)
                 , fIsAA(isAA)
                 , fIsRect(isRect) {}
 
@@ -525,22 +528,25 @@ private:
 
     void onClipShader(sk_sp<SkShader> shader) override;
 
+    // Borrows the current clip; valid until the clip stack next changes.
     const ClipState& clip() const { return fClipStack.back(); }
     ClipState& writableClip();
 
     skia_private::STArray<4, ClipState> fClipStack;
 };
 
+// Sets a device's local-to-device transform and restores the previous one on destruction. The
+// device is borrowed and must outlive this object.
 class [[nodiscard]] SkAutoDeviceTransformRestore : SkNoncopyable {
 public:
     SkAutoDeviceTransformRestore(SkDevice* device, const SkM44& localToDevice)
         : fDevice(device)
-        , fPrevLocalToDevice(device->localToDevice())
+        , fPrevLocalToDevice((*device).localToDevice())
     {
-        fDevice->setLocalToDevice(localToDevice);
+        (*fDevice).setLocalToDevice(localToDevice);
     }
     ~SkAutoDeviceTransformRestore() {
-        fDevice->setLocalToDevice(fPrevLocalToDevice);
+        (*fDevice).setLocalToDevice(fPrevLocalToDevice);
     }
 
 private:

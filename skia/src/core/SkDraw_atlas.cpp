@@ -54,19 +54,24 @@ static void fill_rect(const SkMatrix& ctm, const SkRasterClip& rc,
     } else {
         SkPathRawShapes::Rect raw(r);
         ctm.mapPoints(raw.fStorage);
-        if (auto bounds = SkRect::Bounds(raw.fStorage)) {
+        const std::optional<SkRect> bounds = SkRect::Bounds(raw.fStorage);
+        if (bounds.has_value()) {
             raw.fBounds = *bounds;
             SkScan::FillPath(raw, rc, blitter);
         }
     }
 }
 
+// Stores a premultiplied color in both the low-precision and float forms of the context.
 static void load_color(SkRasterPipelineContexts::UniformColorCtx* ctx, const float rgba[]) {
     // only need one of these. can I query the pipeline to know if its lowp or highp?
-    ctx->rgba[0] = SkScalarRoundToInt(rgba[0]*255); ctx->r = rgba[0];
-    ctx->rgba[1] = SkScalarRoundToInt(rgba[1]*255); ctx->g = rgba[1];
-    ctx->rgba[2] = SkScalarRoundToInt(rgba[2]*255); ctx->b = rgba[2];
-    ctx->rgba[3] = SkScalarRoundToInt(rgba[3]*255); ctx->a = rgba[3];
+    for (int channel = 0; channel < 4; ++channel) {
+        (*ctx).rgba[channel] = static_cast<uint16_t>(SkScalarRoundToInt(rgba[channel] * 255));
+    }
+    (*ctx).r = rgba[0];
+    (*ctx).g = rgba[1];
+    (*ctx).b = rgba[2];
+    (*ctx).a = rgba[3];
 }
 
 namespace skcpu {
@@ -92,13 +97,14 @@ void Draw::drawAtlas(SkSpan<const SkRSXform> xform,
     p.setMaskFilter(nullptr);
 
     // The RSXForms can't contain perspective - only the CTM can.
-    const bool perspective = fCTM->hasPerspective();
+    const bool perspective = (*fCTM).hasPerspective();
 
-    auto transformShader = alloc.make<SkTransformShader>(*as_SB(atlasShader), perspective);
+    SkTransformShader* transformShader =
+            alloc.make<SkTransformShader>(*as_SB(atlasShader), perspective);
 
     SkRasterPipeline pipeline(&alloc);
-    SkSurfaceProps props = SkSurfacePropsCopyOrDefault(fProps);
-    SkStageRec rec = {&pipeline,
+    const SkSurfaceProps props = SkSurfacePropsCopyOrDefault(fProps);
+    const SkStageRec rec = {&pipeline,
                       &alloc,
                       fDst.colorType(),
                       fDst.colorSpace(),
@@ -107,32 +113,32 @@ void Draw::drawAtlas(SkSpan<const SkRSXform> xform,
                       SkRect::MakeEmpty()};
     // We pass an identity matrix here rather than the CTM. The CTM gets folded into the
     // per-triangle matrix.
-    if (!as_SB(transformShader)->appendRootStages(rec, SkMatrix::I())) {
+    if (!(*as_SB(transformShader)).appendRootStages(rec, SkMatrix::I())) {
         return;
     }
 
     SkRasterPipelineContexts::UniformColorCtx* uniformCtx = nullptr;
-    SkColorSpaceXformSteps steps(sk_srgb_singleton(), kUnpremul_SkAlphaType,
-                                 rec.fDstCS, kUnpremul_SkAlphaType);
+    const SkColorSpaceXformSteps steps(sk_srgb_singleton(), kUnpremul_SkAlphaType,
+                                       rec.fDstCS, kUnpremul_SkAlphaType);
     if (!colors.empty()) {
         // we will late-bind the values in ctx, once for each color in the loop
         uniformCtx = alloc.make<SkRasterPipelineContexts::UniformColorCtx>();
-        rec.fPipeline->append(SkRasterPipelineOp::uniform_color_dst, uniformCtx);
-        std::optional<SkBlendMode> bm = as_BB(blender)->asBlendMode();
+        (*rec.fPipeline).append(SkRasterPipelineOp::uniform_color_dst, uniformCtx);
+        const std::optional<SkBlendMode> bm = (*as_BB(blender)).asBlendMode();
         if (!bm.has_value()) {
             return;
         }
         SkBlendMode_AppendStages(*bm, rec.fPipeline);
     }
 
-    bool isOpaque = colors.empty() && transformShader->isOpaque();
+    bool isOpaque = colors.empty() && (*transformShader).isOpaque();
     if (p.getAlphaf() != 1) {
-        rec.fPipeline->append(SkRasterPipelineOp::scale_1_float, alloc.make<float>(p.getAlphaf()));
+        (*rec.fPipeline).append(SkRasterPipelineOp::scale_1_float, alloc.make<float>(p.getAlphaf()));
         isOpaque = false;
     }
 
-    auto blitter = SkCreateRasterPipelineBlitter(fDst, p, pipeline, isOpaque, &alloc,
-                                                 fRC->clipShader());
+    SkBlitter* blitter = SkCreateRasterPipelineBlitter(fDst, p, pipeline, isOpaque, &alloc,
+                                                       (*fRC).clipShader());
     if (!blitter) {
         return;
     }
@@ -148,12 +154,12 @@ void Draw::drawAtlas(SkSpan<const SkRSXform> xform,
         mx.setRSXform(xform[i]);
         mx.preTranslate(-textures[i].fLeft, -textures[i].fTop);
         mx.postConcat(*fCTM);
-        if (auto inv = mx.invert()) {
-            if (transformShader->update(*inv)) {
-                fill_rect(mx, *fRC, textures[i], blitter);
-            }
-        } else {
+        const std::optional<SkMatrix> inv = mx.invert();
+        if (!inv.has_value()) {
             return; // non-invertible
+        }
+        if ((*transformShader).update(*inv)) {
+            fill_rect(mx, *fRC, textures[i], blitter);
         }
     }
 }
