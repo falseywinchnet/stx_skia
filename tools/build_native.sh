@@ -47,6 +47,7 @@ else
     "build/$profile/stx_skia_android_clip_tests" "build/$profile/android-clip.raw" "build/$profile/android-clip-reset.raw"
     "build/$profile/stx_skia_patch_utils_tests" "build/$profile/patch-utils.raw" "build/$profile/patch-utils-large.raw"
     "build/$profile/stx_skia_memset_tests" "build/$profile/memset.raw"
+    "build/$profile/stx_skia_stream_core_tests" "build/$profile/stream-core.raw"
     "build/$profile/stx_skia_raster_pipeline_corpus_tests" "build/$profile/raster-pipeline.raw"
     "build/$profile/stx_skia_image_subset_tests" "build/$profile/image-subsets.raw"
     "build/$profile/stx_skia_image_sampling_tests" "build/$profile/image-sampling.raw" "build/$profile/image-sampling-corrected.raw"
