@@ -284,7 +284,7 @@ list(APPEND stx_sources baseline/skia/src/core/SkMaskGamma.cpp)
 foreach(unit IN ITEMS src/core/SkDistanceFieldGen.cpp src/core/SkDocument.cpp
         src/utils/SkCamera.cpp src/utils/SkJSONWriter.cpp src/utils/SkParse.cpp
         src/utils/SkParseColor.cpp src/utils/SkParsePath.cpp src/utils/SkFloatToDecimal.cpp
-        src/utils/SkOSPath.cpp src/utils/mac/SkCreateCGImageRef.cpp)
+        src/utils/SkOSPath.cpp src/utils/mac/SkCreateCGImageRef.cpp src/utils/SkPatchUtils.cpp)
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()

@@ -42,6 +42,7 @@ jobs:
           cmake -E compare_files build/baseline/matrix-invert.raw build/candidate/matrix-invert.raw
           cmake -E compare_files build/baseline/raster-clip-stack.raw build/candidate/raster-clip-stack.raw
           cmake -E compare_files build/baseline/android-clip.raw build/candidate/android-clip.raw
+          cmake -E compare_files build/baseline/patch-utils.raw build/candidate/patch-utils.raw
           cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
@@ -100,6 +101,7 @@ jobs:
           cmake -E compare_files build/baseline/matrix-invert.raw build/candidate/matrix-invert.raw
           cmake -E compare_files build/baseline/raster-clip-stack.raw build/candidate/raster-clip-stack.raw
           cmake -E compare_files build/baseline/android-clip.raw build/candidate/android-clip.raw
+          cmake -E compare_files build/baseline/patch-utils.raw build/candidate/patch-utils.raw
           cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
