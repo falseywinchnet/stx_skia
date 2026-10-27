@@ -42,6 +42,7 @@ else
     "build/$profile/stx_skia_vertices_tests" "build/$profile/vertices.raw"
     "build/$profile/stx_skia_paint_tests" "build/$profile/paint.raw"
     "build/$profile/stx_skia_m44_tests" "build/$profile/m44.raw" "build/$profile/m44-corrected.raw"
+    "build/$profile/stx_skia_matrix_invert_tests" "build/$profile/matrix-invert.raw" "build/$profile/matrix-invert-small.raw"
     "build/$profile/stx_skia_raster_pipeline_corpus_tests" "build/$profile/raster-pipeline.raw"
     "build/$profile/stx_skia_image_subset_tests" "build/$profile/image-subsets.raw"
     "build/$profile/stx_skia_image_sampling_tests" "build/$profile/image-sampling.raw" "build/$profile/image-sampling-corrected.raw"
