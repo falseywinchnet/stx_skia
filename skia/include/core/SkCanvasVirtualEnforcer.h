@@ -10,7 +10,7 @@
 
 #include "include/core/SkCanvas.h"
 
-// If you would ordinarily want to inherit from Base (eg SkCanvas, SkNWayCanvas), instead
+// If you would ordinarily want to inherit from Base (eg SkCanvas), instead
 // inherit from SkCanvasVirtualEnforcer<Base>, which will make the build fail if you forget
 // to override one of SkCanvas' key virtual hooks.
 template <typename Base>

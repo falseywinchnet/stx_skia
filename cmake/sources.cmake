@@ -3,7 +3,6 @@
 set(STX_SKIA_BASELINE_SOURCES
     skia/modules/skcms/skcms.cc
     skia/modules/skcms/src/skcms_TransformBaseline.cc
-    skia/src/android/SkAndroidFrameworkUtils.cpp
     skia/src/android/SkAnimatedImage.cpp
     skia/src/capture/SkCapture.cpp
     skia/src/capture/SkCaptureCanvas.cpp
@@ -444,8 +443,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/text/SlugFromBuffer.cpp
     skia/src/text/StrikeForGPU.cpp
     skia/src/utils/SkCamera.cpp
-    skia/src/utils/SkCanvasStack.cpp
-    skia/src/utils/SkCanvasStateUtils.cpp
     skia/src/utils/SkCharToGlyphCache.cpp
     skia/src/utils/SkCustomTypeface.cpp
     skia/src/utils/SkDashPath.cpp
@@ -454,11 +451,8 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/utils/SkJSONWriter.cpp
     skia/src/utils/SkMatrix22.cpp
     skia/src/utils/SkMultiPictureDocument.cpp
-    skia/src/utils/SkNWayCanvas.cpp
-    skia/src/utils/SkNullCanvas.cpp
     skia/src/utils/SkOSPath.cpp
     skia/src/utils/SkOrderedFontMgr.cpp
-    skia/src/utils/SkPaintFilterCanvas.cpp
     skia/src/utils/SkParse.cpp
     skia/src/utils/SkParseColor.cpp
     skia/src/utils/SkParsePath.cpp

@@ -265,3 +265,12 @@ stub's PDF entry points were not installed, and no consumer drew drawables. SkCa
 SkDevice, the virtual enforcer and the no-draw, N-way and paint-filter canvases lose
 their drawable and annotation entry points. tests/canvas_device.cpp and the
 installed-consumer test check their absence.
+
+
+## Wrapper canvas removal
+
+SkNullCanvas, SkCanvasStack, SkCanvasStateUtils and SkAndroidFrameworkUtils (sources and
+headers) now live only in baseline/skia, unchanged with their notices. The candidate copies
+of SkNWayCanvas and SkPaintFilterCanvas are deleted; their originals were already in
+baseline/skia for the reference build. None had a user in the library or GUI.Forms.
+tests/canvas_device.cpp and the installed-consumer test check that the headers are absent.

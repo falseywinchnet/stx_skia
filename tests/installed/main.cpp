@@ -42,6 +42,12 @@ static_assert(!HasAnnotations<SkCanvas>);
 #if __has_include("include/core/SkDrawable.h") || __has_include("include/core/SkAnnotation.h")
 #error Drawable and annotation headers must not be installed.
 #endif
+#if __has_include("include/utils/SkNWayCanvas.h") || \
+    __has_include("include/utils/SkPaintFilterCanvas.h") || \
+    __has_include("include/utils/SkNullCanvas.h") || \
+    __has_include("include/utils/SkCanvasStateUtils.h")
+#error Wrapper canvas and canvas-state headers must not be installed.
+#endif
 #if __has_include("include/effects/SkRuntimeEffect.h")
 #error Runtime compiler headers must not be installed.
 #endif

@@ -1509,12 +1509,20 @@ unread context pointer. Its three downcasts are now valid by construction: the r
 context classes can no longer be derived outside the library. Every shared artifact is
 unchanged. See ../results/2026-10-27/DRAWABLES_ANNOTATIONS_RECORDER.md.
 
+## Wrapper canvases and canvas-state helpers
+
+The N-way, paint-filter, null and stacked canvases are removed, with the canvas-state transfer
+utilities and the Android framework helpers that were their only users. No consumer used any of
+them. The originals live in baseline/skia, and every shared artifact is unchanged. SkCanvas's
+remaining Android framework hooks are left for their own unit. See
+../results/2026-10-27/WRAPPER_CANVAS_REMOVAL.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
 constructs in 106 files; per-file counts are in
 ../results/2026-10-27/HOUSE_POLICY_INVENTORY.md. The mask cache and Gaussian filter unit since
-leaves 2,680 constructs in 102 files, the raster pipeline step 2,076 in 99, the units through the 4x4 matrices 1,839 in 91, the clip stack removal 1,677 in 88, and the drawable, annotation and recorder unit 1,657 in 82. The counts show spelling work only. They omit
+leaves 2,680 constructs in 102 files, the raster pipeline step 2,076 in 99, the units through the 4x4 matrices 1,839 in 91, the clip stack removal 1,677 in 88, the drawable, annotation and recorder unit 1,657 in 82, and the wrapper canvas removal 1,502 in 76. The counts show spelling work only. They omit
 code this arm64 configuration does not compile, and zero findings is not conversion evidence.
 
 - **Raster pipeline and pixel kernels (about 115 findings).** These are the bitmap-sampling
@@ -1523,8 +1531,9 @@ code this arm64 configuration does not compile, and zero findings is not convers
   count the kernel header's remaining configuration macros, or its LoongArch and 32-bit-ARM
   blocks, which this machine cannot compile and which keep their casts and declarations. Imported optimized code stays the baseline. New SIMD
   work follows the 128-bit portable policy and needs measurements.
-- **Canvas-adjacent state.** `SkNWayCanvas` and `SkPaintFilterCanvas` (check their use first),
-  `SkRSXform`, `SkPoint3`, `SkMatrix22`, path utilities, lattice iteration and shadow info.
+- **Canvas-adjacent state.** SkCanvas's unused Android framework hooks (clip restriction,
+  `androidFramework_isClipAA`, `temporary_internal_getRgnClip`), `SkRSXform`, `SkPoint3`,
+  `SkMatrix22`, path utilities, lattice iteration and shadow info.
 - **Shaders and color.** Triangle-color and Perlin-noise shaders, `SkColorSpace`, `SkColor`, and
   skcms (`Transform_inl.h`, `skcms_public.h`).
 - **Memory, containers and support code.** TArray, TBlockList, the block allocator, the arena,

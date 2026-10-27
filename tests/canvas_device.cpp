@@ -67,6 +67,16 @@ static_assert(!HasAnnotations<SkCanvas>);
     __has_include("src/core/SkAnnotationKeys.h")
 #error Drawable and annotation headers must not be part of the candidate.
 #endif
+// The forwarding, paint-filtering, null and stacked canvases, canvas-state transfer and the
+// Android framework helpers had no user in the library or GUI.Forms.
+#if __has_include("include/utils/SkNWayCanvas.h") || \
+    __has_include("include/utils/SkPaintFilterCanvas.h") || \
+    __has_include("include/utils/SkNullCanvas.h") || \
+    __has_include("include/utils/SkCanvasStateUtils.h") || \
+    __has_include("src/utils/SkCanvasStack.h") || \
+    __has_include("include/android/SkAndroidFrameworkUtils.h")
+#error Wrapper canvas and canvas-state headers must not be part of the candidate.
+#endif
 #else
 // The reference canvas still has both, so the expressions above do detect them.
 template <typename T>

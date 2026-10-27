@@ -53,7 +53,6 @@ class SkColorSpace;
 class SkData;
 class SkDevice;
 class SkImage;
-class SkPaintFilterCanvas;
 class SkPath;
 class SkPixmap;
 class SkRRect;
@@ -884,8 +883,6 @@ public:
 
         Pass an empty rect to disable maximum clip.
         This private API is for use by Android framework only.
-
-        DEPRECATED: Replace usage with SkAndroidFrameworkUtils::replaceClip()
 
         @param rect  maximum allowed clip in device coordinates
     */
@@ -2003,11 +2000,9 @@ private:
 
     virtual void onSurfaceDelete() {}
 
-    friend class SkAndroidFrameworkUtils;
     friend class SkCanvasPriv;      // needs to expose android functions for testing outside android
     friend class SkSurface_Raster;  // needs getDevice()
     friend class SkNoDrawCanvas;    // needs resetForNextPicture()
-    friend class SkNWayCanvas;
     friend class SkOverdrawCanvas;
     friend class SkRasterHandleAllocator;
     friend class SkRecords::Draw;
@@ -2044,9 +2039,6 @@ private:
     void drawClippedToSaveBehind(const SkPaint&);
 
     void resetForNextPicture(const SkIRect& bounds);
-
-    // needs gettotalclip()
-    friend class SkCanvasStateUtils;
 
     void init(sk_sp<SkDevice>);
 
@@ -2087,8 +2079,6 @@ private:
      * earlier save point.
      */
     void internal_private_resetClip();
-
-    virtual SkPaintFilterCanvas* internal_private_asPaintFilterCanvas() const { return nullptr; }
 
     // Keep track of the device clip bounds in the canvas' global space to reject draws before
     // invoking the top-level device.
