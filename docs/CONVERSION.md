@@ -1514,8 +1514,19 @@ unchanged. See ../results/2026-10-27/DRAWABLES_ANNOTATIONS_RECORDER.md.
 The N-way, paint-filter, null and stacked canvases are removed, with the canvas-state transfer
 utilities and the Android framework helpers that were their only users. No consumer used any of
 them. The originals live in baseline/skia, and every shared artifact is unchanged. SkCanvas's
-remaining Android framework hooks are left for their own unit. See
+remaining Android framework hooks were kept and fixed in their own unit, below. See
 ../results/2026-10-27/WRAPPER_CANVAS_REMOVAL.md.
+
+## Android clip hooks
+
+The device clip restriction, `androidFramework_isClipAA` and `temporary_internal_getRgnClip` stay,
+since the owner may need the Android framework support. The GPU-only stencil clip hook is
+removed from `SkDevice`. The restriction is one optional value. Resetting a no-draw canvas ends
+it. A second restriction, a restriction inside a layer, and a null region now stop in Release
+instead of being ignored or dereferenced. The header comments now match the behaviour. Before
+any change, both builds wrote identical bytes for a new corpus over the hooks (`android-clip.raw`).
+That file is unchanged afterwards. `android-clip-reset.raw` is meant to differ. See
+../results/2026-10-27/ANDROID_CLIP_HOOKS.md.
 
 ## Still required
 
@@ -1531,9 +1542,8 @@ code this arm64 configuration does not compile, and zero findings is not convers
   count the kernel header's remaining configuration macros, or its LoongArch and 32-bit-ARM
   blocks, which this machine cannot compile and which keep their casts and declarations. Imported optimized code stays the baseline. New SIMD
   work follows the 128-bit portable policy and needs measurements.
-- **Canvas-adjacent state.** SkCanvas's unused Android framework hooks (clip restriction,
-  `androidFramework_isClipAA`, `temporary_internal_getRgnClip`), `SkRSXform`, `SkPoint3`,
-  `SkMatrix22`, path utilities, lattice iteration and shadow info.
+- **Canvas-adjacent state.** `SkRSXform`, `SkPoint3`, `SkMatrix22`, path utilities, lattice
+  iteration and shadow info.
 - **Shaders and color.** Triangle-color and Perlin-noise shaders, `SkColorSpace`, `SkColor`, and
   skcms (`Transform_inl.h`, `skcms_public.h`).
 - **Memory, containers and support code.** TArray, TBlockList, the block allocator, the arena,

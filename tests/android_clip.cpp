@@ -5,6 +5,9 @@
 // clipping, and on a no-draw canvas. After every step the corpus records the save count, the
 // device clip bounds and kind, whether the clip is antialiased and the clip region; each run
 // ends with a hash of the pixels. Both builds must produce identical bytes (android-clip.raw).
+// The same runs on one no-draw canvas reset between runs go to android-clip-reset.raw, which is
+// meant to differ: the reference keeps a root-level restriction across the reset, and the
+// candidate ends it. Arguments beginning with "--" select a Release-check stop instead.
 
 #include "differential_corpus.h"
 
@@ -29,6 +32,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 namespace skiatest {
@@ -71,7 +75,9 @@ void record_region(Output& output, const SkRegion& region) {
     int rects = 0;
     for (SkRegion::Iterator iter(region); !iter.done(); iter.next()) ++rects;
     append(output, rects);
-    for (SkRegion::Iterator iter(region); !iter.done(); iter.next()) append_rect(output, iter.rect());
+    for (SkRegion::Iterator iter(region); !iter.done(); iter.next()) {
+        append_rect(output, iter.rect());
+    }
 }
 
 void record_clip(Output& output, SkCanvas& canvas) {
@@ -304,15 +310,115 @@ void shared_corpus(Output& output) {
     }
 }
 
+// One no-draw canvas, reset to a new size before each run, or with fresh set, a new canvas
+// of that size for each run.
+void reset_corpus(Output& output, bool fresh) {
+    Sequence sequence{};
+    SkNoDrawCanvas canvas(64, 48);
+    for (int i = 0; i < 24; ++i) {
+        const int width = 16 + static_cast<int>(sequence.pick(64));
+        const int height = 16 + static_cast<int>(sequence.pick(48));
+        if (fresh) {
+            SkNoDrawCanvas created(width, height);
+            run(output, sequence, created, nullptr, width, height);
+        } else {
+            canvas.resetCanvas(width, height);
+            run(output, sequence, canvas, nullptr, width, height);
+        }
+    }
+}
+
+#ifndef STX_SKIA_REFERENCE
+// A restriction at the root save level lasts until the canvas is reset, and only then can
+// another be set.
+bool reset_ends_restriction_case() {
+    SkNoDrawCanvas canvas(64, 48);
+    const SkIRect restriction = SkIRect::MakeLTRB(8, 8, 24, 24);
+    canvas.androidFramework_setDeviceClipRestriction(restriction);
+    SkCanvasPriv::ResetClip(&canvas);
+    if (canvas.getDeviceClipBounds() != restriction) return false;
+    canvas.resetCanvas(64, 48);
+    SkCanvasPriv::ResetClip(&canvas);
+    if (canvas.getDeviceClipBounds() != SkIRect::MakeWH(64, 48)) return false;
+    const SkIRect next = SkIRect::MakeLTRB(0, 0, 4, 4);
+    canvas.androidFramework_setDeviceClipRestriction(next);
+    SkCanvasPriv::ResetClip(&canvas);
+    return canvas.getDeviceClipBounds() == next;
+}
+
+// A nested restriction holds through clip resets, ends when the canvas restores past its save
+// level, and can then be set again.
+bool nested_restriction_case() {
+    const SkImageInfo info = SkImageInfo::MakeN32Premul(32, 32);
+    sk_sp<SkSurface> surface = SkSurfaces::Raster(info);
+    if (!surface) return false;
+    SkCanvas& canvas = *(*surface).getCanvas();
+    canvas.save();
+    const SkIRect restriction = SkIRect::MakeLTRB(4, 4, 12, 12);
+    canvas.androidFramework_setDeviceClipRestriction(restriction);
+    canvas.save();
+    canvas.clipRect(SkRect::MakeLTRB(6, 6, 30, 30));
+    SkCanvasPriv::ResetClip(&canvas);
+    if (canvas.getDeviceClipBounds() != restriction) return false;
+    canvas.restore();
+    if (canvas.getDeviceClipBounds() != restriction) return false;
+    canvas.restore();
+    SkCanvasPriv::ResetClip(&canvas);
+    if (canvas.getDeviceClipBounds() != SkIRect::MakeWH(32, 32)) return false;
+    // An empty restriction does nothing, even at the root save level.
+    canvas.androidFramework_setDeviceClipRestriction(SkIRect::MakeEmpty());
+    canvas.androidFramework_setDeviceClipRestriction(restriction);
+    return canvas.getDeviceClipBounds() == restriction;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 1 || argc > 2) return 2;
+    if (argc < 1 || argc > 3) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (argc == 2 && std::strcmp(argv[1], "--restrict-twice") == 0) {
+        SkNoDrawCanvas invalid(16, 16);
+        invalid.androidFramework_setDeviceClipRestriction(SkIRect::MakeWH(8, 8));
+        invalid.androidFramework_setDeviceClipRestriction(SkIRect::MakeWH(4, 4));
+        return 0;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--restrict-in-layer") == 0) {
+        const SkImageInfo info = SkImageInfo::MakeN32Premul(16, 16);
+        sk_sp<SkSurface> surface = SkSurfaces::Raster(info);
+        if (!surface) return 1;
+        SkCanvas& invalid = *(*surface).getCanvas();
+        invalid.saveLayer(nullptr, nullptr);
+        invalid.androidFramework_setDeviceClipRestriction(SkIRect::MakeWH(8, 8));
+        return 0;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--null-region") == 0) {
+        SkNoDrawCanvas invalid(16, 16);
+        invalid.temporary_internal_getRgnClip(nullptr);
+        return 0;
+    }
+    // A reset canvas behaves as a new one.
+    Output reused{};
+    Output created{};
+    reset_corpus(reused, false);
+    reset_corpus(created, true);
+    bool valid = reused.bytes == created.bytes;
+    valid = reset_ends_restriction_case() && valid;
+    valid = nested_restriction_case() && valid;
+    if (!valid) {
+        std::fputs("android clip contract mismatch\n", stderr);
+        return 1;
+    }
+#endif
     Output output{};
+    Output reset{};
     shared_corpus(output);
-    if (argc == 2 && !corpus::write_file(argv[1], output)) return 2;
+    reset_corpus(reset, false);
+    if (argc >= 2 && !corpus::write_file(argv[1], output)) return 2;
+    if (argc == 3 && !corpus::write_file(argv[2], reset)) return 2;
     const unsigned long long hash = corpus::fnv1a(output.bytes);
-    std::printf("android clip: %zu cases, %zu bytes, hash=%llu PASS\n", output.cases,
-                output.bytes.size(), hash);
+    const unsigned long long resetHash = corpus::fnv1a(reset.bytes);
+    std::printf("android clip: %zu cases, %zu bytes, hash=%llu; reset %zu cases, hash=%llu PASS\n",
+                output.cases, output.bytes.size(), hash, reset.cases, resetHash);
     return 0;
 }

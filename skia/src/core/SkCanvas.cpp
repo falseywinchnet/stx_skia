@@ -253,6 +253,8 @@ std::optional<PreparedDraw> SkCanvas::aboutToDraw(
 
 void SkCanvas::resetForNextPicture(const SkIRect& bounds) {
     (*this).restoreToCount(1);
+    // A restriction set at the root save level survives the restores; the reset ends it.
+    fClipRestriction.reset();
 
     // We're peering through a lot of structs here.  Only at this scope do we know that the device
     // is a SkNoPixelsDevice.
@@ -685,9 +687,8 @@ void SkCanvas::internalRestore() {
     }
 
     // Reset the clip restriction if the restore went past the save point that had added it.
-    if ((*this).getSaveCount() < fClipRestrictionSaveCount) {
-        fClipRestrictionRect.setEmpty();
-        fClipRestrictionSaveCount = -1;
+    if (fClipRestriction.has_value() && (*this).getSaveCount() < (*fClipRestriction).fSaveCount) {
+        fClipRestriction.reset();
     }
     // Update the quick-reject bounds in case the restore changed the top device or the
     // removed save record had included modifications to the clip stack.
@@ -891,22 +892,20 @@ void SkCanvas::androidFramework_setDeviceClipRestriction(const SkIRect& rect) {
     // prior restriction and re-apply the new one. It also only makes sense to apply to the base
     // device; any other device for a saved layer will be clipped back to the base device during its
     // matched restore. As such, we:
-    // - Remember the save count that added the clip restriction and reset the rect to empty when
+    // - Remember the save count that added the clip restriction and end the restriction when
     //   we've restored past that point to keep our state in sync with the device's clip stack.
-    // - We assert that we're on the base device when this is invoked.
-    // - We assert that setDeviceClipRestriction() is only called when there was no prior
-    //   restriction (cannot re-restrict, and prior state must have been reset by restoring the
-    //   canvas state).
+    // - Stop unless we're on the base device: a restriction set in a layer would be escaped by a
+    //   clip reset in that layer and never reach the base device.
+    // - Stop if a restriction is already active: it cannot be undone separately, and ignoring
+    //   the new one would let drawing escape it.
     // - Historically, the empty rect would reset the clip restriction but it only could do so
     //   partially since the device's clips wasn't adjusted. Resetting is now handled
     //   automatically via SkCanvas::restore(), so empty input rects are skipped.
-    SkASSERT((*this).topDevice() == (*this).rootDevice()); // shouldn't be in a nested layer
-    // and shouldn't already have a restriction
-    SkASSERT(fClipRestrictionSaveCount < 0 && fClipRestrictionRect.isEmpty());
+    SkASSERT_RELEASE((*this).topDevice() == (*this).rootDevice());
+    SkASSERT_RELEASE(!fClipRestriction.has_value());
 
-    if (fClipRestrictionSaveCount < 0 && !rect.isEmpty()) {
-        fClipRestrictionRect = rect;
-        fClipRestrictionSaveCount = (*this).getSaveCount();
+    if (!rect.isEmpty()) {
+        fClipRestriction = ClipRestriction{rect, (*this).getSaveCount()};
 
         // A non-empty clip restriction immediately applies an intersection op (ignoring the ctm).
         // so we have to resolve the save.
@@ -925,11 +924,11 @@ void SkCanvas::internal_private_resetClip() {
 
 void SkCanvas::onResetClip() {
     SkIRect deviceRestriction = (*(*this).topDevice()).imageInfo().bounds();
-    if (fClipRestrictionSaveCount >= 0 && (*this).topDevice() == (*this).rootDevice()) {
+    if (fClipRestriction.has_value() && (*this).topDevice() == (*this).rootDevice()) {
         // Respect the device clip restriction when resetting the clip if we're on the base device.
         // If we're not on the base device, then the "reset" applies to the top device's clip stack,
         // and the clip restriction will be respected automatically during a restore of the layer.
-        if (!deviceRestriction.intersect(fClipRestrictionRect)) {
+        if (!deviceRestriction.intersect((*fClipRestriction).fRect)) {
             deviceRestriction = SkIRect::MakeEmpty();
         }
     }
@@ -1035,6 +1034,7 @@ bool SkCanvas::androidFramework_isClipAA() const {
 }
 
 void SkCanvas::temporary_internal_getRgnClip(SkRegion* rgn) {
+    SkASSERT_RELEASE(rgn != nullptr);
     (*rgn).setEmpty();
     const SkDevice& device = *(*this).topDevice();
     if (device.isPixelAlignedToGlobal()) {

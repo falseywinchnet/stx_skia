@@ -876,12 +876,14 @@ public:
         (*this).clipRect(SkRect::Make(irect), op, false);
     }
 
-    /** Sets the maximum clip rectangle, which can be set by clipRect(), clipRRect() and
-        clipPath() and intersect the current clip with the specified rect.
-        The maximum clip affects only future clipping operations; it is not retroactive.
-        The clip restriction is not recorded in pictures.
+    /** Restricts drawing to rect, in device coordinates, until the canvas is restored past the
+        current save level. The clip is intersected with rect immediately, ignoring the matrix,
+        and a later clip reset at the root layer resets to rect rather than to the device
+        bounds. The restriction is not recorded in pictures, and resetting a no-draw canvas
+        ends it. An empty rect does nothing.
 
-        Pass an empty rect to disable maximum clip.
+        A restriction may be set only on the root layer, outside any saveLayer(), and only
+        while no other restriction is active; Release builds stop otherwise.
         This private API is for use by Android framework only.
 
         @param rect  maximum allowed clip in device coordinates
@@ -1780,8 +1782,10 @@ public:
     ///////////////////////////////////////////////////////////////////////////
 
     /**
-     *  Returns the global clip as a region. If the clip contains AA, then only the bounds
-     *  of the clip may be returned.
+     *  Sets region to the top layer's clip in global coordinates. An antialiased clip, and
+     *  any clip of a layer without pixels, is given as its bounds, and a shader clip is not
+     *  represented, so the region may be larger than the clip. region must not be null;
+     *  Release builds stop otherwise.
      */
     void temporary_internal_getRgnClip(SkRegion* region);
 
@@ -1991,8 +1995,12 @@ private:
     friend class SkSurface_Base;
     friend class SkSurface_Ganesh;
 
-    SkIRect fClipRestrictionRect = SkIRect::MakeEmpty();
-    int fClipRestrictionSaveCount = -1;
+    // The active device clip restriction and the save count at which it was set.
+    struct ClipRestriction {
+        SkIRect fRect = SkIRect::MakeEmpty();
+        int fSaveCount = 0;
+    };
+    std::optional<ClipRestriction> fClipRestriction;
 
     void doSave();
     void checkForDeferredSave();
@@ -2068,8 +2076,8 @@ private:
                                      SkEnumBitMask<PredrawFlags>) const;
 
     /**
-     *  Returns true if the clip (for any active layer) contains antialiasing.
-     *  If the clip is empty, this will return false.
+     *  Returns true if the top layer's clip contains antialiasing. If the clip is empty, this
+     *  will return false.
      */
     bool androidFramework_isClipAA() const;
 

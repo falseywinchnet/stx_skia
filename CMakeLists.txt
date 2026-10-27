@@ -498,6 +498,14 @@ if(BUILD_TESTING)
     add_executable(stx_skia_android_clip_tests tests/android_clip.cpp)
     target_link_libraries(stx_skia_android_clip_tests PRIVATE stx_skia)
     add_test(NAME android_clip_contract COMMAND stx_skia_android_clip_tests)
+    if(NOT STX_SKIA_BASELINE)
+        # Each mode violates one Release-checked precondition and must stop the program.
+        foreach(mode IN ITEMS restrict-twice restrict-in-layer null-region)
+            add_test(NAME android_clip_stops_${mode}
+                     COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_android_clip_tests>
+                             -DMODE=--${mode} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+        endforeach()
+    endif()
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         target_compile_options(stx_skia_android_clip_tests PRIVATE -ffp-contract=off)
     endif()
