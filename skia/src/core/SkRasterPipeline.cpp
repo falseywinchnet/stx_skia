@@ -16,12 +16,15 @@
 #include "src/core/SkImageInfoPriv.h"
 #include "src/core/SkOpts.h"
 #include "src/core/SkRasterPipelineOpContexts.h"
+#include "src/core/SkRasterPipelineOpContextTypes.h"
 #include "src/core/SkRasterPipelineOpList.h"
 #include "src/core/SkVx.h"
 
 #include <algorithm>
 #include <cstring>
 #include <functional>
+#include <iterator>
+#include <type_traits>
 #include <vector>
 
 using namespace skia_private;
@@ -249,11 +252,45 @@ MemoryUse memory_use(SkRasterPipelineOp op) {
     return use;
 }
 
-// Ops whose contexts run() patches for a row's tail, and so must be mutable.
-bool patches_context(SkRasterPipelineOp op) {
-    const MemoryUse use = memory_use(op);
-    const bool patched = use.load || use.store || op == Op::emboss;
-    return patched;
+// Each op's context entry, from SkRasterPipelineOpContextTypes.h, in op order.
+struct OpContextInfo {
+    SkRasterPipelineContextKind kind = SkRasterPipelineContextKind::kNone;
+    const void* object = nullptr;  // The append object's token, for pointer contexts.
+    bool mutableRequired = false;
+};
+
+template <SkRasterPipelineOp op>
+constexpr OpContextInfo op_context_info() {
+    using Spec = SkRasterPipelineOpContext<op>;
+    using Append = typename Spec::AppendObject;
+    if constexpr (Spec::kind == SkRasterPipelineContextKind::kPointer) {
+        const OpContextInfo info{Spec::kind,
+                                 &SkRasterPipelineContextToken<std::remove_const_t<Append>>::kId,
+                                 !std::is_const_v<Append>};
+        return info;
+    } else {
+        const OpContextInfo info{Spec::kind, nullptr, false};
+        return info;
+    }
+}
+
+// Expanding the op list over the table also checks that every op has an entry.
+constexpr OpContextInfo kOpContexts[] = {
+#define M(op) op_context_info<SkRasterPipelineOp::op>(),
+    SK_RASTER_PIPELINE_OPS_ALL(M)
+#undef M
+};
+static_assert(std::size(kOpContexts) == kNumRasterPipelineHighpOps);
+
+// Stops the program when a context does not match its op's entry.
+void check_context(SkRasterPipelineOp op, SkRasterPipelineContextKind kind, const void* object,
+                   bool readOnly) {
+    const int index = static_cast<int>(op);
+    SkASSERT_RELEASE(index >= 0 && index < kNumRasterPipelineHighpOps);
+    const OpContextInfo& info = kOpContexts[index];
+    SkASSERT_RELEASE(info.kind == kind);
+    SkASSERT_RELEASE(info.object == object);
+    SkASSERT_RELEASE(!(readOnly && info.mutableRequired));
 }
 
 }  // namespace
@@ -269,7 +306,30 @@ void SkRasterPipeline::reset() {
     fMemoryCtxInfos.clear();
 }
 
-void SkRasterPipeline::append(SkRasterPipelineOp op, void* ctx) {
+void SkRasterPipeline::append(SkRasterPipelineOp op) {
+    check_context(op, SkRasterPipelineContextKind::kNone, nullptr, false);
+    appendStage(op, nullptr);
+}
+
+void SkRasterPipeline::appendWithContext(SkRasterPipelineOp op, const void* object, bool readOnly,
+                                         void* ctx) {
+    check_context(op, SkRasterPipelineContextKind::kPointer, object, readOnly);
+    appendStage(op, ctx);
+}
+
+void SkRasterPipeline::uncheckedAppend(SkRasterPipelineOp op) {
+    check_context(op, SkRasterPipelineContextKind::kNone, nullptr, false);
+    recordStage(op, nullptr);
+}
+
+template <typename Object>
+void SkRasterPipeline::uncheckedAppend(SkRasterPipelineOp op, Object* ctx) {
+    const void* object = &SkRasterPipelineContextToken<std::remove_const_t<Object>>::kId;
+    check_context(op, SkRasterPipelineContextKind::kPointer, object, std::is_const_v<Object>);
+    recordStage(op, const_cast<void*>(static_cast<const void*>(ctx)));
+}
+
+void SkRasterPipeline::appendStage(SkRasterPipelineOp op, void* ctx) {
     SkASSERT(op != Op::uniform_color);            // Please use appendConstantColor().
     SkASSERT(op != Op::unbounded_uniform_color);  // Please use appendConstantColor().
     SkASSERT(op != Op::set_rgb);                  // Please use appendSetRGB().
@@ -279,16 +339,10 @@ void SkRasterPipeline::append(SkRasterPipelineOp op, void* ctx) {
     SkASSERT(op != Op::PQish);                    // Please use appendTransferFunction().
     SkASSERT(op != Op::HLGish);                   // Please use appendTransferFunction().
     SkASSERT(op != Op::HLGinvish);                // Please use appendTransferFunction().
-    uncheckedAppend(op, ctx);
+    recordStage(op, ctx);
 }
 
-void SkRasterPipeline::append(SkRasterPipelineOp op, const void* ctx) {
-    // run() writes the pixel pointer of every memory context; those must arrive mutable.
-    SkASSERT_RELEASE(!patches_context(op));
-    append(op, const_cast<void*>(ctx));
-}
-
-void SkRasterPipeline::uncheckedAppend(SkRasterPipelineOp op, void* ctx) {
+void SkRasterPipeline::recordStage(SkRasterPipelineOp op, void* ctx) {
     if (op == Op::emboss) {
         // This op's context holds *two* MemoryCtxs.
         SkRasterPipelineContexts::EmbossCtx& embossCtx =
@@ -315,11 +369,18 @@ void SkRasterPipeline::uncheckedAppend(SkRasterPipelineOp op, void* ctx) {
 }
 
 // Packs an immediate value into the context field without forming a pointer from it.
-void SkRasterPipeline::append(SkRasterPipelineOp op, uintptr_t ctx) {
+void SkRasterPipeline::append(SkRasterPipelineOp op, uintptr_t value) {
     static_assert(sizeof(void*) == sizeof(uintptr_t));
+    check_context(op, SkRasterPipelineContextKind::kImmediate, nullptr, false);
     void* ptrCtx = nullptr;
-    std::memcpy(&ptrCtx, &ctx, sizeof(ctx));
-    append(op, ptrCtx);
+    std::memcpy(&ptrCtx, &value, sizeof(value));
+    appendStage(op, ptrCtx);
+}
+
+void SkRasterPipeline::appendRecordedStage(const StageList& stage) {
+    const int index = static_cast<int>(stage.stage);
+    SkASSERT_RELEASE(index >= 0 && index < kNumRasterPipelineHighpOps);
+    recordStage(stage.stage, stage.ctx);
 }
 
 void SkRasterPipeline::extend(const SkRasterPipeline& src) {
@@ -663,7 +724,7 @@ void SkRasterPipeline::appendStore(SkColorType ct, SkRasterPipelineContexts::Mem
 }
 
 void SkRasterPipeline::appendTransferFunction(const skcms_TransferFunction& tf) {
-    void* ctx = const_cast<void*>(static_cast<const void*>(&tf));
+    const skcms_TransferFunction* ctx = &tf;
     switch (skcms_TransferFunction_getType(&tf)) {
         default: SkASSERT(false); break;
 
@@ -684,7 +745,7 @@ void SkRasterPipeline::appendTransferFunction(const skcms_TransferFunction& tf) 
 // that auto-clamp, the RP blitter uses this helper immediately before appending blending stages.
 void SkRasterPipeline::appendClampIfNormalized(const SkImageInfo& info) {
     if (SkColorTypeIsNormalized(info.colorType())) {
-        uncheckedAppend(Op::clamp_01, nullptr);
+        uncheckedAppend(Op::clamp_01);
     }
 }
 

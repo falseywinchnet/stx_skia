@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <type_traits>
 
 class SkMatrix;
 enum class SkRasterPipelineOp;
@@ -70,6 +71,12 @@ struct SkRasterPipelineStage {
 };
 SK_END_REQUIRE_DENSE
 
+// A unique address per context object type, for the run-time context check in append().
+template <typename Object>
+struct SkRasterPipelineContextToken {
+    static constexpr char kId = 0;
+};
+
 class SkRasterPipeline {
 public:
     explicit SkRasterPipeline(SkArenaAlloc*);
@@ -82,13 +89,25 @@ public:
 
     void reset();
 
-    // Ops that load or store through a MemoryCtx (including emboss's pair) need a mutable
-    // context: run() and compiled thunks repoint its pixels at scratch storage for a row's
-    // tail, and restore them before returning.
-    void append(SkRasterPipelineOp, void* = nullptr);
-    // For read-only contexts. A memory-context op passed here fails in Release.
-    void append(SkRasterPipelineOp op, const void* ctx);
-    void append(SkRasterPipelineOp, uintptr_t ctx);
+    // Every op's context is listed in SkRasterPipelineOpContextTypes.h, and append() checks the
+    // argument against that entry in Release; a mismatch stops the program.
+    //
+    // Appends op without a context. Its entry must say it takes none.
+    void append(SkRasterPipelineOp op);
+    // Appends op with ctx, which must point to the entry's object type. A const ctx is accepted
+    // only where the entry is read-only; mutable entries are written by their stages, or are
+    // memory contexts that run() repoints at scratch storage for row tails. The stage list
+    // keeps an untyped pointer, so const is removed here; the table keeps stages from writing
+    // read-only contexts.
+    template <typename Object>
+    void append(SkRasterPipelineOp op, Object* ctx) {
+        static_assert(!std::is_void_v<std::remove_const_t<Object>>, "Pass a typed context.");
+        const void* object = &SkRasterPipelineContextToken<std::remove_const_t<Object>>::kId;
+        void* address = const_cast<void*>(static_cast<const void*>(ctx));
+        appendWithContext(op, object, std::is_const_v<Object>, address);
+    }
+    // Packs value into the context field of an op whose entry says Immediate.
+    void append(SkRasterPipelineOp op, uintptr_t value);
 
     // Append all stages to this pipeline.
     void extend(const SkRasterPipeline&);
@@ -110,6 +129,10 @@ public:
     static const char* GetOpName(SkRasterPipelineOp op);
     const StageList* getStageList() const { return fStages; }
     int getNumStages() const { return fNumStages; }
+
+    // Appends a stage that another pipeline recorded, with its context. That context was
+    // checked when it was first appended; its memory contexts are recorded again here.
+    void appendRecordedStage(const StageList& stage);
 
     // Prints the entire StageList using SkDebugf.
     void dump() const;
@@ -153,7 +176,16 @@ private:
                                      SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>);
     StartPipelineFn buildPipeline(SkRasterPipelineStage*) const;
 
-    void uncheckedAppend(SkRasterPipelineOp, void*);
+    // Checks the context against the op's entry, then appends through appendStage().
+    void appendWithContext(SkRasterPipelineOp, const void* object, bool readOnly, void* ctx);
+    // The public appends' final step: refuses ops that have a dedicated append helper.
+    void appendStage(SkRasterPipelineOp, void* ctx);
+    // The helpers' appends: the context check without the dedicated-helper refusal.
+    void uncheckedAppend(SkRasterPipelineOp op);
+    template <typename Object>
+    void uncheckedAppend(SkRasterPipelineOp op, Object* ctx);
+    // Records a stage whose context has been checked, and its memory contexts.
+    void recordStage(SkRasterPipelineOp, void* ctx);
     int stagesNeeded() const;
 
     void addMemoryContext(SkRasterPipelineContexts::MemoryCtx*,

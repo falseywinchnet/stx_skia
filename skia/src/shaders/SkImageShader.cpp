@@ -403,7 +403,7 @@ struct SamplingStages {
             }
         }
 
-        void* ctx = level.gather;
+        SkRasterPipelineContexts::GatherCtx* ctx = level.gather;
         switch (level.pm.colorType()) {
             case kAlpha_8_SkColorType:      pipeline.append(SkRasterPipelineOp::gather_a8,    ctx); break;
             case kA16_unorm_SkColorType:    pipeline.append(SkRasterPipelineOp::gather_a16,   ctx); break;

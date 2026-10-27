@@ -220,7 +220,7 @@ void SkConicalGradient::appendGradientStages(SkArenaAlloc* alloc,
         (*ctx).fP0 = scaledR0 * scaledR0;
         (*p).append(SkRasterPipelineOp::xy_to_2pt_conical_strip, ctx);
         (*p).append(SkRasterPipelineOp::mask_2pt_conical_nan, ctx);
-        (*postPipeline).append(SkRasterPipelineOp::apply_vector_mask, &(*ctx).fMask);
+        (*postPipeline).append(SkRasterPipelineOp::apply_vector_mask, (*ctx).fMask);
         return;
     }
 
@@ -252,7 +252,7 @@ void SkConicalGradient::appendGradientStages(SkArenaAlloc* alloc,
         (*p).append(SkRasterPipelineOp::alter_2pt_conical_unswap);
     }
     if (!fFocalData.isWellBehaved()) {
-        (*postPipeline).append(SkRasterPipelineOp::apply_vector_mask, &(*ctx).fMask);
+        (*postPipeline).append(SkRasterPipelineOp::apply_vector_mask, (*ctx).fMask);
     }
 }
 

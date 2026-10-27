@@ -14,6 +14,7 @@
 #include "include/private/SkTemplates.h"
 #include "modules/skcms/skcms.h"
 #include "src/core/SkRasterPipeline.h"
+#include "src/core/SkRasterPipelineOpContextTypes.h"
 #include "src/core/SkUtils.h"  // unaligned_{load,store}
 #include "src/shaders/SkPerlinNoiseShaderType.h"
 
@@ -60,16 +61,40 @@ SI Dst widen_cast(const Src& src) {
     return dst;
 }
 
-struct Ctx {
-    SkRasterPipelineStage* fStage;
+using NoCtx = const void*;
 
-    template <typename T>
-    operator T*() {
-        return (T*)(*fStage).ctx;
+// A stage kernel receives its context as its first parameter, of the type it declares.
+// stage_context_matches checks that type against SkRasterPipelineOpContext for the stage's op
+// and precision; the stage-defining macros below assert it for every stage. StageContext then
+// hands the kernel the program's context field as the table's pointer type.
+template <SkRasterPipelineOp op, bool kHighp, typename Return, typename Context, typename... Rest>
+consteval bool stage_context_matches(Return (&)(Context, Rest...)) {
+    using Spec = SkRasterPipelineOpContext<op>;
+    using Object = std::conditional_t<kHighp, typename Spec::HighpObject,
+                                      typename Spec::LowpObject>;
+    const bool matches = sk_raster_pipeline_stage_context_matches<Spec, Object, Context>();
+    return matches;
+}
+
+template <SkRasterPipelineOp op, bool kHighp>
+using StageContextPointer = SkRasterPipelineStageContextPointer<SkRasterPipelineOpContext<op>,
+                                                                 kHighp>;
+
+// The program's context for one stage, convertible only to the table's pointer type (and from
+// there, by adding const, to the kernel's declared parameter). It keeps the form of the untyped
+// adapter it replaces, a temporary converted at the kernel call, because that form compiles to
+// the same code; a helper function returning the pointer changes register allocation in
+// perlin_noise and bicubic_clamp_8888.
+template <SkRasterPipelineOp op, bool kHighp>
+struct StageContext {
+    const SkRasterPipelineStage* fStage;
+
+    operator StageContextPointer<op, kHighp>() const {
+        StageContextPointer<op, kHighp> context =
+                static_cast<StageContextPointer<op, kHighp>>((*fStage).ctx);
+        return context;
     }
 };
-
-using NoCtx = const void*;
 
 #if defined(SKRP_CPU_SCALAR) || defined(SKRP_CPU_NEON) || defined(SKRP_CPU_AVX2) || \
         defined(SKRP_CPU_ML4) || defined(SKRP_CPU_AVX) || defined(SKRP_CPU_SSE41) || \
@@ -1822,9 +1847,10 @@ static void start_pipeline(size_t dx, size_t dy,
     #define DECLARE_HIGHP_STAGE(name, ARG, STAGE_RET, INC, OFFSET, MUSTTAIL)               \
         SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy,      \
                               F& r, F& g, F& b, F& a, F& dr, F& dg, F& db, F& da);         \
+        static_assert(stage_context_matches<SkRasterPipelineOp::name, true>(name##_k));     \
         static void ABI name(Params* params, SkRasterPipelineStage* program,               \
                              F r, F g, F b, F a) {                                         \
-            OFFSET name##_k(Ctx{program}, (*params).dx,(*params).dy,              \
+            OFFSET name##_k(StageContext<SkRasterPipelineOp::name, true>{program}, (*params).dx,(*params).dy,   \
                             r,g,b,a, (*params).dr, (*params).dg, (*params).db, (*params).da);      \
             INC;                                                                           \
             Stage fn = reinterpret_cast<Stage>((*program).fn);                                                  \
@@ -1836,9 +1862,10 @@ static void start_pipeline(size_t dx, size_t dy,
     #define DECLARE_HIGHP_STAGE(name, ARG, STAGE_RET, INC, OFFSET, MUSTTAIL)                     \
         SI STAGE_RET name##_k(ARG, const size_t dx, const size_t dy,            \
                               F& r, F& g, F& b, F& a, F& dr, F& dg, F& db, F& da);               \
+        static_assert(stage_context_matches<SkRasterPipelineOp::name, true>(name##_k));           \
         static void ABI name(SkRasterPipelineStage* program, const size_t dx, const size_t dy,   \
                              F r, F g, F b, F a, F dr, F dg, F db, F da) {      \
-            OFFSET name##_k(Ctx{program}, dx,dy, r,g,b,a, dr,dg,db,da);                     \
+            OFFSET name##_k(StageContext<SkRasterPipelineOp::name, true>{program}, dx,dy, r,g,b,a, dr,dg,db,da);   \
             INC;                                                                                 \
             Stage fn = reinterpret_cast<Stage>((*program).fn);                                                        \
             MUSTTAIL return fn(program, dx,dy, r,g,b,a, dr,dg,db,da);                       \
@@ -2892,16 +2919,18 @@ HIGHP_STAGE(parametric, const skcms_TransferFunction* ctx) {
 // gamma_channel and the bilerp_lerp helpers replaced lambdas and keep ordinary inlining, as
 // those lambdas had: forcing it reorders gamma_'s loads and costs NEON bilerp_clamp_8888 a
 // register spill. The other helpers that replaced lambdas compile to the same code with SI.
-static inline F gamma_channel(F v, const float* G) {
+// gamma_ appends the whole sRGB-ish transfer function and uses only its exponent g. It read g
+// through a float pointer to the structure before; it now names the member.
+static inline F gamma_channel(F v, const skcms_TransferFunction* ctx) {
     U32 sign;
     v = strip_sign(v, &sign);
-    return apply_sign(approx_powf(v, *G), sign);
+    return apply_sign(approx_powf(v, (*ctx).g), sign);
 }
 
-HIGHP_STAGE(gamma_, const float* G) {
-    r = gamma_channel(r, G);
-    g = gamma_channel(g, G);
-    b = gamma_channel(b, G);
+HIGHP_STAGE(gamma_, const skcms_TransferFunction* ctx) {
+    r = gamma_channel(r, ctx);
+    g = gamma_channel(g, ctx);
+    b = gamma_channel(b, ctx);
 }
 
 SI F PQish_channel(F v, const skcms_TransferFunction* ctx) {
@@ -4337,11 +4366,12 @@ static void start_pipeline(size_t x0,     size_t y0,
 #if SKRP_NARROW_STAGES
     #define LOWP_STAGE_GG(name, ARG)                                                           \
         SI void name##_k(ARG, const size_t dx, const size_t dy, F& x, F& y);                   \
+        static_assert(stage_context_matches<SkRasterPipelineOp::name, false>(name##_k));     \
         static void ABI name(Params* params, SkRasterPipelineStage* program,                   \
                              U16 r, U16 g, U16 b, U16 a) {                                     \
             F x = join<F>(r,g);                                                               \
             F y = join<F>(b,a);                                                             \
-            name##_k(Ctx{program}, (*params).dx,(*params).dy, x,y);                                \
+            name##_k(StageContext<SkRasterPipelineOp::name, false>{program}, (*params).dx,(*params).dy, x,y);                                \
             split(x, &r,&g);                                                                   \
             split(y, &b,&a);                                                                   \
             ++program;                                                                     \
@@ -4353,11 +4383,12 @@ static void start_pipeline(size_t x0,     size_t y0,
     #define LOWP_STAGE_GP(name, ARG)                                                       \
         SI void name##_k(ARG, const size_t dx, const size_t dy, const F x, const F y,      \
                          U16& r, U16& g, U16& b, U16& a);                                  \
+        static_assert(stage_context_matches<SkRasterPipelineOp::name, false>(name##_k));     \
         static void ABI name(Params* params, SkRasterPipelineStage* program,               \
                              U16 r, U16 g, U16 b, U16 a) {                                 \
             F x = join<F>(r,g);                                                           \
             F y = join<F>(b,a);                                                         \
-            name##_k(Ctx{program}, (*params).dx,(*params).dy, x,y, r,g,b,a);                   \
+            name##_k(StageContext<SkRasterPipelineOp::name, false>{program}, (*params).dx,(*params).dy, x,y, r,g,b,a);                   \
             ++program;                                                                     \
             Stage fn = reinterpret_cast<Stage>((*program).fn);                              \
             fn(params, program, r,g,b,a);                                                  \
@@ -4369,9 +4400,10 @@ static void start_pipeline(size_t x0,     size_t y0,
         SI void name##_k(ARG, const size_t dx, const size_t dy,                            \
                          U16&  r, U16&  g, U16&  b, U16&  a,                               \
                          U16& dr, U16& dg, U16& db, U16& da);                              \
+        static_assert(stage_context_matches<SkRasterPipelineOp::name, false>(name##_k));     \
         static void ABI name(Params* params, SkRasterPipelineStage* program,               \
                              U16 r, U16 g, U16 b, U16 a) {                                 \
-            name##_k(Ctx{program}, (*params).dx,(*params).dy, r,g,b,a,                         \
+            name##_k(StageContext<SkRasterPipelineOp::name, false>{program}, (*params).dx,(*params).dy, r,g,b,a,                         \
                      (*params).dr,(*params).dg,(*params).db,(*params).da);                         \
             ++program;                                                                     \
             Stage fn = reinterpret_cast<Stage>((*program).fn);                              \
@@ -4383,13 +4415,14 @@ static void start_pipeline(size_t x0,     size_t y0,
 #else
     #define LOWP_STAGE_GG(name, ARG)                                                       \
         SI void name##_k(ARG, const size_t dx, const size_t dy, F& x, F& y);               \
+        static_assert(stage_context_matches<SkRasterPipelineOp::name, false>(name##_k));     \
         static void ABI name(SkRasterPipelineStage* program,                               \
                              const size_t dx, const size_t dy,                             \
                              U16  r, U16  g, U16  b, U16  a,                               \
                              U16 dr, U16 dg, U16 db, U16 da) {                             \
             F x = join<F>(r,g);                                                           \
             F y = join<F>(b,a);                                                         \
-            name##_k(Ctx{program}, dx,dy, x,y);                                            \
+            name##_k(StageContext<SkRasterPipelineOp::name, false>{program}, dx,dy, x,y);                                            \
             split(x, &r,&g);                                                               \
             split(y, &b,&a);                                                               \
             ++program;                                                                     \
@@ -4401,13 +4434,14 @@ static void start_pipeline(size_t x0,     size_t y0,
     #define LOWP_STAGE_GP(name, ARG)                                                       \
         SI void name##_k(ARG, const size_t dx, const size_t dy, const F x, const F y,      \
                          U16& r, U16& g, U16& b, U16& a);                                  \
+        static_assert(stage_context_matches<SkRasterPipelineOp::name, false>(name##_k));     \
         static void ABI name(SkRasterPipelineStage* program,                               \
                              const size_t dx, const size_t dy,                             \
                              U16  r, U16  g, U16  b, U16  a,                               \
                              U16 dr, U16 dg, U16 db, U16 da) {                             \
             F x = join<F>(r,g);                                                           \
             F y = join<F>(b,a);                                                         \
-            name##_k(Ctx{program}, dx,dy, x,y, r,g,b,a);                                   \
+            name##_k(StageContext<SkRasterPipelineOp::name, false>{program}, dx,dy, x,y, r,g,b,a);                                   \
             ++program;                                                                     \
             Stage fn = reinterpret_cast<Stage>((*program).fn);                              \
             fn(program, dx,dy, r,g,b,a, dr,dg,db,da);                                      \
@@ -4419,11 +4453,12 @@ static void start_pipeline(size_t x0,     size_t y0,
         SI void name##_k(ARG, const size_t dx, const size_t dy,                            \
                          U16&  r, U16&  g, U16&  b, U16&  a,                               \
                          U16& dr, U16& dg, U16& db, U16& da);                              \
+        static_assert(stage_context_matches<SkRasterPipelineOp::name, false>(name##_k));     \
         static void ABI name(SkRasterPipelineStage* program,                               \
                              const size_t dx, const size_t dy,                             \
                              U16  r, U16  g, U16  b, U16  a,                               \
                              U16 dr, U16 dg, U16 db, U16 da) {                             \
-            name##_k(Ctx{program}, dx,dy, r,g,b,a, dr,dg,db,da);                           \
+            name##_k(StageContext<SkRasterPipelineOp::name, false>{program}, dx,dy, r,g,b,a, dr,dg,db,da);                           \
             ++program;                                                                     \
             Stage fn = reinterpret_cast<Stage>((*program).fn);                              \
             fn(program, dx,dy, r,g,b,a, dr,dg,db,da);                                      \

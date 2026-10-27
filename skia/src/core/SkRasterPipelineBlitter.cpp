@@ -148,7 +148,8 @@ private:
     // If the blender is a blend-mode, we retain that information for late-stage optimizations
     std::optional<SkBlendMode> fBlendMode;
     // set to pipeline storage (for alpha) if we have a clipShader
-    void*                  fClipShaderBuffer = nullptr; // "native" : float or U16
+    // Clip coverage in lane storage: float for a highp program, uint16_t lanes for a lowp one.
+    float*                 fClipShaderBuffer = nullptr;
 
     bool fCanDirectBlit;
     const SkColor4f fDirectBlitPaintColor;
@@ -303,7 +304,7 @@ SkBlitter* CreateBlitter(const SkPixmap& dst,
     SkRasterPipeline_<256> shaderPipeline2;
 
     for (size_t i = 0; i < stages.size(); i++) {
-        shaderPipeline2.append(stages[i].stage, stages[i].ctx);
+        shaderPipeline2.appendRecordedStage(stages[i]);
         const DebugStage& stage = debugStages[i];
         SkASSERT_RELEASE(stage.panels.size() == stage.ops.size());
         for (size_t j = 0; j < stage.panels.size() && j < stage.ops.size(); j++) {

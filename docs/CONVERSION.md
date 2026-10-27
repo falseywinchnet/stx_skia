@@ -1430,8 +1430,11 @@ are fixed separately. See ../results/2026-10-27/RASTER_PIPELINE_SPELLING.md.
 
 Fixed since: memory-context helpers take mutable contexts. The const overload refuses ops whose
 contexts `run()` repoints, and the raster blitter's dst helpers are no longer `const`. Shared
-compiled-pipeline state and the any-pointer stage-context adapter remain open. See
-../results/2026-10-27/RASTER_PIPELINE_FIXES.md.
+compiled-pipeline state remains open. Every op now has a declared context type in
+SkRasterPipelineOpContextTypes.h. Stages are checked against it at compile time, and appends in
+Release, which replaces the any-pointer `Ctx` adapter. Kernel object code is unchanged on eight
+ISA variants. The audit fixed 33 type-punned callers, among them the tri-color shader reading
+`SkMatrix`'s private layout. See ../results/2026-10-27/RASTER_PIPELINE_FIXES.md.
 
 ## Still required
 

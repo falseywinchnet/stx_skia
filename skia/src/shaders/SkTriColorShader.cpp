@@ -19,9 +19,9 @@
 bool SkTriColorShader::appendStages(const SkStageRec& rec, const SkShaders::MatrixRec&) const {
     rec.fPipeline->append(SkRasterPipelineOp::seed_shader);
     if (fUsePersp) {
-        rec.fPipeline->append(SkRasterPipelineOp::matrix_perspective, &fM33);
+        rec.fPipeline->append(SkRasterPipelineOp::matrix_perspective, fM33Values);
     }
-    rec.fPipeline->append(SkRasterPipelineOp::matrix_4x3, &fM43);
+    rec.fPipeline->append(SkRasterPipelineOp::matrix_4x3, fM43.fMat);
     return true;
 }
 
@@ -44,6 +44,7 @@ bool SkTriColorShader::update(const SkMatrix& ctmInv,
     }
 
     fM33.setConcat(im, ctmInv);
+    fM33.get9(fM33Values);
 
     auto c0 = skvx::float4::Load(colors[index0].vec()),
          c1 = skvx::float4::Load(colors[index1].vec()),
