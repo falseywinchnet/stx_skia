@@ -8,87 +8,87 @@
 #include "src/core/SkVertState.h"
 
 bool VertState::Triangles(VertState* state) {
-    int index = state->fCurrIndex;
-    if (index + 3 > state->fCount) {
+    int index = (*state).fCurrIndex;
+    if (index + 3 > (*state).fCount) {
         return false;
     }
-    state->f0 = index + 0;
-    state->f1 = index + 1;
-    state->f2 = index + 2;
-    state->fCurrIndex = index + 3;
+    (*state).f0 = index + 0;
+    (*state).f1 = index + 1;
+    (*state).f2 = index + 2;
+    (*state).fCurrIndex = index + 3;
     return true;
 }
 
 bool VertState::TrianglesX(VertState* state) {
-    const uint16_t* indices = state->fIndices;
-    int index = state->fCurrIndex;
-    if (index + 3 > state->fCount) {
+    const uint16_t* indices = (*state).fIndices;
+    int index = (*state).fCurrIndex;
+    if (index + 3 > (*state).fCount) {
         return false;
     }
-    state->f0 = indices[index + 0];
-    state->f1 = indices[index + 1];
-    state->f2 = indices[index + 2];
-    state->fCurrIndex = index + 3;
+    (*state).f0 = indices[index + 0];
+    (*state).f1 = indices[index + 1];
+    (*state).f2 = indices[index + 2];
+    (*state).fCurrIndex = index + 3;
     return true;
 }
 
 bool VertState::TriangleStrip(VertState* state) {
-    int index = state->fCurrIndex;
-    if (index + 3 > state->fCount) {
+    int index = (*state).fCurrIndex;
+    if (index + 3 > (*state).fCount) {
         return false;
     }
-    state->f2 = index + 2;
+    (*state).f2 = index + 2;
     if (index & 1) {
-        state->f0 = index + 1;
-        state->f1 = index + 0;
+        (*state).f0 = index + 1;
+        (*state).f1 = index + 0;
     } else {
-        state->f0 = index + 0;
-        state->f1 = index + 1;
+        (*state).f0 = index + 0;
+        (*state).f1 = index + 1;
     }
-    state->fCurrIndex = index + 1;
+    (*state).fCurrIndex = index + 1;
     return true;
 }
 
 bool VertState::TriangleStripX(VertState* state) {
-    const uint16_t* indices = state->fIndices;
-    int index = state->fCurrIndex;
-    if (index + 3 > state->fCount) {
+    const uint16_t* indices = (*state).fIndices;
+    int index = (*state).fCurrIndex;
+    if (index + 3 > (*state).fCount) {
         return false;
     }
-    state->f2 = indices[index + 2];
+    (*state).f2 = indices[index + 2];
     if (index & 1) {
-        state->f0 = indices[index + 1];
-        state->f1 = indices[index + 0];
+        (*state).f0 = indices[index + 1];
+        (*state).f1 = indices[index + 0];
     } else {
-        state->f0 = indices[index + 0];
-        state->f1 = indices[index + 1];
+        (*state).f0 = indices[index + 0];
+        (*state).f1 = indices[index + 1];
     }
-    state->fCurrIndex = index + 1;
+    (*state).fCurrIndex = index + 1;
     return true;
 }
 
 bool VertState::TriangleFan(VertState* state) {
-    int index = state->fCurrIndex;
-    if (index + 3 > state->fCount) {
+    int index = (*state).fCurrIndex;
+    if (index + 3 > (*state).fCount) {
         return false;
     }
-    state->f0 = 0;
-    state->f1 = index + 1;
-    state->f2 = index + 2;
-    state->fCurrIndex = index + 1;
+    (*state).f0 = 0;
+    (*state).f1 = index + 1;
+    (*state).f2 = index + 2;
+    (*state).fCurrIndex = index + 1;
     return true;
 }
 
 bool VertState::TriangleFanX(VertState* state) {
-    const uint16_t* indices = state->fIndices;
-    int index = state->fCurrIndex;
-    if (index + 3 > state->fCount) {
+    const uint16_t* indices = (*state).fIndices;
+    int index = (*state).fCurrIndex;
+    if (index + 3 > (*state).fCount) {
         return false;
     }
-    state->f0 = indices[0];
-    state->f1 = indices[index + 1];
-    state->f2 = indices[index + 2];
-    state->fCurrIndex = index + 1;
+    (*state).f0 = indices[0];
+    (*state).f1 = indices[index + 1];
+    (*state).f2 = indices[index + 2];
+    (*state).fCurrIndex = index + 1;
     return true;
 }
 

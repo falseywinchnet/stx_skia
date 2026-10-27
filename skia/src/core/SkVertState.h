@@ -20,23 +20,20 @@
 */
 
 struct VertState {
-    int f0, f1, f2;
+    // The current triangle's vertex indices.
+    int f0 = 0;
+    int f1 = 0;
+    int f2 = 0;
 
     /**
      *  Construct a VertState from a vertex count, index array, and index count.
      *  If the vertices are unindexed pass nullptr for indices.
      */
     VertState(int vCount, const uint16_t indices[], int indexCount)
-            : fIndices(indices) {
-        fCurrIndex = 0;
-        if (indices) {
-            fCount = indexCount;
-        } else {
-            fCount = vCount;
-        }
-    }
+            : fCount(indices ? indexCount : vCount)
+            , fIndices(indices) {}
 
-    typedef bool (*Proc)(VertState*);
+    using Proc = bool (*)(VertState*);
 
     /**
      *  Choose an appropriate function to traverse the vertices.
@@ -45,9 +42,9 @@ struct VertState {
     Proc chooseProc(SkVertices::VertexMode mode);
 
 private:
-    int             fCount;
-    int             fCurrIndex;
-    const uint16_t* fIndices;
+    int             fCount = 0;
+    int             fCurrIndex = 0;
+    const uint16_t* fIndices = nullptr;
 
     static bool Triangles(VertState*);
     static bool TrianglesX(VertState*);
