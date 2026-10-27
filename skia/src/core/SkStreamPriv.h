@@ -8,13 +8,9 @@
 #ifndef SkStreamPriv_DEFINED
 #define SkStreamPriv_DEFINED
 
-#include "include/core/SkRefCnt.h"
 #include "include/core/SkStream.h"
-#include "src/core/SkEndian.h"
 
-#include <cstdint>
-
-class SkData;
+#include <cstddef>
 
 namespace SkStreamPriv {
 

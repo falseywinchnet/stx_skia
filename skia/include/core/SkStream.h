@@ -8,19 +8,10 @@
 #ifndef SkStream_DEFINED
 #define SkStream_DEFINED
 
-#include "include/core/SkData.h"
-#include "include/core/SkRefCnt.h"
-#include "include/core/SkScalar.h"
 #include "include/core/SkTypes.h"
-#include "include/private/SkCPUTypes.h"
-#include "include/private/SkTo.h"
 
-#include <cstdint>
-#include <cstdio>
+#include <cstddef>
 #include <cstring>
-#include <memory>
-#include <utility>
-#include <vector>
 
 /**
  *  SkStream -- abstraction for a source of bytes. Subclasses can be backed by
@@ -44,7 +35,7 @@ public:
      *  @return the actual number bytes that could be skipped.
      */
     size_t skip(size_t size) {
-        return this->read(nullptr, size);
+        return (*this).read(nullptr, size);
     }
 
     /** Returns true when all the bytes in the stream have been read.
@@ -92,7 +83,7 @@ public:
 
     bool writeText(const char text[]) {
         SkASSERT(text);
-        return this->write(text, std::strlen(text));
+        return (*this).write(text, std::strlen(text));
     }
 
 private:
