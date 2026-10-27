@@ -33,7 +33,10 @@ behind an unsupported success path. Imported baseline files are reference-only.
 | 3x3 matrices | `include/core/SkMatrix.h`, `src/core/SkMatrix.cpp`, `src/core/SkMatrixPriv.h`, `src/core/SkMatrixUtils.h` | 2,794-case byte-exact corpus over classification, mapping at every kernel count, concatenation, inversion, fitting and serialization; defined sprite translation test |
 | Path storage, construction, iteration and serialization | `include/core/SkPath.h`, `SkPathBuilder.h`, `SkPathIter.h`, `SkPathTypes.h`; `src/core/SkPath.cpp`, `SkPathBuilder.cpp`, `SkPathPriv.cpp/.h`, `SkPathData.cpp/.h`, `SkPathRaw.cpp/.h`, `SkPathIter.cpp`, `SkPath_serial.cpp`, `SkPathRawShapes.cpp/.h`, `SkPathMakers.h`, `SkPathEnums.h`, `SkPath_interpolate.cpp`, `SkPathDump.cpp` | 4,905-case, 22.5 MB byte-exact corpus over every factory, all 30 builder operations, queries, iterators, transforms and the binary form; defined reversal and conic-weight access, checked allocation, aligned reads |
 
-Paths in this table are relative to `skia/`. The second conversion batch preserves
+Paths in this table are relative to `skia/`. The table ends at path storage. Later
+converted boundaries (curve geometry, contour measurement, stroking, dashing, path and line
+clipping, scan conversion, regions and clips, blitters, canvas and devices) are recorded in
+their own sections below. The second conversion batch preserves
 arithmetic, callback order and atomic memory ordering. It replaces procedure-local
 owner classes with named implementation classes and initializes generation and
 mutability state directly. It does not claim a new pixel-kernel optimization.
@@ -150,6 +153,9 @@ The direct Gaussian comparison routine now respects source stride and checks
 scratch extents. Private failure/ownership contracts and exceptional geometry
 are recorded in BLUR_STYLES.md. Blur-filter dispatch and remaining mask
 rasterizers are still unconverted; this does not mark the subsystem complete.
+(Superseded: blur-filter dispatch was converted afterwards in e15c498 and a09364d; see the
+mask-filter and blur-filter notes below and ../results/2026-10-27/HOUSE_POLICY_INVENTORY.md.
+Mask caching and the Gaussian filter helper remain.)
 
 ## Cached storage conversion notes
 
@@ -1402,23 +1408,44 @@ saturated margin queries. Both corpora match the reference byte for byte. See
 
 ## Still required
 
-- Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
-  image/pixel views; then mask/blur, sampling, compositing and raster kernels.
-- Convert retained geometry, paths, scan conversion, canvas/device state,
-  transforms, clipping and surface/image ownership.
-- Finish pruning unused generic serialization and unsupported compatibility
-  interfaces. Picture, capture and font machinery are removed; preserve external
-  glyph coverage and all admitted drawing behavior.
-- Convert remaining retained filter, shader, color and skcms implementation;
-  retain blur masks, matrix color filters and shader masks. General image filters
-  and runtime/SkSL effects and their compiler-only raster stages are removed.
-  Convert the remaining raster stage construction, execution and kernels.
-- Audit every retained production header and build/source list, including
-  templates, generated runtime support and platform ports. Syntax-checker success
-  alone is not semantic conversion evidence.
-- Complete native platform, installed-package, GUI.Forms and instrumented gates,
-  including broader workload and allocation/workspace measurements.
-- Complete the owner's independent review and coordinate production integration.
+Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
+constructs in 106 files; per-file counts are in
+../results/2026-10-27/HOUSE_POLICY_INVENTORY.md. The counts show spelling work only. They omit
+code this arm64 configuration does not compile, and zero findings is not conversion evidence.
+
+- **Raster pipeline and pixel kernels (about 770 findings).** `SkRasterPipeline.cpp/.h` and
+  `SkRasterPipeline_opts.h`, the bitmap-sampling procedures and their shader, row blending and
+  swizzles (`SkBlitRow_opts.h`, `SkSwizzler_opts.inc`, `Sk4px.h`, `SkVx.h`), and blend modes and
+  blenders. Also the remaining mask pieces: `SkMaskCache.cpp`, `SkGaussFilter`, and three
+  `decltype` uses in `SkMaskBlurFilter.cpp`. Imported optimized code stays the baseline. New
+  SIMD work follows the 128-bit portable policy and needs measurements.
+- **Canvas-adjacent state.** Clip stack and its device, paint and paint helpers, vertices and
+  vertex state, 4x4 matrices, drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`,
+  `SkMatrix22`, path utilities, lattice iteration and shadow info.
+- **Shaders and color.** Triangle-color and Perlin-noise shaders, `SkColorSpace`, `SkColor`, and
+  skcms (`Transform_inl.h`, `skcms_public.h`).
+- **Memory, containers and support code.** TArray, TBlockList, the block allocator, the arena,
+  strings, streams, buffers, `SkZip`, `SkRandom`, MD5, the spinlock, data tables, time, CPU
+  detection, tracing and assertion helpers, and the POSIX file port. Also the compatibility
+  remnants: `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the
+  `SkSpan` traits.
+- **Prune or convert, decided by link closure (about 850 findings).** The `src/utils`
+  facilities: polygon utilities, shadow tessellation and shadow utilities, the JSON writer,
+  canvas-state utilities, the n-way, paint-filter, stack and no-draw canvases, the camera, path
+  and color parsing, patch utilities, and the macOS CoreGraphics image bridge. Also
+  `SkDocument` with its PDF stub, tiled-image utilities and distance-field generation. Patch
+  utilities back `drawPatch`, which the canvas corpus exercises. A missing direct consumer call
+  does not prove a facility unused. This continues the pruning of generic serialization and
+  unsupported compatibility interfaces; picture, capture and font machinery are already gone.
+- **Audit.** Review every retained production header and build/source list, including
+  templates, generated runtime support and platform ports. Neither checker's success is
+  semantic conversion evidence.
+- **Gates.** Native Linux x64/arm64 and Windows CLANG64 gates. The installed-package check was
+  last recorded at c0b71cb, 25 commits before 2333dc6, and the GUI.Forms fixture at 92e41ac, 56
+  commits before. Rerun both against the current head. Then broader workload and
+  allocation/workspace measurements.
+- **Review and integration.** The owner's independent review, then production integration
+  through GUI.Forms' private renderer seam.
 
 The ledger records completed boundaries; it is not a count-based substitute for
 the full scope. Large unconverted portions remain and the goal stays active.
