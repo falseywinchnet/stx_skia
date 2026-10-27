@@ -1261,6 +1261,17 @@ the instrumented suite reports PASS. See
 ../results/2026-10-26/CURVE_GEOMETRY_CONVERSION.md. Contour measurement, stroking and
 dashing remain.
 
+## Contour measurement
+
+Contour measurement and the path-measure facade are converted. Segment search,
+interpolation and extraction use indices, so no pointer is formed before the segment array
+or walked past a verb without a bound; segments and verb measures start initialized; the
+iterator returns owned measures directly. A declaration with no definition is removed.
+Candidate/reference suites pass 64/64 and 63/63; the new corpus and every other shared
+artifact match, except the intentionally corrected sampling artifact; the instrumented
+suite reports PASS. See ../results/2026-10-26/CONTOUR_MEASURE_CONVERSION.md. Stroking and
+dashing remain.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

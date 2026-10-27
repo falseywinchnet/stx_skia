@@ -466,3 +466,8 @@ foreach(unit IN ITEMS SkGeometry SkBezierCurves SkQuads SkCubics SkCubicClipper 
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
+
+# Contour measurement and the path-measure facade before conversion.
+list(REMOVE_ITEM stx_sources skia/src/core/SkContourMeasure.cpp skia/src/core/SkPathMeasure.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkContourMeasure.cpp
+    baseline/skia/src/core/SkPathMeasure.cpp)
