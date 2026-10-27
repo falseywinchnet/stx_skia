@@ -16,9 +16,10 @@ namespace skcpu {
 class Recorder;
 }
 
+// The library's CPU recorder is the only SkRecorder: callers receive recorders but cannot derive
+// new kinds, because the library downcasts every SkRecorder by its type().
 class SK_API SkRecorder {
 public:
-    SkRecorder() = default;
     virtual ~SkRecorder() = default;
     SkRecorder(const SkRecorder&) = delete;
     SkRecorder(SkRecorder&&) = delete;
@@ -32,6 +33,10 @@ public:
     virtual Type type() const = 0;
 
     virtual skcpu::Recorder* cpuRecorder() = 0;
+
+private:
+    SkRecorder() = default;
+    friend class skcpu::Recorder;
 };
 
 #endif

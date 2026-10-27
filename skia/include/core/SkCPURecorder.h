@@ -22,6 +22,9 @@ struct SkImageInfo;
 
 namespace skcpu {
 
+class RecorderImpl;
+
+// Only the library's RecorderImpl derives from Recorder, which the library downcasts to it.
 class SK_API Recorder : public SkRecorder {
 public:
     /** Returns a non-null global context. Can be used as a means of transitioning onto
@@ -54,6 +57,10 @@ public:
                                        const SkSurfaceProps* surfaceProps);
     sk_sp<SkSurface> makeBitmapSurface(const SkImageInfo& imageInfo,
                                        const SkSurfaceProps* surfaceProps = nullptr);
+
+private:
+    Recorder() = default;
+    friend class RecorderImpl;
 };
 
 inline Recorder* AsRecorder(SkRecorder* recorder) {

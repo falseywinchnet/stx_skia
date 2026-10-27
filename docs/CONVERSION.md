@@ -1500,12 +1500,21 @@ once two earlier, intended shader-clip differences are set apart. The stack's ab
 run as CTest death tests through `cmake/expect_stop.cmake`. See
 ../results/2026-10-27/RASTER_CLIP_STACK_AUDIT.md.
 
+## Drawables, annotations and the CPU recorder
+
+Drawables and annotations are removed: no consumer drew drawables, the CPU device ignored
+annotations, and the PDF-disabled stub that used them belonged to uninstalled headers. The CPU
+recorder, which draws, surfaces and images depend on, is kept and pruned of GPU types and an
+unread context pointer. Its three downcasts are now valid by construction: the recorder and
+context classes can no longer be derived outside the library. Every shared artifact is
+unchanged. See ../results/2026-10-27/DRAWABLES_ANNOTATIONS_RECORDER.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
 constructs in 106 files; per-file counts are in
 ../results/2026-10-27/HOUSE_POLICY_INVENTORY.md. The mask cache and Gaussian filter unit since
-leaves 2,680 constructs in 102 files, the raster pipeline step 2,076 in 99, the units through the 4x4 matrices 1,839 in 91, and the clip stack removal 1,677 in 88. The counts show spelling work only. They omit
+leaves 2,680 constructs in 102 files, the raster pipeline step 2,076 in 99, the units through the 4x4 matrices 1,839 in 91, the clip stack removal 1,677 in 88, and the drawable, annotation and recorder unit 1,657 in 82. The counts show spelling work only. They omit
 code this arm64 configuration does not compile, and zero findings is not conversion evidence.
 
 - **Raster pipeline and pixel kernels (about 115 findings).** These are the bitmap-sampling
@@ -1514,8 +1523,8 @@ code this arm64 configuration does not compile, and zero findings is not convers
   count the kernel header's remaining configuration macros, or its LoongArch and 32-bit-ARM
   blocks, which this machine cannot compile and which keep their casts and declarations. Imported optimized code stays the baseline. New SIMD
   work follows the 128-bit portable policy and needs measurements.
-- **Canvas-adjacent state.** Drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`,
-  `SkMatrix22`, path utilities, lattice iteration and shadow info.
+- **Canvas-adjacent state.** `SkNWayCanvas` and `SkPaintFilterCanvas` (check their use first),
+  `SkRSXform`, `SkPoint3`, `SkMatrix22`, path utilities, lattice iteration and shadow info.
 - **Shaders and color.** Triangle-color and Perlin-noise shaders, `SkColorSpace`, `SkColor`, and
   skcms (`Transform_inl.h`, `skcms_public.h`).
 - **Memory, containers and support code.** TArray, TBlockList, the block allocator, the arena,

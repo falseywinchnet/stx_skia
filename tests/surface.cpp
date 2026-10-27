@@ -1,10 +1,12 @@
 #include "include/core/SkBitmap.h"
+#include "include/core/SkCPUContext.h"
 #include "include/core/SkCPURecorder.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPixelRef.h"
 #include "include/core/SkPixmap.h"
+#include "include/core/SkRecorder.h"
 #include "include/core/SkSurface.h"
 #include "src/image/SkSurface_Raster.h"
 
@@ -14,6 +16,7 @@
 #include <cstdio>
 #include <limits>
 #include <memory>
+#include <type_traits>
 #include <utility>
 
 template <typename T>
@@ -38,6 +41,27 @@ static_assert(!HasGpuSurfaceRecorder<SkSurface>);
 static_assert(!HasGpuSurfaceWait<SkSurface>);
 static_assert(!HasGpuSurfaceCharacterization<SkSurface>);
 static_assert(!HasYuvSurfaceRead<SkSurface>);
+#endif
+
+// The library downcasts SkRecorder by type(), skcpu::Recorder to its implementation, and
+// skcpu::Context to its implementation. Classes derived outside the library would make those
+// casts undefined, so the candidate does not let them be constructed; the reference does.
+struct ForeignRecorder : SkRecorder {
+    Type type() const override { return Type::kCPU; }
+    skcpu::Recorder* cpuRecorder() override { return nullptr; }
+};
+struct ForeignCpuRecorder : skcpu::Recorder {};
+struct ForeignContext : skcpu::Context {};
+#ifdef STX_SKIA_REFERENCE
+// The intake SkRecorder has further pure virtual functions, so ForeignRecorder is abstract there.
+static_assert(std::is_default_constructible_v<ForeignCpuRecorder>);
+static_assert(std::is_default_constructible_v<ForeignContext>);
+#else
+// ForeignRecorder is concrete, so only the sealed constructor keeps it from being constructed.
+static_assert(!std::is_abstract_v<ForeignRecorder>);
+static_assert(!std::is_default_constructible_v<ForeignRecorder>);
+static_assert(!std::is_default_constructible_v<ForeignCpuRecorder>);
+static_assert(!std::is_default_constructible_v<ForeignContext>);
 #endif
 
 namespace {
