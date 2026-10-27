@@ -597,15 +597,13 @@ static bool cubic_in_line(const SkPoint cubic[4]) {
             }
         }
     }
-    SkASSERT(outer1 >= 0 && outer1 <= 2);
-    SkASSERT(outer2 >= 1 && outer2 <= 3);
-    SkASSERT(outer1 < outer2);
+    // No pair was found only when every difference is NaN; such points are not in a line.
+    // Otherwise 0 <= outer1 < outer2 <= 3, and mid1 and mid2 are the other two indices.
+    if (outer1 >= outer2) {
+        return false;
+    }
     const int mid1 = (1 + (2 >> outer2)) >> outer1;
-    SkASSERT(mid1 >= 0 && mid1 <= 2);
-    SkASSERT(outer1 != mid1 && outer2 != mid1);
     const int mid2 = outer1 ^ outer2 ^ mid1;
-    SkASSERT(mid2 >= 1 && mid2 <= 3);
-    SkASSERT(mid2 != outer1 && mid2 != outer2 && mid2 != mid1);
     SkASSERT(((1 << outer1) | (1 << outer2) | (1 << mid1) | (1 << mid2)) == 0x0f);
     const SkScalar lineSlop = ptMax * ptMax * 0.00001f;  // this multiplier is pulled out of the air
     if (!(pt_to_line(cubic[mid1], cubic[outer1], cubic[outer2]) <= lineSlop)) {
@@ -637,9 +635,11 @@ static bool quad_in_line(const SkPoint quad[3]) {
             }
         }
     }
-    SkASSERT(outer1 >= 0 && outer1 <= 1);
-    SkASSERT(outer2 >= 1 && outer2 <= 2);
-    SkASSERT(outer1 < outer2);
+    // No pair was found only when every difference is NaN; the original then read quad[3].
+    // Otherwise 0 <= outer1 < outer2 <= 2, and mid is the remaining index.
+    if (outer1 >= outer2) {
+        return false;
+    }
     const int mid = outer1 ^ outer2 ^ 3;
     const float kCurvatureSlop = 0.000005f;  // this multiplier is pulled out of the air
     const SkScalar lineSlop =  ptMax * ptMax * kCurvatureSlop;

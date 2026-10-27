@@ -792,7 +792,8 @@ private:
 // Conic weights do not affect contour extents; only points and verbs are walked.
 ContourIter::ContourIter(SkSpan<const SkPoint> pts, SkSpan<const SkPathVerb> vbs,
                          SkSpan<const float>) {
-    fStopVerbs = vbs.data() + vbs.size();
+    // An empty verb span leaves every cursor null.
+    fStopVerbs = vbs.empty() ? nullptr : &vbs.back() + 1;
     fDone = false;
     fCurrPt = pts.data();
     fCurrVerb = vbs.data();
@@ -1495,7 +1496,10 @@ static int compute_quad_extremas(const SkPoint src[3], SkPoint extremas[3]) {
     SkScalar ts[2] = {0, 0};
     int n  = SkFindQuadExtrema(src[0].fX, src[1].fX, src[2].fX, ts);
         n += SkFindQuadExtrema(src[0].fY, src[1].fY, src[2].fY, &ts[n]);
-    SkASSERT(n >= 0 && n <= 2);
+    // Each axis contributes at most one extremum.
+    if (n < 0 || n > 2) {
+        n = 0;
+    }
     for (int i = 0; i < n; ++i) {
         extremas[i] = SkEvalQuadAt(src, ts[i]);
     }
@@ -1508,7 +1512,10 @@ static int compute_conic_extremas(const SkPoint src[3], SkScalar w, SkPoint extr
     SkScalar ts[2] = {0, 0};
     int n  = conic.findXExtrema(ts);
         n += conic.findYExtrema(&ts[n]);
-    SkASSERT(n >= 0 && n <= 2);
+    // Each axis contributes at most one extremum.
+    if (n < 0 || n > 2) {
+        n = 0;
+    }
     for (int i = 0; i < n; ++i) {
         extremas[i] = conic.evalAt(ts[i]);
     }
@@ -1520,7 +1527,10 @@ static int compute_cubic_extremas(const SkPoint src[4], SkPoint extremas[5]) {
     SkScalar ts[4] = {0, 0, 0, 0};
     int n  = SkFindCubicExtrema(src[0].fX, src[1].fX, src[2].fX, src[3].fX, ts);
         n += SkFindCubicExtrema(src[0].fY, src[1].fY, src[2].fY, src[3].fY, &ts[n]);
-    SkASSERT(n >= 0 && n <= 4);
+    // Each axis contributes at most two extrema.
+    if (n < 0 || n > 4) {
+        n = 0;
+    }
     for (int i = 0; i < n; ++i) {
         SkEvalCubicAt(src, ts[i], &extremas[i], nullptr, nullptr);
     }

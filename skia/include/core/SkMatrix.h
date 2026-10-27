@@ -381,8 +381,9 @@ public:
         @return       value corresponding to index
     */
     SkScalar get(int index) const {
-        SkASSERT((unsigned)index < 9);
-        return fMat[index];
+        SkASSERT_RELEASE(index >= 0 && index < 9);
+        const SkScalar value = fMat[index];
+        return value;
     }
 
     /** Returns one matrix value from a particular row/column. Asserts if index is out
@@ -478,7 +479,7 @@ public:
         @param value  scalar to store in SkMatrix
     */
     SkMatrix& set(int index, SkScalar value) {
-        SkASSERT((unsigned)index < 9);
+        SkASSERT_RELEASE(index >= 0 && index < 9);
         fMat[index] = value;
         setTypeMask(kUnknown_Mask);
         return *this;

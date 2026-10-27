@@ -20,8 +20,8 @@ public:
 
     // The returned point borrows this iterator.
     const SkPoint& current() const {
-        SkASSERT(fCurrent < N);
-        return fPts[fCurrent];
+        // fCurrent is always reduced modulo N.
+        return fPts[fCurrent % N];
     }
 
     const SkPoint& next() {

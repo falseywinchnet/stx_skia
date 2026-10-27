@@ -1,4 +1,5 @@
 #include "src/core/SkTSort.h"
+#include "checked_size.h"
 
 #include <algorithm>
 #include <array>
@@ -58,7 +59,7 @@ void sort_records(Algorithm algorithm, Record* data, int count, const Less& less
 }
 
 bool verify(const std::vector<int>& keys, Algorithm algorithm, Trace& trace, uint64_t& digest) {
-    const int count = static_cast<int>(keys.size());
+    const int count = test_sizes::to_int(keys.size());
     std::vector<Record> guarded(keys.size() + 2);
     guarded.front() = {-10001, -10001};
     guarded.back() = {-10002, -10002};
@@ -161,8 +162,12 @@ bool defaults_and_owning_values() {
         std::vector<std::string> values(originals);
         switch (mode) {
             case 0: SkTHeapSort(values.data(), values.size(), less); break;
-            case 1: SkTInsertionSort(values.data(), static_cast<int>(values.size()), less); break;
-            case 2: SkTQSort(values.data(), values.data() + values.size(), less); break;
+            case 1: SkTInsertionSort(values.data(), test_sizes::to_int(values.size()), less); break;
+            case 2:
+                if (!values.empty()) {
+                    SkTQSort(values.data(), &values.back() + 1, less);
+                }
+                break;
             default: return false;
         }
         if (values != expected) return false;
@@ -197,7 +202,7 @@ void benchmark() {
             const Clock::time_point start = Clock::now();
             for (int round = 0; round < rounds; ++round) {
                 std::copy(original.begin(), original.end(), values.begin());
-                SkTQSort(values.data(), values.data() + values.size(), less);
+                SkTQSort(values.data(), &values.back() + 1, less);  // count >= 32
                 hash_value(digest, static_cast<uint32_t>(values.front().identity));
                 hash_value(digest, static_cast<uint32_t>(values.back().identity));
             }

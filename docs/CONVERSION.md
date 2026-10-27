@@ -1294,6 +1294,18 @@ and 65/65; the new corpus and every other shared artifact match, except the inte
 corrected sampling artifact; the instrumented suite reports PASS after an oversized first
 corpus was reduced. See ../results/2026-10-26/DASH_CONVERSION.md.
 
+## Code-integrity scan of converted sources
+
+The GUI.Forms code-integrity scanner reported 106 review candidates; 41 were in converted
+sources or tests. All but one reviewed test contract are resolved with Release-evident
+bounds, empty-safe endpoints and checked size conversions; this also closes a latent
+`quad[3]` read in the stroker's line test. The 65 candidates in unconverted imported Skia
+are left for their conversion units. Release accessors built on
+`sk_collection_check_bounds` remain undefined (not trapped) out of range, an open owner
+decision. Suites pass 66/66 and 65/65, all shared artifacts match except the corrected
+sampling artifact, and the instrumented suite reports PASS. See
+../results/2026-10-26/CODE_INTEGRITY_SCAN.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

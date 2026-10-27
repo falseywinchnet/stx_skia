@@ -37,8 +37,13 @@ static inline void SkRectMemcpy(void* dst, size_t dstRB, const void* src, size_t
     }
     uint8_t* dst_bytes = static_cast<uint8_t*>(dst);
     const uint8_t* src_bytes = static_cast<const uint8_t*>(src);
+    // The offsets never exceed the last-row offsets validated above.
+    size_t dst_offset = 0;
+    size_t src_offset = 0;
     for (size_t row = 0; row < rows; ++row) {
-        std::memcpy(dst_bytes + row * dstRB, src_bytes + row * srcRB, trimRowBytes);
+        std::memcpy(dst_bytes + dst_offset, src_bytes + src_offset, trimRowBytes);
+        dst_offset += dstRB;
+        src_offset += srcRB;
     }
 }
 

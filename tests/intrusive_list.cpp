@@ -2,6 +2,7 @@
 #include "include/private/SkTDArray.h"
 #include "src/utils/SkPolyUtils.h"
 #include "src/lazy/SkDiscardableMemoryPool.h"
+#include "checked_size.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -49,7 +50,7 @@ bool verify(const List& list, const std::vector<int>& expected) {
     if (index != expected.size()) return false;
 #ifdef SK_DEBUG
     list.validate();
-    if (list.countEntries() != static_cast<int>(expected.size())) return false;
+    if (list.countEntries() != test_sizes::to_int(expected.size())) return false;
 #endif
     return true;
 }

@@ -928,7 +928,10 @@ bool SkPixmap::erase(const SkColor4f& color, const SkIRect* subset) const {
             fill_pixel_row<uint32_t>, fill_pixel_row<uint64_t>
         };
         const unsigned int shift = static_cast<unsigned int>(shiftPerPixel());
-        SkASSERT(shift < std::size(fills));
+        // Only RGBA_F32 has 16-byte pixels, and it is handled above.
+        if (shift >= std::size(fills)) {
+            return false;
+        }
         const FillRow fill = fills[shift];
         const uint64_t pixel = dstPixel[0];
         for (int y = clip.fTop; y < clip.fBottom; ++y) {

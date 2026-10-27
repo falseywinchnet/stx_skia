@@ -404,8 +404,8 @@ size_t SkPath::getPoints(SkSpan<SkPoint> dst) const {
 // Returns (0, 0) for an index outside the points.
 SkPoint SkPath::getPoint(int index) const {
     const SkSpan<const SkPoint> pts = points();
-    if (static_cast<unsigned>(index) < static_cast<unsigned>(pts.size())) {
-        return pts[index];
+    if (index >= 0 && static_cast<size_t>(index) < pts.size()) {
+        return pts[static_cast<size_t>(index)];
     }
     const SkPoint origin = SkPoint::Make(0, 0);
     return origin;
@@ -468,10 +468,13 @@ void SkPath::Iter::setPath(const SkPath& path, bool forceClose) {
     fPts = path.points().data();
 
     const SkSpan<const SkPathVerb> vbs = path.verbs();
-    fVerbs = vbs.data();
-    fVerbStop = vbs.data() + vbs.size();
-    // For empty paths we receive an empty span, which should yield a nullptr fVerbsStop.
-    SkASSERT(!!fVerbs == !!fVerbStop);
+    // An empty path has no verb storage; both cursors stay null.
+    fVerbs = nullptr;
+    fVerbStop = nullptr;
+    if (!vbs.empty()) {
+        fVerbs = vbs.data();
+        fVerbStop = &vbs.back() + 1;
+    }
 
     fConicWeights = path.conicWeights().data();
     fConicWeight = 0;

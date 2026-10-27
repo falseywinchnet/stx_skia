@@ -1,5 +1,6 @@
 #include "src/core/SkTDPQueue.h"
 #include "src/utils/SkPolyUtils.h"
+#include "checked_size.h"
 
 #include <algorithm>
 #include <array>
@@ -35,7 +36,7 @@ void hash_entry(uint64_t& digest, const Entry& entry) {
     digest *= UINT64_C(1099511628211);
 }
 bool remove_minimum(Queue& queue, std::vector<Entry>& remaining, uint64_t& digest) {
-    if (queue.count() != static_cast<int>(remaining.size()) || remaining.empty()) return false;
+    if (queue.count() != test_sizes::to_int(remaining.size()) || remaining.empty()) return false;
     int minimum = std::numeric_limits<int>::max();
     for (const Entry& entry : remaining) minimum = std::min(minimum, entry.priority);
     const Entry next = queue.peek();
@@ -46,7 +47,7 @@ bool remove_minimum(Queue& queue, std::vector<Entry>& remaining, uint64_t& diges
     remaining.erase(remaining.begin() + static_cast<std::ptrdiff_t>(position));
     hash_entry(digest, next);
     queue.pop();
-    const bool countMatches = queue.count() == static_cast<int>(remaining.size());
+    const bool countMatches = queue.count() == test_sizes::to_int(remaining.size());
     return countMatches;
 }
 

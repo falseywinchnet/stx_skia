@@ -43,6 +43,35 @@ SkScalar SkContourMeasure::Segment::getScalarT() const {
     return t;
 }
 
+// Number of points a segment type reads from the measure's point array.
+static int segment_point_count(unsigned segType) {
+    int count = 0;
+    switch (segType) {
+        case kLine_SegType:
+            count = 2;
+            break;
+        case kQuad_SegType:
+            count = 3;
+            break;
+        case kCubic_SegType:
+        case kConic_SegType:
+            count = 4;
+            break;
+        default:
+            count = 0;
+            break;
+    }
+    return count;
+}
+
+// True when the points a segment of segType reads from ptIndex lie inside pointCount points.
+static bool segment_points_fit(unsigned ptIndex, unsigned segType, int pointCount) {
+    const int needed = segment_point_count(segType);
+    const bool fits = needed > 0 && pointCount >= needed &&
+                      static_cast<size_t>(ptIndex) <= static_cast<size_t>(pointCount - needed);
+    return fits;
+}
+
 // Appends the part of one verb between startT and stopT to dst. pts holds the verb's points
 // in the measure's layout (a conic stores its weight in pts[1].fX).
 static void SkContourMeasure_segTo(const SkPoint pts[], unsigned segType,
@@ -248,7 +277,7 @@ private:
 
 void SkContourMeasureIter::Impl::appendSegment(SkScalar distance, unsigned ptIndex,
                                                SkSegType type, int tValue) {
-    SkASSERT(ptIndex < static_cast<unsigned>(fPts.size()));
+    SkASSERT(fPts.size() > 0 && static_cast<size_t>(ptIndex) < static_cast<size_t>(fPts.size()));
     SkContourMeasure::Segment segment{};
     segment.fDistance = distance;
     segment.fPtIndex = ptIndex;
@@ -599,8 +628,12 @@ int SkContourMeasure::distanceToSegment(SkScalar distance, SkScalar* t) const {
     if (count > 0 && fSegments[static_cast<int>(hi)].fDistance < distance) {
         hi += 1;
     }
-    const int index = static_cast<int>(hi);
-    SkASSERT(index < count);
+    int index = static_cast<int>(hi);
+    // distance <= length() == the last segment's distance, so the search stays in range;
+    // keep the last segment if rounding ever disagrees.
+    if (index >= count) {
+        index = count - 1;
+    }
     const Segment& seg = fSegments[index];
 
     // now interpolate t-values with the prev segment (if possible)
@@ -630,7 +663,10 @@ bool SkContourMeasure::getPosTan(SkScalar distance, SkPoint* pos, SkVector* tang
     }
 
     const SkScalar contourLength = length();
-    SkASSERT(contourLength > 0 && !fSegments.empty());
+    SkASSERT(contourLength > 0);
+    if (fSegments.empty()) {
+        return false;
+    }
 
     // pin the distance to a legal range
     if (distance < 0) {
@@ -646,7 +682,9 @@ bool SkContourMeasure::getPosTan(SkScalar distance, SkPoint* pos, SkVector* tang
     }
 
     const Segment& seg = fSegments[index];
-    SkASSERT(seg.fPtIndex < static_cast<unsigned>(fPts.size()));
+    if (!segment_points_fit(seg.fPtIndex, seg.fType, fPts.size())) {
+        return false;
+    }
     compute_pos_tan(&fPts[static_cast<int>(seg.fPtIndex)], seg.fType, t, pos, tangent);
     return true;
 }
@@ -701,7 +739,16 @@ bool SkContourMeasure::getSegment(SkScalar startD, SkScalar stopD, SkPathBuilder
     if (!SkIsFinite(stopT)) {
         return false;
     }
-    SkASSERT(segIndex <= stopIndex);
+    // Distances are non-decreasing along the segments, so startD <= stopD orders the indices.
+    if (segIndex > stopIndex) {
+        return false;
+    }
+    // Every segment between them must reference points inside the point array.
+    for (int i = segIndex; i <= stopIndex; ++i) {
+        if (!segment_points_fit(fSegments[i].fPtIndex, fSegments[i].fType, fPts.size())) {
+            return false;
+        }
+    }
     if (startWithMoveTo) {
         const Segment& seg = fSegments[segIndex];
         compute_pos_tan(&fPts[static_cast<int>(seg.fPtIndex)], seg.fType, startT, &p, nullptr);

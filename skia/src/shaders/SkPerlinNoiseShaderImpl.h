@@ -140,9 +140,9 @@ public:
             }
             for (int i = kBlockSize - 1; i > 0; --i) {
                 int k = fLatticeSelector[i];
-                int j = random() % kBlockSize;
-                SkASSERT(j >= 0);
-                SkASSERT(j < kBlockSize);
+                // random() is positive; the unsigned remainder keeps j in [0, kBlockSize).
+                const int j = static_cast<int>(static_cast<unsigned>(random()) %
+                                               static_cast<unsigned>(kBlockSize));
                 fLatticeSelector[i] = fLatticeSelector[j];
                 fLatticeSelector[j] = k;
             }

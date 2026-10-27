@@ -120,8 +120,8 @@ void append_points(Output& output, const SkPoint* points, int count) {
     }
 }
 
-void append_scalars(Output& output, const float* values, int count) {
-    for (int i = 0; i < count; ++i) {
+void append_scalars(Output& output, const float* values, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
         append(output, values[i]);
     }
 }
@@ -317,14 +317,14 @@ void cubic_corpus(Output& output, Sequence& sequence) {
         float curvature[3] = {-7, -7, -7};
         const int curvatureRoots = SkFindCubicMaxCurvature(cubic, curvature);
         append(output, curvatureRoots);
-        append_scalars(output, curvature, curvatureRoots);
+        append_scalars(output, curvature, static_cast<size_t>(curvatureRoots));
 
         SkPoint curvatureChops[13] = {};
         float curvatureTs[3] = {-7, -7, -7};
         const int pieces = SkChopCubicAtMaxCurvature(cubic, curvatureChops, curvatureTs);
         append(output, pieces);
         append_points(output, curvatureChops, 1 + 3 * pieces);
-        append_scalars(output, curvatureTs, pieces - 1);
+        append_scalars(output, curvatureTs, static_cast<size_t>(pieces - 1));
         append(output, SkChopCubicAtMaxCurvature(cubic, curvatureChops));
         append_points(output, curvatureChops, 1 + 3 * pieces);
         append(output, SkChopCubicAtMaxCurvature(cubic, nullptr));
@@ -544,13 +544,13 @@ void solver_corpus(Output& output, Sequence& sequence) {
                 SkBezierCubic::IntersectWithHorizontalLine(SkSpan<const SkPoint>(cubic, 4), y,
                                                            storage);
         append(output, cubicHits.size());
-        append_scalars(output, cubicHits.data(), static_cast<int>(cubicHits.size()));
+        append_scalars(output, cubicHits.data(), cubicHits.size());
         float quadStorage[2] = {-7, -7};
         const SkSpan<const float> quadHits =
                 SkBezierQuad::IntersectWithHorizontalLine(SkSpan<const SkPoint>(cubic, 3), y,
                                                           quadStorage);
         append(output, quadHits.size());
-        append_scalars(output, quadHits.data(), static_cast<int>(quadHits.size()));
+        append_scalars(output, quadHits.data(), quadHits.size());
 
         const double A = pick_double(sequence);
         const double B = pick_double(sequence);

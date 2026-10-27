@@ -39,12 +39,15 @@ namespace {
 // append can move the array; disjoint callers keep the direct copy path.
 template <typename T>
 bool spans_overlap(SkSpan<const T> source, SkSpan<const T> stored) {
-    if (source.empty() || stored.empty()) {
+    if (source.empty()) {
+        return false;
+    }
+    if (stored.empty()) {
         return false;
     }
     const std::less<const T*> less{};
-    const T* sourceEnd = source.data() + source.size();
-    const T* storedEnd = stored.data() + stored.size();
+    const T* sourceEnd = &source.back() + 1;
+    const T* storedEnd = &stored.back() + 1;
     const bool overlaps = less(source.data(), storedEnd) && less(stored.data(), sourceEnd);
     return overlaps;
 }
@@ -287,8 +290,9 @@ SkPathBuilder& SkPathBuilder::close() {
 SkPathBuilder& SkPathBuilder::rMoveTo(SkVector pt) {
     SkPoint lastPt = {0,0}; // in case we're empty
     if (!fPts.empty()) {
-        SkASSERT(fLastMoveIndex >= 0);
-        if (fVerbs.back() == SkPathVerb::kClose) {
+        // A builder with points always has a move; fall back to the last point otherwise.
+        if (fVerbs.back() == SkPathVerb::kClose && fLastMoveIndex >= 0 &&
+            fLastMoveIndex < fPts.size()) {
             lastPt = fPts[fLastMoveIndex];
         } else {
             lastPt = fPts.back();

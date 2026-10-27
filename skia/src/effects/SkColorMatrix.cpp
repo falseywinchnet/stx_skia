@@ -96,10 +96,12 @@ void SkColorMatrix::setConcat(const SkColorMatrix& matA, const SkColorMatrix& ma
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void setrow(float row[], float r, float g, float b) {
-    row[0] = r;
-    row[1] = g;
-    row[2] = b;
+// Sets the red, green and blue coefficients of one 5-column row.
+static void setrow(std::array<float, 20>* mat, size_t row, float r, float g, float b) {
+    const size_t first = row * 5;
+    (*mat)[first] = r;
+    (*mat)[first + 1] = g;
+    (*mat)[first + 2] = b;
 }
 
 static const float kHueR = 0.213f;
@@ -113,8 +115,8 @@ void SkColorMatrix::setSaturation(float sat) {
     const float G = kHueG * (1.0f - sat);
     const float B = kHueB * (1.0f - sat);
 
-    setrow(fMat.data() +  0, R + sat, G, B);
-    setrow(fMat.data() +  5, R, G + sat, B);
-    setrow(fMat.data() + 10, R, G, B + sat);
+    setrow(&fMat, 0, R + sat, G, B);
+    setrow(&fMat, 1, R, G + sat, B);
+    setrow(&fMat, 2, R, G, B + sat);
     fMat[kA_Scale] = 1.0f;
 }

@@ -1,4 +1,5 @@
 #include "include/private/SkDeque.h"
+#include "checked_size.h"
 
 #include <array>
 #include <chrono>
@@ -31,7 +32,7 @@ size_t steps = 0;
 template <size_t N> using Record = std::array<uint8_t, N>;
 
 template <size_t N> bool verify(SkDeque& actual, const std::deque<Record<N>>& expected, bool record) {
-    if (actual.count() != static_cast<int>(expected.size()) || actual.empty() != expected.empty()) return false;
+    if (actual.count() != test_sizes::to_int(expected.size()) || actual.empty() != expected.empty()) return false;
     if (actual.elemSize() != N) return false;
     if (expected.empty()) {
         if (actual.front() != nullptr || actual.back() != nullptr) return false;

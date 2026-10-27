@@ -1,4 +1,5 @@
 #include "include/private/SkTDArray.h"
+#include "checked_size.h"
 
 #include <array>
 #include <chrono>
@@ -9,7 +10,7 @@
 
 namespace {
 bool equals(const SkTDArray<int>& actual, const std::vector<int>& expected) {
-    if (actual.size() != static_cast<int>(expected.size())) return false;
+    if (actual.size() != test_sizes::to_int(expected.size())) return false;
     if (actual.capacity() < actual.size()) return false;
     for (int index = 0; index < actual.size(); ++index) {
         if (actual[index] != expected[static_cast<size_t>(index)]) return false;

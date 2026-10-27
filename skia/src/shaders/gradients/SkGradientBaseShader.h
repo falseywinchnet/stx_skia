@@ -108,13 +108,13 @@ public:
                                               const SkColorSpace* dstColorSpace);
 
     float getPos(size_t i) const {
-        SkASSERT(i < fColorCount);
+        SkASSERT_RELEASE(i < static_cast<size_t>(fColorCount));
         const float position = fPositions ? fPositions[i] : SkIntToScalar(i) / (fColorCount - 1);
         return position;
     }
 
     SkColor getLegacyColor(size_t i) const {
-        SkASSERT(i < fColorCount);
+        SkASSERT_RELEASE(i < static_cast<size_t>(fColorCount));
         const SkColor color = fColors[i].toSkColor();
         return color;
     }

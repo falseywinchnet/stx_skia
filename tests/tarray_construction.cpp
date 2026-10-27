@@ -1,4 +1,5 @@
 #include "include/private/SkTArray.h"
+#include "checked_size.h"
 
 #include <array>
 #include <chrono>
@@ -34,8 +35,8 @@ static_assert(std::is_trivially_copyable_v<TrivialNonCopy>);
 bool trivial_copy_without_constructor() {
     std::array<TrivialNonCopy, 9> input{};
     for (size_t index = 0; index < input.size(); ++index) input[index].value = static_cast<uint32_t>(index + 21);
-    TArray<TrivialNonCopy> owner(input.data(), static_cast<int>(input.size()));
-    STArray<4, TrivialNonCopy> inlineOwner(input.data(), static_cast<int>(input.size()));
+    TArray<TrivialNonCopy> owner(input.data(), test_sizes::to_int(input.size()));
+    STArray<4, TrivialNonCopy> inlineOwner(input.data(), test_sizes::to_int(input.size()));
     for (int index = 0; index < owner.size(); ++index) {
         if (owner[index].value != input[index].value || inlineOwner[index].value != input[index].value) return false;
     }
