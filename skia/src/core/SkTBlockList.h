@@ -24,9 +24,10 @@
 using IndexFn = int (*)(const SkBlockAllocator::Block*);
 using NextFn = int (*)(const SkBlockAllocator::Block*, int);
 template<typename T, typename B> using ItemFn = T (*)(B*, int);
+template <bool Const>
+using BlockFor = std::conditional_t<Const, const SkBlockAllocator::Block, SkBlockAllocator::Block>;
 template <typename T, bool Forward, bool Const, IndexFn Start, IndexFn End, NextFn Next,
-          ItemFn<T, typename std::conditional<Const, const SkBlockAllocator::Block,
-                                                     SkBlockAllocator::Block>::type> Resolve>
+          ItemFn<T, BlockFor<Const>> Resolve>
 class BlockIndexIterator;
 
 /**
@@ -84,7 +85,7 @@ public:
                                   SkBlockAllocator::GrowthPolicy::kFixed)
             : fAllocator(policy, BlockBytes(itemsPerBlock)) {}
 
-    ~SkTBlockList() { this->reset(); }
+    ~SkTBlockList() { (*this).reset(); }
 
     /**
      * Adds an item and returns it.
@@ -124,11 +125,11 @@ public:
      */
     void reserve(int n) {
         SkASSERT_RELEASE(n >= 0);
-        int avail = fAllocator->currentBlock()->template avail<alignof(T)>() / sizeof(T);
+        const int avail = (*store().currentBlock()).template avail<alignof(T)>() / sizeof(T);
         if (n > avail) {
-            int reserved = n - avail;
+            const int reserved = n - avail;
             // Don't consider existing bytes since we've already determined how to split the N items
-            fAllocator->template reserve<alignof(T)>(
+            store().template reserve<alignof(T)>(
                     reserved * sizeof(T), SkBlockAllocator::kIgnoreExistingBytes_Flag);
         }
     }
@@ -139,21 +140,21 @@ public:
     void pop_back() {
         SkASSERT_RELEASE(count() > 0);
 
-        SkBlockAllocator::Block* block = fAllocator->currentBlock();
+        SkBlockAllocator::Block* block = store().currentBlock();
 
         // Run dtor for the popped item
-        int releaseIndex = Last(block);
+        const int releaseIndex = Last(block);
         GetItem(block, releaseIndex).~T();
 
         if (releaseIndex == First(block)) {
-            fAllocator->releaseBlock(block);
+            store().releaseBlock(block);
         } else {
             // Since this always follows LIFO, the block should always be able to release the memory
-            SkAssertResult(block->release(releaseIndex, releaseIndex + sizeof(T)));
-            block->setMetadata(Decrement(block, releaseIndex));
+            SkAssertResult((*block).release(releaseIndex, releaseIndex + sizeof(T)));
+            (*block).setMetadata(Decrement(block, releaseIndex));
         }
 
-        fAllocator->setMetadata(fAllocator->metadata() - 1);
+        store().setMetadata(store().metadata() - 1);
     }
 
     /**
@@ -161,13 +162,13 @@ public:
      */
     void reset() {
         // Invoke destructors in reverse order if not trivially destructible
-        if constexpr (!std::is_trivially_destructible<T>::value) {
-            for (T& t : this->ritems()) {
+        if constexpr (!std::is_trivially_destructible_v<T>) {
+            for (T& t : (*this).ritems()) {
                 t.~T();
             }
         }
 
-        fAllocator->reset();
+        store().reset();
     }
 
     /**
@@ -177,21 +178,21 @@ public:
 #ifdef SK_DEBUG
         // Confirm total count matches sum of block counts
         int count = 0;
-        for (const auto* b :fAllocator->blocks()) {
-            if (b->metadata() == 0) {
+        for (const SkBlockAllocator::Block* b : store().blocks()) {
+            if ((*b).metadata() == 0) {
                 continue; // skip empty
             }
             count += (sizeof(T) + Last(b) - First(b)) / sizeof(T);
         }
-        SkASSERT(count == fAllocator->metadata());
+        SkASSERT(count == store().metadata());
 #endif
-        return fAllocator->metadata();
+        return store().metadata();
     }
 
     /**
      * Is the count 0?
      */
-    bool empty() const { return this->count() == 0; }
+    bool empty() const { return (*this).count() == 0; }
 
     /**
      * Access first item, only call if count() != 0
@@ -199,24 +200,24 @@ public:
     T& front() {
         // This assumes that the head block actually have room to store the first item.
         static_assert(StartingItems >= 1);
-        SkASSERT_RELEASE(count() > 0 && fAllocator->headBlock()->metadata() > 0);
-        return GetItem(fAllocator->headBlock(), First(fAllocator->headBlock()));
+        SkASSERT_RELEASE(count() > 0 && (*store().headBlock()).metadata() > 0);
+        return GetItem(store().headBlock(), First(store().headBlock()));
     }
     const T& front() const {
-        SkASSERT_RELEASE(count() > 0 && fAllocator->headBlock()->metadata() > 0);
-        return GetItem(fAllocator->headBlock(), First(fAllocator->headBlock()));
+        SkASSERT_RELEASE(count() > 0 && (*store().headBlock()).metadata() > 0);
+        return GetItem(store().headBlock(), First(store().headBlock()));
     }
 
     /**
      * Access last item, only call if count() != 0
      */
     T& back() {
-        SkASSERT_RELEASE(count() > 0 && fAllocator->currentBlock()->metadata() > 0);
-        return GetItem(fAllocator->currentBlock(), Last(fAllocator->currentBlock()));
+        SkASSERT_RELEASE(count() > 0 && (*store().currentBlock()).metadata() > 0);
+        return GetItem(store().currentBlock(), Last(store().currentBlock()));
     }
     const T& back() const {
-        SkASSERT_RELEASE(count() > 0 && fAllocator->currentBlock()->metadata() > 0);
-        return GetItem(fAllocator->currentBlock(), Last(fAllocator->currentBlock()));
+        SkASSERT_RELEASE(count() > 0 && (*store().currentBlock()).metadata() > 0);
+        return GetItem(store().currentBlock(), Last(store().currentBlock()));
     }
 
     /**
@@ -227,8 +228,8 @@ public:
         SkASSERT_RELEASE(i >= 0 && i < count());
 
         // Iterate over blocks until we find the one that contains i.
-        for (auto* b : fAllocator->blocks()) {
-            if (b->metadata() == 0) {
+        for (SkBlockAllocator::Block* b : store().blocks()) {
+            if ((*b).metadata() == 0) {
                 continue; // skip empty
             }
 
@@ -245,14 +246,15 @@ public:
         SkUNREACHABLE;
     }
     const T& item(int i) const {
-        return const_cast<SkTBlockList*>(this)->item(i);
+        return (*const_cast<SkTBlockList*>(this)).item(i);
     }
 
 private:
     static size_t BlockBytes(int itemsPerBlock) {
         SkASSERT_RELEASE(itemsPerBlock > 0);
         const size_t count = static_cast<size_t>(itemsPerBlock);
-        const size_t maximum = static_cast<size_t>(SkBlockAllocator::kMaxAllocationSize) / sizeof(T);
+        const size_t maximum =
+                static_cast<size_t>(SkBlockAllocator::kMaxAllocationSize) / sizeof(T);
         SkASSERT_RELEASE(count <= maximum);
         const size_t bytes = SkBlockAllocator::BlockOverhead<alignof(T)>() + count * sizeof(T);
         return bytes;
@@ -295,7 +297,7 @@ private:
         SkBlockAllocator::ByteRange range = target.allocate<alignof(T)>(count * sizeof(T));
         void* destination = (*range.fBlock).ptr(range.fAlignedOffset);
         const void* source = (*sourceBlock).ptr(sourceStart);
-        memcpy(destination, source, count * sizeof(T));
+        std::memcpy(destination, source, count * sizeof(T));
         const int lastOffset = range.fAlignedOffset + (count - 1) * sizeof(T);
         (*range.fBlock).setMetadata(lastOffset);
         target.setMetadata(target.metadata() + count);
@@ -310,16 +312,16 @@ private:
             SkBlockAllocator::Overhead<alignof(T)>() + StartingItems * sizeof(T);
 
     static T& GetItem(SkBlockAllocator::Block* block, int index) {
-        return *static_cast<T*>(block->ptr(index));
+        return *static_cast<T*>((*block).ptr(index));
     }
     static const T& GetItem(const SkBlockAllocator::Block* block, int index) {
-        return *static_cast<const T*>(block->ptr(index));
+        return *static_cast<const T*>((*block).ptr(index));
     }
     static int First(const SkBlockAllocator::Block* b) {
-        return b->firstAlignedOffset<alignof(T)>();
+        return (*b).firstAlignedOffset<alignof(T)>();
     }
     static int Last(const SkBlockAllocator::Block* b) {
-        return b->metadata();
+        return (*b).metadata();
     }
     static int Increment(const SkBlockAllocator::Block* b, int index) {
         return index + sizeof(T);
@@ -335,6 +337,9 @@ private:
     // metadata to track the index of the last allocated item within each block.
     SkSBlockAllocator<StartingSize> fAllocator;
 
+    SkBlockAllocator& store() { return *fAllocator.allocator(); }
+    const SkBlockAllocator& store() const { return *fAllocator.allocator(); }
+
 public:
     using Iter   = BlockIndexIterator<T&,       true,  false, &First, &Last,  &Increment, &GetItem>;
     using CIter  = BlockIndexIterator<const T&, true,  true,  &First, &Last,  &Increment, &GetItem>;
@@ -344,7 +349,7 @@ public:
     /**
      * Iterate over all items in allocation order (oldest to newest) using a for-range loop:
      *
-     *   for (auto&& T : this->items()) {}
+     *   for (T& item : list.items()) {}
      */
     Iter   items() { return Iter(fAllocator.allocator()); }
     CIter  items() const { return CIter(fAllocator.allocator()); }
@@ -363,10 +368,10 @@ void SkTBlockList<T, SI1>::concat(SkTBlockList<T, SI2>&& other) {
     if (other.empty()) {
         return;
     } else if (other.count() == 1) {
-        if constexpr (std::is_copy_constructible<T>::value) {
-            this->push_back(other.back());
+        if constexpr (std::is_copy_constructible_v<T>) {
+            (*this).push_back(other.back());
         } else {
-            this->push_back(std::move(other.back()));
+            (*this).push_back(std::move(other.back()));
         }
         other.pop_back();
         return;
@@ -375,25 +380,25 @@ void SkTBlockList<T, SI1>::concat(SkTBlockList<T, SI2>&& other) {
     // Manually move all items in other's head block into this list; all heap blocks from 'other'
     // will be appended to the block linked list (no per-item moves needed then).
     int headItemCount = 0;
-    SkBlockAllocator::Block* headBlock = other.fAllocator->headBlock();
-    SkDEBUGCODE(int oldCount = this->count();)
-    if (headBlock->metadata() > 0) {
-        int headStart = First(headBlock);
-        int headEnd = Last(headBlock) + sizeof(T); // exclusive
+    SkBlockAllocator::Block* headBlock = other.store().headBlock();
+    SkDEBUGCODE(int oldCount = (*this).count();)
+    if ((*headBlock).metadata() > 0) {
+        const int headStart = First(headBlock);
+        const int headEnd = Last(headBlock) + sizeof(T); // exclusive
         headItemCount = (headEnd - headStart) / sizeof(T);
-        int avail = fAllocator->currentBlock()->template avail<alignof(T)>() / sizeof(T);
+        const int avail = (*store().currentBlock()).template avail<alignof(T)>() / sizeof(T);
         if (headItemCount > avail) {
             // Make sure there is extra room for the items beyond what's already avail. Use the
             // kIgnoreGrowthPolicy_Flag to make this reservation as tight as possible since
             // 'other's heap blocks will be appended after it and any extra space is wasted.
-            fAllocator->template reserve<alignof(T)>((headItemCount - avail) * sizeof(T),
+            store().template reserve<alignof(T)>((headItemCount - avail) * sizeof(T),
                                                      SkBlockAllocator::kIgnoreExistingBytes_Flag |
                                                      SkBlockAllocator::kIgnoreGrowthPolicy_Flag);
         }
 
-        if constexpr (std::is_trivially_copy_constructible<T>::value) {
+        if constexpr (std::is_trivially_copy_constructible_v<T>) {
             // memcpy all items at once (or twice between current and reserved space).
-            SkASSERT(std::is_trivially_destructible<T>::value);
+            SkASSERT(std::is_trivially_destructible_v<T>);
             if (avail > 0) {
                 // Copy 0 to avail items into existing tail block
                 CopyHeadItems(headBlock, headStart, *fAllocator.allocator(),
@@ -408,7 +413,7 @@ void SkTBlockList<T, SI1>::concat(SkTBlockList<T, SI2>&& other) {
             // Keep the source objects live until all destination moves succeed.
             for (int i = headStart; i < headEnd; i += sizeof(T)) {
                 T& toMove = GetItem(headBlock, i);
-                this->push_back(std::move(toMove));
+                (*this).push_back(std::move(toMove));
             }
             for (int i = headStart; i < headEnd; i += sizeof(T)) {
                 T& moved = GetItem(headBlock, i);
@@ -416,16 +421,16 @@ void SkTBlockList<T, SI1>::concat(SkTBlockList<T, SI2>&& other) {
             }
         }
 
-        other.fAllocator->releaseBlock(headBlock);
+        other.store().releaseBlock(headBlock);
     }
 
     // other's head block must have been fully copied since it cannot be stolen
-    SkASSERT(other.fAllocator->headBlock()->metadata() == 0 &&
-             fAllocator->metadata() == oldCount + headItemCount);
-    fAllocator->stealHeapBlocks(other.fAllocator.allocator());
-    fAllocator->setMetadata(fAllocator->metadata() +
-                            (other.fAllocator->metadata() - headItemCount));
-    other.fAllocator->setMetadata(0);
+    SkASSERT((*other.store().headBlock()).metadata() == 0 &&
+             store().metadata() == oldCount + headItemCount);
+    store().stealHeapBlocks(other.fAllocator.allocator());
+    store().setMetadata(store().metadata() +
+                            (other.store().metadata() - headItemCount));
+    other.store().setMetadata(0);
 }
 
 /**
@@ -440,8 +445,7 @@ template <typename T,    // The element type (including any modifiers)
           IndexFn Start, // Returns the index of the first valid item in a block
           IndexFn End,   // Returns the index of the last valid item (so it is inclusive)
           NextFn Next,   // Returns the next index given the current index
-          ItemFn<T, typename std::conditional<Const, const SkBlockAllocator::Block,
-                                                     SkBlockAllocator::Block>::type> Resolve>
+          ItemFn<T, BlockFor<Const>> Resolve>
 class BlockIndexIterator {
     using BlockIter = typename SkBlockAllocator::BlockIter<Forward, Const>;
 public:
@@ -459,14 +463,14 @@ public:
         }
 
         Item& operator++() {
-            const auto* block = *fBlock;
-            SkASSERT(block && block->metadata() > 0);
+            const SkBlockAllocator::Block* block = *fBlock;
+            SkASSERT(block && (*block).metadata() > 0);
             SkASSERT((Forward && Next(block, fIndex) > fIndex) ||
                      (!Forward && Next(block, fIndex) < fIndex));
             fIndex = Next(block, fIndex);
             if ((Forward && fIndex > fEndIndex) || (!Forward && fIndex < fEndIndex)) {
                 ++fBlock;
-                this->setIndices();
+                (*this).setIndices();
             }
             return *this;
         }
@@ -476,12 +480,12 @@ public:
         using BlockItem = typename BlockIter::Item;
 
         Item(BlockItem block) : fBlock(block) {
-            this->setIndices();
+            (*this).setIndices();
         }
 
         void setIndices() {
             // Skip empty blocks
-            while(*fBlock && (*fBlock)->metadata() == 0) {
+            while (*fBlock && (*(*fBlock)).metadata() == 0) {
                 ++fBlock;
             }
             if (*fBlock) {
@@ -496,8 +500,8 @@ public:
         }
 
         BlockItem fBlock;
-        int       fIndex;
-        int       fEndIndex;
+        int       fIndex = 0;
+        int       fEndIndex = 0;
     };
 
     Item begin() const { return Item(fBlockIter.begin()); }

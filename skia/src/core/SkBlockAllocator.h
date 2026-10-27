@@ -75,21 +75,21 @@ public:
 
         // Return the maximum allocation size with the given alignment that can fit in this block.
         template <size_t Align = 1, size_t Padding = 0>
-        int avail() const { return std::max(0, fSize - this->cursor<Align, Padding>()); }
+        int avail() const { return std::max(0, fSize - (*this).cursor<Align, Padding>()); }
 
         // Return the aligned offset of the first allocation, assuming it was made with the
         // specified Align, and Padding. The returned offset does not mean a valid allocation
         // starts at that offset, this is a utility function for classes built on top to manage
         // indexing into a block effectively.
         template <size_t Align = 1, size_t Padding = 0>
-        int firstAlignedOffset() const { return this->alignedOffset<Align, Padding>(kDataStart); }
+        int firstAlignedOffset() const { return (*this).alignedOffset<Align, Padding>(kDataStart); }
 
         // Convert an offset into this block's storage into a usable pointer.
         void* ptr(int offset) {
             SkASSERT(offset >= kDataStart && offset < fSize);
             return reinterpret_cast<char*>(this) + offset;
         }
-        const void* ptr(int offset) const { return const_cast<Block*>(this)->ptr(offset); }
+        const void* ptr(int offset) const { return (*const_cast<Block*>(this)).ptr(offset); }
 
         // Every block has an extra 'int' for clients to use however they want. It will start
         // at 0 when a new block is made, or when the head block is reset.
@@ -135,7 +135,7 @@ public:
 
         // Get fCursor, but aligned such that ptr(rval) satisfies Align.
         template <size_t Align, size_t Padding>
-        int cursor() const { return this->alignedOffset<Align, Padding>(fCursor); }
+        int cursor() const { return (*this).alignedOffset<Align, Padding>(fCursor); }
 
         template <size_t Align, size_t Padding>
         int alignedOffset(int offset) const;
@@ -143,34 +143,34 @@ public:
         bool isScratch() const { return fCursor < 0; }
         void markAsScratch() {
             fCursor = -1;
-            this->poisonRange(kDataStart, fSize);
+            (*this).poisonRange(kDataStart, fSize);
         }
 
         SkDEBUGCODE(uint32_t fSentinel;)  // known value to check for bad back pointers to blocks
 
-        Block*          fNext;      // doubly-linked list of blocks
-        Block*          fPrev;
+        Block*          fNext = nullptr;  // doubly-linked list of blocks
+        Block*          fPrev = nullptr;
 
         // Each block tracks its own cursor because as later blocks are released, an older block
         // may become the active tail again.
-        int             fSize;      // includes the size of the BlockHeader and requested metadata
-        int             fCursor;    // (this + fCursor) points to next available allocation
-        int             fMetadata;
+        int             fSize = 0;    // includes the size of the BlockHeader and requested metadata
+        int             fCursor = 0;  // (this + fCursor) points to next available allocation
+        int             fMetadata = 0;
 
         // On release builds, a Block's other 2 pointers and 3 int fields leaves 4 bytes of padding
         // for 8 and 16 aligned systems. Currently this is only manipulated in the head block for
         // an allocator-level metadata and is explicitly not reset when the head block is "released"
         // Down the road we could instead choose to offer multiple metadata slots per block.
-        int             fAllocatorMetadata;
+        int             fAllocatorMetadata = 0;
     };
 
     // Tuple representing a range of bytes, marking the unaligned start, the first aligned point
     // after any padding, and the upper limit depending on requested size.
     struct ByteRange {
-        Block* fBlock;         // Owning block
-        int    fStart;         // Inclusive byte lower limit of byte range
-        int    fAlignedOffset; // >= start, matching alignment requirement (i.e. first real byte)
-        int    fEnd;           // Exclusive upper limit of byte range
+        Block* fBlock = nullptr;   // Owning block
+        int    fStart = 0;         // Inclusive byte lower limit of byte range
+        int    fAlignedOffset = 0; // >= start, matching alignment requirement (first real byte)
+        int    fEnd = 0;           // Exclusive upper limit of byte range
     };
 
     // The size of the head block is determined by 'additionalPreallocBytes'. Subsequent heap blocks
@@ -184,7 +184,7 @@ public:
     SkBlockAllocator(GrowthPolicy policy, size_t blockIncrementBytes,
                      size_t additionalPreallocBytes = 0);
 
-    ~SkBlockAllocator() { this->reset(); }
+    ~SkBlockAllocator() { (*this).reset(); }
     void operator delete(void* p) { ::operator delete(p); }
 
     /**
@@ -335,7 +335,7 @@ public:
 
     template <size_t Align, size_t Padding = 0>
     const Block* owningBlock(const void* ptr, int start) const {
-        return const_cast<SkBlockAllocator*>(this)->owningBlock<Align, Padding>(ptr, start);
+        return (*const_cast<SkBlockAllocator*>(this)).owningBlock<Align, Padding>(ptr, start);
     }
 
     /**
@@ -344,7 +344,7 @@ public:
      */
     Block* findOwningBlock(const void* ptr);
     const Block* findOwningBlock(const void* ptr) const {
-        return const_cast<SkBlockAllocator*>(this)->findOwningBlock(ptr);
+        return (*const_cast<SkBlockAllocator*>(this)).findOwningBlock(ptr);
     }
 
     /**
@@ -392,9 +392,9 @@ public:
      * Clients can iterate over all active Blocks in the SkBlockAllocator using for loops:
      *
      * Forward iteration from head to tail block (or non-const variant):
-     *   for (const Block* b : this->blocks()) { }
+     *   for (const Block* b : (*this).blocks()) { }
      * Reverse iteration from tail to head block:
-     *   for (const Block* b : this->rblocks()) { }
+     *   for (const Block* b : (*this).rblocks()) { }
      *
      * It is safe to call releaseBlock() on the active block while looping.
      */
@@ -444,9 +444,9 @@ private:
     // that will preserve the static guarantees SkBlockAllocator makes.
     void addBlock(int minSize, int maxSize);
 
-    int scratchBlockSize() const { return fHead.fPrev ? fHead.fPrev->fSize : 0; }
+    int scratchBlockSize() const { return fHead.fPrev ? (*fHead.fPrev).fSize : 0; }
 
-    Block* fTail; // All non-head blocks are heap allocated; tail will never be null.
+    Block* fTail = nullptr; // All non-head blocks are heap allocated; tail will never be null.
 
     // All remaining state is packed into 64 bits to keep SkBlockAllocator at 16 bytes + head block
     // (on a 64-bit system).
@@ -460,10 +460,10 @@ private:
     // eventually reach the hard 2^29 size limit of SkBlockAllocator.
 
     // Next heap block size = (fBlockIncrement * alignof(std::max_align_t) * (fN0 + fN1))
-    uint64_t fBlockIncrement : 16;
-    uint64_t fGrowthPolicy   : 2;  // GrowthPolicy
-    uint64_t fN0             : 23; // = 1 for linear/exp.; = 0 for fixed/fibonacci, initially
-    uint64_t fN1             : 23; // = 1 initially
+    uint64_t fBlockIncrement : 16 = 0;
+    uint64_t fGrowthPolicy   : 2 = 0;  // GrowthPolicy
+    uint64_t fN0             : 23 = 0; // = 1 for linear/exp.; = 0 for fixed/fibonacci, initially
+    uint64_t fN1             : 23 = 0; // = 1 initially
 
     // Inline head block, must be at the end so that it can utilize any additional reserved space
     // from the initial allocation.
@@ -494,11 +494,11 @@ public:
     }
 
     ~SkSBlockAllocator() {
-        this->allocator()->~SkBlockAllocator();
+        (*(*this).allocator()).~SkBlockAllocator();
     }
 
-    SkBlockAllocator* operator->() { return this->allocator(); }
-    const SkBlockAllocator* operator->() const { return this->allocator(); }
+    SkBlockAllocator* operator->() { return (*this).allocator(); }
+    const SkBlockAllocator* operator->() const { return (*this).allocator(); }
 
     SkBlockAllocator* allocator() { return reinterpret_cast<SkBlockAllocator*>(fStorage); }
     const SkBlockAllocator* allocator() const {
@@ -544,32 +544,33 @@ void SkBlockAllocator::reserve(size_t size, ReserveFlags flags) {
     if (size > kMaxAllocationSize) {
         SK_ABORT("Allocation too large (%zu bytes requested)", size);
     }
-    int iSize = (int) size;
+    const int iSize = static_cast<int>(size);
     if ((flags & kIgnoreExistingBytes_Flag) ||
-        this->currentBlock()->avail<Align, Padding>() < iSize) {
+        (*(*this).currentBlock()).avail<Align, Padding>() < iSize) {
 
-        int blockSize = BlockOverhead<Align, Padding>() + iSize;
-        int maxSize = (flags & kIgnoreGrowthPolicy_Flag) ? blockSize
-                                                         : MaxBlockSize<Align, Padding>();
-        SkASSERT((size_t) maxSize <= (MaxBlockSize<Align, Padding>()));
+        const int blockSize = static_cast<int>(BlockOverhead<Align, Padding>()) + iSize;
+        const int maxSize = (flags & kIgnoreGrowthPolicy_Flag)
+                                    ? blockSize
+                                    : static_cast<int>(MaxBlockSize<Align, Padding>());
+        SkASSERT(static_cast<size_t>(maxSize) <= (MaxBlockSize<Align, Padding>()));
 
-        SkDEBUGCODE(auto oldTail = fTail;)
-        this->addBlock(blockSize, maxSize);
+        SkDEBUGCODE(const Block* oldTail = fTail;)
+        (*this).addBlock(blockSize, maxSize);
         SkASSERT(fTail != oldTail);
         // Releasing the just added block will move it into scratch space, allowing the original
         // tail's bytes to be used first before the scratch block is activated.
-        this->releaseBlock(fTail);
+        (*this).releaseBlock(fTail);
     }
 }
 
 template <size_t Align, size_t Padding>
 SkBlockAllocator::ByteRange SkBlockAllocator::allocate(size_t size) {
     // Amount of extra space for a new block to make sure the allocation can succeed.
-    static constexpr int kBlockOverhead = (int) BlockOverhead<Align, Padding>();
+    static constexpr int kBlockOverhead = static_cast<int>(BlockOverhead<Align, Padding>());
 
     // Ensures 'offset' and 'end' calculations will be valid
     static_assert((kMaxAllocationSize + SkAlignTo(MaxBlockSize<Align, Padding>(), Align))
-                        <= (size_t) std::numeric_limits<int32_t>::max());
+                        <= static_cast<size_t>(std::numeric_limits<int32_t>::max()));
     // Ensures size + blockOverhead + addBlock's alignment operations will be valid
     static_assert(kMaxAllocationSize + kBlockOverhead + ((1 << 12) - 1) // 4K align for large blocks
                         <= std::numeric_limits<int32_t>::max());
@@ -578,26 +579,27 @@ SkBlockAllocator::ByteRange SkBlockAllocator::allocate(size_t size) {
         SK_ABORT("Allocation too large (%zu bytes requested)", size);
     }
 
-    int iSize = (int) size;
-    int offset = fTail->cursor<Align, Padding>();
+    const int iSize = static_cast<int>(size);
+    int offset = (*fTail).cursor<Align, Padding>();
     int end = offset + iSize;
-    if (end > fTail->fSize) {
-        this->addBlock(iSize + kBlockOverhead, MaxBlockSize<Align, Padding>());
-        offset = fTail->cursor<Align, Padding>();
+    if (end > (*fTail).fSize) {
+        (*this).addBlock(iSize + kBlockOverhead,
+                         static_cast<int>(MaxBlockSize<Align, Padding>()));
+        offset = (*fTail).cursor<Align, Padding>();
         end = offset + iSize;
     }
 
     // Check invariants
-    SkASSERT(end <= fTail->fSize);
+    SkASSERT(end <= (*fTail).fSize);
     SkASSERT(end - offset == iSize);
-    SkASSERT(offset - fTail->fCursor >= (int) Padding &&
-             offset - fTail->fCursor <= (int) (Padding + Align - 1));
-    SkASSERT(reinterpret_cast<uintptr_t>(fTail->ptr(offset)) % Align == 0);
+    SkASSERT(offset - (*fTail).fCursor >= static_cast<int>(Padding) &&
+             offset - (*fTail).fCursor <= static_cast<int>(Padding + Align - 1));
+    SkASSERT(reinterpret_cast<uintptr_t>((*fTail).ptr(offset)) % Align == 0);
 
-    int start = fTail->fCursor;
-    fTail->fCursor = end;
+    const int start = (*fTail).fCursor;
+    (*fTail).fCursor = end;
 
-    fTail->unpoisonRange(offset - Padding, end);
+    (*fTail).unpoisonRange(offset - static_cast<int>(Padding), end);
 
     return {fTail, start, offset, end};
 }
@@ -611,15 +613,15 @@ SkBlockAllocator::Block* SkBlockAllocator::owningBlock(const void* p, int start)
     // Masking these terms by ~(Align-1) reconstructs 'block' if the alignment of the block is
     // greater than or equal to Align (since block & ~(Align-1) == (block + Align-1) & ~(Align-1)
     // in that case). Overalignment does not reduce to inequality unfortunately.
-    if /* constexpr */ (Align <= kAddressAlign) {
+    if constexpr (Align <= kAddressAlign) {
         Block* block = reinterpret_cast<Block*>(
                 (reinterpret_cast<uintptr_t>(p) - start - Padding) & ~(Align - 1));
-        SkASSERT(block->fSentinel == kAssignedMarker);
+        SkASSERT((*block).fSentinel == kAssignedMarker);
         return block;
     } else {
         // There's not a constant-time expression available to reconstruct the block from 'p',
         // but this is unlikely to happen frequently.
-        return this->findOwningBlock(p);
+        return (*this).findOwningBlock(p);
     }
 }
 
@@ -628,18 +630,21 @@ int SkBlockAllocator::Block::alignedOffset(int offset) const {
     static_assert(SkIsPow2(Align));
     // Aligning adds (Padding + Align - 1) as an intermediate step, so ensure that can't overflow
     static_assert(MaxBlockSize<Align, Padding>() + Padding + Align - 1
-                        <= (size_t) std::numeric_limits<int32_t>::max());
+                        <= static_cast<size_t>(std::numeric_limits<int32_t>::max()));
 
-    if /* constexpr */ (Align <= kAddressAlign) {
+    if constexpr (Align <= kAddressAlign) {
         // Same as SkAlignTo, but operates on ints instead of size_t
-        return (offset + Padding + Align - 1) & ~(Align - 1);
+        constexpr int kPadding = static_cast<int>(Padding);
+        constexpr int kAlign = static_cast<int>(Align);
+        return (offset + kPadding + kAlign - 1) & ~(kAlign - 1);
     } else {
         // Must take into account that 'this' may be starting at a pointer that doesn't satisfy the
         // larger alignment request, so must align the entire pointer, not just offset
-        uintptr_t blockPtr = reinterpret_cast<uintptr_t>(this);
-        uintptr_t alignedPtr = (blockPtr + offset + Padding + Align - 1) & ~(Align - 1);
-        SkASSERT(alignedPtr - blockPtr <= (uintptr_t) std::numeric_limits<int32_t>::max());
-        return (int) (alignedPtr - blockPtr);
+        const uintptr_t blockPtr = reinterpret_cast<uintptr_t>(this);
+        const uintptr_t alignedPtr = (blockPtr + offset + Padding + Align - 1) & ~(Align - 1);
+        SkASSERT(alignedPtr - blockPtr <=
+                 static_cast<uintptr_t>(std::numeric_limits<int32_t>::max()));
+        return static_cast<int>(alignedPtr - blockPtr);
     }
 }
 
@@ -652,16 +657,16 @@ bool SkBlockAllocator::Block::resize(int start, int end, int deltaBytes) {
         return false;
     }
     if (fCursor == end) {
-        int nextCursor = end + deltaBytes;
+        const int nextCursor = end + deltaBytes;
         SkASSERT(nextCursor >= start);
         // We still check nextCursor >= start for release builds that wouldn't assert.
         if (nextCursor <= fSize && nextCursor >= start) {
             if (nextCursor < fCursor) {
                 // The allocation got smaller; poison the space that can no longer be used.
-                this->poisonRange(nextCursor, end);
+                (*this).poisonRange(nextCursor, end);
             } else {
                 // The allocation got larger; unpoison the space that can now be used.
-                this->unpoisonRange(end, nextCursor);
+                (*this).unpoisonRange(end, nextCursor);
             }
 
             fCursor = nextCursor;
@@ -678,7 +683,7 @@ bool SkBlockAllocator::Block::release(int start, int end) {
     SkASSERT(fSentinel == kAssignedMarker);
     SkASSERT(start >= kDataStart && end <= fSize && start < end);
 
-    this->poisonRange(start, end);
+    (*this).poisonRange(start, end);
 
     if (fCursor == end) {
         fCursor = start;
@@ -692,9 +697,8 @@ bool SkBlockAllocator::Block::release(int start, int end) {
 template <bool Forward, bool Const>
 class SkBlockAllocator::BlockIter {
 private:
-    using BlockT = typename std::conditional<Const, const Block, Block>::type;
-    using AllocatorT =
-            typename std::conditional<Const, const SkBlockAllocator, SkBlockAllocator>::type;
+    using BlockT = std::conditional_t<Const, const Block, Block>;
+    using AllocatorT = std::conditional_t<Const, const SkBlockAllocator, SkBlockAllocator>;
 
 public:
     BlockIter(AllocatorT* allocator) : fAllocator(allocator) {}
@@ -706,36 +710,36 @@ public:
         BlockT* operator*() const { return fBlock; }
 
         Item& operator++() {
-            this->advance(fNext);
+            (*this).advance(fNext);
             return *this;
         }
 
     private:
         friend BlockIter;
 
-        Item(BlockT* block) { this->advance(block); }
+        Item(BlockT* block) { (*this).advance(block); }
 
         void advance(BlockT* block) {
             fBlock = block;
-            fNext = block ? (Forward ? block->fNext : block->fPrev) : nullptr;
-            if (!Forward && fNext && fNext->isScratch()) {
+            fNext = block ? (Forward ? (*block).fNext : (*block).fPrev) : nullptr;
+            if (!Forward && fNext && (*fNext).isScratch()) {
                 // For reverse-iteration only, we need to stop at the head, not the scratch block
                 // possibly stashed in head->prev.
                 fNext = nullptr;
             }
-            SkASSERT(!fNext || !fNext->isScratch());
+            SkASSERT(!fNext || !(*fNext).isScratch());
         }
 
-        BlockT* fBlock;
+        BlockT* fBlock = nullptr;
         // Cache this before operator++ so that fBlock can be released during iteration
-        BlockT* fNext;
+        BlockT* fNext = nullptr;
     };
 
-    Item begin() const { return Item(Forward ? &fAllocator->fHead : fAllocator->fTail); }
+    Item begin() const { return Item(Forward ? &(*fAllocator).fHead : (*fAllocator).fTail); }
     Item end() const { return Item(nullptr); }
 
 private:
-    AllocatorT* fAllocator;
+    AllocatorT* fAllocator = nullptr;
 };
 
 SkBlockAllocator::BlockIter<true, false> SkBlockAllocator::blocks() {
