@@ -76,26 +76,4 @@ size_t sk_qread(FILE*, void* buffer, size_t count, size_t offset);
 // Description of the error, if any, will be written to stderr.
 bool    sk_mkdir(const char* path);
 
-class SkOSFile {
-public:
-    class Iter {
-    public:
-        // SPI for module use.
-        SK_SPI Iter();
-        SK_SPI Iter(const char path[], const char suffix[] = nullptr);
-        SK_SPI ~Iter();
-
-        SK_SPI void reset(const char path[], const char suffix[] = nullptr);
-        /** If getDir is true, only returns directories.
-            Results are undefined if true and false calls are
-            interleaved on a single iterator.
-        */
-        SK_SPI bool next(SkString* name, bool getDir = false);
-
-        static const size_t kStorageSize = 40;
-    private:
-        alignas(void*) alignas(double) char fSelf[kStorageSize];
-    };
-};
-
 #endif

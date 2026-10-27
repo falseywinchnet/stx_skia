@@ -292,6 +292,15 @@ foreach(unit IN ITEMS src/core/SkDistanceFieldGen.cpp src/core/SkDocument.cpp
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
 
+# Strings and the OS file ports before the string prune. The port is the POSIX or the
+# Windows file, whichever this platform compiles.
+foreach(unit IN ITEMS src/core/SkString.cpp src/core/SkStringUtils.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()
+list(TRANSFORM stx_sources REPLACE "^skia/src/ports/SkOSFile_(posix|win)\\.cpp$"
+    "baseline/skia/src/ports/SkOSFile_\\1.cpp")
+
 if(NOT APPLE)
     list(FILTER stx_sources EXCLUDE REGEX "baseline/skia/src/utils/mac/.*\\.cpp$")
 endif()

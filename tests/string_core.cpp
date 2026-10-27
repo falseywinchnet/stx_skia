@@ -3,6 +3,8 @@
 // boundaries, code-point appends, printf and appendf across the 1024-byte stack buffer,
 // SkStringPrintf, and SkAppendScalar in both formats. Both builds must produce identical bytes
 // (string-core.raw). Each string is recorded as its size, its bytes and whether it is terminated.
+// Expressions check that the members the candidate removed are absent there and present in the
+// reference.
 
 #include "differential_corpus.h"
 
@@ -17,6 +19,28 @@
 #include <utility>
 
 namespace {
+
+// The candidate drops members nothing uses; the reference still has them.
+template <typename T>
+concept HasNumberAppends = requires(T& text) { text.appendS32(1); text.insertHex(0, 1u, 2); };
+template <typename T>
+concept HasPrepend = requires(T& text) { text.prepend("x"); text.prependf("%d", 1); };
+template <typename T>
+concept HasResizeAndRemove = requires(T& text) { text.resize(1); text.remove(0, 1); };
+template <typename T>
+concept HasStdStringConstruction = requires(const std::string& source) { T{source}; };
+template <typename T>
+concept HasSearch = requires(const T& text) { text.find("a"); text.startsWith("a"); };
+template <typename T>
+concept HasIndexing = requires(T& text) { text[0]; text.begin(); };
+#ifdef STX_SKIA_REFERENCE
+static_assert(HasNumberAppends<SkString> && HasPrepend<SkString> && HasResizeAndRemove<SkString> &&
+              HasStdStringConstruction<SkString> && HasSearch<SkString> && HasIndexing<SkString>);
+#else
+static_assert(!HasNumberAppends<SkString> && !HasPrepend<SkString> &&
+              !HasResizeAndRemove<SkString> && !HasStdStringConstruction<SkString> &&
+              !HasSearch<SkString> && !HasIndexing<SkString>);
+#endif
 
 using corpus::Output;
 using corpus::append;
