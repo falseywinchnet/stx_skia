@@ -17,7 +17,9 @@
 struct SkRect;
 
 struct SK_API SkV3 {
-    float x, y, z;
+    float x = 0;
+    float y = 0;
+    float z = 0;
 
     bool operator==(const SkV3& v) const {
         return x == v.x && y == v.y && z == v.z;
@@ -59,7 +61,10 @@ struct SK_API SkV3 {
 };
 
 struct SK_API SkV4 {
-    float x, y, z, w;
+    float x = 0;
+    float y = 0;
+    float z = 0;
+    float w = 0;
 
     bool operator==(const SkV4& v) const {
         return x == v.x && y == v.y && z == v.z && w == v.w;
@@ -94,11 +99,11 @@ struct SK_API SkV4 {
 
     float operator[](int i) const {
         SkASSERT(i >= 0 && i < 4);
-        return this->ptr()[i];
+        return ptr()[i];
     }
     float& operator[](int i) {
         SkASSERT(i >= 0 && i < 4);
-        return this->ptr()[i];
+        return ptr()[i];
     }
 };
 
@@ -123,7 +128,7 @@ public:
         {}
 
     SkM44(const SkM44& a, const SkM44& b) {
-        this->setConcat(a, b);
+        setConcat(a, b);
     }
 
     enum Uninitialized_Constructor {
@@ -232,7 +237,7 @@ public:
      *  This does not attempt to verify that axis.length() == 1.
      */
     SkM44& setRotateUnit(SkV3 axis, SkScalar radians) {
-        return this->setRotateUnitSinCos(axis, SkScalarSin(radians), SkScalarCos(radians));
+        return setRotateUnitSinCos(axis, SkScalarSin(radians), SkScalarCos(radians));
     }
 
     /**
@@ -251,11 +256,11 @@ public:
     }
 
     SkM44& preConcat(const SkM44& m) {
-        return this->setConcat(*this, m);
+        return setConcat(*this, m);
     }
 
     SkM44& postConcat(const SkM44& m) {
-        return this->setConcat(m, *this);
+        return setConcat(m, *this);
     }
 
     /**
@@ -288,11 +293,11 @@ public:
 
     SkV4 map(float x, float y, float z, float w) const;
     SkV4 operator*(const SkV4& v) const {
-        return this->map(v.x, v.y, v.z, v.w);
+        return map(v.x, v.y, v.z, v.w);
     }
     SkV3 operator*(SkV3 v) const {
-        auto v4 = this->map(v.x, v.y, v.z, 0);
-        return {v4.x, v4.y, v4.z};
+        const SkV4 mapped = map(v.x, v.y, v.z, 0);
+        return {mapped.x, mapped.y, mapped.z};
     }
     ////////////////////// Converting to/from SkMatrix
 
