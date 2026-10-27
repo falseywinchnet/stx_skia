@@ -35,7 +35,6 @@
 
 struct SkArc;
 class SkColorSpace;
-struct SkDrawShadowRec;
 class SkRasterHandleAllocator;
 class SkSpecialImage;
 class GrRecordingContext;
@@ -330,7 +329,6 @@ public:
                               sk_sp<SkBlender>,
                               const SkPaint&,
                               bool skipColorXform = false) = 0;
-    virtual void drawShadow(SkCanvas*, const SkPath&, const SkDrawShadowRec&);
 
     // default implementation calls drawVertices
     virtual void drawPatch(const SkPoint cubics[12], const SkColor colors[4],

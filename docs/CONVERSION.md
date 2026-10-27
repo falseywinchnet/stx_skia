@@ -1555,44 +1555,60 @@ includes canvas and CoreGraphics tests. Still open:
 
 See ../results/2026-10-27/SWAP_KERNEL.md and SWAP_KERNEL_GUI_INTEGRATION.md.
 
+## Shadow drawing removal
+
+Shadow drawing is withdrawn with the canvas and device entry points that served it, the shadow
+tessellator, the polygon utilities and the priority queue. Nothing drew shadows: not the
+library, not GUI.Forms, and not any test except two container tests that used polygon calls as
+a consumer. The originals live in baseline/skia, and every shared artifact is unchanged. See
+../results/2026-10-27/SHADOW_REMOVAL.md.
+
 ## Still required
 
-Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
-constructs in 106 files; per-file counts are in
-../results/2026-10-27/HOUSE_POLICY_INVENTORY.md. The mask cache and Gaussian filter unit since
-leaves 2,680 constructs in 102 files, the raster pipeline step 2,076 in 99, the units through the 4x4 matrices 1,839 in 91, the clip stack removal 1,677 in 88, the drawable, annotation and recorder unit 1,657 in 82, and the wrapper canvas removal 1,502 in 76. The counts show spelling work only. They omit
-code this arm64 configuration does not compile, and zero findings is not conversion evidence.
+Refreshed 2026-10-27 at the shadow removal. The whole-library AST inventory counts 1,055
+excluded constructs in 70 files, almost all `->` member arrows. The counts show spelling work
+only. They omit code this arm64 configuration does not compile, and zero findings is not
+conversion evidence. Each unit also fixes defects, as before.
 
-- **Raster pipeline and pixel kernels (about 115 findings).** These are the bitmap-sampling
-  procedures and their shader, row blending and swizzles (`SkBlitRow_opts.h`,
-  `SkSwizzler_opts.inc`, `Sk4px.h`, `SkVx.h`), and blend modes and blenders. The checkers do not
-  count the kernel header's remaining configuration macros, or its LoongArch and 32-bit-ARM
-  blocks, which this machine cannot compile and which keep their casts and declarations. Imported optimized code stays the baseline. New SIMD
-  work follows the 128-bit portable policy and needs measurements.
-- **Canvas-adjacent state.** `SkRSXform`, `SkPoint3`, `SkMatrix22`, path utilities, lattice
-  iteration and shadow info.
-- **Shaders and color.** Triangle-color and Perlin-noise shaders, `SkColorSpace`, `SkColor`, and
-  skcms (`Transform_inl.h`, `skcms_public.h`).
-- **Memory, containers and support code.** TArray, TBlockList, the block allocator, the arena,
-  strings, streams, buffers, `SkZip`, `SkRandom`, MD5, the spinlock, data tables, time, CPU
-  detection, tracing and assertion helpers, and the POSIX file port. Also the compatibility
-  remnants: `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the
-  `SkSpan` traits.
-- **Prune or convert, decided by link closure (about 850 findings).** The `src/utils`
-  facilities: polygon utilities, shadow tessellation and shadow utilities, the JSON writer,
-  canvas-state utilities, the n-way, paint-filter, stack and no-draw canvases, the camera, path
-  and color parsing, patch utilities, and the macOS CoreGraphics image bridge. Also
-  `SkDocument` with its PDF stub, tiled-image utilities and distance-field generation. Patch
-  utilities back `drawPatch`, which the canvas corpus exercises. A missing direct consumer call
-  does not prove a facility unused. This continues the pruning of generic serialization and
-  unsupported compatibility interfaces; picture, capture and font machinery are already gone.
-- **Audit.** Review every retained production header and build/source list, including
+- **Prune or convert, decided by link closure (about 240).** `SkJSONWriter`, `SkCamera`,
+  `SkDistanceFieldGen`, the macOS CoreGraphics image bridge, path and colour parsing,
+  `SkDocument` and its PDF stub, and patch utilities. GUI.Forms calls none of them directly.
+  Patch utilities back `drawPatch`, which the canvas corpus exercises. A missing direct
+  consumer call does not prove a facility unused.
+- **Memory, containers and support code (about 510).** Streams (GUI.Forms uses `SkStream` in
+  one place), strings, `TArray`, `TBlockList`, the block allocator, the arena, `SkZip`,
+  `SkBuffer`, `SkRandom`, MD5, the spinlock, data tables, time, CPU detection, tracing and
+  assertion helpers, and the POSIX file port. Also the compatibility remnants:
+  `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the `SkSpan`
+  traits.
+- **Shaders and colour (about 180).** skcms (`Transform_inl.h`, `skcms_public.h`),
+  `SkColorSpace`, `SkColor`, `SkBlendMode`, and the triangle-colour and Perlin-noise shaders.
+  GUI.Forms does not call the Perlin-noise shader.
+- **Raster pipeline and pixel kernels (about 65).** The bitmap-sampling procedures, row
+  blending and swizzles (`SkBitmapProcState`, `SkBlitRow_opts.h`, `SkSwizzler_opts.inc`,
+  `Sk4px.h`, `SkVx.h`). Imported optimized code stays the baseline. GUI.Forms' wasm build
+  (SSE4.1 emulated over SIMD128) and the planned Android NDK build (NEON) need these paths to
+  keep compiling. New SIMD work follows the 128-bit portable policy and needs measurements.
+- **Canvas-adjacent state.** `SkRSXform`, `SkPoint3`, `SkMatrix22` and lattice iteration.
+- **Deferred defects.**
+  - The process-wide CPU recorder and context singletons are never released.
+  - `SkMatrix::normalizePerspective` mishandles infinite entries.
+  - About a dozen tests have Release-check stop modes that are not registered as stop tests
+    (deferred by the owner).
+- **Swap kernel.** Windows CI results with the pinned toolchain are pending on PR #1. Still
+  open:
+  - wasm SIMD128 object-code inspection;
+  - GUI.Forms' `release_hdc`, which copies a BGRA lease back into an RGBA bitmap without
+    swapping;
+  - a fifth GUI.Forms byte loop, in `material_image.cpp`.
+- **Build profiles.** An Android NDK build (aarch64, and x86_64 for the emulator) and
+  confirmation that GUI.Forms' wasm configuration still compiles.
+- **Audit.** Review every retained production header and build or source list, including
   templates, generated runtime support and platform ports. Neither checker's success is
   semantic conversion evidence.
-- **Gates.** Native Linux x64/arm64 and Windows CLANG64 gates. The installed-package check was
-  last recorded at c0b71cb, 25 commits before 2333dc6, and the GUI.Forms fixture at 92e41ac, 56
-  commits before. Rerun both against the current head. Then broader workload and
-  allocation/workspace measurements.
+- **Gates.** Native Linux x64/arm64 and Windows CLANG64 CI pass on PR #1. The installed-package
+  check and the GUI.Forms fixture were rerun on 2026-10-27. Broader workload and
+  allocation/workspace measurements remain.
 - **Review and integration.** The owner's independent review, then production integration
   through GUI.Forms' private renderer seam.
 

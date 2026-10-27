@@ -59,7 +59,6 @@ protected:
                   SkBlendMode, const SkSamplingOptions&, const SkRect*, const SkPaint*) override {}
 
     void onDrawVerticesObject(const SkVertices*, SkBlendMode, const SkPaint&) override {}
-    void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&) override {}
 
     void onDrawEdgeAAQuad(const SkRect&, const SkPoint[4], QuadAAFlags, const SkColor4f&,
                           SkBlendMode) override {}

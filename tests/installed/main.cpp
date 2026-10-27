@@ -49,6 +49,9 @@ static_assert(!HasAnnotations<SkCanvas>);
     __has_include("include/utils/SkCanvasStateUtils.h")
 #error Wrapper canvas and canvas-state headers must not be installed.
 #endif
+#if __has_include("include/utils/SkShadowUtils.h")
+#error Shadow utilities must not be installed.
+#endif
 #if __has_include("include/effects/SkRuntimeEffect.h")
 #error Runtime compiler headers must not be installed.
 #endif

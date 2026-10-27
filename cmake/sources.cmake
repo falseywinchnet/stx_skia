@@ -91,7 +91,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkDistanceFieldGen.cpp
     skia/src/core/SkDocument.cpp
     skia/src/core/SkDraw.cpp
-    skia/src/core/SkDrawShadowInfo.cpp
     skia/src/core/SkDraw_atlas.cpp
     skia/src/core/SkDraw_text.cpp
     skia/src/core/SkDraw_vertices.cpp
@@ -457,10 +456,7 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/utils/SkParseColor.cpp
     skia/src/utils/SkParsePath.cpp
     skia/src/utils/SkPatchUtils.cpp
-    skia/src/utils/SkPolyUtils.cpp
     skia/src/utils/SkShaderUtils.cpp
-    skia/src/utils/SkShadowTessellator.cpp
-    skia/src/utils/SkShadowUtils.cpp
     skia/src/utils/SkTextUtils.cpp
     skia/src/utils/mac/SkCTFont.cpp
     skia/src/utils/mac/SkCTFontCreateExactCopy.cpp

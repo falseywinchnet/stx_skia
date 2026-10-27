@@ -1,6 +1,4 @@
 #include "src/core/SkTInternalLList.h"
-#include "include/private/SkTDArray.h"
-#include "src/utils/SkPolyUtils.h"
 #include "src/lazy/SkDiscardableMemoryPool.h"
 #include "checked_size.h"
 #include <algorithm>
@@ -168,37 +166,6 @@ bool concatenation_and_lifetime() {
     return true;
 }
 
-bool triangulation(uint64_t& digest, int& cases) {
-    // Concave stair-step polygons exercise the retained consumer's reflex grid
-    // and convex list in both windings and under translated/scaled coordinates.
-    const std::array<SkPoint, 8> outline{{{0, 0}, {8, 0}, {8, 2}, {5, 2},
-                                        {5, 5}, {2, 5}, {2, 8}, {0, 8}}};
-    for (const float scale : std::array<float, 3>{0.5f, 1.0f, 16.0f}) {
-        for (const bool reverse : std::array<bool, 2>{false, true}) {
-            for (int shift = 0; shift < 8; ++shift) {
-                std::array<SkPoint, 8> points{};
-                std::array<uint16_t, 8> map{};
-                for (size_t index = 0; index < points.size(); ++index) {
-                    const size_t source = reverse ? points.size() - 1 - index : index;
-                    points[index].set(outline[source].fX * scale + static_cast<float>(shift),
-                                      outline[source].fY * scale - static_cast<float>(shift));
-                    map[index] = static_cast<uint16_t>(index);
-                }
-                SkTDArray<uint16_t> triangles{};
-                if (!SkTriangulateSimplePolygon(points.data(), map.data(), 8, &triangles)) return false;
-                if (triangles.size() != 18) return false;
-                for (int index = 0; index < triangles.size(); ++index) {
-                    if (triangles[index] >= points.size()) return false;
-                    digest ^= triangles[index];
-                    digest *= UINT64_C(1099511628211);
-                }
-                ++cases;
-            }
-        }
-    }
-    return true;
-}
-
 // Probe an unlocked block and leave it unlocked, including on unexpected success.
 bool discarded(SkDiscardableMemory& memory) {
     const bool acquired = memory.lock();
@@ -255,11 +222,8 @@ int main() {
     if (!insertion_and_removal()) return 1;
     if (!relative_insertions()) return 2;
     if (!concatenation_and_lifetime()) return 3;
-    uint64_t digest = UINT64_C(1469598103934665603);
-    int cases = 0;
-    if (!triangulation(digest, cases)) return 4;
     if (!discardable_pool()) return 5;
-    std::printf("intrusive list: links, traversal, transfer, lifetime PASS; triangulation cases=%d hash=%llu; list=%zu iterator=%zu\n",
-                cases, static_cast<unsigned long long>(digest), sizeof(List), sizeof(List::Iter));
+    std::printf("intrusive list: links, traversal, transfer, lifetime PASS; list=%zu iterator=%zu\n",
+                sizeof(List), sizeof(List::Iter));
     return 0;
 }

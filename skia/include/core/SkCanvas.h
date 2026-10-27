@@ -63,7 +63,6 @@ class SkSpecialImage;
 class SkSurface;
 class SkSurface_Base;
 class SkVertices;
-struct SkDrawShadowRec;
 
 template<typename E>
 class SkEnumBitMask;
@@ -1789,8 +1788,6 @@ public:
      */
     void temporary_internal_getRgnClip(SkRegion* region);
 
-    void private_draw_shadow_rec(const SkPath&, const SkDrawShadowRec&);
-
 
 protected:
     // default impl defers to getDevice()->newSurface(info)
@@ -1863,7 +1860,6 @@ protected:
 
     virtual void onDrawVerticesObject(const SkVertices* vertices, SkBlendMode mode,
                                       const SkPaint& paint);
-    virtual void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&);
 
 
     virtual void onDrawEdgeAAQuad(const SkRect& rect, const SkPoint clip[4], QuadAAFlags aaFlags,

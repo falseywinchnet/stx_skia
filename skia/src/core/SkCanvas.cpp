@@ -1332,20 +1332,6 @@ void SkCanvas::drawAtlas(const SkImage* atlas, SkSpan<const SkRSXform> xform,
                        mode, sampling, cull, paint);
 }
 
-void SkCanvas::private_draw_shadow_rec(const SkPath& path, const SkDrawShadowRec& rec) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
-    (*this).onDrawShadowRec(path, rec);
-}
-
-void SkCanvas::onDrawShadowRec(const SkPath& path, const SkDrawShadowRec& rec) {
-    // We don't test quickReject because the shadow outsets the path's bounds.
-    // TODO(michaelludwig): Is it worth calling SkDrawShadowMetrics::GetLocalBounds here?
-    if (!(*this).predrawNotify()) {
-        return;
-    }
-    (*(*this).topDevice()).drawShadow(this, path, rec);
-}
-
 void SkCanvas::experimental_DrawEdgeAAQuad(const SkRect& rect, const SkPoint clip[4],
                                            QuadAAFlags aaFlags, const SkColor4f& color,
                                            SkBlendMode mode) {

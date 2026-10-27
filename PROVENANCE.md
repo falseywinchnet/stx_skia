@@ -274,3 +274,16 @@ headers) now live only in baseline/skia, unchanged with their notices. The candi
 of SkNWayCanvas and SkPaintFilterCanvas are deleted; their originals were already in
 baseline/skia for the reference build. None had a user in the library or GUI.Forms.
 tests/canvas_device.cpp and the installed-consumer test check that the headers are absent.
+
+## Shadow drawing removal
+
+SkShadowUtils.h/.cpp, SkShadowTessellator.cpp/.h, SkPolyUtils.h and SkDrawShadowInfo.cpp/.h
+now live only in baseline/skia, unchanged with their notices. The candidate copies of
+SkPolyUtils.cpp and SkTDPQueue.h, converted earlier, are deleted; their intake originals were
+already in baseline/skia. The reference build compiles the baseline shadow sources. Shadow
+drawing was reachable only through SkShadowUtils, which neither GUI.Forms nor the library
+called; the polygon utilities served only the shadow tessellator, and the priority queue only
+the polygon utilities. SkCanvas loses private_draw_shadow_rec and onDrawShadowRec, SkDevice
+loses drawShadow, and the virtual enforcer and no-draw canvas lose their overrides. The
+upstream ShadowTest.cpp, PolyUtilsTest.cpp and TDPQueueTest.cpp sources are preserved and not
+built. tests/canvas_device.cpp and the installed-consumer test check the absence.

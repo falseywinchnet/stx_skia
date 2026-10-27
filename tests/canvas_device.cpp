@@ -77,7 +77,28 @@ static_assert(!HasAnnotations<SkCanvas>);
     __has_include("include/android/SkAndroidFrameworkUtils.h")
 #error Wrapper canvas and canvas-state headers must not be part of the candidate.
 #endif
+// Shadow drawing is withdrawn with its tessellator, polygon utilities and priority queue: no
+// consumer drew shadows through the canvas.
+#if __has_include("include/utils/SkShadowUtils.h") || \
+    __has_include("src/utils/SkShadowTessellator.h") || \
+    __has_include("src/utils/SkPolyUtils.h") || \
+    __has_include("src/core/SkDrawShadowInfo.h") || \
+    __has_include("src/core/SkTDPQueue.h")
+#error Shadow, polygon and priority-queue headers must not be part of the candidate.
+#endif
+#endif
+// The canvas's shadow entry point, detected by expression so that overloads count.
+struct SkDrawShadowRec;
+template <typename T>
+concept HasShadowDrawing = requires(T& canvas, const SkPath& path, const SkDrawShadowRec& rec) {
+    canvas.private_draw_shadow_rec(path, rec);
+};
+#ifndef STX_SKIA_REFERENCE
+static_assert(!HasShadowDrawing<SkCanvas>);
 #else
+static_assert(HasShadowDrawing<SkCanvas>);
+#endif
+#ifdef STX_SKIA_REFERENCE
 // The reference canvas still has both, so the expressions above do detect them.
 template <typename T>
 concept HasDrawableDrawing = requires(T& canvas) { canvas.drawDrawable(nullptr, 0.0f, 0.0f); };
