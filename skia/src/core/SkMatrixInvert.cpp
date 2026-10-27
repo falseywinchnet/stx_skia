@@ -9,66 +9,6 @@
 
 #include "include/private/SkFloatingPoint.h"
 
-SkScalar SkInvert2x2Matrix(const SkScalar inMatrix[4], SkScalar outMatrix[4]) {
-    double a00 = inMatrix[0];
-    double a01 = inMatrix[1];
-    double a10 = inMatrix[2];
-    double a11 = inMatrix[3];
-
-    // Calculate the determinant
-    double determinant = a00 * a11 - a01 * a10;
-    if (outMatrix) {
-        double invdet = sk_ieee_double_divide(1.0, determinant);
-        outMatrix[0] =  a11 * invdet;
-        outMatrix[1] = -a01 * invdet;
-        outMatrix[2] = -a10 * invdet;
-        outMatrix[3] =  a00 * invdet;
-        // If 1/det overflows to infinity (i.e. det is denormalized) or any of the inverted matrix
-        // values is non-finite, return zero to indicate a non-invertible matrix.
-        if (!SkIsFinite(outMatrix, 4)) {
-            determinant = 0.0f;
-        }
-    }
-    return determinant;
-}
-
-SkScalar SkInvert3x3Matrix(const SkScalar inMatrix[9], SkScalar outMatrix[9]) {
-    double a00 = inMatrix[0];
-    double a01 = inMatrix[1];
-    double a02 = inMatrix[2];
-    double a10 = inMatrix[3];
-    double a11 = inMatrix[4];
-    double a12 = inMatrix[5];
-    double a20 = inMatrix[6];
-    double a21 = inMatrix[7];
-    double a22 = inMatrix[8];
-
-    double b01 =  a22 * a11 - a12 * a21;
-    double b11 = -a22 * a10 + a12 * a20;
-    double b21 =  a21 * a10 - a11 * a20;
-
-    // Calculate the determinant
-    double determinant = a00 * b01 + a01 * b11 + a02 * b21;
-    if (outMatrix) {
-        double invdet = sk_ieee_double_divide(1.0, determinant);
-        outMatrix[0] = b01 * invdet;
-        outMatrix[1] = (-a22 * a01 + a02 * a21) * invdet;
-        outMatrix[2] = ( a12 * a01 - a02 * a11) * invdet;
-        outMatrix[3] = b11 * invdet;
-        outMatrix[4] = ( a22 * a00 - a02 * a20) * invdet;
-        outMatrix[5] = (-a12 * a00 + a02 * a10) * invdet;
-        outMatrix[6] = b21 * invdet;
-        outMatrix[7] = (-a21 * a00 + a01 * a20) * invdet;
-        outMatrix[8] = ( a11 * a00 - a01 * a10) * invdet;
-        // If 1/det overflows to infinity (i.e. det is denormalized) or any of the inverted matrix
-        // values is non-finite, return zero to indicate a non-invertible matrix.
-        if (!SkIsFinite(outMatrix, 9)) {
-            determinant = 0.0f;
-        }
-    }
-    return determinant;
-}
-
 SkScalar SkInvert4x4Matrix(const SkScalar inMatrix[16], SkScalar outMatrix[16]) {
     double a00 = inMatrix[0];
     double a01 = inMatrix[1];
