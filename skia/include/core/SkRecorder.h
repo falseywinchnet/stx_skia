@@ -24,10 +24,9 @@ public:
     SkRecorder(SkRecorder&&) = delete;
     SkRecorder& operator=(const SkRecorder&) = delete;
 
+    // Only the CPU recorder is admitted; GPU backends are not built.
     enum class Type {
         kCPU,
-        kGanesh,
-        kGraphite,
     };
 
     virtual Type type() const = 0;

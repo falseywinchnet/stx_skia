@@ -143,9 +143,6 @@ public:
         }
 
         fDraw.fProps = &(*fDevice).surfaceProps();
-        if ((*fDevice).fRecorder) {
-            fDraw.fCtx = (*(*fDevice).fRecorder).ctx();
-        }
     }
 
     bool needsTiling() const { return fNeedsTiling; }

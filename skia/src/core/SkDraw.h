@@ -43,8 +43,6 @@ struct SkRect;
 
 namespace skcpu {
 
-class ContextImpl;
-
 /** Helper function that creates a mask from a path and a required maskfilter.
     Note however, that the resulting mask will not have been actually filtered,
     that must be done afterwards (by calling filterMask). The maskfilter is provided
@@ -214,8 +212,6 @@ public:
     const SkMatrix* fCTM{nullptr};             // required
     const SkRasterClip* fRC{nullptr};          // required
     const SkSurfaceProps* fProps{nullptr};     // optional
-
-    const ContextImpl* fCtx{nullptr};  // optional for now
 
 #ifdef SK_DEBUG
     void validate() const;

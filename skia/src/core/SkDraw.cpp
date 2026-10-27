@@ -882,7 +882,7 @@ bool Draw::drawRRectNinePatch(const SkRRect& rrect, const SkPaint& paint) const 
     const std::optional<SkRRect> rr = rrect.transform(*fCTM);
     if (rr.has_value()) {
         SkAutoBlitterChoose blitter(*this, nullptr, paint, rrect.getBounds());
-        SkResourceCache* cache = nullptr;  // TODO(kjlubick) get this from fCtx
+        SkResourceCache* cache = nullptr;  // a null cache selects the process-wide mask cache
         const SkMaskFilterBase* maskFilter = as_MFB(paint.getMaskFilter());
         if (rrect.getType() == SkRRect::kRect_Type) {
             const SkRect devRect = (*rr).rect();
@@ -919,7 +919,7 @@ void Draw::drawDevPath(const SkPathRaw& raw,
     if (paint.getMaskFilter()) {
         const SkStrokeRec::InitStyle style = doFill ? SkStrokeRec::kFill_InitStyle
                                                     : SkStrokeRec::kHairline_InitStyle;
-        SkResourceCache* cache = nullptr;  // TODO(kjlubick) get this from fCtx
+        SkResourceCache* cache = nullptr;  // a null cache selects the process-wide mask cache
         if ((*as_MFB(paint.getMaskFilter())).filterPath(raw, *fCTM, *fRC, blitter, style, cache)) {
             return;  // filterPath() called the blitter, so we're done
         }

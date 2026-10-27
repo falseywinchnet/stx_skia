@@ -9,18 +9,12 @@
 #define skcpu_RecorderImpl_DEFINED
 
 #include "include/core/SkCPURecorder.h"
-#include "src/core/SkCPUContextImpl.h"
 
 namespace skcpu {
 
 class RecorderImpl final : public skcpu::Recorder {
 public:
-    RecorderImpl(const ContextImpl* ctx) : fCtx(ctx) {}
-
-    const ContextImpl* ctx() const { return fCtx; }
-
-private:
-    const ContextImpl* const fCtx;
+    RecorderImpl() = default;
 };
 
 }  // namespace skcpu
