@@ -63,6 +63,17 @@ SI Dst widen_cast(const Src& src) {
 
 using NoCtx = const void*;
 
+// Reinterprets a value's bits as another type of the same size: lane vectors, intrinsic vector
+// types, and on the scalar path, same-size integers. It takes the value, not a reference; the
+// reference-taking sk_bit_cast and std::bit_cast change code generation in the AVX-512 and
+// AVX2 kernels.
+template <typename To, typename From>
+SI To bit_cast_lanes(From v) {
+    static_assert(sizeof(To) == sizeof(From));
+    To bits = __builtin_bit_cast(To, v);
+    return bits;
+}
+
 // A stage kernel receives its context as its first parameter, of the type it declares.
 // stage_context_matches checks that type against SkRasterPipelineOpContext for the stage's op
 // and precision; the stage-defining macros below assert it for every stage. StageContext then
@@ -171,10 +182,10 @@ namespace SK_OPTS_NS {
     SI F   sqrt_ (F v)          { return sqrtf(v); }
     SI F   rcp_precise (F v)    { return 1.0f / v; }
 
-    SI I32 iround(F v)          { return (I32)(v + 0.5f); }
-    SI U32 round(F v)           { return (U32)(v + 0.5f); }
-    SI U16 pack(U32 v)          { return (U16)v; }
-    SI U8  pack(U16 v)          { return  (U8)v; }
+    SI I32 iround(F v)          { return static_cast<I32>((v + 0.5f)); }
+    SI U32 round(F v)           { return static_cast<U32>((v + 0.5f)); }
+    SI U16 pack(U32 v)          { return static_cast<U16>(v); }
+    SI U8  pack(U16 v)          { return  static_cast<U8>(v); }
 
     SI F   if_then_else(I32 c, F   t, F   e) { return c ? t : e; }
     SI I32 if_then_else(I32 c, I32 t, I32 e) { return c ? t : e; }
@@ -251,12 +262,12 @@ namespace SK_OPTS_NS {
     SI U16 pack(U32 v)       { return __builtin_convertvector(v, U16); }
     SI U8  pack(U16 v)       { return __builtin_convertvector(v,  U8); }
 
-    SI F   if_then_else(I32 c, F   t, F   e) { return vbslq_f32((U32)c,t,e); }
-    SI I32 if_then_else(I32 c, I32 t, I32 e) { return vbslq_s32((U32)c,t,e); }
+    SI F   if_then_else(I32 c, F   t, F   e) { return vbslq_f32(bit_cast_lanes<U32>(c),t,e); }
+    SI I32 if_then_else(I32 c, I32 t, I32 e) { return vbslq_s32(bit_cast_lanes<U32>(c),t,e); }
 
     #if defined(SK_CPU_ARM64)
-        SI bool any(I32 c) { return vmaxvq_u32((U32)c) != 0; }
-        SI bool all(I32 c) { return vminvq_u32((U32)c) != 0; }
+        SI bool any(I32 c) { return vmaxvq_u32(bit_cast_lanes<U32>(c)) != 0; }
+        SI bool all(I32 c) { return vminvq_u32(bit_cast_lanes<U32>(c)) != 0; }
 
         SI F     mad(F f, F m, F a) { return vfmaq_f32(a,f,m); }
         SI F    nmad(F f, F m, F a) { return vfmsq_f32(a,f,m); }
@@ -366,13 +377,13 @@ namespace SK_OPTS_NS {
     SI F   mad(F f, F m, F a) { return _mm512_fmadd_ps(f, m, a); }
     SI F  nmad(F f, F m, F a) { return _mm512_fnmadd_ps(f, m, a); }
     SI F   min(F a, F b)     { return _mm512_min_ps(a,b);    }
-    SI I32 min(I32 a, I32 b) { return (I32)_mm512_min_epi32((__m512i)a,(__m512i)b); }
-    SI U32 min(U32 a, U32 b) { return (U32)_mm512_min_epu32((__m512i)a,(__m512i)b); }
+    SI I32 min(I32 a, I32 b) { return bit_cast_lanes<I32>(_mm512_min_epi32(bit_cast_lanes<__m512i>(a),bit_cast_lanes<__m512i>(b))); }
+    SI U32 min(U32 a, U32 b) { return bit_cast_lanes<U32>(_mm512_min_epu32(bit_cast_lanes<__m512i>(a),bit_cast_lanes<__m512i>(b))); }
     SI F   max(F a, F b)     { return _mm512_max_ps(a,b);    }
-    SI I32 max(I32 a, I32 b) { return (I32)_mm512_max_epi32((__m512i)a,(__m512i)b); }
-    SI U32 max(U32 a, U32 b) { return (U32)_mm512_max_epu32((__m512i)a,(__m512i)b); }
+    SI I32 max(I32 a, I32 b) { return bit_cast_lanes<I32>(_mm512_max_epi32(bit_cast_lanes<__m512i>(a),bit_cast_lanes<__m512i>(b))); }
+    SI U32 max(U32 a, U32 b) { return bit_cast_lanes<U32>(_mm512_max_epu32(bit_cast_lanes<__m512i>(a),bit_cast_lanes<__m512i>(b))); }
     SI F   abs_  (F v)   { return _mm512_and_ps(v, _mm512_sub_ps(_mm512_setzero(), v)); }
-    SI I32 abs_  (I32 v) { return (I32)_mm512_abs_epi32((__m512i)v);   }
+    SI I32 abs_  (I32 v) { return bit_cast_lanes<I32>(_mm512_abs_epi32(bit_cast_lanes<__m512i>(v)));   }
     SI F   floor_(F v)   { return _mm512_floor_ps(v);    }
     SI F   ceil_(F v)    { return _mm512_ceil_ps(v);     }
     SI F   rcp_approx(F v) { return _mm512_rcp14_ps  (v);  }
@@ -382,33 +393,33 @@ namespace SK_OPTS_NS {
         F e = rcp_approx(v);
         return _mm512_fnmadd_ps(v, e, _mm512_set1_ps(2.0f)) * e;
     }
-    SI I32 iround(F v)         { return (I32)_mm512_cvtps_epi32(v); }
-    SI U32 round(F v)          { return (U32)_mm512_cvtps_epi32(v); }
+    SI I32 iround(F v)         { return bit_cast_lanes<I32>(_mm512_cvtps_epi32(v)); }
+    SI U32 round(F v)          { return bit_cast_lanes<U32>(_mm512_cvtps_epi32(v)); }
     SI U16 pack(U32 v) {
-        __m256i rst = _mm256_packus_epi32(_mm512_castsi512_si256((__m512i)v),
-                                          _mm512_extracti64x4_epi64((__m512i)v, 1));
-        return (U16)_mm256_permutex_epi64(rst, 216);
+        __m256i rst = _mm256_packus_epi32(_mm512_castsi512_si256(bit_cast_lanes<__m512i>(v)),
+                                          _mm512_extracti64x4_epi64(bit_cast_lanes<__m512i>(v), 1));
+        return bit_cast_lanes<U16>(_mm256_permutex_epi64(rst, 216));
     }
     SI U8 pack(U16 v) {
-        __m256i rst = _mm256_packus_epi16((__m256i)v, (__m256i)v);
-        return (U8)_mm256_castsi256_si128(_mm256_permute4x64_epi64(rst, 8));
+        __m256i rst = _mm256_packus_epi16(bit_cast_lanes<__m256i>(v), bit_cast_lanes<__m256i>(v));
+        return bit_cast_lanes<U8>(_mm256_castsi256_si128(_mm256_permute4x64_epi64(rst, 8)));
     }
     SI F if_then_else(I32 c, F t, F e) {
         __m512i mask = _mm512_set1_epi32(0x80000000);
-        __m512i aa = _mm512_and_si512((__m512i)c, mask);
+        __m512i aa = _mm512_and_si512(bit_cast_lanes<__m512i>(c), mask);
         return _mm512_mask_blend_ps(_mm512_test_epi32_mask(aa, aa),e,t);
     }
     SI I32 if_then_else(I32 c, I32 t, I32 e) {
         __m512i mask = _mm512_set1_epi32(0x80000000);
-        __m512i aa = _mm512_and_si512((__m512i)c, mask);
-        return (I32)_mm512_mask_blend_epi32(_mm512_test_epi32_mask(aa, aa),(__m512i)e,(__m512i)t);
+        __m512i aa = _mm512_and_si512(bit_cast_lanes<__m512i>(c), mask);
+        return bit_cast_lanes<I32>(_mm512_mask_blend_epi32(_mm512_test_epi32_mask(aa, aa),bit_cast_lanes<__m512i>(e),bit_cast_lanes<__m512i>(t)));
     }
     SI bool any(I32 c) {
-        __mmask16 mask32 = _mm512_test_epi32_mask((__m512i)c, (__m512i)c);
+        __mmask16 mask32 = _mm512_test_epi32_mask(bit_cast_lanes<__m512i>(c), bit_cast_lanes<__m512i>(c));
         return mask32 != 0;
     }
     SI bool all(I32 c) {
-        __mmask16 mask32 = _mm512_test_epi32_mask((__m512i)c, (__m512i)c);
+        __mmask16 mask32 = _mm512_test_epi32_mask(bit_cast_lanes<__m512i>(c), bit_cast_lanes<__m512i>(c));
         return mask32 == 0xffff;
     }
     template <typename T>
@@ -418,13 +429,13 @@ namespace SK_OPTS_NS {
                      p[ix[ 8]], p[ix[ 9]], p[ix[10]], p[ix[11]],
                      p[ix[12]], p[ix[13]], p[ix[14]], p[ix[15]] };
     }
-    SI F   gather(const float* p, U32 ix) { return _mm512_i32gather_ps((__m512i)ix, p, 4); }
+    SI F   gather(const float* p, U32 ix) { return _mm512_i32gather_ps(bit_cast_lanes<__m512i>(ix), p, 4); }
     SI U32 gather(const uint32_t* p, U32 ix) {
-        return (U32)_mm512_i32gather_epi32((__m512i)ix, p, 4); }
+        return bit_cast_lanes<U32>(_mm512_i32gather_epi32(bit_cast_lanes<__m512i>(ix), p, 4)); }
     SI U64 gather(const uint64_t* p, U32 ix) {
         __m512i parts[] = {
-            _mm512_i32gather_epi64(_mm512_castsi512_si256((__m512i)ix), p, 8),
-            _mm512_i32gather_epi64(_mm512_extracti32x8_epi32((__m512i)ix, 1), p, 8),
+            _mm512_i32gather_epi64(_mm512_castsi512_si256(bit_cast_lanes<__m512i>(ix)), p, 8),
+            _mm512_i32gather_epi64(_mm512_extracti32x8_epi32(bit_cast_lanes<__m512i>(ix), 1), p, 8),
         };
         return sk_bit_cast<U64>(parts);
     }
@@ -461,10 +472,10 @@ namespace SK_OPTS_NS {
     // which is enough to represent any 32-bit integer exactly.
     SI void div_fn(I32* dst, I32* src) {
         // Load using 256-bit registers to avoid 512-bit performance issues
-        __m256i d_lo = _mm256_loadu_si256((const __m256i*)dst + 0);
-        __m256i d_hi = _mm256_loadu_si256((const __m256i*)dst + 1);
-        __m256i s_lo = _mm256_loadu_si256((const __m256i*)src + 0);
-        __m256i s_hi = _mm256_loadu_si256((const __m256i*)src + 1);
+        __m256i d_lo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(dst) + 0);
+        __m256i d_hi = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(dst) + 1);
+        __m256i s_lo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src) + 0);
+        __m256i s_hi = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src) + 1);
 
         // Split lower 256-bit into two 128-bit registers (each holding 4 lanes)
         __m128i d0 = _mm256_castsi256_si128(d_lo);
@@ -506,17 +517,17 @@ namespace SK_OPTS_NS {
         __m256i r_lo = _mm256_insertf128_si256(_mm256_castsi128_si256(r0), r1, 1);
         __m256i r_hi = _mm256_insertf128_si256(_mm256_castsi128_si256(r2), r3, 1);
 
-        _mm256_storeu_si256((__m256i*)dst + 0, r_lo);
-        _mm256_storeu_si256((__m256i*)dst + 1, r_hi);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst) + 0, r_lo);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst) + 1, r_hi);
     }
     #define SKRP_SUPPORTS_OPTIMIZED_DIV_INT
 
     SI void div_fn(U32* dst, U32* src) {
         // Load using 256-bit registers to avoid 512-bit performance issues.
-        __m256i d_lo = _mm256_loadu_si256((const __m256i*)dst + 0);
-        __m256i d_hi = _mm256_loadu_si256((const __m256i*)dst + 1);
-        __m256i s_lo = _mm256_loadu_si256((const __m256i*)src + 0);
-        __m256i s_hi = _mm256_loadu_si256((const __m256i*)src + 1);
+        __m256i d_lo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(dst) + 0);
+        __m256i d_hi = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(dst) + 1);
+        __m256i s_lo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src) + 0);
+        __m256i s_hi = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src) + 1);
 
         // Split lower 256-bit into two 128-bit registers (each holding 4 lanes)
         __m128i d0 = _mm256_castsi256_si128(d_lo);
@@ -557,38 +568,38 @@ namespace SK_OPTS_NS {
         __m256i r_lo = _mm256_insertf128_si256(_mm256_castsi128_si256(r0), r1, 1);
         __m256i r_hi = _mm256_insertf128_si256(_mm256_castsi128_si256(r2), r3, 1);
 
-        _mm256_storeu_si256((__m256i*)dst + 0, r_lo);
-        _mm256_storeu_si256((__m256i*)dst + 1, r_hi);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst) + 0, r_lo);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst) + 1, r_hi);
     }
     #define SKRP_SUPPORTS_OPTIMIZED_DIV_UINT
 
     SI void load2(const uint16_t* ptr, U16* r, U16* g) {
-        __m256i _01234567 = _mm256_loadu_si256(((const __m256i*)ptr) + 0);
-        __m256i _89abcdef = _mm256_loadu_si256(((const __m256i*)ptr) + 1);
+        __m256i _01234567 = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 0);
+        __m256i _89abcdef = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 1);
 
-        *r = (U16)_mm256_permute4x64_epi64(_mm256_packs_epi32(_mm256_srai_epi32(_mm256_slli_epi32
-            (_01234567, 16), 16), _mm256_srai_epi32(_mm256_slli_epi32(_89abcdef, 16), 16)), 216);
-        *g = (U16)_mm256_permute4x64_epi64(_mm256_packs_epi32(_mm256_srai_epi32(_01234567, 16),
-                             _mm256_srai_epi32(_89abcdef, 16)), 216);
+        *r = bit_cast_lanes<U16>(_mm256_permute4x64_epi64(_mm256_packs_epi32(_mm256_srai_epi32(_mm256_slli_epi32
+            (_01234567, 16), 16), _mm256_srai_epi32(_mm256_slli_epi32(_89abcdef, 16), 16)), 216));
+        *g = bit_cast_lanes<U16>(_mm256_permute4x64_epi64(_mm256_packs_epi32(_mm256_srai_epi32(_01234567, 16),
+                             _mm256_srai_epi32(_89abcdef, 16)), 216));
     }
     SI void store2(uint16_t* ptr, U16 r, U16 g) {
-        __m256i _01234567 = _mm256_unpacklo_epi16((__m256i)r, (__m256i)g);
-        __m256i _89abcdef = _mm256_unpackhi_epi16((__m256i)r, (__m256i)g);
+        __m256i _01234567 = _mm256_unpacklo_epi16(bit_cast_lanes<__m256i>(r), bit_cast_lanes<__m256i>(g));
+        __m256i _89abcdef = _mm256_unpackhi_epi16(bit_cast_lanes<__m256i>(r), bit_cast_lanes<__m256i>(g));
         __m512i combinedVector = _mm512_inserti64x4(_mm512_castsi256_si512(_01234567),
                     _89abcdef, 1);
         __m512i aa = _mm512_permutexvar_epi64(_mm512_setr_epi64(0,1,4,5,2,3,6,7), combinedVector);
         _01234567 = _mm512_castsi512_si256(aa);
         _89abcdef = _mm512_extracti64x4_epi64(aa, 1);
 
-        _mm256_storeu_si256((__m256i*)ptr + 0, _01234567);
-        _mm256_storeu_si256((__m256i*)ptr + 1, _89abcdef);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(ptr) + 0, _01234567);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(ptr) + 1, _89abcdef);
     }
 
     SI void load4(const uint16_t* ptr, U16* r, U16* g, U16* b, U16* a) {
-        __m256i _0123 = _mm256_loadu_si256((const __m256i*)ptr),
-                _4567 = _mm256_loadu_si256(((const __m256i*)ptr) + 1),
-                _89ab = _mm256_loadu_si256(((const __m256i*)ptr) + 2),
-                _cdef = _mm256_loadu_si256(((const __m256i*)ptr) + 3);
+        __m256i _0123 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr)),
+                _4567 = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 1),
+                _89ab = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 2),
+                _cdef = _mm256_loadu_si256((reinterpret_cast<const __m256i*>(ptr)) + 3);
 
         __m256i a0 = _mm256_unpacklo_epi16(_0123, _4567),
              a1 = _mm256_unpackhi_epi16(_0123, _4567),
@@ -603,16 +614,16 @@ namespace SK_OPTS_NS {
              bb = _mm256_unpacklo_epi64(b1, b3),
              aa = _mm256_unpackhi_epi64(b1, b3);
 
-        *r = (U16)_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), rr);
-        *g = (U16)_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), gg);
-        *b = (U16)_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), bb);
-        *a = (U16)_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), aa);
+        *r = bit_cast_lanes<U16>(_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), rr));
+        *g = bit_cast_lanes<U16>(_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), gg));
+        *b = bit_cast_lanes<U16>(_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), bb));
+        *a = bit_cast_lanes<U16>(_mm256_permutexvar_epi32(_mm256_setr_epi32(0,4,1,5,2,6,3,7), aa));
     }
     SI void store4(uint16_t* ptr, U16 r, U16 g, U16 b, U16 a) {
-        __m256i rg012389ab = _mm256_unpacklo_epi16((__m256i)r, (__m256i)g),
-             rg4567cdef = _mm256_unpackhi_epi16((__m256i)r, (__m256i)g),
-             ba012389ab = _mm256_unpacklo_epi16((__m256i)b, (__m256i)a),
-             ba4567cdef = _mm256_unpackhi_epi16((__m256i)b, (__m256i)a);
+        __m256i rg012389ab = _mm256_unpacklo_epi16(bit_cast_lanes<__m256i>(r), bit_cast_lanes<__m256i>(g)),
+             rg4567cdef = _mm256_unpackhi_epi16(bit_cast_lanes<__m256i>(r), bit_cast_lanes<__m256i>(g)),
+             ba012389ab = _mm256_unpacklo_epi16(bit_cast_lanes<__m256i>(b), bit_cast_lanes<__m256i>(a)),
+             ba4567cdef = _mm256_unpackhi_epi16(bit_cast_lanes<__m256i>(b), bit_cast_lanes<__m256i>(a));
 
         __m256i _0189 = _mm256_unpacklo_epi32(rg012389ab, ba012389ab),
              _23ab = _mm256_unpackhi_epi32(rg012389ab, ba012389ab),
@@ -626,10 +637,10 @@ namespace SK_OPTS_NS {
              _4567 = _mm256_blend_epi32(_45cd, _ef67, 0xf0),
              _cdef = _mm256_permutex_epi64(_mm256_blend_epi32(_45cd, _ef67, 0x0f), 78);
 
-        _mm256_storeu_si256((__m256i*)ptr, _0123);
-        _mm256_storeu_si256((__m256i*)ptr + 1, _4567);
-        _mm256_storeu_si256((__m256i*)ptr + 2, _89ab);
-        _mm256_storeu_si256((__m256i*)ptr + 3, _cdef);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(ptr), _0123);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(ptr) + 1, _4567);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(ptr) + 2, _89ab);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(ptr) + 3, _cdef);
     }
 
     SI void load4(const float* ptr, F* r, F* g, F* b, F* a) {
@@ -657,10 +668,10 @@ namespace SK_OPTS_NS {
           rg13579bde = _mm512_unpacklo_ps(_159d, _37bf),
           ba13579bde = _mm512_unpackhi_ps(_159d, _37bf);
 
-        *r = (F)_mm512_unpacklo_ps(rg02468acf, rg13579bde);
-        *g = (F)_mm512_unpackhi_ps(rg02468acf, rg13579bde);
-        *b = (F)_mm512_unpacklo_ps(ba02468acf, ba13579bde);
-        *a = (F)_mm512_unpackhi_ps(ba02468acf, ba13579bde);
+        *r = bit_cast_lanes<F>(_mm512_unpacklo_ps(rg02468acf, rg13579bde));
+        *g = bit_cast_lanes<F>(_mm512_unpackhi_ps(rg02468acf, rg13579bde));
+        *b = bit_cast_lanes<F>(_mm512_unpacklo_ps(ba02468acf, ba13579bde));
+        *a = bit_cast_lanes<F>(_mm512_unpackhi_ps(ba02468acf, ba13579bde));
     }
 
     SI void store4(float* ptr, F r, F g, F b, F a) {
@@ -669,37 +680,37 @@ namespace SK_OPTS_NS {
           ba014589cd = _mm512_unpacklo_ps(b, a),
           ba2367abef = _mm512_unpackhi_ps(b, a);
 
-        F _048c = (F)_mm512_unpacklo_pd((__m512d)rg014589cd, (__m512d)ba014589cd),
-          _26ae = (F)_mm512_unpacklo_pd((__m512d)rg2367abef, (__m512d)ba2367abef),
-          _159d = (F)_mm512_unpackhi_pd((__m512d)rg014589cd, (__m512d)ba014589cd),
-          _37bf = (F)_mm512_unpackhi_pd((__m512d)rg2367abef, (__m512d)ba2367abef);
+        F _048c = bit_cast_lanes<F>(_mm512_unpacklo_pd(bit_cast_lanes<__m512d>(rg014589cd), bit_cast_lanes<__m512d>(ba014589cd))),
+          _26ae = bit_cast_lanes<F>(_mm512_unpacklo_pd(bit_cast_lanes<__m512d>(rg2367abef), bit_cast_lanes<__m512d>(ba2367abef))),
+          _159d = bit_cast_lanes<F>(_mm512_unpackhi_pd(bit_cast_lanes<__m512d>(rg014589cd), bit_cast_lanes<__m512d>(ba014589cd))),
+          _37bf = bit_cast_lanes<F>(_mm512_unpackhi_pd(bit_cast_lanes<__m512d>(rg2367abef), bit_cast_lanes<__m512d>(ba2367abef)));
 
-        F _ae26 = (F)_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), (__m512d)_26ae),
-          _bf37 = (F)_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), (__m512d)_37bf),
-          _8c04 = (F)_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), (__m512d)_048c),
-          _9d15 = (F)_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), (__m512d)_159d);
+        F _ae26 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_26ae))),
+          _bf37 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_37bf))),
+          _8c04 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_048c))),
+          _9d15 = bit_cast_lanes<F>(_mm512_permutexvar_pd(_mm512_setr_epi64(4,5,6,7,0,1,2,3), bit_cast_lanes<__m512d>(_159d)));
 
         __m512i index = _mm512_setr_epi32(4,5,6,7,0,1,2,3,12,13,14,15,8,9,10,11);
-        F _0426 = (F)_mm512_permutex2var_pd((__m512d)_048c, _mm512_setr_epi64(0,1,2,3,12,13,14,15),
-                    (__m512d)_ae26),
-          _1537 = (F)_mm512_permutex2var_pd((__m512d)_159d, _mm512_setr_epi64(0,1,2,3,12,13,14,15),
-                    (__m512d)_bf37),
+        F _0426 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_048c), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
+                    bit_cast_lanes<__m512d>(_ae26))),
+          _1537 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_159d), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
+                    bit_cast_lanes<__m512d>(_bf37))),
           _5173 = _mm512_permutexvar_ps(index, _1537),
-          _0123 = (F)_mm512_permutex2var_pd((__m512d)_0426, _mm512_setr_epi64(0,1,10,11,4,5,14,15),
-                    (__m512d)_5173);
+          _0123 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_0426), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
+                    bit_cast_lanes<__m512d>(_5173)));
 
-        F _5476 = (F)_mm512_permutex2var_pd((__m512d)_5173, _mm512_setr_epi64(0,1,10,11,4,5,14,15),
-                    (__m512d)_0426),
+        F _5476 = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_5173), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
+                    bit_cast_lanes<__m512d>(_0426))),
           _4567 = _mm512_permutexvar_ps(index, _5476),
-          _8cae = (F)_mm512_permutex2var_pd((__m512d)_8c04, _mm512_setr_epi64(0,1,2,3,12,13,14,15),
-                    (__m512d)_26ae),
-          _9dbf = (F)_mm512_permutex2var_pd((__m512d)_9d15, _mm512_setr_epi64(0,1,2,3,12,13,14,15),
-                    (__m512d)_37bf),
+          _8cae = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_8c04), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
+                    bit_cast_lanes<__m512d>(_26ae))),
+          _9dbf = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_9d15), _mm512_setr_epi64(0,1,2,3,12,13,14,15),
+                    bit_cast_lanes<__m512d>(_37bf))),
           _d9fb = _mm512_permutexvar_ps(index, _9dbf),
-          _89ab = (F)_mm512_permutex2var_pd((__m512d)_8cae, _mm512_setr_epi64(0,1,10,11,4,5,14,15),
-                    (__m512d)_d9fb),
-          _dcfe = (F)_mm512_permutex2var_pd((__m512d)_d9fb, _mm512_setr_epi64(0,1,10,11,4,5,14,15),
-                    (__m512d)_8cae),
+          _89ab = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_8cae), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
+                    bit_cast_lanes<__m512d>(_d9fb))),
+          _dcfe = bit_cast_lanes<F>(_mm512_permutex2var_pd(bit_cast_lanes<__m512d>(_d9fb), _mm512_setr_epi64(0,1,10,11,4,5,14,15),
+                    bit_cast_lanes<__m512d>(_8cae))),
           _cdef = _mm512_permutexvar_ps(index, _dcfe);
 
         _mm512_storeu_ps(ptr+0, _0123);
@@ -722,14 +733,14 @@ namespace SK_OPTS_NS {
     SI F  nmad(F f, F m, F a) { return _mm256_fnmadd_ps(f, m, a); }
 
     SI F   min(F a, F b)     { return _mm256_min_ps(a,b);    }
-    SI I32 min(I32 a, I32 b) { return (I32)_mm256_min_epi32((__m256i)a,(__m256i)b); }
-    SI U32 min(U32 a, U32 b) { return (U32)_mm256_min_epu32((__m256i)a,(__m256i)b); }
+    SI I32 min(I32 a, I32 b) { return bit_cast_lanes<I32>(_mm256_min_epi32(bit_cast_lanes<__m256i>(a),bit_cast_lanes<__m256i>(b))); }
+    SI U32 min(U32 a, U32 b) { return bit_cast_lanes<U32>(_mm256_min_epu32(bit_cast_lanes<__m256i>(a),bit_cast_lanes<__m256i>(b))); }
     SI F   max(F a, F b)     { return _mm256_max_ps(a,b);    }
-    SI I32 max(I32 a, I32 b) { return (I32)_mm256_max_epi32((__m256i)a,(__m256i)b); }
-    SI U32 max(U32 a, U32 b) { return (U32)_mm256_max_epu32((__m256i)a,(__m256i)b); }
+    SI I32 max(I32 a, I32 b) { return bit_cast_lanes<I32>(_mm256_max_epi32(bit_cast_lanes<__m256i>(a),bit_cast_lanes<__m256i>(b))); }
+    SI U32 max(U32 a, U32 b) { return bit_cast_lanes<U32>(_mm256_max_epu32(bit_cast_lanes<__m256i>(a),bit_cast_lanes<__m256i>(b))); }
 
     SI F   abs_  (F v)       { return _mm256_and_ps(v, 0-v); }
-    SI I32 abs_  (I32 v)     { return (I32)_mm256_abs_epi32((__m256i)v); }
+    SI I32 abs_  (I32 v)     { return bit_cast_lanes<I32>(_mm256_abs_epi32(bit_cast_lanes<__m256i>(v))); }
     SI F   floor_(F v)       { return _mm256_floor_ps(v);    }
     SI F   ceil_(F v)        { return _mm256_ceil_ps(v);     }
     SI F   rcp_approx(F v)   { return _mm256_rcp_ps  (v);    }  // use rcp_fast instead
@@ -740,41 +751,41 @@ namespace SK_OPTS_NS {
         return _mm256_fnmadd_ps(v, e, _mm256_set1_ps(2.0f)) * e;
     }
 
-    SI I32 iround(F v)         { return (I32)_mm256_cvtps_epi32(v); }
-    SI U32 round(F v)          { return (U32)_mm256_cvtps_epi32(v); }
+    SI I32 iround(F v)         { return bit_cast_lanes<I32>(_mm256_cvtps_epi32(v)); }
+    SI U32 round(F v)          { return bit_cast_lanes<U32>(_mm256_cvtps_epi32(v)); }
     SI U16 pack(U32 v) {
-        return (U16)_mm_packus_epi32(_mm256_extractf128_si256((__m256i)v, 0),
-                                     _mm256_extractf128_si256((__m256i)v, 1));
+        return bit_cast_lanes<U16>(_mm_packus_epi32(_mm256_extractf128_si256(bit_cast_lanes<__m256i>(v), 0),
+                                     _mm256_extractf128_si256(bit_cast_lanes<__m256i>(v), 1)));
     }
     SI U8 pack(U16 v) {
-        __m128i r = _mm_packus_epi16((__m128i)v,(__m128i)v);
+        __m128i r = _mm_packus_epi16(bit_cast_lanes<__m128i>(v),bit_cast_lanes<__m128i>(v));
         return sk_unaligned_load<U8>(&r);
     }
 
-    SI F   if_then_else(I32 c, F   t, F   e) { return _mm256_blendv_ps(e, t, (__m256)c); }
+    SI F   if_then_else(I32 c, F   t, F   e) { return _mm256_blendv_ps(e, t, bit_cast_lanes<__m256>(c)); }
     SI I32 if_then_else(I32 c, I32 t, I32 e) {
-        return (I32)_mm256_blendv_ps((__m256)e, (__m256)t, (__m256)c);
+        return bit_cast_lanes<I32>(_mm256_blendv_ps(bit_cast_lanes<__m256>(e), bit_cast_lanes<__m256>(t), bit_cast_lanes<__m256>(c)));
     }
 
     // NOTE: This version of 'all' only works with mask values (true == all bits set)
-    SI bool any(I32 c) { return !_mm256_testz_si256((__m256i)c, _mm256_set1_epi32(-1)); }
-    SI bool all(I32 c) { return  _mm256_testc_si256((__m256i)c, _mm256_set1_epi32(-1)); }
+    SI bool any(I32 c) { return !_mm256_testz_si256(bit_cast_lanes<__m256i>(c), _mm256_set1_epi32(-1)); }
+    SI bool all(I32 c) { return  _mm256_testc_si256(bit_cast_lanes<__m256i>(c), _mm256_set1_epi32(-1)); }
 
     template <typename T>
     SI V<T> gather(const T* p, U32 ix) {
         return V<T>{ p[ix[0]], p[ix[1]], p[ix[2]], p[ix[3]],
                      p[ix[4]], p[ix[5]], p[ix[6]], p[ix[7]], };
     }
-    SI F   gather(const float*    p, U32 ix) { return _mm256_i32gather_ps(p, (__m256i)ix, 4); }
+    SI F   gather(const float*    p, U32 ix) { return _mm256_i32gather_ps(p, bit_cast_lanes<__m256i>(ix), 4); }
     SI U32 gather(const uint32_t* p, U32 ix) {
-        return (U32)_mm256_i32gather_epi32((const int*)p, (__m256i)ix, 4);
+        return bit_cast_lanes<U32>(_mm256_i32gather_epi32(reinterpret_cast<const int*>(p), bit_cast_lanes<__m256i>(ix), 4));
     }
     SI U64 gather(const uint64_t* p, U32 ix) {
         __m256i parts[] = {
                 _mm256_i32gather_epi64(
-                        (const long long int*)p, _mm256_extracti128_si256((__m256i)ix, 0), 8),
+                        reinterpret_cast<const long long int*>(p), _mm256_extracti128_si256(bit_cast_lanes<__m256i>(ix), 0), 8),
                 _mm256_i32gather_epi64(
-                        (const long long int*)p, _mm256_extracti128_si256((__m256i)ix, 1), 8),
+                        reinterpret_cast<const long long int*>(p), _mm256_extracti128_si256(bit_cast_lanes<__m256i>(ix), 1), 8),
         };
         return sk_bit_cast<U64>(parts);
     }
@@ -802,10 +813,10 @@ namespace SK_OPTS_NS {
     // which is enough to represent any 32-bit integer exactly.
     SI void div_fn(I32* dst, I32* src) {
         // Load using 128-bit registers to avoid 256-bit extraction overhead
-        __m128i d0 = _mm_loadu_si128((const __m128i*)dst + 0);
-        __m128i d1 = _mm_loadu_si128((const __m128i*)dst + 1);
-        __m128i s0 = _mm_loadu_si128((const __m128i*)src + 0);
-        __m128i s1 = _mm_loadu_si128((const __m128i*)src + 1);
+        __m128i d0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(dst) + 0);
+        __m128i d1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(dst) + 1);
+        __m128i s0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src) + 0);
+        __m128i s1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src) + 1);
 
         // Convert lower 4 lanes to double, divide, and convert back to integer.
         // Double-precision division natively handles dividing by zero (producing +/-Inf/NaN)
@@ -821,17 +832,17 @@ namespace SK_OPTS_NS {
         __m256d fr1 = _mm256_div_pd(fd1, fs1);
         __m128i r1  = _mm256_cvttpd_epi32(fr1);
         // Recombine lanes
-        _mm_storeu_si128((__m128i*)dst + 0, r0);
-        _mm_storeu_si128((__m128i*)dst + 1, r1);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(dst) + 0, r0);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(dst) + 1, r1);
     }
     #define SKRP_SUPPORTS_OPTIMIZED_DIV_INT
 
     SI void div_fn(U32* dst, U32* src) {
         // Load using 128-bit registers to avoid 256-bit extraction overhead
-        __m128i d0 = _mm_loadu_si128((const __m128i*)dst + 0);
-        __m128i d1 = _mm_loadu_si128((const __m128i*)dst + 1);
-        __m128i s0 = _mm_loadu_si128((const __m128i*)src + 0);
-        __m128i s1 = _mm_loadu_si128((const __m128i*)src + 1);
+        __m128i d0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(dst) + 0);
+        __m128i d1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(dst) + 1);
+        __m128i s0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src) + 0);
+        __m128i s1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src) + 1);
 
         // AVX2 (and below) lack a way to turn unsigned integers to doubles directly so we
         // clamp to INT_MAX before converting to doubles.
@@ -854,31 +865,31 @@ namespace SK_OPTS_NS {
         __m256d fr1  = _mm256_div_pd(fd1, fs1);
         __m128i r1   = _mm256_cvttpd_epi32(fr1);
         // Recombine lanes
-        _mm_storeu_si128((__m128i*)dst + 0, r0);
-        _mm_storeu_si128((__m128i*)dst + 1, r1);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(dst) + 0, r0);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(dst) + 1, r1);
     }
     #define SKRP_SUPPORTS_OPTIMIZED_DIV_UINT
 
     SI void load2(const uint16_t* ptr, U16* r, U16* g) {
-        __m128i _0123 = _mm_loadu_si128(((const __m128i*)ptr) + 0),
-                _4567 = _mm_loadu_si128(((const __m128i*)ptr) + 1);
-        *r = (U16)_mm_packs_epi32(_mm_srai_epi32(_mm_slli_epi32(_0123, 16), 16),
-                                  _mm_srai_epi32(_mm_slli_epi32(_4567, 16), 16));
-        *g = (U16)_mm_packs_epi32(_mm_srai_epi32(_0123, 16),
-                                  _mm_srai_epi32(_4567, 16));
+        __m128i _0123 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0),
+                _4567 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1);
+        *r = bit_cast_lanes<U16>(_mm_packs_epi32(_mm_srai_epi32(_mm_slli_epi32(_0123, 16), 16),
+                                  _mm_srai_epi32(_mm_slli_epi32(_4567, 16), 16)));
+        *g = bit_cast_lanes<U16>(_mm_packs_epi32(_mm_srai_epi32(_0123, 16),
+                                  _mm_srai_epi32(_4567, 16)));
     }
     SI void store2(uint16_t* ptr, U16 r, U16 g) {
-        __m128i _0123 = _mm_unpacklo_epi16((__m128i)r, (__m128i)g),
-             _4567 = _mm_unpackhi_epi16((__m128i)r, (__m128i)g);
-        _mm_storeu_si128((__m128i*)ptr + 0, _0123);
-        _mm_storeu_si128((__m128i*)ptr + 1, _4567);
+        __m128i _0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g)),
+             _4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g));
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 0, _0123);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 1, _4567);
     }
 
     SI void load4(const uint16_t* ptr, U16* r, U16* g, U16* b, U16* a) {
-        __m128i _01 = _mm_loadu_si128(((const __m128i*)ptr) + 0),
-                _23 = _mm_loadu_si128(((const __m128i*)ptr) + 1),
-                _45 = _mm_loadu_si128(((const __m128i*)ptr) + 2),
-                _67 = _mm_loadu_si128(((const __m128i*)ptr) + 3);
+        __m128i _01 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0),
+                _23 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1),
+                _45 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 2),
+                _67 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 3);
 
         __m128i _02 = _mm_unpacklo_epi16(_01, _23),  // r0 r2 g0 g2 b0 b2 a0 a2
              _13 = _mm_unpackhi_epi16(_01, _23),  // r1 r3 g1 g3 b1 b3 a1 a3
@@ -890,26 +901,26 @@ namespace SK_OPTS_NS {
              rg4567 = _mm_unpacklo_epi16(_46, _57),
              ba4567 = _mm_unpackhi_epi16(_46, _57);
 
-        *r = (U16)_mm_unpacklo_epi64(rg0123, rg4567);
-        *g = (U16)_mm_unpackhi_epi64(rg0123, rg4567);
-        *b = (U16)_mm_unpacklo_epi64(ba0123, ba4567);
-        *a = (U16)_mm_unpackhi_epi64(ba0123, ba4567);
+        *r = bit_cast_lanes<U16>(_mm_unpacklo_epi64(rg0123, rg4567));
+        *g = bit_cast_lanes<U16>(_mm_unpackhi_epi64(rg0123, rg4567));
+        *b = bit_cast_lanes<U16>(_mm_unpacklo_epi64(ba0123, ba4567));
+        *a = bit_cast_lanes<U16>(_mm_unpackhi_epi64(ba0123, ba4567));
     }
     SI void store4(uint16_t* ptr, U16 r, U16 g, U16 b, U16 a) {
-        __m128i rg0123 = _mm_unpacklo_epi16((__m128i)r, (__m128i)g),  // r0 g0 r1 g1 r2 g2 r3 g3
-             rg4567 = _mm_unpackhi_epi16((__m128i)r, (__m128i)g),  // r4 g4 r5 g5 r6 g6 r7 g7
-             ba0123 = _mm_unpacklo_epi16((__m128i)b, (__m128i)a),
-             ba4567 = _mm_unpackhi_epi16((__m128i)b, (__m128i)a);
+        __m128i rg0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g)),  // r0 g0 r1 g1 r2 g2 r3 g3
+             rg4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(r), bit_cast_lanes<__m128i>(g)),  // r4 g4 r5 g5 r6 g6 r7 g7
+             ba0123 = _mm_unpacklo_epi16(bit_cast_lanes<__m128i>(b), bit_cast_lanes<__m128i>(a)),
+             ba4567 = _mm_unpackhi_epi16(bit_cast_lanes<__m128i>(b), bit_cast_lanes<__m128i>(a));
 
         __m128i _01 = _mm_unpacklo_epi32(rg0123, ba0123),
              _23 = _mm_unpackhi_epi32(rg0123, ba0123),
              _45 = _mm_unpacklo_epi32(rg4567, ba4567),
              _67 = _mm_unpackhi_epi32(rg4567, ba4567);
 
-        _mm_storeu_si128((__m128i*)ptr + 0, _01);
-        _mm_storeu_si128((__m128i*)ptr + 1, _23);
-        _mm_storeu_si128((__m128i*)ptr + 2, _45);
-        _mm_storeu_si128((__m128i*)ptr + 3, _67);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 0, _01);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 1, _23);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 2, _45);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 3, _67);
     }
 
     SI void load4(const float* ptr, F* r, F* g, F* b, F* a) {
@@ -927,10 +938,10 @@ namespace SK_OPTS_NS {
           rg2367 = _mm256_unpacklo_ps(_26,_37),
           ba2367 = _mm256_unpackhi_ps(_26,_37);
 
-        *r = (F)_mm256_unpacklo_pd((__m256d)rg0145, (__m256d)rg2367);
-        *g = (F)_mm256_unpackhi_pd((__m256d)rg0145, (__m256d)rg2367);
-        *b = (F)_mm256_unpacklo_pd((__m256d)ba0145, (__m256d)ba2367);
-        *a = (F)_mm256_unpackhi_pd((__m256d)ba0145, (__m256d)ba2367);
+        *r = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(rg2367)));
+        *g = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(rg2367)));
+        *b = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(ba0145), bit_cast_lanes<__m256d>(ba2367)));
+        *a = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(ba0145), bit_cast_lanes<__m256d>(ba2367)));
     }
     SI void store4(float* ptr, F r, F g, F b, F a) {
         F rg0145 = _mm256_unpacklo_ps(r, g),  // r0 g0 r1 g1 | r4 g4 r5 g5
@@ -938,10 +949,10 @@ namespace SK_OPTS_NS {
           ba0145 = _mm256_unpacklo_ps(b, a),  // b0 a0 b1 a1 | b4 a4 b5 a5
           ba2367 = _mm256_unpackhi_ps(b, a);  // b2 ...      | b6 ...
 
-        F _04 = (F)_mm256_unpacklo_pd((__m256d)rg0145, (__m256d)ba0145),// r0 g0 b0 a0 | r4 g4 b4 a4
-          _15 = (F)_mm256_unpackhi_pd((__m256d)rg0145, (__m256d)ba0145),// r1 ...      | r5 ...
-          _26 = (F)_mm256_unpacklo_pd((__m256d)rg2367, (__m256d)ba2367),// r2 ...      | r6 ...
-          _37 = (F)_mm256_unpackhi_pd((__m256d)rg2367, (__m256d)ba2367);// r3 ...      | r7 ...
+        F _04 = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(ba0145))),// r0 g0 b0 a0 | r4 g4 b4 a4
+          _15 = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(rg0145), bit_cast_lanes<__m256d>(ba0145))),// r1 ...      | r5 ...
+          _26 = bit_cast_lanes<F>(_mm256_unpacklo_pd(bit_cast_lanes<__m256d>(rg2367), bit_cast_lanes<__m256d>(ba2367))),// r2 ...      | r6 ...
+          _37 = bit_cast_lanes<F>(_mm256_unpackhi_pd(bit_cast_lanes<__m256d>(rg2367), bit_cast_lanes<__m256d>(ba2367)));// r3 ...      | r7 ...
 
         F _01 = _mm256_permute2f128_ps(_04, _15, 32),  // 32 == 0010 0000 == lo, lo
           _23 = _mm256_permute2f128_ps(_26, _37, 32),
@@ -963,20 +974,20 @@ namespace SK_OPTS_NS {
     using U8  = V<uint8_t >;
 
     SI F if_then_else(I32 c, F t, F e) {
-        return _mm_or_ps(_mm_and_ps((__m128)c, t), _mm_andnot_ps((__m128)c, e));
+        return _mm_or_ps(_mm_and_ps(bit_cast_lanes<__m128>(c), t), _mm_andnot_ps(bit_cast_lanes<__m128>(c), e));
     }
     SI I32 if_then_else(I32 c, I32 t, I32 e) {
-        return (I32)_mm_or_ps(_mm_and_ps((__m128)c, (__m128)t),
-                              _mm_andnot_ps((__m128)c, (__m128)e));
+        return bit_cast_lanes<I32>(_mm_or_ps(_mm_and_ps(bit_cast_lanes<__m128>(c), bit_cast_lanes<__m128>(t)),
+                              _mm_andnot_ps(bit_cast_lanes<__m128>(c), bit_cast_lanes<__m128>(e))));
     }
 
     SI F   min(F a, F b)     { return _mm_min_ps(a,b); }
     SI F   max(F a, F b)     { return _mm_max_ps(a,b); }
 #if defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
-    SI I32 min(I32 a, I32 b) { return (I32)_mm_min_epi32((__m128i)a,(__m128i)b); }
-    SI U32 min(U32 a, U32 b) { return (U32)_mm_min_epu32((__m128i)a,(__m128i)b); }
-    SI I32 max(I32 a, I32 b) { return (I32)_mm_max_epi32((__m128i)a,(__m128i)b); }
-    SI U32 max(U32 a, U32 b) { return (U32)_mm_max_epu32((__m128i)a,(__m128i)b); }
+    SI I32 min(I32 a, I32 b) { return bit_cast_lanes<I32>(_mm_min_epi32(bit_cast_lanes<__m128i>(a),bit_cast_lanes<__m128i>(b))); }
+    SI U32 min(U32 a, U32 b) { return bit_cast_lanes<U32>(_mm_min_epu32(bit_cast_lanes<__m128i>(a),bit_cast_lanes<__m128i>(b))); }
+    SI I32 max(I32 a, I32 b) { return bit_cast_lanes<I32>(_mm_max_epi32(bit_cast_lanes<__m128i>(a),bit_cast_lanes<__m128i>(b))); }
+    SI U32 max(U32 a, U32 b) { return bit_cast_lanes<U32>(_mm_max_epu32(bit_cast_lanes<__m128i>(a),bit_cast_lanes<__m128i>(b))); }
 #else
     SI I32 min(I32 a, I32 b) { return if_then_else(a < b, a, b); }
     SI I32 max(I32 a, I32 b) { return if_then_else(a > b, a, b); }
@@ -992,7 +1003,7 @@ namespace SK_OPTS_NS {
     SI F  nmad(F f, F m, F a)  { return a-f*m;              }
     SI F   abs_(F v)           { return _mm_and_ps(v, 0-v); }
 #if defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
-    SI I32 abs_(I32 v)         { return (I32)_mm_abs_epi32((__m128i)v); }
+    SI I32 abs_(I32 v)         { return bit_cast_lanes<I32>(_mm_abs_epi32(bit_cast_lanes<__m128i>(v))); }
 #else
     SI I32 abs_(I32 v)         { return max(v, -v); }
 #endif
@@ -1006,8 +1017,8 @@ namespace SK_OPTS_NS {
     // performing the division in double precision. A 64-bit double has 53 bits of mantissa,
     // which is enough to represent any 32-bit integer exactly.
     SI void div_fn(I32* dst, I32* src) {
-        __m128i d = (__m128i)*dst;
-        __m128i s = (__m128i)*src;
+        __m128i d = bit_cast_lanes<__m128i>(*dst);
+        __m128i s = bit_cast_lanes<__m128i>(*src);
         // Convert top 2 lanes to double, divide, and convert back to integer.
         // Double-precision division natively handles dividing by zero (producing +/-Inf/NaN)
         // and INT_MIN / -1 overflow (producing +2147483648.0) without any hardware crash.
@@ -1022,13 +1033,13 @@ namespace SK_OPTS_NS {
         __m128d fr_hi = _mm_div_pd(fd_hi, fs_hi);
         __m128i r_hi  = _mm_cvttpd_epi32(fr_hi);
         // Recombine lanes
-        *dst = (I32)_mm_unpacklo_epi64(r_lo, r_hi); // Combine halves
+        *dst = bit_cast_lanes<I32>(_mm_unpacklo_epi64(r_lo, r_hi)); // Combine halves
     }
     #define SKRP_SUPPORTS_OPTIMIZED_DIV_INT
 
     SI void div_fn(U32* dst, U32* src) {
-        __m128i d_raw = (__m128i)*dst;
-        __m128i s_raw = (__m128i)*src;
+        __m128i d_raw = bit_cast_lanes<__m128i>(*dst);
+        __m128i s_raw = bit_cast_lanes<__m128i>(*src);
 
         // AVX2 (and below) lack a way to turn unsigned integers to doubles directly so we
         // clamp to INT_MAX before converting to doubles.
@@ -1058,19 +1069,19 @@ namespace SK_OPTS_NS {
         __m128d fr_hi = _mm_div_pd(fd_hi, fs_hi);
         __m128i r_hi  = _mm_cvttpd_epi32(fr_hi);
         // Recombine lanes
-        *dst = (U32)_mm_unpacklo_epi64(r_lo, r_hi);
+        *dst = bit_cast_lanes<U32>(_mm_unpacklo_epi64(r_lo, r_hi));
     }
     #define SKRP_SUPPORTS_OPTIMIZED_DIV_UINT
 
-    SI I32 iround(F v)         { return (I32)_mm_cvtps_epi32(v); }
-    SI U32 round(F v)          { return (U32)_mm_cvtps_epi32(v); }
+    SI I32 iround(F v)         { return bit_cast_lanes<I32>(_mm_cvtps_epi32(v)); }
+    SI U32 round(F v)          { return bit_cast_lanes<U32>(_mm_cvtps_epi32(v)); }
 
     SI U16 pack(U32 v) {
     #if defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
-        __m128i p = _mm_packus_epi32((__m128i)v,(__m128i)v);
+        __m128i p = _mm_packus_epi32(bit_cast_lanes<__m128i>(v),bit_cast_lanes<__m128i>(v));
     #else
         // Sign extend so that _mm_packs_epi32() does the pack we want.
-        __m128i p = _mm_srai_epi32(_mm_slli_epi32((__m128i)v, 16), 16);
+        __m128i p = _mm_srai_epi32(_mm_slli_epi32(bit_cast_lanes<__m128i>(v), 16), 16);
         p = _mm_packs_epi32(p,p);
     #endif
         return sk_unaligned_load<U16>(&p);  // We have two copies.  Return (the lower) one.
@@ -1120,7 +1131,7 @@ namespace SK_OPTS_NS {
         dst[ix[3]] = after[3];
     }
     SI void load2(const uint16_t* ptr, U16* r, U16* g) {
-        __m128i _01 = _mm_loadu_si128(((const __m128i*)ptr) + 0); // r0 g0 r1 g1 r2 g2 r3 g3
+        __m128i _01 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0); // r0 g0 r1 g1 r2 g2 r3 g3
         __m128i rg01_23 = _mm_shufflelo_epi16(_01, 0xD8);            // r0 r1 g0 g1 r2 g2 r3 g3
         __m128i rg      = _mm_shufflehi_epi16(rg01_23, 0xD8);        // r0 r1 g0 g1 r2 r3 g2 g3
 
@@ -1131,12 +1142,12 @@ namespace SK_OPTS_NS {
     }
     SI void store2(uint16_t* ptr, U16 r, U16 g) {
         __m128i rg = _mm_unpacklo_epi16(widen_cast<__m128i>(r), widen_cast<__m128i>(g));
-        _mm_storeu_si128((__m128i*)ptr + 0, rg);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 0, rg);
     }
 
     SI void load4(const uint16_t* ptr, U16* r, U16* g, U16* b, U16* a) {
-        __m128i _01 = _mm_loadu_si128(((const __m128i*)ptr) + 0), // r0 g0 b0 a0 r1 g1 b1 a1
-                _23 = _mm_loadu_si128(((const __m128i*)ptr) + 1); // r2 g2 b2 a2 r3 g3 b3 a3
+        __m128i _01 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 0), // r0 g0 b0 a0 r1 g1 b1 a1
+                _23 = _mm_loadu_si128((reinterpret_cast<const __m128i*>(ptr)) + 1); // r2 g2 b2 a2 r3 g3 b3 a3
 
         __m128i _02 = _mm_unpacklo_epi16(_01, _23),  // r0 r2 g0 g2 b0 b2 a0 a2
              _13 = _mm_unpackhi_epi16(_01, _23);  // r1 r3 g1 g3 b1 b3 a1 a3
@@ -1144,18 +1155,18 @@ namespace SK_OPTS_NS {
         __m128i rg = _mm_unpacklo_epi16(_02, _13),  // r0 r1 r2 r3 g0 g1 g2 g3
              ba = _mm_unpackhi_epi16(_02, _13);  // b0 b1 b2 b3 a0 a1 a2 a3
 
-        *r = sk_unaligned_load<U16>((uint16_t*)&rg + 0);
-        *g = sk_unaligned_load<U16>((uint16_t*)&rg + 4);
-        *b = sk_unaligned_load<U16>((uint16_t*)&ba + 0);
-        *a = sk_unaligned_load<U16>((uint16_t*)&ba + 4);
+        *r = sk_unaligned_load<U16>(reinterpret_cast<uint16_t*>(&rg) + 0);
+        *g = sk_unaligned_load<U16>(reinterpret_cast<uint16_t*>(&rg) + 4);
+        *b = sk_unaligned_load<U16>(reinterpret_cast<uint16_t*>(&ba) + 0);
+        *a = sk_unaligned_load<U16>(reinterpret_cast<uint16_t*>(&ba) + 4);
     }
 
     SI void store4(uint16_t* ptr, U16 r, U16 g, U16 b, U16 a) {
         __m128i rg = _mm_unpacklo_epi16(widen_cast<__m128i>(r), widen_cast<__m128i>(g)),
              ba = _mm_unpacklo_epi16(widen_cast<__m128i>(b), widen_cast<__m128i>(a));
 
-        _mm_storeu_si128((__m128i*)ptr + 0, _mm_unpacklo_epi32(rg, ba));
-        _mm_storeu_si128((__m128i*)ptr + 1, _mm_unpackhi_epi32(rg, ba));
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 0, _mm_unpacklo_epi32(rg, ba));
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(ptr) + 1, _mm_unpackhi_epi32(rg, ba));
     }
 
     SI void load4(const float* ptr, F* r, F* g, F* b, F* a) {
@@ -1609,15 +1620,15 @@ static constexpr F F0 = F_(0.0f),
 // (F)x means cast x to float in the portable path, but bit_cast x to float in the others.
 // These named casts and bit_cast() are always what they seem to be.
 #if defined(SKRP_CPU_SCALAR)
-    SI F   cast  (U32 v) { return   (F)v; }
-    SI F   cast64(U64 v) { return   (F)v; }
-    SI U32 trunc_(F   v) { return (U32)v; }
-    SI U32 expand(U16 v) { return (U32)v; }
-    SI U32 expand(U8  v) { return (U32)v; }
+    SI F   cast  (U32 v) { return   static_cast<F>(v); }
+    SI F   cast64(U64 v) { return   static_cast<F>(v); }
+    SI U32 trunc_(F   v) { return static_cast<U32>(v); }
+    SI U32 expand(U16 v) { return static_cast<U32>(v); }
+    SI U32 expand(U8  v) { return static_cast<U32>(v); }
 #else
-    SI F   cast  (U32 v) { return      __builtin_convertvector((I32)v,   F); }
+    SI F   cast  (U32 v) { return      __builtin_convertvector(bit_cast_lanes<I32>(v),   F); }
     SI F   cast64(U64 v) { return      __builtin_convertvector(     v,   F); }
-    SI U32 trunc_(F   v) { return (U32)__builtin_convertvector(     v, I32); }
+    SI U32 trunc_(F   v) { return bit_cast_lanes<U32>(__builtin_convertvector(     v, I32)); }
     SI U32 expand(U16 v) { return      __builtin_convertvector(     v, U32); }
     SI U32 expand(U8  v) { return      __builtin_convertvector(     v, U32); }
 #endif
@@ -1673,13 +1684,13 @@ SI F approx_powf(F x, float y) { return approx_powf(x, F_(y)); }
 
 SI F from_half(U16 h) {
 #if defined(SKRP_CPU_NEON) && defined(SK_CPU_ARM64)
-    return vcvt_f32_f16((float16x4_t)h);
+    return vcvt_f32_f16(bit_cast_lanes<float16x4_t>(h));
 
 #elif defined(SKRP_CPU_ML4)
-    return _mm512_cvtph_ps((__m256i)h);
+    return _mm512_cvtph_ps(bit_cast_lanes<__m256i>(h));
 
 #elif defined(SKRP_CPU_AVX2)
-    return _mm256_cvtph_ps((__m128i)h);
+    return _mm256_cvtph_ps(bit_cast_lanes<__m128i>(h));
 
 #else
     // Remember, a half is 1-5-10 (sign-exponent-mantissa) with 15 exponent bias.
@@ -1688,7 +1699,7 @@ SI F from_half(U16 h) {
          em = sem ^ s;
 
     // Convert to 1-8-23 float with 127 bias, flushing denorm halfs (including zero) to zero.
-    I32 denorm = (I32)em < 0x0400;      // I32 comparison is often quicker, and always safe here.
+    I32 denorm = bit_cast_lanes<I32>(em) < 0x0400;      // I32 comparison is often quicker, and always safe here.
     return if_then_else(denorm, F0
                               , sk_bit_cast<F>( (s<<16) + (em<<13) + ((127-15)<<23) ));
 #endif
@@ -1696,13 +1707,13 @@ SI F from_half(U16 h) {
 
 SI U16 to_half(F f) {
 #if defined(SKRP_CPU_NEON) && defined(SK_CPU_ARM64)
-    return (U16)vcvt_f16_f32(f);
+    return bit_cast_lanes<U16>(vcvt_f16_f32(f));
 
 #elif defined(SKRP_CPU_ML4)
-    return (U16)_mm512_cvtps_ph(f, _MM_FROUND_CUR_DIRECTION);
+    return bit_cast_lanes<U16>(_mm512_cvtps_ph(f, _MM_FROUND_CUR_DIRECTION));
 
 #elif defined(SKRP_CPU_AVX2)
-    return (U16)_mm256_cvtps_ph(f, _MM_FROUND_CUR_DIRECTION);
+    return bit_cast_lanes<U16>(_mm256_cvtps_ph(f, _MM_FROUND_CUR_DIRECTION));
 
 #else
     // Remember, a float is 1-8-23 (sign-exponent-mantissa) with 127 exponent bias.
@@ -1711,9 +1722,9 @@ SI U16 to_half(F f) {
          em = sem ^ s;
 
     // Convert to 1-5-10 half with 15 bias, flushing denorm halfs (including zero) to zero.
-    I32 denorm = (I32)em < 0x38800000;  // I32 comparison is often quicker, and always safe here.
-    return pack((U32)if_then_else(denorm, I32_(0)
-                                        , (I32)((s>>16) + (em>>13) - ((127-15)<<10))));
+    I32 denorm = bit_cast_lanes<I32>(em) < 0x38800000;  // I32 comparison is often quicker, and always safe here.
+    return pack(bit_cast_lanes<U32>(if_then_else(denorm, I32_(0)
+                                        , bit_cast_lanes<I32>(((s>>16) + (em>>13) - ((127-15)<<10))))));
 #endif
 }
 
@@ -2150,9 +2161,9 @@ SI U32 ix_and_ptr(T** ptr, const SkRasterPipelineContexts::GatherCtx* ctx, F x, 
     // produce a NaN if applied to +0.f.
     x = clamp_ex(x, (*ctx).width );
     y = clamp_ex(y, (*ctx).height);
-    x = sk_bit_cast<F>(sk_bit_cast<U32>(x) - (uint32_t)(*ctx).roundDownAtInteger);
-    y = sk_bit_cast<F>(sk_bit_cast<U32>(y) - (uint32_t)(*ctx).roundDownAtInteger);
-    *ptr = (const T*)(*ctx).pixels;
+    x = sk_bit_cast<F>(sk_bit_cast<U32>(x) - static_cast<uint32_t>((*ctx).roundDownAtInteger));
+    y = sk_bit_cast<F>(sk_bit_cast<U32>(y) - static_cast<uint32_t>((*ctx).roundDownAtInteger));
+    *ptr = static_cast<const T*>((*ctx).pixels);
     return trunc_(y)*(*ctx).stride + trunc_(x);
 }
 
@@ -2169,10 +2180,10 @@ SI U32 ix_and_ptr(T** ptr, const SkRasterPipelineContexts::GatherCtx* ctx, F x, 
 // by tweaking `maxI` relative to `scale`.
 SI U32 to_unorm(F v, float scale, float bias, int maxI) {
     // Any time we use round() we probably want to use to_unorm().
-    return round(min(max(0.0f, mad(v, scale, bias)), (float) maxI));
+    return round(min(max(0.0f, mad(v, scale, bias)), static_cast<float>( maxI)));
 }
 SI U32 to_unorm(F v, int scale) {
-    return to_unorm(v, (float) scale, /*bias=*/0.f, /*maxI=*/scale);
+    return to_unorm(v, static_cast<float>( scale), /*bias=*/0.f, /*maxI=*/scale);
 }
 
 SI I32 cond_to_mask(I32 cond) {
@@ -3328,7 +3339,7 @@ HIGHP_STAGE(load_f16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint64_t* ptr = ptr_at_xy<const uint64_t>(ctx, dx,dy);
 
     U16 R,G,B,A;
-    load4((const uint16_t*)ptr, &R,&G,&B,&A);
+    load4(reinterpret_cast<const uint16_t*>(ptr), &R,&G,&B,&A);
     r = from_half(R);
     g = from_half(G);
     b = from_half(B);
@@ -3338,7 +3349,7 @@ HIGHP_STAGE(load_f16_dst, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint64_t* ptr = ptr_at_xy<const uint64_t>(ctx, dx,dy);
 
     U16 R,G,B,A;
-    load4((const uint16_t*)ptr, &R,&G,&B,&A);
+    load4(reinterpret_cast<const uint16_t*>(ptr), &R,&G,&B,&A);
     dr = from_half(R);
     dg = from_half(G);
     db = from_half(B);
@@ -3350,7 +3361,7 @@ HIGHP_STAGE(gather_f16, const SkRasterPipelineContexts::GatherCtx* ctx) {
     U64 px = gather_unaligned(ptr, ix);
 
     U16 R,G,B,A;
-    load4((const uint16_t*)&px, &R,&G,&B,&A);
+    load4(reinterpret_cast<const uint16_t*>(&px), &R,&G,&B,&A);
     r = from_half(R);
     g = from_half(G);
     b = from_half(B);
@@ -3358,7 +3369,7 @@ HIGHP_STAGE(gather_f16, const SkRasterPipelineContexts::GatherCtx* ctx) {
 }
 HIGHP_STAGE(store_f16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     uint64_t* ptr = ptr_at_xy<uint64_t>(ctx, dx,dy);
-    store4((uint16_t*)ptr, to_half(r)
+    store4(reinterpret_cast<uint16_t*>(ptr), to_half(r)
                          , to_half(g)
                          , to_half(b)
                          , to_half(a));
@@ -3367,7 +3378,7 @@ HIGHP_STAGE(store_f16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(load_af16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint16_t* ptr = ptr_at_xy<const uint16_t>(ctx, dx,dy);
 
-    U16 A = load<U16>((const uint16_t*)ptr);
+    U16 A = load<U16>(static_cast<const uint16_t*>(ptr));
     r = F0;
     g = F0;
     b = F0;
@@ -3376,7 +3387,7 @@ HIGHP_STAGE(load_af16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(load_af16_dst, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint16_t* ptr = ptr_at_xy<const uint16_t>(ctx, dx, dy);
 
-    U16 A = load<U16>((const uint16_t*)ptr);
+    U16 A = load<U16>(static_cast<const uint16_t*>(ptr));
     dr = dg = db = F0;
     da = from_half(A);
 }
@@ -3394,7 +3405,7 @@ HIGHP_STAGE(store_af16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(load_rf16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint16_t* ptr = ptr_at_xy<const uint16_t>(ctx, dx,dy);
 
-    U16 R = load<U16>((const uint16_t*)ptr);
+    U16 R = load<U16>(static_cast<const uint16_t*>(ptr));
     r = from_half(R);
     g = b = F0;
     a = F1;
@@ -3402,7 +3413,7 @@ HIGHP_STAGE(load_rf16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
 HIGHP_STAGE(load_rf16_dst, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint16_t* ptr = ptr_at_xy<const uint16_t>(ctx, dx, dy);
 
-    U16 R = load<U16>((const uint16_t*)ptr);
+    U16 R = load<U16>(static_cast<const uint16_t*>(ptr));
     dr = from_half(R);
     dg = db = F0;
     da = F1;
@@ -3423,7 +3434,7 @@ HIGHP_STAGE(load_rgf16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint32_t* ptr = ptr_at_xy<const uint32_t>(ctx, dx, dy);
 
     U16 R,G;
-    load2((const uint16_t*)ptr, &R, &G);
+    load2(reinterpret_cast<const uint16_t*>(ptr), &R, &G);
     r = from_half(R);
     g = from_half(G);
     b = F0;
@@ -3433,7 +3444,7 @@ HIGHP_STAGE(load_rgf16_dst, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     const uint32_t* ptr = ptr_at_xy<const uint32_t>(ctx, dx, dy);
 
     U16 R,G;
-    load2((const uint16_t*)ptr, &R, &G);
+    load2(reinterpret_cast<const uint16_t*>(ptr), &R, &G);
     dr = from_half(R);
     dg = from_half(G);
     db = F0;
@@ -3445,7 +3456,7 @@ HIGHP_STAGE(gather_rgf16, const SkRasterPipelineContexts::GatherCtx* ctx) {
     U32 px = gather_unaligned(ptr, ix);
 
     U16 R,G;
-    load2((const uint16_t*)&px, &R, &G);
+    load2(reinterpret_cast<const uint16_t*>(&px), &R, &G);
     r = from_half(R);
     g = from_half(G);
     b = F0;
@@ -3453,7 +3464,7 @@ HIGHP_STAGE(gather_rgf16, const SkRasterPipelineContexts::GatherCtx* ctx) {
 }
 HIGHP_STAGE(store_rgf16, const SkRasterPipelineContexts::MemoryCtx* ctx) {
     uint32_t* ptr = ptr_at_xy<uint32_t>(ctx, dx, dy);
-    store2((uint16_t*)ptr, to_half(r)
+    store2(reinterpret_cast<uint16_t*>(ptr), to_half(r)
                          , to_half(g));
 }
 
@@ -3646,14 +3657,14 @@ SI void gradient_lookup(const SkRasterPipelineContexts::GradientCtx* c, U32 idx,
     F fr, br, fg, bg, fb, bb, fa, ba;
 #if defined(SKRP_CPU_AVX2)
     if ((*c).stopCount <=8) {
-        fr = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[0]), (__m256i)idx);
-        br = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).biases[0]), (__m256i)idx);
-        fg = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[1]), (__m256i)idx);
-        bg = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).biases[1]), (__m256i)idx);
-        fb = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[2]), (__m256i)idx);
-        bb = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).biases[2]), (__m256i)idx);
-        fa = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[3]), (__m256i)idx);
-        ba = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).biases[3]), (__m256i)idx);
+        fr = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[0]), bit_cast_lanes<__m256i>(idx));
+        br = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).biases[0]), bit_cast_lanes<__m256i>(idx));
+        fg = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[1]), bit_cast_lanes<__m256i>(idx));
+        bg = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).biases[1]), bit_cast_lanes<__m256i>(idx));
+        fb = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[2]), bit_cast_lanes<__m256i>(idx));
+        bb = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).biases[2]), bit_cast_lanes<__m256i>(idx));
+        fa = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).factors[3]), bit_cast_lanes<__m256i>(idx));
+        ba = _mm256_permutevar8x32_ps(_mm256_loadu_ps((*c).biases[3]), bit_cast_lanes<__m256i>(idx));
     } else
 #elif defined(SKRP_CPU_LASX)
     if ((*c).stopCount <= 8) {
@@ -3724,7 +3735,7 @@ HIGHP_STAGE(gradient, const SkRasterPipelineContexts::GradientCtx* c) {
 
     // N.B. The loop starts at 1 because idx 0 is the color to use before the first stop.
     for (size_t i = 1; i < (*c).stopCount; i++) {
-        idx += (U32)if_then_else(t >= (*c).ts[i], I32_(1), I32_(0));
+        idx += bit_cast_lanes<U32>(if_then_else(t >= (*c).ts[i], I32_(1), I32_(0)));
     }
 
     gradient_lookup(c, idx, t, &r, &g, &b, &a);
@@ -4007,15 +4018,15 @@ HIGHP_STAGE(perlin_noise, SkRasterPipelineContexts::PerlinNoiseCtx* ctx) {
                                        sk_bit_cast<I32>(stitchDataY));
         }
 
-        U32 latticeLookup = (U32)(iround(floorValX)) & 0xFF;
+        U32 latticeLookup = bit_cast_lanes<U32>((iround(floorValX))) & 0xFF;
         F latticeIdxX = cast(expand(gather((*ctx).latticeSelector, latticeLookup)));
-        latticeLookup = (U32)(iround(ceilValX)) & 0xFF;
+        latticeLookup = bit_cast_lanes<U32>((iround(ceilValX))) & 0xFF;
         F latticeIdxY = cast(expand(gather((*ctx).latticeSelector, latticeLookup)));
 
-        U32 b00 = (U32)(iround(latticeIdxX + floorValY)) & 0xFF;
-        U32 b10 = (U32)(iround(latticeIdxY + floorValY)) & 0xFF;
-        U32 b01 = (U32)(iround(latticeIdxX + ceilValY)) & 0xFF;
-        U32 b11 = (U32)(iround(latticeIdxY + ceilValY)) & 0xFF;
+        U32 b00 = bit_cast_lanes<U32>((iround(latticeIdxX + floorValY))) & 0xFF;
+        U32 b10 = bit_cast_lanes<U32>((iround(latticeIdxY + floorValY))) & 0xFF;
+        U32 b01 = bit_cast_lanes<U32>((iround(latticeIdxX + ceilValY))) & 0xFF;
+        U32 b11 = bit_cast_lanes<U32>((iround(latticeIdxY + ceilValY))) & 0xFF;
 
         // Calculate noise colors. (Roughly $noise_function in Graphite)
         // Apply Hermite interpolation to the fractional value.
@@ -4525,15 +4536,15 @@ SI D cast(S src) {
 template <typename D, typename S>
 SI void split(S v, D* lo, D* hi) {
     static_assert(2*sizeof(D) == sizeof(S), "");
-    memcpy(lo, (const char*)&v + 0*sizeof(D), sizeof(D));
-    memcpy(hi, (const char*)&v + 1*sizeof(D), sizeof(D));
+    memcpy(lo, reinterpret_cast<const char*>(&v) + 0*sizeof(D), sizeof(D));
+    memcpy(hi, reinterpret_cast<const char*>(&v) + 1*sizeof(D), sizeof(D));
 }
 template <typename D, typename S>
 SI D join(S lo, S hi) {
     static_assert(sizeof(D) == 2*sizeof(S), "");
     D v;
-    memcpy((char*)&v + 0*sizeof(S), &lo, sizeof(S));
-    memcpy((char*)&v + 1*sizeof(S), &hi, sizeof(S));
+    memcpy(reinterpret_cast<char*>(&v) + 0*sizeof(S), &lo, sizeof(S));
+    memcpy(reinterpret_cast<char*>(&v) + 1*sizeof(S), &hi, sizeof(S));
     return v;
 }
 
@@ -4564,15 +4575,15 @@ SI U16 min(U16 x, U16 y) { return if_then_else(x < y, x, y); }
 #if defined(SKRP_CPU_ML4)
 // This helps split the broadcast (copying the float to all lanes of the register)
 // from the min/max operation which helps free up ports.
-SI F max(F     a, float b) { return max(a, (F)_mm512_set1_ps(b)); }
-SI F max(float a, F b) { return max((F)_mm512_set1_ps(a), b); }
-SI F min(F     a, float b) { return min(a, (F)_mm512_set1_ps(b)); }
-SI F min(float a, F b) { return min((F)_mm512_set1_ps(a), b); }
+SI F max(F     a, float b) { return max(a, bit_cast_lanes<F>(_mm512_set1_ps(b))); }
+SI F max(float a, F b) { return max(bit_cast_lanes<F>(_mm512_set1_ps(a)), b); }
+SI F min(F     a, float b) { return min(a, bit_cast_lanes<F>(_mm512_set1_ps(b))); }
+SI F min(float a, F b) { return min(bit_cast_lanes<F>(_mm512_set1_ps(a)), b); }
 
-SI I32 max(I32     a, int32_t b) { return max(a, (I32)_mm512_set1_epi32(b)); }
-SI I32 max(int32_t a, I32     b) { return max((I32)_mm512_set1_epi32(a), b); }
-SI I32 min(I32     a, int32_t b) { return min(a, (I32)_mm512_set1_epi32(b)); }
-SI I32 min(int32_t a, I32     b) { return min((I32)_mm512_set1_epi32(a), b); }
+SI I32 max(I32     a, int32_t b) { return max(a, bit_cast_lanes<I32>(_mm512_set1_epi32(b))); }
+SI I32 max(int32_t a, I32     b) { return max(bit_cast_lanes<I32>(_mm512_set1_epi32(a)), b); }
+SI I32 min(I32     a, int32_t b) { return min(a, bit_cast_lanes<I32>(_mm512_set1_epi32(b))); }
+SI I32 min(int32_t a, I32     b) { return min(bit_cast_lanes<I32>(_mm512_set1_epi32(a)), b); }
 #else
 SI F max(F a, float b) { return max(a, F_(b)); }
 SI F max(float a, F b) { return max(F_(a), b); }
@@ -4597,10 +4608,10 @@ SI U16 min(uint16_t a, U16      b) { return min(U16_(a),      b ); }
 #if defined(SKRP_CPU_ML4)
 SI F max_intr(F x, F y) { return _mm512_max_ps(x, y); }
 SI F min_intr(F x, F y) { return _mm512_min_ps(x, y); }
-SI I32 max_intr(I32 x, I32 y) { return (I32)_mm512_max_epi32((__m512i)x, (__m512i)y); }
-SI I32 min_intr(I32 x, I32 y) { return (I32)_mm512_min_epi32((__m512i)x, (__m512i)y); }
-SI U16 max_intr(U16 x, U16 y) { return (U16)_mm256_max_epu16((__m256i)x, (__m256i)y); }
-SI U16 min_intr(U16 x, U16 y) { return (U16)_mm256_min_epu16((__m256i)x, (__m256i)y); }
+SI I32 max_intr(I32 x, I32 y) { return bit_cast_lanes<I32>(_mm512_max_epi32(bit_cast_lanes<__m512i>(x), bit_cast_lanes<__m512i>(y))); }
+SI I32 min_intr(I32 x, I32 y) { return bit_cast_lanes<I32>(_mm512_min_epi32(bit_cast_lanes<__m512i>(x), bit_cast_lanes<__m512i>(y))); }
+SI U16 max_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm256_max_epu16(bit_cast_lanes<__m256i>(x), bit_cast_lanes<__m256i>(y))); }
+SI U16 min_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm256_min_epu16(bit_cast_lanes<__m256i>(x), bit_cast_lanes<__m256i>(y))); }
 #elif defined(SKRP_CPU_AVX2)
 SI F max_intr(F x, F y) {
     __m256 x_lo, x_hi, y_lo, y_hi;
@@ -4626,8 +4637,8 @@ SI I32 min_intr(I32 x, I32 y) {
     split(y, &y_lo, &y_hi);
     return join<I32>(_mm256_min_epi32(x_lo, y_lo), _mm256_min_epi32(x_hi, y_hi));
 }
-SI U16 max_intr(U16 x, U16 y) { return (U16)_mm256_max_epu16((__m256i)x, (__m256i)y); }
-SI U16 min_intr(U16 x, U16 y) { return (U16)_mm256_min_epu16((__m256i)x, (__m256i)y); }
+SI U16 max_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm256_max_epu16(bit_cast_lanes<__m256i>(x), bit_cast_lanes<__m256i>(y))); }
+SI U16 min_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm256_min_epu16(bit_cast_lanes<__m256i>(x), bit_cast_lanes<__m256i>(y))); }
 #elif defined(SKRP_CPU_SSE2) || defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
 SI F max_intr(F x, F y) {
     __m128 x_lo, x_hi, y_lo, y_hi;
@@ -4654,8 +4665,8 @@ SI I32 min_intr(I32 x, I32 y) {
     split(y, &y_lo, &y_hi);
     return join<I32>(_mm_min_epi32(x_lo, y_lo), _mm_min_epi32(x_hi, y_hi));
 }
-SI U16 max_intr(U16 x, U16 y) { return (U16)_mm_max_epu16((__m128i)x, (__m128i)y); }
-SI U16 min_intr(U16 x, U16 y) { return (U16)_mm_min_epu16((__m128i)x, (__m128i)y); }
+SI U16 max_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm_max_epu16(bit_cast_lanes<__m128i>(x), bit_cast_lanes<__m128i>(y))); }
+SI U16 min_intr(U16 x, U16 y) { return bit_cast_lanes<U16>(_mm_min_epu16(bit_cast_lanes<__m128i>(x), bit_cast_lanes<__m128i>(y))); }
 #else
 SI I32 max_intr(I32 x, I32 y) { return max(x, y); }
 SI I32 min_intr(I32 x, I32 y) { return min(x, y); }
@@ -4675,15 +4686,15 @@ SI U16 min_intr(U16 x, U16 y) { return min(x, y); }
 #if defined(SKRP_CPU_ML4)
 // This helps split the broadcast (copying the float to all lanes of the register)
 // from the min/max operation which helps free up ports.
-SI F max_intr(F     a, float b) { return max_intr(a, (F)_mm512_set1_ps(b)); }
-SI F max_intr(float a, F b) { return max_intr((F)_mm512_set1_ps(a), b); }
-SI F min_intr(F     a, float b) { return min_intr(a, (F)_mm512_set1_ps(b)); }
-SI F min_intr(float a, F b) { return min_intr((F)_mm512_set1_ps(a), b); }
+SI F max_intr(F     a, float b) { return max_intr(a, bit_cast_lanes<F>(_mm512_set1_ps(b))); }
+SI F max_intr(float a, F b) { return max_intr(bit_cast_lanes<F>(_mm512_set1_ps(a)), b); }
+SI F min_intr(F     a, float b) { return min_intr(a, bit_cast_lanes<F>(_mm512_set1_ps(b))); }
+SI F min_intr(float a, F b) { return min_intr(bit_cast_lanes<F>(_mm512_set1_ps(a)), b); }
 
-SI I32 max_intr(I32     a, int32_t b) { return max_intr(a, (I32)_mm512_set1_epi32(b)); }
-SI I32 max_intr(int32_t a, I32     b) { return max_intr((I32)_mm512_set1_epi32(a), b); }
-SI I32 min_intr(I32     a, int32_t b) { return min_intr(a, (I32)_mm512_set1_epi32(b)); }
-SI I32 min_intr(int32_t a, I32     b) { return min_intr((I32)_mm512_set1_epi32(a), b); }
+SI I32 max_intr(I32     a, int32_t b) { return max_intr(a, bit_cast_lanes<I32>(_mm512_set1_epi32(b))); }
+SI I32 max_intr(int32_t a, I32     b) { return max_intr(bit_cast_lanes<I32>(_mm512_set1_epi32(a)), b); }
+SI I32 min_intr(I32     a, int32_t b) { return min_intr(a, bit_cast_lanes<I32>(_mm512_set1_epi32(b))); }
+SI I32 min_intr(int32_t a, I32     b) { return min_intr(bit_cast_lanes<I32>(_mm512_set1_epi32(a)), b); }
 #else
 SI F max_intr(F a, float b) { return max_intr(a, F_(b)); }
 SI F max_intr(float a, F b) { return max_intr(F_(a), b); }
@@ -4717,7 +4728,7 @@ SI F nmad(float f, F     m, F     a) { return nmad(F_(f),    m ,    a ); }
 SI F nmad(float f, F     m, float a) { return nmad(F_(f),    m , F_(a)); }
 SI F nmad(float f, float m, F     a) { return nmad(F_(f), F_(m),    a ); }
 
-SI U32 trunc_(F x) { return (U32)cast<I32>(x); }
+SI U32 trunc_(F x) { return bit_cast_lanes<U32>(cast<I32>(x)); }
 
 // Use approximate instructions and one Newton-Raphson step to calculate 1/x.
 SI F rcp_precise(F x) {
@@ -4825,11 +4836,11 @@ SI F floor_(F x) {
 // Note: on neon this is a saturating multiply while the others are not.
 SI I16 scaled_mult(I16 a, I16 b) {
 #if defined(SKRP_CPU_ML4)
-    return (I16)_mm256_mulhrs_epi16((__m256i)a, (__m256i)b);
+    return bit_cast_lanes<I16>(_mm256_mulhrs_epi16(bit_cast_lanes<__m256i>(a), bit_cast_lanes<__m256i>(b)));
 #elif defined(SKRP_CPU_AVX2)
-    return (I16)_mm256_mulhrs_epi16((__m256i)a, (__m256i)b);
+    return bit_cast_lanes<I16>(_mm256_mulhrs_epi16(bit_cast_lanes<__m256i>(a), bit_cast_lanes<__m256i>(b)));
 #elif defined(SKRP_CPU_SSE41) || defined(SKRP_CPU_AVX)
-    return (I16)_mm_mulhrs_epi16((__m128i)a, (__m128i)b);
+    return bit_cast_lanes<I16>(_mm_mulhrs_epi16(bit_cast_lanes<__m128i>(a), bit_cast_lanes<__m128i>(b)));
 #elif defined(SK_CPU_ARM64)
     return vqrdmulhq_s16(a, b);
 #elif defined(SKRP_CPU_NEON)
@@ -5083,7 +5094,7 @@ LOWP_STAGE_PP(swap_src_dst, NoCtx) {
 
 template <typename T>
 SI T* ptr_at_xy(const SkRasterPipelineContexts::MemoryCtx* ctx, const size_t dx, const size_t dy) {
-    return (T*)(*ctx).pixels + dy*(*ctx).stride + dx;
+    return static_cast<T*>((*ctx).pixels) + dy*(*ctx).stride + dx;
 }
 
 template <typename T>
@@ -5097,10 +5108,10 @@ SI U32 ix_and_ptr(T** ptr, const SkRasterPipelineContexts::GatherCtx* ctx, F x, 
     x = min_intr(max_intr(z, x), w);
     y = min_intr(max_intr(z, y), h);
 
-    x = sk_bit_cast<F>(sk_bit_cast<U32>(x) - (uint32_t)(*ctx).roundDownAtInteger);
-    y = sk_bit_cast<F>(sk_bit_cast<U32>(y) - (uint32_t)(*ctx).roundDownAtInteger);
+    x = sk_bit_cast<F>(sk_bit_cast<U32>(x) - static_cast<uint32_t>((*ctx).roundDownAtInteger));
+    y = sk_bit_cast<F>(sk_bit_cast<U32>(y) - static_cast<uint32_t>((*ctx).roundDownAtInteger));
 
-    *ptr = (const T*)(*ctx).pixels;
+    *ptr = static_cast<const T*>((*ctx).pixels);
     return trunc_(y)*(*ctx).stride + trunc_(x);
 }
 
@@ -5115,7 +5126,7 @@ SI U32 ix_and_ptr(T** ptr, const SkRasterPipelineContexts::GatherCtx* ctx, I32 x
     U32 ax = cast<U32>(min_intr(max_intr(0, x), w)),
         ay = cast<U32>(min_intr(max_intr(0, y), h));
 
-    *ptr = (const T*)(*ctx).pixels;
+    *ptr = static_cast<const T*>((*ctx).pixels);
     return ay * (*ctx).stride + ax;
 }
 
@@ -5141,12 +5152,12 @@ SI void store(T* ptr, V v) {
 
     template<>
     F gather(const float* ptr, U32 ix) {
-        return _mm512_i32gather_ps((__m512i)ix, ptr, 4);
+        return _mm512_i32gather_ps(bit_cast_lanes<__m512i>(ix), ptr, 4);
     }
 
     template<>
     U32 gather(const uint32_t* ptr, U32 ix) {
-        return (U32)_mm512_i32gather_epi32((__m512i)ix, ptr, 4);
+        return bit_cast_lanes<U32>(_mm512_i32gather_epi32(bit_cast_lanes<__m512i>(ix), ptr, 4));
     }
 
     template <typename V, typename T>
@@ -5176,8 +5187,8 @@ SI void store(T* ptr, V v) {
         __m256i lo, hi;
         split(ix, &lo, &hi);
 
-        return join<U32>(_mm256_i32gather_epi32((const int*)ptr, lo, 4),
-                         _mm256_i32gather_epi32((const int*)ptr, hi, 4));
+        return join<U32>(_mm256_i32gather_epi32(reinterpret_cast<const int*>(ptr), lo, 4),
+                         _mm256_i32gather_epi32(reinterpret_cast<const int*>(ptr), hi, 4));
     }
 
     template <typename V, typename T>
@@ -5239,7 +5250,7 @@ SI void store(T* ptr, V v) {
     SI U16 from_8888_cast_U16(U32 v) {
         __m256i _02,_13;
         split(v, &_02,&_13);
-        return (U16)_mm256_packus_epi32(_02,_13);
+        return bit_cast_lanes<U16>(_mm256_packus_epi32(_02,_13));
     }
 #elif defined(SKRP_CPU_LASX)
     SI U16 from_8888_cast_U16(U32 v) {
@@ -5259,9 +5270,9 @@ SI void from_8888(U32 rgba, U16* r, U16* g, U16* b, U16* a) {
 #if defined(SKRP_CPU_ML4)
     // Turns [0xAABBGGRR, 0xAABBGGRR, 0xAABBGGRR, ... 13 more times] to
     //       [0xGGRR, 0xGGRR, 0xGGRR, ...]
-    U16 rg = (U16)_mm512_cvtepi32_epi16((__m512i)rgba);
+    U16 rg = bit_cast_lanes<U16>(_mm512_cvtepi32_epi16(bit_cast_lanes<__m512i>(rgba)));
     // and   [0xAABB, 0xAABB, 0xAABB, ...]
-    U16 ba = (U16)_mm512_cvtepi32_epi16(_mm512_srli_epi32((__m512i)rgba, 16));
+    U16 ba = bit_cast_lanes<U16>(_mm512_cvtepi32_epi16(_mm512_srli_epi32(bit_cast_lanes<__m512i>(rgba), 16)));
     *r = rg & 255;
     *g = rg >> 8;
     *b = ba & 255;
@@ -5303,7 +5314,7 @@ SI void from_8888(U32 rgba, U16* r, U16* g, U16* b, U16* a) {
 
 SI void load_8888_(const uint32_t* ptr, U16* r, U16* g, U16* b, U16* a) {
 #if defined(SKRP_CPU_NEON)
-    uint8x8x4_t rgba = vld4_u8((const uint8_t*)(ptr));
+    uint8x8x4_t rgba = vld4_u8(reinterpret_cast<const uint8_t*>((ptr)));
     *r = cast<U16>(rgba.val[0]);
     *g = cast<U16>(rgba.val[1]);
     *b = cast<U16>(rgba.val[2]);
@@ -5349,7 +5360,7 @@ SI void store_8888_(uint32_t* ptr, U16 r, U16 g, U16 b, U16 a) {
         cast<U8>(b),
         cast<U8>(a),
     }};
-    vst4_u8((uint8_t*)(ptr), rgba);
+    vst4_u8(reinterpret_cast<uint8_t*>((ptr)), rgba);
 #else
     store(ptr, cast<U32>(r | (g<<8)) <<  0
              | cast<U32>(b | (a<<8)) << 16);
@@ -5479,7 +5490,7 @@ SI void from_88(U16 rg, U16* r, U16* g) {
 
 SI void load_88_(const uint16_t* ptr, U16* r, U16* g) {
 #if defined(SKRP_CPU_NEON)
-    uint8x8x2_t rg = vld2_u8((const uint8_t*)(ptr));
+    uint8x8x2_t rg = vld2_u8(reinterpret_cast<const uint8_t*>((ptr)));
     *r = cast<U16>(rg.val[0]);
     *g = cast<U16>(rg.val[1]);
 #else
@@ -5496,7 +5507,7 @@ SI void store_88_(uint16_t* ptr, U16 r, U16 g) {
         cast<U8>(r),
         cast<U8>(g),
     }};
-    vst2_u8((uint8_t*)(ptr), rg);
+    vst2_u8(reinterpret_cast<uint8_t*>((ptr)), rg);
 #else
     store(ptr, cast<U16>(r | (g<<8)) <<  0);
 #endif
@@ -5879,7 +5890,7 @@ LOWP_STAGE_GP(evenly_spaced_2_stop_gradient,
 //         2^-8 * v = 2^-9 * (tx*(R - L) + (R + L))
 //                v = 1/2 * (tx*(R - L) + (R + L))
 static inline U16 bilerp_lerp_x(U16 left, U16 right, I16 tx) {
-    I16 width  = (I16)(right - left) << 7;
+    I16 width  = bit_cast_lanes<I16>((right - left)) << 7;
     U16 middle = (right + left) << 7;
     // The constrained_add is the most subtle part of lerp. The first term is on the interval
     // [-1, 1), and the second term is on the interval is on the interval [0, 1) because
@@ -5898,7 +5909,7 @@ static inline U16 bilerp_lerp_x(U16 left, U16 right, I16 tx) {
 // bilerp_lerp_y plays the same mathematical tricks as bilerp_lerp_x, but the final divide is by
 // 256 resulting in a value on [0, 255].
 static inline U16 bilerp_lerp_y(U16 top, U16 bottom, I16 ty) {
-    I16 width  = (I16)bottom - (I16)top;
+    I16 width  = bit_cast_lanes<I16>(bottom) - bit_cast_lanes<I16>(top);
     U16 middle = bottom + top;
     // Add + 0x80 for rounding.
     U16 blend  = constrained_add(scaled_mult(ty, width), middle) + 0x80;
