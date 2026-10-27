@@ -6,8 +6,9 @@
 // stealHeapBlocks, reset, resetScratchSpace, metadata, owningBlock and findOwningBlock. After
 // each step the corpus records the offsets returned, the block count and every block's
 // available bytes and metadata, the current block's index, and the size totals. Addresses are
-// never recorded, and alignments stay within the allocator's address alignment so that offsets
-// do not depend on where the heap places a block.
+// never recorded. Alignments stay at 8 or below, within the allocator's address alignment on
+// every target (alignof(std::max_align_t) is 8 on Apple arm64, MSVC and wasm), so that offsets
+// do not depend on where the stack or heap places a block.
 //
 // Block list: seeded sequences of push_back (default, copy, move), emplace_back, pop_back,
 // reserve, reset, item, front, back and concat (with equal and different starting sizes), on
@@ -61,7 +62,7 @@ void record_allocator(Output& output, const SkBlockAllocator& allocator) {
     int blocks = 0;
     for (const Block* block : allocator.blocks()) {
         append(output, static_cast<int32_t>((*block).avail()));
-        append(output, static_cast<int32_t>((*block).avail<16>()));
+        append(output, static_cast<int32_t>((*block).avail<8>()));
         append(output, static_cast<int32_t>((*block).metadata()));
         append(output, static_cast<int32_t>((*block).firstAlignedOffset<8, 4>()));
         ++blocks;
@@ -111,9 +112,9 @@ Held allocate_kind(SkBlockAllocator& allocator, int kind, size_t size) {
         case 0: return allocate_with<1, 0>(allocator, size);
         case 1: return allocate_with<4, 0>(allocator, size);
         case 2: return allocate_with<8, 0>(allocator, size);
-        case 3: return allocate_with<16, 0>(allocator, size);
+        case 3: return allocate_with<2, 0>(allocator, size);
         case 4: return allocate_with<4, 4>(allocator, size);
-        default: return allocate_with<16, 8>(allocator, size);
+        default: return allocate_with<8, 8>(allocator, size);
     }
 }
 
@@ -126,13 +127,13 @@ const Block* owner_with(SkBlockAllocator& allocator, const Held& held) {
 
 const Block* owner_of(SkBlockAllocator& allocator, const Held& held) {
     if (held.alignment == 1) return owner_with<1, 0>(allocator, held);
-    if (held.alignment == 8) return owner_with<8, 0>(allocator, held);
+    if (held.alignment == 2) return owner_with<2, 0>(allocator, held);
     if (held.alignment == 4) {
         if (held.padding == 4) return owner_with<4, 4>(allocator, held);
         return owner_with<4, 0>(allocator, held);
     }
-    if (held.padding == 8) return owner_with<16, 8>(allocator, held);
-    return owner_with<16, 0>(allocator, held);
+    if (held.padding == 8) return owner_with<8, 8>(allocator, held);
+    return owner_with<8, 0>(allocator, held);
 }
 
 void reserve_kind(SkBlockAllocator& allocator, int kind, size_t size,
@@ -140,7 +141,7 @@ void reserve_kind(SkBlockAllocator& allocator, int kind, size_t size,
     switch (kind) {
         case 0: allocator.reserve<1>(size, flags); break;
         case 1: allocator.reserve<8>(size, flags); break;
-        default: allocator.reserve<16, 8>(size, flags); break;
+        default: allocator.reserve<8, 8>(size, flags); break;
     }
 }
 
@@ -332,9 +333,9 @@ void allocator_cases(Output& output) {
     }
     // The overhead helpers are compile-time sizes that both builds must agree on.
     append(output, static_cast<uint64_t>(SkBlockAllocator::BlockOverhead<1, 0>()));
-    append(output, static_cast<uint64_t>(SkBlockAllocator::BlockOverhead<16, 8>()));
+    append(output, static_cast<uint64_t>(SkBlockAllocator::BlockOverhead<8, 8>()));
     append(output, static_cast<uint64_t>(SkBlockAllocator::Overhead<1, 0>()));
-    append(output, static_cast<uint64_t>(SkBlockAllocator::Overhead<16, 8>()));
+    append(output, static_cast<uint64_t>(SkBlockAllocator::Overhead<8, 8>()));
     ++output.cases;
 }
 
