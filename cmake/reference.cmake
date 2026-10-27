@@ -495,3 +495,9 @@ foreach(unit IN ITEMS SkEdge SkAnalyticEdge SkEdgeBuilder)
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
+
+# Scan entry points, the non-anti-aliased path filler and hairlines before conversion.
+foreach(unit IN ITEMS SkScan SkScan_Path SkScan_Hairline)
+    list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
+    list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
+endforeach()

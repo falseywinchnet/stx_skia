@@ -25,6 +25,7 @@
 #include "src/core/SkLineClipper.h"
 #include "src/core/SkMathPriv.h"
 #include "src/core/SkPathPriv.h"
+#include "src/core/SkPointPriv.h"
 #include "src/core/SkRasterClip.h"
 #include "src/core/SkScan.h"
 #include "src/core/SkUtils.h"
@@ -33,69 +34,101 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <optional>
 
-#define DISPATCH_LOOP()                                     \
-    const auto pm = direct->pm;                             \
-    const auto value = direct->value;                       \
-    switch (pm.info().bytesPerPixel()) {                    \
-        case 1: DIRECT_BLIT_LOOP(writable_addr8); break;    \
-        case 2: DIRECT_BLIT_LOOP(writable_addr16); break;   \
-        case 4: DIRECT_BLIT_LOOP(writable_addr32); break;   \
-        case 8: DIRECT_BLIT_LOOP(writable_addr64); break;   \
+// Address of pixel (x, y) in a pixmap whose pixels are T.
+template <typename T>
+static T* pixel_address(const SkPixmap& pm, int x, int y) {
+    T* address = nullptr;
+    if constexpr (sizeof(T) == 1) {
+        address = pm.writable_addr8(x, y);
+    } else if constexpr (sizeof(T) == 2) {
+        address = pm.writable_addr16(x, y);
+    } else if constexpr (sizeof(T) == 4) {
+        address = pm.writable_addr32(x, y);
+    } else {
+        address = pm.writable_addr64(x, y);
     }
+    return address;
+}
 
-#define DIRECT_BLIT_LOOP(writable_proc)         \
-    do {                                        \
-        *pm.writable_proc(x, fy >> 16) = value; \
-        fy += dy;                               \
-    } while (++x < stopx)
+// Writes value at (x, fy >> 16) for x in [x, stopx), stepping fy by dy.
+template <typename T>
+static void direct_horiline(const SkPixmap& pm, uint64_t value, int x, int stopx, SkFixed fy,
+                            SkFixed dy) {
+    const T pixel = static_cast<T>(value);
+    do {
+        *pixel_address<T>(pm, x, fy >> 16) = pixel;
+        fy += dy;
+    } while (++x < stopx);
+}
+
+// Writes value at (fx >> 16, y) for y in [y, stopy), stepping fx by dx.
+template <typename T>
+static void direct_vertline(const SkPixmap& pm, uint64_t value, int y, int stopy, SkFixed fx,
+                            SkFixed dx) {
+    const T pixel = static_cast<T>(value);
+    do {
+        *pixel_address<T>(pm, fx >> 16, y) = pixel;
+        fx += dx;
+    } while (++y < stopy);
+}
 
 static void horiline(int x, int stopx, SkFixed fy, SkFixed dy,
                      SkBlitter* blitter) {
     SkASSERT(x < stopx);
 
-    if (auto direct = blitter->canDirectBlit()) {
-        DISPATCH_LOOP()
+    const std::optional<SkBlitter::DirectBlit> direct = (*blitter).canDirectBlit();
+    if (direct.has_value()) {
+        const SkPixmap& pm = direct.value().pm;
+        const uint64_t value = direct.value().value;
+        // Other pixel sizes are never offered for direct blits.
+        switch (pm.info().bytesPerPixel()) {
+            case 1: direct_horiline<uint8_t>(pm, value, x, stopx, fy, dy); break;
+            case 2: direct_horiline<uint16_t>(pm, value, x, stopx, fy, dy); break;
+            case 4: direct_horiline<uint32_t>(pm, value, x, stopx, fy, dy); break;
+            case 8: direct_horiline<uint64_t>(pm, value, x, stopx, fy, dy); break;
+            default: break;
+        }
     } else {
         do {
-            blitter->blitH(x, fy >> 16, 1);
+            (*blitter).blitH(x, fy >> 16, 1);
             fy += dy;
         } while (++x < stopx);
     }
 }
 
-#undef DIRECT_BLIT_LOOP
-#define DIRECT_BLIT_LOOP(writable_proc)         \
-    do {                                        \
-        *pm.writable_proc(fx >> 16, y) = value; \
-        fx += dx;                               \
-    } while (++y < stopy)
-
-
 static void vertline(int y, int stopy, SkFixed fx, SkFixed dx,
                      SkBlitter* blitter) {
     SkASSERT(y < stopy);
 
-    if (auto direct = blitter->canDirectBlit()) {
-        DISPATCH_LOOP()
+    const std::optional<SkBlitter::DirectBlit> direct = (*blitter).canDirectBlit();
+    if (direct.has_value()) {
+        const SkPixmap& pm = direct.value().pm;
+        const uint64_t value = direct.value().value;
+        // Other pixel sizes are never offered for direct blits.
+        switch (pm.info().bytesPerPixel()) {
+            case 1: direct_vertline<uint8_t>(pm, value, y, stopy, fx, dx); break;
+            case 2: direct_vertline<uint16_t>(pm, value, y, stopy, fx, dx); break;
+            case 4: direct_vertline<uint32_t>(pm, value, y, stopy, fx, dx); break;
+            case 8: direct_vertline<uint64_t>(pm, value, y, stopy, fx, dx); break;
+            default: break;
+        }
     } else {
         do {
-            blitter->blitH(fx >> 16, y, 1);
+            (*blitter).blitH(fx >> 16, y, 1);
             fx += dx;
         } while (++y < stopy);
     }
 }
-
-#undef DIRECT_BLIT_LOOP
 
 //////////////////////////////////////////////////////
 
 #ifdef SK_DEBUG
 static bool canConvertFDot6ToFixed(SkFDot6 x) {
     const int maxDot6 = SK_MaxS32 >> (16 - 6);
-    return SkAbs32(x) <= maxDot6;
+    const bool convertible = SkAbs32(x) <= maxDot6;
+    return convertible;
 }
 #endif
 
@@ -104,20 +137,21 @@ void SkScan::HairLineRgn(SkSpan<const SkPoint> src, const SkRegion* clip, SkBlit
         return;
     }
     SkBlitterClipper    clipper;
-    SkIRect clipR, ptsR;
+    SkIRect clipR = SkIRect::MakeEmpty();
+    SkIRect ptsR = SkIRect::MakeEmpty();
 
     const SkScalar max = SkIntToScalar(32767);
     const SkRect fixedBounds = SkRect::MakeLTRB(-max, -max, max, max);
 
-    SkRect clipBounds;
+    SkRect clipBounds = SkRect::MakeEmpty();
     if (clip) {
-        clipBounds.set(clip->getBounds());
+        clipBounds.set((*clip).getBounds());
     }
 
     for (size_t i = 0; i < src.size() - 1; ++i) {
         SkBlitter* blitter = origBlitter;
 
-        SkPoint pts[2];
+        SkPoint pts[2] = {};
 
         // We have to pre-clip the line to fit in a SkFixed, so we just chop
         // the line. TODO find a way to actually draw beyond that range.
@@ -145,7 +179,7 @@ void SkScan::HairLineRgn(SkSpan<const SkPoint> src, const SkRegion* clip, SkBlit
             // now perform clipping again, as the rounding to dot6 can wiggle us
             // our rects are really dot6 rects, but since we've already used
             // lineclipper, we know they will fit in 32bits (26.6)
-            const SkIRect& bounds = clip->getBounds();
+            const SkIRect& bounds = (*clip).getBounds();
 
             clipR.setLTRB(SkIntToFDot6(bounds.fLeft), SkIntToFDot6(bounds.fTop),
                           SkIntToFDot6(bounds.fRight), SkIntToFDot6(bounds.fBottom));
@@ -161,22 +195,21 @@ void SkScan::HairLineRgn(SkSpan<const SkPoint> src, const SkRegion* clip, SkBlit
             if (!SkIRect::Intersects(ptsR, clipR)) {
                 continue;
             }
-            if (!clip->isRect() || !clipR.contains(ptsR)) {
+            if (!(*clip).isRect() || !clipR.contains(ptsR)) {
                 blitter = clipper.apply(origBlitter, clip);
             }
         }
 
-        SkFDot6 dx = x1 - x0;
-        SkFDot6 dy = y1 - y0;
+        const SkFDot6 dx = x1 - x0;
+        const SkFDot6 dy = y1 - y0;
 
         if (SkAbs32(dx) > SkAbs32(dy)) { // mostly horizontal
             if (x0 > x1) {   // we want to go left-to-right
-                using std::swap;
-                swap(x0, x1);
-                swap(y0, y1);
+                std::swap(x0, x1);
+                std::swap(y0, y1);
             }
-            int ix0 = SkFDot6Round(x0);
-            int ix1 = SkFDot6Round(x1);
+            const int ix0 = SkFDot6Round(x0);
+            const int ix1 = SkFDot6Round(x1);
             if (ix0 == ix1) {// too short to draw
                 continue;
             }
@@ -185,18 +218,17 @@ void SkScan::HairLineRgn(SkSpan<const SkPoint> src, const SkRegion* clip, SkBlit
                 continue; // too big to draw
             }
 #endif
-            SkFixed slope = SkFixedDiv(dy, dx);
-            SkFixed startY = SkFDot6ToFixed(y0) + (slope * ((32 - x0) & 63) >> 6);
+            const SkFixed slope = SkFixedDiv(dy, dx);
+            const SkFixed startY = SkFDot6ToFixed(y0) + (slope * ((32 - x0) & 63) >> 6);
 
             horiline(ix0, ix1, startY, slope, blitter);
         } else {              // mostly vertical
             if (y0 > y1) {   // we want to go top-to-bottom
-                using std::swap;
-                swap(x0, x1);
-                swap(y0, y1);
+                std::swap(x0, x1);
+                std::swap(y0, y1);
             }
-            int iy0 = SkFDot6Round(y0);
-            int iy1 = SkFDot6Round(y1);
+            const int iy0 = SkFDot6Round(y0);
+            const int iy1 = SkFDot6Round(y1);
             if (iy0 == iy1) { // too short to draw
                 continue;
             }
@@ -205,20 +237,21 @@ void SkScan::HairLineRgn(SkSpan<const SkPoint> src, const SkRegion* clip, SkBlit
                 continue; // too big to draw
             }
 #endif
-            SkFixed slope = SkFixedDiv(dx, dy);
-            SkFixed startX = SkFDot6ToFixed(x0) + (slope * ((32 - y0) & 63) >> 6);
+            const SkFixed slope = SkFixedDiv(dx, dy);
+            const SkFixed startX = SkFDot6ToFixed(x0) + (slope * ((32 - y0) & 63) >> 6);
 
             vertline(iy0, iy1, startX, slope, blitter);
         }
     }
 }
 
+// The clip and cull rectangles borrow storage owned by hair_path for the duration of a draw.
 struct DrawingParameters {
-    const SkRegion* clip;
-    const SkRect* insetClip;
-    const SkRect* outsetClip;
-    SkBlitter* blitter;
-    SkScan::HairRgnProc lineproc;
+    const SkRegion* clip = nullptr;
+    const SkRect* insetClip = nullptr;
+    const SkRect* outsetClip = nullptr;
+    SkBlitter* blitter = nullptr;
+    SkScan::HairRgnProc lineproc = nullptr;
 };
 
 // we don't just draw 4 lines, 'cause that can leave a gap in the bottom-right
@@ -247,7 +280,7 @@ void SkScan::HairRect(const SkRect& rect, const SkRasterClip& clip, SkBlitter* b
         return;
     }
     if (!clip.quickContains(r)) {
-        const SkRegion* clipRgn;
+        const SkRegion* clipRgn = nullptr;
         if (clip.isBW()) {
             clipRgn = &clip.bwRgn();
         } else {
@@ -258,27 +291,27 @@ void SkScan::HairRect(const SkRect& rect, const SkRasterClip& clip, SkBlitter* b
         blitter = clipper.apply(blitter, clipRgn);
     }
 
-    int width = r.width();
-    int height = r.height();
+    const int width = r.width();
+    const int height = r.height();
 
     if ((width | height) == 0) {
         return;
     }
     if (width <= 2 || height <= 2) {
-        blitter->blitRect(r.fLeft, r.fTop, width, height);
+        (*blitter).blitRect(r.fLeft, r.fTop, width, height);
         return;
     }
     // if we get here, we know we have 4 segments to draw
-    blitter->blitH(r.fLeft, r.fTop, width);                     // top
-    blitter->blitRect(r.fLeft, r.fTop + 1, 1, height - 2);      // left
-    blitter->blitRect(r.fRight - 1, r.fTop + 1, 1, height - 2); // right
-    blitter->blitH(r.fLeft, r.fBottom - 1, width);              // bottom
+    (*blitter).blitH(r.fLeft, r.fTop, width);                     // top
+    (*blitter).blitRect(r.fLeft, r.fTop + 1, 1, height - 2);      // left
+    (*blitter).blitRect(r.fRight - 1, r.fTop + 1, 1, height - 2); // right
+    (*blitter).blitH(r.fLeft, r.fBottom - 1, width);              // bottom
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define kMaxCubicSubdivideLevel 9
-#define kMaxQuadSubdivideLevel  5
+static constexpr int kMaxCubicSubdivideLevel = 9;
+static constexpr int kMaxQuadSubdivideLevel = 5;
 
 using float2 = skvx::float2;
 
@@ -293,21 +326,20 @@ static uint32_t compute_int_quad_dist(const SkPoint pts[3]) {
     // convert to whole pixel values (use ceiling to be conservative).
     // assign to unsigned so we can safely add 1/2 of the smaller and still fit in
     // uint32_t, since SkScalarCeilToInt() returns 31 bits at most.
-    uint32_t idx = SkScalarCeilToInt(dx);
-    uint32_t idy = SkScalarCeilToInt(dy);
+    const uint32_t idx = static_cast<uint32_t>(SkScalarCeilToInt(dx));
+    const uint32_t idy = static_cast<uint32_t>(SkScalarCeilToInt(dy));
     // use the cheap approx for distance
-    if (idx > idy) {
-        return idx + (idy >> 1);
-    } else {
-        return idy + (idx >> 1);
-    }
+    const uint32_t distance = idx > idy ? idx + (idy >> 1) : idy + (idx >> 1);
+    return distance;
 }
 
 using mask2 = skvx::Vec<2, uint32_t>;
 
+// Lanes whose float has a finite exponent; compares the IEEE bits directly.
 static inline mask2 float2_is_finite(const float2& x) {
     const mask2 exp_mask = mask2(0xFF << 23);
-    return (sk_bit_cast<mask2>(x) & exp_mask) != exp_mask;
+    const mask2 finite = (sk_bit_cast<mask2>(x) & exp_mask) != exp_mask;
+    return finite;
 }
 
 // Draw a quadratic by subdividing it into a series of line segments.
@@ -317,72 +349,77 @@ static void hair_quad(const SkPoint pts[3],
                       SkBlitter* blitter,
                       int level,
                       SkScan::HairRgnProc lineproc) {
-    SkASSERT(level <= kMaxQuadSubdivideLevel);
+    SkASSERT(level >= 0 && level <= kMaxQuadSubdivideLevel);
+    // compute_quad_level limits the level; keep the point storage in range regardless.
+    level = std::clamp(level, 0, kMaxQuadSubdivideLevel);
 
     // Convert the quadratic points into coefficients for the form: p(t) = At^2 + Bt + C
-    SkQuadCoeff coeff(pts);
+    const SkQuadCoeff coeff(pts);
 
-    const unsigned lines = 1 << level;
+    const unsigned lines = 1u << level;
     float2 t(0);
-    float2 dt(1.0f / lines);
+    const float2 dt(1.0f / lines);
 
-    SkPoint tmp[(1 << kMaxQuadSubdivideLevel) + 1];
-    SkASSERT((unsigned)lines < std::size(tmp));
+    SkPoint tmp[(1 << kMaxQuadSubdivideLevel) + 1] = {};
 
     tmp[0] = pts[0];
-    float2 A = coeff.fA;
-    float2 B = coeff.fB;
-    float2 C = coeff.fC;
+    const float2 A = coeff.fA;
+    const float2 B = coeff.fB;
+    const float2 C = coeff.fC;
     mask2 is_finite(~0);  // start out as true
     for (unsigned i = 1; i < lines; ++i) {
         t = t + dt;
-        float2 p = (A * t + B) * t + C;
+        const float2 p = (A * t + B) * t + C;
         is_finite &= float2_is_finite(p);
-        p.store(&tmp[i]);
+        tmp[i] = to_point(p);
     }
     if (all(is_finite)) {
         tmp[lines] = pts[2];
-        lineproc({tmp, lines + 1}, clip, blitter);
+        lineproc(SkSpan<const SkPoint>(tmp, lines + 1), clip, blitter);
     }
 }
 
 static SkRect compute_nocheck_quad_bounds(const SkPoint pts[3]) {
-    SkASSERT(SkIsFinite(&pts[0].fX, 6));
+    SkASSERT(SkPointPriv::AreFinite(pts, 3));
 
-    float2 min = float2::Load(pts);
+    float2 min = from_point(pts[0]);
     float2 max = min;
     for (int i = 1; i < 3; ++i) {
-        float2 pair = float2::Load(pts+i);
+        const float2 pair = from_point(pts[i]);
         min = skvx::min(min, pair);
         max = skvx::max(max, pair);
     }
-    return { min[0], min[1], max[0], max[1] };
+    const SkRect bounds = SkRect::MakeLTRB(min[0], min[1], max[0], max[1]);
+    return bounds;
 }
 
 static bool is_inverted(const SkRect& r) {
-    return r.fLeft > r.fRight || r.fTop > r.fBottom;
+    const bool inverted = r.fLeft > r.fRight || r.fTop > r.fBottom;
+    return inverted;
 }
 
 // Can't call SkRect::intersects, since it cares about empty, and we don't (since we tracking
 // something to be stroked, so empty can still draw something (e.g. horizontal line)
 static bool geometric_overlap(const SkRect& a, const SkRect& b) {
     SkASSERT(!is_inverted(a) && !is_inverted(b));
-    return a.fLeft < b.fRight && b.fLeft < a.fRight &&
-            a.fTop < b.fBottom && b.fTop < a.fBottom;
+    const bool overlaps = a.fLeft < b.fRight && b.fLeft < a.fRight &&
+                          a.fTop < b.fBottom && b.fTop < a.fBottom;
+    return overlaps;
 }
 
 // Can't call SkRect::contains, since it cares about empty, and we don't (since we tracking
 // something to be stroked, so empty can still draw something (e.g. horizontal line)
 static bool geometric_contains(const SkRect& outer, const SkRect& inner) {
     SkASSERT(!is_inverted(outer) && !is_inverted(inner));
-    return inner.fRight <= outer.fRight && inner.fLeft >= outer.fLeft &&
-            inner.fBottom <= outer.fBottom && inner.fTop >= outer.fTop;
+    const bool contains = inner.fRight <= outer.fRight && inner.fLeft >= outer.fLeft &&
+                          inner.fBottom <= outer.fBottom && inner.fTop >= outer.fTop;
+    return contains;
 }
 
 static inline void hairquad(const SkPoint pts[3], DrawingParameters d, int level) {
     if (d.insetClip) {
         SkASSERT(d.outsetClip);
-        SkRect bounds = compute_nocheck_quad_bounds(pts);
+        const SkRect bounds = compute_nocheck_quad_bounds(pts);
         if (!geometric_overlap(*d.outsetClip, bounds)) {
             return;
         } else if (geometric_contains(*d.insetClip, bounds)) {
@@ -394,24 +431,23 @@ static inline void hairquad(const SkPoint pts[3], DrawingParameters d, int level
 }
 
 static inline SkScalar max_component(const float2& value) {
-    SkScalar components[2];
-    value.store(components);
-    return std::max(components[0], components[1]);
+    const SkScalar largest = std::max(value[0], value[1]);
+    return largest;
 }
 
 static inline int compute_cubic_segs(const SkPoint pts[4]) {
-    float2 p0 = from_point(pts[0]);
-    float2 p1 = from_point(pts[1]);
-    float2 p2 = from_point(pts[2]);
-    float2 p3 = from_point(pts[3]);
+    const float2 p0 = from_point(pts[0]);
+    const float2 p1 = from_point(pts[1]);
+    const float2 p2 = from_point(pts[2]);
+    const float2 p3 = from_point(pts[3]);
 
     const float2 oneThird(1.0f / 3.0f);
     const float2 twoThird(2.0f / 3.0f);
 
-    float2 p13 = oneThird * p3 + twoThird * p0;
-    float2 p23 = oneThird * p0 + twoThird * p3;
+    const float2 p13 = oneThird * p3 + twoThird * p0;
+    const float2 p23 = oneThird * p0 + twoThird * p3;
 
-    SkScalar diff = max_component(max(abs(p1 - p13), abs(p2 - p23)));
+    const SkScalar diff = max_component(max(abs(p1 - p13), abs(p2 - p23)));
     SkScalar tol = SK_Scalar1 / 8;
 
     for (int i = 0; i < kMaxCubicSubdivideLevel; ++i) {
@@ -424,15 +460,17 @@ static inline int compute_cubic_segs(const SkPoint pts[4]) {
 }
 
 static bool lt_90(SkPoint p0, SkPoint pivot, SkPoint p2) {
-    return SkVector::DotProduct(p0 - pivot, p2 - pivot) >= 0;
+    const bool acute = SkVector::DotProduct(p0 - pivot, p2 - pivot) >= 0;
+    return acute;
 }
 
 // The off-curve points are "inside" the limits of the on-curve pts
 static bool quick_cubic_niceness_check(const SkPoint pts[4]) {
-    return lt_90(pts[1], pts[0], pts[3]) &&
-           lt_90(pts[2], pts[0], pts[3]) &&
-           lt_90(pts[1], pts[3], pts[0]) &&
-           lt_90(pts[2], pts[3], pts[0]);
+    const bool nice = lt_90(pts[1], pts[0], pts[3]) &&
+                      lt_90(pts[2], pts[0], pts[3]) &&
+                      lt_90(pts[1], pts[3], pts[0]) &&
+                      lt_90(pts[2], pts[3], pts[0]);
+    return nice;
 }
 
 // Draw a cubic by subdividing it into a series of line segments.
@@ -441,57 +479,59 @@ static void hair_cubic(const SkPoint pts[4],
                        const SkRegion* clip,
                        SkBlitter* blitter,
                        SkScan::HairRgnProc lineproc) {
-    const size_t lines = compute_cubic_segs(pts);
+    constexpr size_t kMaxLines = static_cast<size_t>(1) << kMaxCubicSubdivideLevel;
+    // compute_cubic_segs returns at most kMaxLines.
+    const size_t lines = std::min(static_cast<size_t>(compute_cubic_segs(pts)), kMaxLines);
     SkASSERT(lines > 0);
     if (1 == lines) {
-        lineproc({{pts[0], pts[3]}}, clip, blitter);
+        const SkPoint ends[2] = {pts[0], pts[3]};
+        lineproc(SkSpan<const SkPoint>(ends, 2), clip, blitter);
         return;
     }
+    SkPoint tmp[kMaxLines + 1] = {};
 
     // Convert the cubic points into coefficients for the form: p(t) = At^3 + Bt^2 + Ct + D
-    SkCubicCoeff coeff(pts);
+    const SkCubicCoeff coeff(pts);
 
     float2 t(0);
     const float2 dt(1.0f / lines);
 
-    SkPoint tmp[(1 << kMaxCubicSubdivideLevel) + 1];
-    SkASSERT((unsigned)lines < std::size(tmp));
-
     tmp[0] = pts[0];
-    float2 A = coeff.fA;
-    float2 B = coeff.fB;
-    float2 C = coeff.fC;
-    float2 D = coeff.fD;
+    const float2 A = coeff.fA;
+    const float2 B = coeff.fB;
+    const float2 C = coeff.fC;
+    const float2 D = coeff.fD;
     mask2 is_finite(~0);  // start out as true
-    for (unsigned i = 1; i < lines; ++i) {
+    for (size_t i = 1; i < lines; ++i) {
         t = t + dt;
-        float2 p = ((A * t + B) * t + C) * t + D;
+        const float2 p = ((A * t + B) * t + C) * t + D;
         is_finite &= float2_is_finite(p);
-        p.store(&tmp[i]);
+        tmp[i] = to_point(p);
     }
     if (all(is_finite)) {
         tmp[lines] = pts[3];
-        lineproc({tmp, lines + 1}, clip, blitter);
+        lineproc(SkSpan<const SkPoint>(tmp, lines + 1), clip, blitter);
     } // else some point(s) are non-finite, so don't draw
 }
 
 static SkRect compute_nocheck_cubic_bounds(const SkPoint pts[4]) {
-    SkASSERT(SkIsFinite(&pts[0].fX, 8));
+    SkASSERT(SkPointPriv::AreFinite(pts, 4));
 
-    float2 min = float2::Load(pts);
+    float2 min = from_point(pts[0]);
     float2 max = min;
     for (int i = 1; i < 4; ++i) {
-        float2 pair = float2::Load(pts+i);
+        const float2 pair = from_point(pts[i]);
         min = skvx::min(min, pair);
         max = skvx::max(max, pair);
     }
-    return { min[0], min[1], max[0], max[1] };
+    const SkRect bounds = SkRect::MakeLTRB(min[0], min[1], max[0], max[1]);
+    return bounds;
 }
 
-static inline void haircubic(const SkPoint pts[4], DrawingParameters d, int level) {
+static inline void haircubic(const SkPoint pts[4], DrawingParameters d, int /*level*/) {
     if (d.insetClip) {
         SkASSERT(d.outsetClip);
-        SkRect bounds = compute_nocheck_cubic_bounds(pts);
+        const SkRect bounds = compute_nocheck_cubic_bounds(pts);
         if (!geometric_overlap(*d.outsetClip, bounds)) {
             return;
         } else if (geometric_contains(*d.insetClip, bounds)) {
@@ -502,10 +542,10 @@ static inline void haircubic(const SkPoint pts[4], DrawingParameters d, int leve
     if (quick_cubic_niceness_check(pts)) {
         hair_cubic(pts, d.clip, d.blitter, d.lineproc);
     } else {
-        SkPoint tmp[13];
-        SkScalar tValues[3];
+        SkPoint tmp[13] = {};
+        SkScalar tValues[3] = {0, 0, 0};
 
-        int count = SkChopCubicAtMaxCurvature(pts, tmp, tValues);
+        const int count = SkChopCubicAtMaxCurvature(pts, tmp, tValues);
         for (int i = 0; i < count; i++) {
             hair_cubic(
                     &tmp[i * 3], d.clip, d.blitter, d.lineproc);
@@ -514,7 +554,7 @@ static inline void haircubic(const SkPoint pts[4], DrawingParameters d, int leve
 }
 
 static int compute_quad_level(const SkPoint pts[3]) {
-    uint32_t d = compute_int_quad_dist(pts);
+    const uint32_t d = compute_int_quad_dist(pts);
     /*  quadratics approach the line connecting their start and end points
      4x closer with each subdivision, so we compute the number of
      subdivisions to be the minimum need to get that distance to be less
@@ -529,61 +569,89 @@ static int compute_quad_level(const SkPoint pts[3]) {
 }
 
 template <typename T> bool optional_eq(std::optional<T> opt, T other) {
-    return opt.has_value() && (opt.value() == other);
+    const bool equal = opt.has_value() && (opt.value() == other);
+    return equal;
 }
 
 /* Extend the points in the direction of the starting or ending tangent by 1/2 unit to
    account for a round or square cap. If there's no distance between the end point and
    the control point, use the next control point to create a tangent. If the curve
-   is degenerate, move the cap out 1/2 unit horizontally. */
+   is degenerate, move the cap out 1/2 unit horizontally. pts has at least two points. */
 template <SkPaint::Cap capStyle>
 void extend_pts(std::optional<SkPathVerb> prevVerb, std::optional<SkPathVerb> nextVerb,
                 SkSpan<SkPoint> pts) {
     SkASSERT(SkPaint::kSquare_Cap == capStyle || SkPaint::kRound_Cap == capStyle);
+    SkASSERT(pts.size() >= 2);
     // The area of a circle is PI*R*R. For a unit circle, R=1/2, and the cap covers half of that.
     const SkScalar capOutset = SkPaint::kSquare_Cap == capStyle ? 0.5f : SK_ScalarPI / 8;
+    const size_t count = pts.size();
     if (optional_eq(prevVerb, SkPathVerb::kMove)) {
-        SkPoint* first = pts.data();
-        SkPoint* ctrl = first;
-        size_t controls = pts.size() - 1;
-        SkVector tangent;
-        do {
-            tangent = *first - *++ctrl;
-        } while (tangent.isZero() && --controls > 0);
+        // Find the first control point that differs from the start.
+        size_t ctrl = 0;
+        size_t controls = count - 1;
+        SkVector tangent{0, 0};
+        for (;;) {
+            ++ctrl;
+            tangent = pts[0] - pts[ctrl];
+            if (!tangent.isZero()) {
+                break;
+            }
+            --controls;
+            if (controls == 0) {
+                break;
+            }
+        }
         if (tangent.isZero()) {
             tangent.set(1, 0);
-            controls = pts.size() - 1;  // If all points are equal, move all but one
+            controls = count - 1;  // If all points are equal, move all but one
         } else {
-            tangent.normalize();
+            static_cast<void>(tangent.normalize());
         }
-        do {    // If the end point and control points are equal, loop to move them in tandem.
-            first->fX += tangent.fX * capOutset;
-            first->fY += tangent.fY * capOutset;
-            ++first;
-        } while (++controls < pts.size());
+        // If the end point and control points are equal, move them in tandem.
+        size_t index = 0;
+        do {
+            pts[index].fX += tangent.fX * capOutset;
+            pts[index].fY += tangent.fY * capOutset;
+            ++index;
+            ++controls;
+        } while (controls < count);
     }
     if (!nextVerb.has_value() ||
         nextVerb.value() == SkPathVerb::kMove ||
         nextVerb.value() == SkPathVerb::kClose)
     {
-        SkPoint* last = &pts.back();
-        SkPoint* ctrl = last;
-        size_t controls = pts.size() - 1;
-        SkVector tangent;
-        do {
-            tangent = *last - *--ctrl;
-        } while (tangent.isZero() && --controls > 0);
+        // Find the last control point that differs from the end.
+        const size_t lastIndex = count - 1;
+        size_t ctrl = lastIndex;
+        size_t controls = count - 1;
+        SkVector tangent{0, 0};
+        for (;;) {
+            --ctrl;
+            tangent = pts[lastIndex] - pts[ctrl];
+            if (!tangent.isZero()) {
+                break;
+            }
+            --controls;
+            if (controls == 0) {
+                break;
+            }
+        }
         if (tangent.isZero()) {
             tangent.set(-1, 0);
-            controls = pts.size() - 1;
+            controls = count - 1;
         } else {
-            tangent.normalize();
+            static_cast<void>(tangent.normalize());
         }
-        do {
-            last->fX += tangent.fX * capOutset;
-            last->fY += tangent.fY * capOutset;
-            --last;
-        } while (++controls < pts.size());
+        size_t index = lastIndex;
+        for (;;) {
+            pts[index].fX += tangent.fX * capOutset;
+            pts[index].fY += tangent.fY * capOutset;
+            ++controls;
+            if (controls >= count) {
+                break;
+            }
+            --index;
+        }
     }
 }
 
@@ -593,27 +661,39 @@ static inline void hairconic(const SkPoint* p, DrawingParameters d, float conicW
     const SkScalar tol = SK_Scalar1 / 4;
     const SkPoint* quadPts = converter.computeQuads(p, conicWeight, tol);
     for (int i = 0; i < converter.countQuads(); ++i) {
-        int level = compute_quad_level(quadPts);
-        hairquad(quadPts, d, level);
-        quadPts += 2;
+        const SkPoint* quad = &quadPts[2 * i];
+        const int level = compute_quad_level(quad);
+        hairquad(quad, d, level);
     }
 }
 
 // This function assumes that iter is currently ON a SkPathVerb::kMove verb
 static inline bool is_next_contour_closed(SkPathIter scanner) {
     // we assume the first verb is already a move, so do scanner.next() to proceed to the next verb.
-    // This will ideally be a contour verb or a close
-    auto rec = scanner.next();
-    if (rec->fVerb == SkPathVerb::kClose) return true;
-    if (rec->fVerb == SkPathVerb::kMove) return false;
+    // This will ideally be a contour verb or a close. A move that ends the verbs (possible after
+    // repeated moves) has no contour.
+    const std::optional<SkPathIter::Rec> rec = scanner.next();
+    if (!rec.has_value()) {
+        return false;
+    }
+    if (rec.value().fVerb == SkPathVerb::kClose) {
+        return true;
+    }
+    if (rec.value().fVerb == SkPathVerb::kMove) {
+        return false;
+    }
 
     while (scanner.peekNextVerb().has_value()) {
-        SkPathVerb next_verb = scanner.peekNextVerb().value();
+        const SkPathVerb next_verb = scanner.peekNextVerb().value();
         // The current contour ends here, before this kMove.
-        if (next_verb == SkPathVerb::kMove) return false;
+        if (next_verb == SkPathVerb::kMove) {
+            return false;
+        }
         // This kClose ends the current contour.
-        if (next_verb == SkPathVerb::kClose) return true;
-        scanner.next();  // Consume the record
+        if (next_verb == SkPathVerb::kClose) {
+            return true;
+        }
+        static_cast<void>(scanner.next());  // Consume the record
     }
     return false;
 }
@@ -629,7 +709,8 @@ void hair_path(const SkPathRaw& raw,
 
     SkAAClipBlitterWrapper wrap;
     const SkRegion* clip = nullptr;
-    SkRect insetStorage, outsetStorage;
+    SkRect insetStorage = SkRect::MakeEmpty();
+    SkRect outsetStorage = SkRect::MakeEmpty();
     const SkRect* insetClip = nullptr;
     const SkRect* outsetClip = nullptr;
 
@@ -662,7 +743,7 @@ void hair_path(const SkPathRaw& raw,
              *  outsetClip is used for quick-reject (i.e. the segment is entirely outside), so we
              *  outset it from the clip-bounds.
              */
-            insetStorage.set(clip->getBounds());
+            insetStorage.set((*clip).getBounds());
             outsetStorage = insetStorage.makeOutset(1, 1);
             insetStorage.inset(1, 1);
             if (is_inverted(insetStorage)) {
@@ -681,60 +762,69 @@ void hair_path(const SkPathRaw& raw,
         }
     }
 
-    SkPoint pts[4], firstPt, lastPt;
-    SkAutoConicToQuads converter;
+    SkPoint pts[4] = {};
+    SkPoint firstPt{0, 0};
+    SkPoint lastPt{0, 0};
     bool isClosed = false;
-    DrawingParameters params = {clip, insetClip, outsetClip, blitter, lineproc};
-    bool isButtCap = capStyle == SkPaint::kButt_Cap;
+    DrawingParameters params{};
+    params.clip = clip;
+    params.insetClip = insetClip;
+    params.outsetClip = outsetClip;
+    params.blitter = blitter;
+    params.lineproc = lineproc;
+    const bool isButtCap = capStyle == SkPaint::kButt_Cap;
 
     std::optional<SkPathVerb> prevVerb;
-    for (auto iter = raw.iter(); auto rec = iter.next();) {
-        const SkPoint* srcPts = rec->fPoints.data();
-        SkPathVerb verb = rec->fVerb;
-        auto nextVerb = iter.peekNextVerb();
+    SkPathIter iter = raw.iter();
+    for (std::optional<SkPathIter::Rec> rec = iter.next(); rec.has_value(); rec = iter.next()) {
+        const SkPathIter::Rec& record = rec.value();
+        const SkSpan<const SkPoint> srcPts = record.fPoints;
+        const SkPathVerb verb = record.fVerb;
+        const std::optional<SkPathVerb> nextVerb = iter.peekNextVerb();
         switch (verb) {
             case SkPathVerb::kMove:
-                firstPt = lastPt = srcPts[0];
+                firstPt = srcPts[0];
+                lastPt = srcPts[0];
                 isClosed = !isButtCap && is_next_contour_closed(iter);
                 break;
             case SkPathVerb::kLine: {
-                constexpr int kNumLinePts = 2;
-                std::copy(srcPts, srcPts + kNumLinePts, pts);
+                constexpr size_t kNumLinePts = 2;
+                std::copy(srcPts.begin(), srcPts.begin() + kNumLinePts, pts);
                 if (!isButtCap && (!isClosed || SkPath::IsLineDegenerate(pts[0], pts[1], true))) {
-                    extend_pts<capStyle>(prevVerb, nextVerb, {pts, kNumLinePts});
+                    extend_pts<capStyle>(prevVerb, nextVerb, SkSpan<SkPoint>(pts, kNumLinePts));
                 }
-                lineproc({pts, kNumLinePts}, clip, blitter);
+                lineproc(SkSpan<const SkPoint>(pts, kNumLinePts), clip, blitter);
                 lastPt = pts[kNumLinePts - 1];
                 break;
             }
             case SkPathVerb::kQuad: {
-                constexpr int kNumQuadPts = 3;
-                std::copy(srcPts, srcPts + kNumQuadPts, pts);
+                constexpr size_t kNumQuadPts = 3;
+                std::copy(srcPts.begin(), srcPts.begin() + kNumQuadPts, pts);
                 if (!isButtCap &&
                     (!isClosed || SkPath::IsQuadDegenerate(pts[0], pts[1], pts[2], true))) {
-                    extend_pts<capStyle>(prevVerb, nextVerb, {pts, kNumQuadPts});
+                    extend_pts<capStyle>(prevVerb, nextVerb, SkSpan<SkPoint>(pts, kNumQuadPts));
                 }
                 hairquad(pts, params, compute_quad_level(pts));
                 lastPt = pts[kNumQuadPts - 1];
                 break;
             }
             case SkPathVerb::kConic: {
-                constexpr int kNumConicPts = 3;
-                std::copy(srcPts, srcPts + kNumConicPts, pts);
+                constexpr size_t kNumConicPts = 3;
+                std::copy(srcPts.begin(), srcPts.begin() + kNumConicPts, pts);
                 if (!isButtCap &&
                     (!isClosed || SkPath::IsQuadDegenerate(pts[0], pts[1], pts[2], true))) {
-                    extend_pts<capStyle>(prevVerb, nextVerb, {pts, kNumConicPts});
+                    extend_pts<capStyle>(prevVerb, nextVerb, SkSpan<SkPoint>(pts, kNumConicPts));
                 }
-                hairconic(pts, params, rec->conicWeight());
+                hairconic(pts, params, record.conicWeight());
                 lastPt = pts[kNumConicPts - 1];
                 break;
             }
             case SkPathVerb::kCubic: {
-                constexpr int kNumCubicPts = 4;
-                std::copy(srcPts, srcPts + kNumCubicPts, pts);
+                constexpr size_t kNumCubicPts = 4;
+                std::copy(srcPts.begin(), srcPts.begin() + kNumCubicPts, pts);
                 if (!isButtCap && (!isClosed || SkPath::IsCubicDegenerate(
                                                         pts[0], pts[1], pts[2], pts[3], true))) {
-                    extend_pts<capStyle>(prevVerb, nextVerb, {pts, kNumCubicPts});
+                    extend_pts<capStyle>(prevVerb, nextVerb, SkSpan<SkPoint>(pts, kNumCubicPts));
                 }
                 haircubic(pts, params, kMaxCubicSubdivideLevel);
                 lastPt = pts[kNumCubicPts - 1];
@@ -744,9 +834,9 @@ void hair_path(const SkPathRaw& raw,
                 pts[1] = firstPt;
                 if (!isButtCap && optional_eq(prevVerb, SkPathVerb::kMove)) {
                     // cap moveTo/close to match svg expectations for degenerate segments
-                    extend_pts<capStyle>(prevVerb, nextVerb, {pts, 2});
+                    extend_pts<capStyle>(prevVerb, nextVerb, SkSpan<SkPoint>(pts, 2));
                 }
-                lineproc({pts, 2}, clip, blitter);
+                lineproc(SkSpan<const SkPoint>(pts, 2), clip, blitter);
                 break;
         }
         if (!isButtCap) {
@@ -795,9 +885,10 @@ void SkScan::FrameRect(const SkRect& r, const SkPoint& strokeSize,
 
     const float dx = strokeSize.fX;
     const float dy = strokeSize.fY;
-    float rx = dx / 2.f;
-    float ry = dy / 2.f;
-    SkRect   outer, tmp;
+    const float rx = dx / 2.f;
+    const float ry = dy / 2.f;
+    SkRect   outer = SkRect::MakeEmpty();
+    SkRect   tmp = SkRect::MakeEmpty();
 
     outer.setLTRB(r.fLeft - rx, r.fTop - ry, r.fRight + rx, r.fBottom + ry);
 
@@ -836,7 +927,7 @@ void SkScan::HairLine(SkSpan<const SkPoint> pts, const SkRasterClip& clip, SkBli
     } else {
         const SkRegion* clipRgn = nullptr;
 
-        const auto r = SkRect::BoundsOrEmpty(pts).makeOutset(SK_ScalarHalf, SK_ScalarHalf);
+        const SkRect r = SkRect::BoundsOrEmpty(pts).makeOutset(SK_ScalarHalf, SK_ScalarHalf);
 
         SkAAClipBlitterWrapper wrap;
         if (!clip.quickContains(r.roundOut())) {
@@ -854,7 +945,7 @@ void SkScan::AntiHairLine(SkSpan<const SkPoint> pts, const SkRasterClip& clip, S
     } else {
         const SkRegion* clipRgn = nullptr;
 
-        const auto r = SkRect::BoundsOrEmpty(pts);
+        const SkRect r = SkRect::BoundsOrEmpty(pts);
 
         SkAAClipBlitterWrapper wrap;
         if (!clip.quickContains(r.roundOut().makeOutset(1, 1))) {

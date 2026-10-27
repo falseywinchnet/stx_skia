@@ -11,42 +11,43 @@
 #include "src/core/SkRasterClip.h"
 
 static inline void blitrect(SkBlitter* blitter, const SkIRect& r) {
-    blitter->blitRect(r.fLeft, r.fTop, r.width(), r.height());
+    (*blitter).blitRect(r.fLeft, r.fTop, r.width(), r.height());
 }
 
 void SkScan::FillIRect(const SkIRect& r, const SkRegion* clip,
                        SkBlitter* blitter) {
-    if (!r.isEmpty()) {
-        if (clip) {
-            if (clip->isRect()) {
-                const SkIRect& clipBounds = clip->getBounds();
+    if (r.isEmpty()) {
+        return;
+    }
+    if (!clip) {
+        blitrect(blitter, r);
+        return;
+    }
+    if ((*clip).isRect()) {
+        const SkIRect& clipBounds = (*clip).getBounds();
 
-                if (clipBounds.contains(r)) {
-                    blitrect(blitter, r);
-                } else {
-                    SkIRect rr = r;
-                    if (rr.intersect(clipBounds)) {
-                        blitrect(blitter, rr);
-                    }
-                }
-            } else {
-                SkRegion::Cliperator    cliper(*clip, r);
-                const SkIRect&          rr = cliper.rect();
-
-                while (!cliper.done()) {
-                    blitrect(blitter, rr);
-                    cliper.next();
-                }
-            }
-        } else {
+        if (clipBounds.contains(r)) {
             blitrect(blitter, r);
+        } else {
+            SkIRect rr = r;
+            if (rr.intersect(clipBounds)) {
+                blitrect(blitter, rr);
+            }
         }
+        return;
+    }
+    SkRegion::Cliperator    cliper(*clip, r);
+    const SkIRect&          rr = cliper.rect();
+
+    while (!cliper.done()) {
+        blitrect(blitter, rr);
+        cliper.next();
     }
 }
 
 void SkScan::FillXRect(const SkXRect& xr, const SkRegion* clip,
                        SkBlitter* blitter) {
-    SkIRect r;
+    SkIRect r = SkIRect::MakeEmpty();
 
     XRect_round(xr, &r);
     SkScan::FillIRect(r, clip, blitter);
@@ -54,7 +55,7 @@ void SkScan::FillXRect(const SkXRect& xr, const SkRegion* clip,
 
 void SkScan::FillRect(const SkRect& r, const SkRegion* clip,
                        SkBlitter* blitter) {
-    SkIRect ir;
+    SkIRect ir = SkIRect::MakeEmpty();
 
     r.round(&ir);
     SkScan::FillIRect(ir, clip, blitter);

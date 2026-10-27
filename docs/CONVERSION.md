@@ -1328,6 +1328,18 @@ and 67/67; the new corpus and every other shared artifact match, except the inte
 corrected sampling artifact; the instrumented suite reports PASS. See
 ../results/2026-10-26/SCAN_EDGES_CONVERSION.md.
 
+## Non-anti-aliased scan conversion and hairlines
+
+The scan entry points, shared scan helpers, non-anti-aliased path filler and hairline
+scanner are converted: two `goto`s become structured control flow, macro-generated direct
+blits become a pixel-type template, curve points are no longer loaded or stored through
+`SkPoint` addresses, and cap extension walks points by index. Capped hairlines over raw
+storage ending in repeated moves no longer read an empty path record. Candidate/reference
+suites pass 69/69 and 68/68; the new corpus and every other shared artifact match, except
+the intentionally corrected sampling artifact; the instrumented suite reports PASS. See
+../results/2026-10-26/SCAN_CONVERTERS_CONVERSION.md. Anti-aliased path fillers and hairlines
+remain.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining
