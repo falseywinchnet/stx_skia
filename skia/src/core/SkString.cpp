@@ -11,6 +11,7 @@
 #include "include/core/SkTypes.h"
 #include "include/private/SkDebug.h"
 #include "include/private/SkMalloc.h"
+#include "include/private/SkTFitsIn.h"
 #include "include/private/SkTo.h"
 #include "src/core/SkSafeMath.h"
 #include "src/core/SkUTF.h"
@@ -20,6 +21,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <new>
 #include <utility>
 
@@ -57,7 +59,8 @@ static StringBuffer apply_format_string(const char* format, va_list args, char (
     // byte at the end of the buffer for a null terminator, so we don't need to add one here.
     (*heapBuffer).set(nullptr, static_cast<size_t>(outLength));
     char* heapBufferDest = (*heapBuffer).data();
-    SkDEBUGCODE(int checkLength =) std::vsnprintf(heapBufferDest, outLength + 1, format, argsCopy);
+    const size_t capacity = static_cast<size_t>(outLength) + 1;
+    SkDEBUGCODE(int checkLength =) std::vsnprintf(heapBufferDest, capacity, format, argsCopy);
     SkASSERT(checkLength == outLength);
     va_end(argsCopy);
     return {heapBufferDest, outLength};
@@ -73,23 +76,13 @@ static size_t size_of_rec(const char* emptyData, const void* emptyRec) {
     return size;
 }
 
-static uint32_t trim_size_t_to_u32(size_t value) {
-    if (sizeof(size_t) > sizeof(uint32_t)) {
-        if (value > UINT32_MAX) {
-            value = UINT32_MAX;
-        }
-    }
-    return static_cast<uint32_t>(value);
-}
-
-static size_t check_add32(size_t base, size_t extra) {
-    SkASSERT(base <= UINT32_MAX);
-    if (sizeof(size_t) > sizeof(uint32_t)) {
-        if (base + extra > UINT32_MAX) {
-            extra = UINT32_MAX - base;
-        }
-    }
-    return extra;
+// Whether text points into the length bytes at begin or at their terminator. An in-place edit
+// moves or overwrites those bytes, so text there must be read before the edit.
+static bool points_into(const char* begin, size_t length, const char* text) {
+    const std::less_equal<const char*> notAfter{};
+    const std::less<const char*> before{};
+    const bool inside = notAfter(begin, text) && before(text, begin + length + 1);
+    return inside;
 }
 
 sk_sp<SkString::Rec> SkString::Rec::Make(const char text[], size_t len) {
@@ -113,6 +106,8 @@ sk_sp<SkString::Rec> SkString::Rec::Make(const char text[], size_t len) {
     sk_sp<Rec> rec(new (storage) Rec(stringLen, 1));
     if (text) {
         std::memcpy((*rec).data(), text, len);
+    } else {
+        std::memset((*rec).data(), 0, len);
     }
     (*rec).data()[len] = 0;
     return rec;
@@ -195,7 +190,7 @@ bool SkString::equals(const char text[]) const {
 }
 
 bool SkString::equals(const char text[], size_t len) const {
-    SkASSERT(len == 0 || text != nullptr);
+    SkASSERT_RELEASE(len == 0 || text != nullptr);
 
     return (*fRec).fLength == len && sk_careful_memcmp((*fRec).data(), text, len) == 0;
 }
@@ -236,14 +231,17 @@ void SkString::set(const char text[]) {
 }
 
 void SkString::set(const char text[], size_t len) {
-    len = trim_size_t_to_u32(len);
+    SkASSERT_RELEASE(SkTFitsIn<uint32_t>(len));
     if (len == 0) {
         (*this).reset();
     } else if ((*fRec).unique() && ((len >> 2) <= ((*fRec).fLength >> 2))) {
-        // Use less of the buffer we have without allocating a smaller one.
+        // Use less of the buffer we have without allocating a smaller one. The text may be part
+        // of this string, so the copy may overlap.
         char* p = (*this).data();
         if (text) {
-            std::memcpy(p, text, len);
+            std::memmove(p, text, len);
+        } else {
+            std::memset(p, 0, len);
         }
         p[len] = '\0';
         (*fRec).fLength = SkToU32(len);
@@ -259,16 +257,15 @@ void SkString::insert(size_t offset, const char text[]) {
 
 void SkString::insert(size_t offset, const char text[], size_t len) {
     if (len) {
+        SkASSERT_RELEASE(text != nullptr);
         const size_t length = (*fRec).fLength;
         if (offset > length) {
             offset = length;
         }
 
-        // Check if length + len exceeds 32bits, we trim len
-        len = check_add32(length, len);
-        if (len == 0) {
-            return;
-        }
+        // The result must fit the 32-bit length. Written so that it cannot wrap where size_t
+        // is 32 bits wide.
+        SkASSERT_RELEASE(len <= UINT32_MAX - length);
 
         /*  If we're the only owner, and we have room in our allocation for the insert,
             do it in place, rather than allocating a new buffer.
@@ -279,8 +276,12 @@ void SkString::insert(size_t offset, const char text[], size_t len) {
             but SkAlign4(x) is (x + 3) >> 2 << 2
             which is equivalent for testing to (length + 1 + 3) >> 2 == (length + 1 + 3 + len) >> 2
             and we can then eliminate the +1+3 since that doesn't affec the answer
+
+            Text from this string's own storage would move under the in-place edit; the
+            allocating path reads it from the old storage, which stays alive until the swap.
         */
-        if ((*fRec).unique() && (length >> 2) == ((length + len) >> 2)) {
+        if ((*fRec).unique() && (length >> 2) == ((length + len) >> 2) &&
+            !points_into((*fRec).data(), length, text)) {
             char* dst = (*this).data();
 
             if (offset < length) {
@@ -330,11 +331,16 @@ void SkString::printf(const char format[], ...) {
 }
 
 void SkString::printVAList(const char format[], va_list args) {
+    // The arguments may point into this string, so a long result is formatted into a separate
+    // string and replaces this one only afterwards.
+    SkString overflow{};
     char stackBuffer[kBufferSize] = {};
-    const StringBuffer result = apply_format_string(format, args, stackBuffer, this);
+    const StringBuffer result = apply_format_string(format, args, stackBuffer, &overflow);
 
     if (result.fText == stackBuffer) {
         (*this).set(result.fText, static_cast<size_t>(result.fLength));
+    } else {
+        *this = std::move(overflow);
     }
 }
 

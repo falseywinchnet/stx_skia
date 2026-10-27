@@ -1599,19 +1599,29 @@ nothing and returns false instead of calling `strlen` on null, and `RemainingLen
 takes a stream reference instead of a pointer it dereferenced unchecked in Release. See
 ../results/2026-10-27/STREAM_CONVERSION.md.
 
+## Strings
+
+`SkString` keeps construction, copying and moving, comparison, `set`, `insert`, `append` and
+formatting; the number formatters, prepending, resizing, searching, the standard-library
+overloads, the split, tab and UTF-16 helpers and `SkOSFile::Iter` had no user and are removed.
+The kept code is respelled, then fixed: edits and `printf` may take the string's own text, a
+null text with a length gives zero bytes instead of uninitialized ones, and lengths past
+32 bits stop the program instead of truncating, without the wrap a 32-bit `size_t` allowed.
+See ../results/2026-10-27/STRING_CONVERSION.md.
+
 ## Still required
 
-Refreshed 2026-10-27 after the streams. The whole-library AST inventory counts 619 excluded
-constructs in 53 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 after the strings. The whole-library AST inventory counts 501 excluded
+constructs in 51 files, almost all `->` member arrows. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
 - **Remaining tree cleanup.** Public headers that nothing compiled includes and no consumer
   uses. The unbuilt upstream test, GM, benchmark and tool trees under `skia/` are kept as
   preserved sources.
-- **Memory, containers and support code.** Strings, `TArray`, `TBlockList`, the block allocator, the arena, `SkZip`,
-  `SkBuffer`, `SkRandom`, MD5, the spinlock, data tables, time, CPU detection, tracing and
-  assertion helpers, and the POSIX file port. Also the compatibility remnants:
+- **Memory, containers and support code.** `TArray`, `TBlockList`, the block allocator, the
+  arena, `SkZip`, `SkBuffer`, `SkRandom`, the spinlock, data tables, time, CPU detection,
+  tracing and assertion helpers, and the OS file ports. Also the compatibility remnants:
   `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the `SkSpan`
   traits.
 - **Shaders and colour (about 180).** skcms (`Transform_inl.h`, `skcms_public.h`),

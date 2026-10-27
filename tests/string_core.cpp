@@ -5,6 +5,10 @@
 // (string-core.raw). Each string is recorded as its size, its bytes and whether it is terminated.
 // Expressions check that the members the candidate removed are absent there and present in the
 // reference.
+//
+// The candidate alone also checks what the intake code gets wrong: text from the string's own
+// storage given to insert, set, printf and appendf; a null text with a length; and lengths past
+// 32 bits. Arguments beginning with "--" select a Release-check stop instead.
 
 #include "differential_corpus.h"
 
@@ -15,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <utility>
 
@@ -287,10 +292,118 @@ void scalar_cases(Output& output) {
     }
 }
 
+#ifndef STX_SKIA_REFERENCE
+bool same(const SkString& actual, const std::string& expected) {
+    const bool sizes = actual.size() == expected.size();
+    const bool equal = sizes && std::memcmp(actual.c_str(), expected.data(), expected.size()) == 0;
+    return equal && actual.c_str()[actual.size()] == '\0';
+}
+
+// Every insertion and replacement of a piece of a string's own text into itself, on unique
+// strings of up to 20 bytes, matches std::string.
+bool own_text_edits_match() {
+    for (size_t base = 0; base <= 20; ++base) {
+        const std::string text = pattern(base, 'a');
+        for (size_t start = 0; start <= base; ++start) {
+            for (size_t count = 0; start + count <= base; ++count) {
+                const std::string piece = text.substr(start, count);
+                for (size_t offset = 0; offset <= base + 1; ++offset) {
+                    SkString edited(text.c_str());
+                    edited.insert(offset, edited.c_str() + start, count);
+                    std::string expected = text;
+                    expected.insert(offset < base ? offset : base, piece);
+                    if (!same(edited, expected)) return false;
+                }
+                SkString replaced(text.c_str());
+                replaced.set(replaced.c_str() + start, count);
+                if (!same(replaced, piece)) return false;
+            }
+        }
+        SkString doubled(text.c_str());
+        doubled.append(doubled);
+        if (!same(doubled, text + text)) return false;
+        SkString prefixed(text.c_str());
+        prefixed.insert(0, prefixed.c_str());
+        if (!same(prefixed, text + text)) return false;
+    }
+    return true;
+}
+
+// printf and appendf may take this string's own text as an argument, on either side of the
+// stack buffer.
+bool own_text_formats_match() {
+    for (const size_t length : {size_t{10}, size_t{500}, size_t{1100}, size_t{3000}}) {
+        const std::string text = pattern(length, 'a');
+        SkString printed(text.c_str());
+        printed.printf("<%s|%s>", printed.c_str(), printed.c_str());
+        if (!same(printed, "<" + text + "|" + text + ">")) return false;
+        SkString appended(text.c_str());
+        appended.appendf("%s!", appended.c_str());
+        if (!same(appended, text + text + "!")) return false;
+    }
+    return true;
+}
+
+// A null text with a length gives zero bytes, whatever the string held before.
+bool null_text_gives_zeros() {
+    const std::string zeros(9, '\0');
+    if (!same(SkString(nullptr, 9), zeros)) return false;
+    if (!same(SkString(size_t{9}), zeros)) return false;
+    for (const size_t before : {size_t{3}, size_t{12}, size_t{40}}) {
+        SkString unique(pattern(before, 'a').c_str());
+        unique.set(nullptr, 9);
+        if (!same(unique, zeros)) return false;
+        SkString shared(pattern(before, 'a').c_str());
+        const SkString owner(shared);
+        shared.set(nullptr, 9);
+        if (!same(shared, zeros) || !same(owner, pattern(before, 'a'))) return false;
+    }
+    return true;
+}
+
+// Each mode violates one Release-checked precondition and must stop the program.
+int stop_mode(const char* mode) {
+    const char text[] = "abc";
+    if (std::strcmp(mode, "--insert-null") == 0) {
+        SkString invalid(text);
+        invalid.insert(1, nullptr, 2);
+    } else if (std::strcmp(mode, "--equals-null") == 0) {
+        const SkString invalid(text);
+        std::printf("%d\n", invalid.equals(nullptr, 3) ? 1 : 0);
+    } else if (std::strcmp(mode, "--insert-too-long") == 0) {
+        // The sum passes 32 bits; the check stops before any byte is read.
+        SkString invalid(text);
+        invalid.insert(0, text, size_t{UINT32_MAX} - 2);
+    } else if (std::strcmp(mode, "--set-too-long") == 0) {
+        static_assert(sizeof(size_t) > sizeof(uint32_t), "the stop tests run on 64-bit hosts");
+        SkString invalid(text);
+        invalid.set(text, size_t{UINT32_MAX} + 1);
+    } else {
+        return 2;
+    }
+    return 0;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 2) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (argc == 2 && std::strncmp(argv[1], "--", 2) == 0) return stop_mode(argv[1]);
+    if (!own_text_edits_match()) {
+        std::puts("string core: an edit with the string's own text went wrong");
+        return 1;
+    }
+    if (!own_text_formats_match()) {
+        std::puts("string core: formatting the string's own text went wrong");
+        return 1;
+    }
+    if (!null_text_gives_zeros()) {
+        std::puts("string core: a null text with a length did not give zero bytes");
+        return 1;
+    }
+#endif
     Output output{};
     construction_cases(output);
     comparison_cases(output);

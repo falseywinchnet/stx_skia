@@ -41,6 +41,10 @@ inline bool SkStrContains(const char string[], char subchar) {
 */
 class SK_API SkString {
 public:
+    // A string holds at most UINT32_MAX bytes; constructing, setting or inserting past that
+    // stops the program. A null text with a nonzero length gives that many zero bytes to the
+    // constructors and set; insert and equals require a text for a nonzero length. Texts may
+    // point into the string they are inserted into or set on.
     SkString();
     explicit SkString(size_t len);
     explicit SkString(const char text[]);
@@ -131,7 +135,7 @@ private:
     };
     sk_sp<Rec> fRec;
 
-    static_assert(::sk_is_trivially_relocatable<decltype(fRec)>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<Rec>>::value);
 
 #ifdef SK_DEBUG
     SkString& validate();
