@@ -128,3 +128,6 @@ list(REMOVE_ITEM stx_sources skia/src/sfnt/SkOTTable_name.cpp)
 
 # Owned broadcast invalidation replaces the unused generic message bus.
 list(APPEND stx_sources skia/src/core/SkResourceCacheInvalidation.cpp)
+
+# Nothing in the tree includes SkQuadClipper.h or names its classes.
+list(REMOVE_ITEM stx_sources skia/src/core/SkQuadClipper.cpp)

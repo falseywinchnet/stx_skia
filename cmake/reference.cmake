@@ -482,3 +482,10 @@ list(APPEND stx_sources baseline/skia/src/core/SkStroke.cpp baseline/skia/src/co
 list(REMOVE_ITEM stx_sources skia/src/utils/SkDashPath.cpp skia/src/effects/SkDashPathEffect.cpp)
 list(APPEND stx_sources baseline/skia/src/utils/SkDashPath.cpp
     baseline/skia/src/effects/SkDashPathEffect.cpp)
+
+# Line and edge clipping before conversion, and the unreferenced quad clipper that the
+# candidate no longer carries.
+list(REMOVE_ITEM stx_sources skia/src/core/SkLineClipper.cpp skia/src/core/SkEdgeClipper.cpp
+    skia/src/core/SkQuadClipper.cpp)
+list(APPEND stx_sources baseline/skia/src/core/SkLineClipper.cpp
+    baseline/skia/src/core/SkEdgeClipper.cpp baseline/skia/src/core/SkQuadClipper.cpp)

@@ -1307,6 +1307,17 @@ recommends keeping the trap.) Suites pass 66/66 and 65/65, all shared artifacts 
 sampling artifact, and the instrumented suite reports PASS. See
 ../results/2026-10-26/CODE_INTEGRITY_SCAN.md.
 
+## Path clipping ahead of scan conversion
+
+The line and edge clippers are converted: the edge clipper records and replays segments
+through checked integer cursors instead of raw pointer cursors; the cubic chop no longer
+reads every other float from a point address; copies are element-wise and every local is
+initialized. The unreferenced `SkQuadClipper` and debug-only monotonic assertions are
+removed from the candidate. Candidate/reference suites pass 67/67 and 66/66; the new
+corpus and every other shared artifact match, except the intentionally corrected sampling
+artifact; the instrumented suite reports PASS. See
+../results/2026-10-26/PATH_CLIPPING_CONVERSION.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

@@ -31,6 +31,7 @@ else
     "build/$profile/stx_skia_contour_measure_tests" "build/$profile/contour-measure.raw"
     "build/$profile/stx_skia_stroke_geometry_tests" "build/$profile/stroke-geometry.raw"
     "build/$profile/stx_skia_dash_effect_tests" "build/$profile/dash-effects.raw"
+    "build/$profile/stx_skia_path_clipping_tests" "build/$profile/path-clipping.raw"
     "build/$profile/stx_skia_image_subset_tests" "build/$profile/image-subsets.raw"
     "build/$profile/stx_skia_image_sampling_tests" "build/$profile/image-sampling.raw" "build/$profile/image-sampling-corrected.raw"
     "build/$profile/stx_skia_shader_coordinate_tests" "build/$profile/shader-coordinates.raw"
