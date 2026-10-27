@@ -1387,6 +1387,15 @@ match, except the intentionally corrected sampling artifact; the instrumented su
 PASS. Blurred paths already differed from the reference before this unit and are recorded
 there. See ../results/2026-10-26/CANVAS_DEVICE_CONVERSION.md.
 
+## Blurred path and point divergence (investigation)
+
+The divergence comes from c046c51 and is not intended. Its BoxBlur extent check rejects the
+metadata-only margin query for inverse fills. Its BlurRect profile-size check rejects narrow
+padded rectangles. In both cases the draw falls back unblurred. The original is safe on both
+inputs. Bisection: parent 0b9f2be matches the reference; c046c51 differs in 144 of 288 path
+probes (all inverse fills) and 12 of 216 point probes. No fix is applied yet. See
+../results/2026-10-27/BLURRED_PATH_DIVERGENCE.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

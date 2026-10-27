@@ -84,8 +84,8 @@ built separately with the same test, produced exactly the converted candidate's 
 unit did not introduce the difference: blurred path coverage already differs from the
 reference. The shared corpus therefore draws paths and points unblurred (blurred rectangles,
 rounded rectangles, arcs, regions and images remain), and the candidate before and after this
-unit agree on that corpus too. The source of the blurred-path difference is not investigated
-here.
+unit agree on that corpus too. The difference was later traced to two unintended rejections in
+c046c51; see ../2026-10-27/BLURRED_PATH_DIVERGENCE.md.
 
 M4 arm64, non-Apple LLVM, sequential AGENTS.md commands:
 
