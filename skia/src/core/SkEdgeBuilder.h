@@ -16,10 +16,13 @@
 #include <cstddef>
 
 class SkEdge;
+class SkEdgeClipper;
 class SkPath;
 struct SkPathRaw;
 struct SkAnalyticEdge;
 
+// Builds the edges of a path for scan conversion. Edges live in this builder's arena; the
+// edge lists returned by the subclasses borrow them until the builder is destroyed.
 class SkEdgeBuilder {
 public:
     int buildEdges(const SkPathRaw&, const SkIRect* shiftedClip);
@@ -29,8 +32,8 @@ protected:
     SkEdgeBuilder() = default;
     virtual ~SkEdgeBuilder() = default;
 
-    // In general mode we allocate pointers in fList and fEdgeList points to its head.
-    // In polygon mode we preallocated edges contiguously in fAlloc and fEdgeList points there.
+    // Points to the head of fList once the edges are built. Every element is the subclass's
+    // edge type, stored as void*.
     void**              fEdgeList = nullptr;
     SkTDArray<void*>    fList;
     SkSTArenaAlloc<512> fAlloc;
@@ -45,55 +48,54 @@ private:
     int build    (const SkPathRaw&, const SkIRect* clip, bool clipToTheRight);
     int buildPoly(const SkPathRaw&, const SkIRect* clip, bool clipToTheRight);
 
-    virtual char* allocEdges(size_t n, size_t* sizeof_edge) = 0;
-    virtual SkRect recoverClip(const SkIRect&) const = 0;
+    // SkEdgeClipper::ClipPath consumer; ctx is the build's clip record.
+    static void AddClippedSegments(SkEdgeClipper* clipper, bool newContour, void* ctx);
+    // Splits a quadratic into Y-monotonic pieces and adds each.
+    void addMonotonicQuads(const SkPoint pts[3]);
 
+    virtual SkRect recoverClip(const SkIRect&) const = 0;
+    // Appends the edges for one clipped or monotonic segment.
     virtual void addLine (const SkPoint pts[]) = 0;
     virtual void addQuad (const SkPoint pts[]) = 0;
     virtual void addCubic(const SkPoint pts[]) = 0;
-    virtual Combine addPolyLine(const SkPoint pts[], char* edge, char** edgePtr) = 0;
 };
 
 class SkBasicEdgeBuilder final : public SkEdgeBuilder {
 public:
-    explicit SkBasicEdgeBuilder() {}
+    SkBasicEdgeBuilder() = default;
 
-    SkEdge** edgeList() { return (SkEdge**)fEdgeList; }
+    // Borrows this builder's edges; valid until the builder is destroyed.
+    SkEdge** edgeList() {
+        SkEdge** list = reinterpret_cast<SkEdge**>(fEdgeList);
+        return list;
+    }
 
 private:
     Combine combineVertical(const SkEdge* edge, SkEdge* last);
 
-    char* allocEdges(size_t, size_t*) override {
-        SkDEBUGFAIL("Not implemented");
-        return nullptr;
-    }
-
     SkRect recoverClip(const SkIRect&) const override;
-
     void addLine (const SkPoint pts[]) override;
     void addQuad (const SkPoint pts[]) override;
     void addCubic(const SkPoint pts[]) override;
-    Combine addPolyLine(const SkPoint pts[], char* edge, char** edgePtr) override {
-        SkDEBUGFAIL("Not implemented");
-        return kNo_Combine;
-    }
 };
 
 class SkAnalyticEdgeBuilder final : public SkEdgeBuilder {
 public:
-    SkAnalyticEdgeBuilder() {}
+    SkAnalyticEdgeBuilder() = default;
 
-    SkAnalyticEdge** analyticEdgeList() { return (SkAnalyticEdge**)fEdgeList; }
+    // Borrows this builder's edges; valid until the builder is destroyed.
+    SkAnalyticEdge** analyticEdgeList() {
+        SkAnalyticEdge** list = reinterpret_cast<SkAnalyticEdge**>(fEdgeList);
+        return list;
+    }
 
 private:
     Combine combineVertical(const SkAnalyticEdge* edge, SkAnalyticEdge* last);
 
-    char* allocEdges(size_t, size_t*) override;
     SkRect recoverClip(const SkIRect&) const override;
-
     void addLine (const SkPoint pts[]) override;
     void addQuad (const SkPoint pts[]) override;
     void addCubic(const SkPoint pts[]) override;
-    Combine addPolyLine(const SkPoint pts[], char* edge, char** edgePtr) override;
 };
+
 #endif

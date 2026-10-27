@@ -489,3 +489,9 @@ list(REMOVE_ITEM stx_sources skia/src/core/SkLineClipper.cpp skia/src/core/SkEdg
     skia/src/core/SkQuadClipper.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkLineClipper.cpp
     baseline/skia/src/core/SkEdgeClipper.cpp baseline/skia/src/core/SkQuadClipper.cpp)
+
+# Scan-conversion edges and the edge builder before conversion.
+foreach(unit IN ITEMS SkEdge SkAnalyticEdge SkEdgeBuilder)
+    list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
+    list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
+endforeach()

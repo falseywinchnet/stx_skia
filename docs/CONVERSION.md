@@ -1318,6 +1318,16 @@ corpus and every other shared artifact match, except the intentionally corrected
 artifact; the instrumented suite reports PASS. See
 ../results/2026-10-26/PATH_CLIPPING_CONVERSION.md.
 
+## Scan-conversion edges and the edge builder
+
+Line, quadratic and cubic edges, the analytic anti-aliased edges and both edge builders are
+converted: every edge member starts initialized, macros become functions and constants, the
+builder's lambdas become named functions, and its two uncalled virtuals are removed. The
+analytic inverse table read gains a Release bound. Candidate/reference suites pass 68/68
+and 67/67; the new corpus and every other shared artifact match, except the intentionally
+corrected sampling artifact; the instrumented suite reports PASS. See
+../results/2026-10-26/SCAN_EDGES_CONVERSION.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

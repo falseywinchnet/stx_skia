@@ -20,8 +20,12 @@
 
 struct SkIRect;
 
-// This correctly favors the lower-pixel when y0 is on a 1/2 pixel boundary
-#define SkEdge_Compute_DY(top, y0)  (SkLeftShift(top, 6) + 32 - (y0))
+// Distance in FDot6 from y0 to the center of row top. This correctly favors the lower pixel
+// when y0 is on a 1/2 pixel boundary.
+static inline SkFDot6 SkEdge_Compute_DY(int top, SkFDot6 y0) {
+    const SkFDot6 dy = SkLeftShift(top, 6) + 32 - y0;
+    return dy;
+}
 
 /**
     SkEdge approximates monotonic curves with one or more line segments in a way that makes
@@ -49,23 +53,24 @@ public:
         kCCW = -1,  // counter clockwise
     };
 
-    // Can be used to join edges together
-    SkEdge* fNext;
-    SkEdge* fPrev;
+    // Can be used to join edges together. The links borrow edges owned by the edge builder's
+    // arena (or a scan converter's sentinels).
+    SkEdge* fNext = nullptr;
+    SkEdge* fPrev = nullptr;
 
     // The current line segment starts at (fX, fFirstY + 0.5). It has slope
     // fDxDy (yes, run over rise, because this is geared toward horizontal scanlines)
     // and stops once Y gets to fLastY + 0.5.
-    SkFixed fX;
-    SkFixed fDxDy;
+    SkFixed fX = 0;
+    SkFixed fDxDy = 0;
 
     // These are integers because they represent a discrete pixel. Mathematically, these are
     // treated as half way inside the pixel, so 6 -> 6.5.
-    int32_t fFirstY;
-    int32_t fLastY;
+    int32_t fFirstY = 0;
+    int32_t fLastY = 0;
 
-    Type    fEdgeType;      // Remembers the *initial* edge type
-    Winding fWinding;
+    Type    fEdgeType = Type::kLine;      // Remembers the *initial* edge type
+    Winding fWinding = Winding::kCW;
 
     // Represent a straight line with an optional clip. This will always be a single segment.
     // Returns false if the line has height 0.
@@ -74,7 +79,8 @@ public:
     inline bool setLine(const SkPoint& p0, const SkPoint& p1);
 
     bool hasNextSegment() const {
-        return fSegmentCount != 0;
+        const bool more = fSegmentCount != 0;
+        return more;
     }
     // Update fX, fDxDY, fFirstY, and fLastY to represent the segment. It will skip over
     // any lines that have a height of 0 pixels and return false if there were only 0-height
@@ -89,10 +95,10 @@ public:
 protected:
     inline bool updateLine(SkFixed ax, SkFixed ay, SkFixed bx, SkFixed by);
 
-    uint8_t fSegmentCount; // only non-zero for Quad and Cubics
+    uint8_t fSegmentCount = 0; // only non-zero for Quad and Cubics
     // How much to shift the derivatives to multiply by deltaT when doing forward-differencing.
     // For cubics, this is log_2(N) and for quadratics this is log_2(N) - 1.
-    uint8_t fCurveShift;
+    uint8_t fCurveShift = 0;
 
 private:
     void chopLineWithClip(const SkIRect& clip);
@@ -102,8 +108,8 @@ public:
     virtual void dump() const;
     void validate() const {
         SkASSERT(fPrev && fNext);
-        SkASSERT(fPrev->fNext == this);
-        SkASSERT(fNext->fPrev == this);
+        SkASSERT((*fPrev).fNext == this);
+        SkASSERT((*fNext).fPrev == this);
 
         SkASSERT(fFirstY <= fLastY);
         SkASSERT(fWinding == Winding::kCW || fWinding == Winding::kCCW);
@@ -119,19 +125,23 @@ public:
 
 private:
     // These are the non-rounded points that the current line segment ends at.
-    SkFixed fQx, fQy;
+    SkFixed fQx = 0;
+    SkFixed fQy = 0;
     // These represent the first derivatives of the quadratic curve evaluated
     // at the midpoint of the next line segment. To avoid overflows, we store them as half
     // their normal value. During the forward-difference step, instead of multiplying by
     // a deltaT of 1/N, we'll multiply by 2/N instead.
-    SkFixed fQDxDt, fQDyDt;
+    SkFixed fQDxDt = 0;
+    SkFixed fQDyDt = 0;
     // These are the second derivatives of the quadratic curve pre-multiplied by 1/N.
-    SkFixed fQD2xDt2, fQD2yDt2;
+    SkFixed fQD2xDt2 = 0;
+    SkFixed fQD2yDt2 = 0;
 
     // The non-rounded end points for the entire curve. On the last segment, these
     // will be used instead of the results from our forward-differnce technique
     // to make sure cumulative error doesn't result in a dramatically different line.
-    SkFixed fQLastX, fQLastY;
+    SkFixed fQLastX = 0;
+    SkFixed fQLastY = 0;
 
 #if defined(SK_DEBUG)
 public:
@@ -147,17 +157,22 @@ public:
 
 private:
     // These are the non-rounded points that the current line segment ends at.
-    SkFixed fCx, fCy;
-    SkFixed fCDxDt, fCDyDt;
-    SkFixed fCD2xDt2, fCD2yDt2;
-    SkFixed fCD3xDt3, fCD3yDt3;
+    SkFixed fCx = 0;
+    SkFixed fCy = 0;
+    SkFixed fCDxDt = 0;
+    SkFixed fCDyDt = 0;
+    SkFixed fCD2xDt2 = 0;
+    SkFixed fCD2yDt2 = 0;
+    SkFixed fCD3xDt3 = 0;
+    SkFixed fCD3yDt3 = 0;
 
     // The non-rounded end points for the entire curve. On the last segment, these
     // will be used instead of the results from our forward-difference technique
     // to make sure cumulative error doesn't result in a dramatically different line.
-    SkFixed fCLastX, fCLastY;
+    SkFixed fCLastX = 0;
+    SkFixed fCLastY = 0;
 
-    uint8_t fToFixedShift; // applied to fCDxDt and fCDyDt in nextSegment() to align to SkFixed
+    uint8_t fToFixedShift = 0; // applied to fCDxDt and fCDyDt in nextSegment() to align to SkFixed
 
 #if defined(SK_DEBUG)
 public:
@@ -166,38 +181,35 @@ public:
 };
 
 bool SkEdge::setLine(const SkPoint& p0, const SkPoint& p1) {
-    SkFDot6 x0, y0, x1, y1;
-
 #if defined(SK_RASTERIZE_EVEN_ROUNDING)
-    x0 = SkScalarRoundToFDot6(p0.fX, 0);
-    y0 = SkScalarRoundToFDot6(p0.fY, 0);
-    x1 = SkScalarRoundToFDot6(p1.fX, 0);
-    y1 = SkScalarRoundToFDot6(p1.fY, 0);
+    SkFDot6 x0 = SkScalarRoundToFDot6(p0.fX, 0);
+    SkFDot6 y0 = SkScalarRoundToFDot6(p0.fY, 0);
+    SkFDot6 x1 = SkScalarRoundToFDot6(p1.fX, 0);
+    SkFDot6 y1 = SkScalarRoundToFDot6(p1.fY, 0);
 #else
-    x0 = SkFloatToFDot6(p0.fX);
-    y0 = SkFloatToFDot6(p0.fY);
-    x1 = SkFloatToFDot6(p1.fX);
-    y1 = SkFloatToFDot6(p1.fY);
+    SkFDot6 x0 = SkFloatToFDot6(p0.fX);
+    SkFDot6 y0 = SkFloatToFDot6(p0.fY);
+    SkFDot6 x1 = SkFloatToFDot6(p1.fX);
+    SkFDot6 y1 = SkFloatToFDot6(p1.fY);
 #endif
 
     Winding winding = Winding::kCW;
 
     if (y0 > y1) {
-        using std::swap;
-        swap(x0, x1);
-        swap(y0, y1);
+        std::swap(x0, x1);
+        std::swap(y0, y1);
         winding = Winding::kCCW;
     }
 
-    int top = SkFDot6Round(y0);
-    int bot = SkFDot6Round(y1);
+    const int top = SkFDot6Round(y0);
+    const int bot = SkFDot6Round(y1);
 
     // are we a zero-height line?
     if (top == bot) {
         return false;
     }
 
-    SkFixed slope = SkFDot6Div(x1 - x0, y1 - y0);
+    const SkFixed slope = SkFDot6Div(x1 - x0, y1 - y0);
     const SkFDot6 dy  = SkEdge_Compute_DY(top, y0);
 
     // Note that SkFixedMul(SkFixed, SkFDot6) produces results in SkFDot6
