@@ -18,7 +18,8 @@ namespace SkStreamPriv {
 // true if there are not enough bytes in the stream to fulfill a read of the given length.
 // Otherwise, it returns false.
 // False does *not* mean a read will succeed of the given length, but true means we are
-// certain it will fail.
+// certain it will fail. A position past the length leaves nothing, so every length is
+// below it. The stream must not be null; a null stream stops the program.
 bool RemainingLengthIsBelow(SkStream* stream, size_t len);
 
 }  // namespace SkStreamPriv

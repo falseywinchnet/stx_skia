@@ -1590,18 +1590,26 @@ directories, and 58 headers only they included, are removed: 953 files the candi
 compiled or read. The reference build takes the sources it needs from baseline/skia. See
 ../results/2026-10-27/UPSTREAM_TREE_CLEANUP.md.
 
+## Streams
+
+Only the abstract `SkStream` and `SkWStream` interfaces and `RemainingLengthIsBelow` are kept;
+the concrete streams, typed readers and writers, the other private helpers and MD5 had no
+user and are removed. The kept code is respelled, then fixed: `writeText(nullptr)` writes
+nothing and returns false instead of calling `strlen` on null, and a null stream given to
+`RemainingLengthIsBelow` stops the program in Release. See
+../results/2026-10-27/STREAM_CONVERSION.md.
+
 ## Still required
 
-Refreshed 2026-10-27 at the font-machinery check. The whole-library AST inventory counts 801
-excluded constructs in 58 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 after the streams. The whole-library AST inventory counts 619 excluded
+constructs in 53 files, almost all `->` member arrows. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
 - **Remaining tree cleanup.** Public headers that nothing compiled includes and no consumer
   uses. The unbuilt upstream test, GM, benchmark and tool trees under `skia/` are kept as
   preserved sources.
-- **Memory, containers and support code (about 510).** Streams (GUI.Forms uses `SkStream` in
-  one place), strings, `TArray`, `TBlockList`, the block allocator, the arena, `SkZip`,
+- **Memory, containers and support code.** Strings, `TArray`, `TBlockList`, the block allocator, the arena, `SkZip`,
   `SkBuffer`, `SkRandom`, MD5, the spinlock, data tables, time, CPU detection, tracing and
   assertion helpers, and the POSIX file port. Also the compatibility remnants:
   `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the `SkSpan`

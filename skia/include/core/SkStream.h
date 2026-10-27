@@ -81,8 +81,11 @@ public:
 
     // helpers
 
+    /** Writes the bytes of a null-terminated string, without the terminator. A null text
+        writes nothing and returns false.
+    */
     bool writeText(const char text[]) {
-        SkASSERT(text);
+        if (text == nullptr) return false;
         return (*this).write(text, std::strlen(text));
     }
 

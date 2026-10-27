@@ -19,7 +19,7 @@ void SkWStream::flush() {}
 namespace SkStreamPriv {
 
 bool RemainingLengthIsBelow(SkStream* stream, size_t len) {
-    SkASSERT(stream);
+    SkASSERT_RELEASE(stream != nullptr);
     if ((*stream).hasLength()) {
         if ((*stream).hasPosition()) {
             const size_t total = (*stream).getLength();

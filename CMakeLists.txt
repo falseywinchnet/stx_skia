@@ -536,6 +536,12 @@ if(BUILD_TESTING)
     add_executable(stx_skia_stream_core_tests tests/stream_core.cpp)
     target_link_libraries(stx_skia_stream_core_tests PRIVATE stx_skia)
     add_test(NAME stream_core_contract COMMAND stx_skia_stream_core_tests)
+    if(NOT STX_SKIA_BASELINE)
+        # A null stream violates a Release-checked precondition and must stop the program.
+        add_test(NAME stream_core_stops_null-stream
+                 COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_stream_core_tests>
+                         -DMODE=--null-stream -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+    endif()
     add_executable(stx_skia_tiled_clip_shader_tests tests/tiled_clip_shader.cpp)
     target_link_libraries(stx_skia_tiled_clip_shader_tests PRIVATE stx_skia)
     add_test(NAME tiled_clip_shader_contract COMMAND stx_skia_tiled_clip_shader_tests)
