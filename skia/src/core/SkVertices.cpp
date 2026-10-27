@@ -10,13 +10,9 @@
 #include "include/private/SkDebug.h"
 #include "include/private/SkMalloc.h"
 #include "include/private/SkTo.h"
-#include "src/core/SkPicturePriv.h"
-#include "src/core/SkReadBuffer.h"
 #include "src/core/SkSafeMath.h"
-#include "src/core/SkSafeRange.h"
 #include "src/core/SkVerticesPriv.h"
 #include "src/core/SkVx.h"
-#include "src/core/SkWriteBuffer.h"
 
 #include <algorithm>
 #include <atomic>
@@ -270,110 +266,6 @@ SkVertices::Sizes SkVertices::getSizes() const {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-// storage = packed | vertex_count | index_count | attr_count
-//           | pos[] | custom[] | texs[] | colors[] | indices[]
-
-#define kMode_Mask          0x0FF
-#define kHasTexs_Mask       0x100
-#define kHasColors_Mask     0x200
-
-void SkVerticesPriv::encode(SkWriteBuffer& buffer) const {
-    // packed has room for additional flags in the future
-    uint32_t packed = static_cast<uint32_t>(fVertices->fMode);
-    SkASSERT((packed & ~kMode_Mask) == 0);  // our mode fits in the mask bits
-    if (fVertices->fTexs) {
-        packed |= kHasTexs_Mask;
-    }
-    if (fVertices->fColors) {
-        packed |= kHasColors_Mask;
-    }
-
-    SkVertices::Sizes sizes = fVertices->getSizes();
-    SkASSERT(!sizes.fBuilderTriFanISize);
-
-    // Header
-    buffer.writeUInt(packed);
-    buffer.writeInt(fVertices->fVertexCount);
-    buffer.writeInt(fVertices->fIndexCount);
-
-    // Data arrays
-    buffer.writeByteArray(fVertices->fPositions, sizes.fVSize);
-    buffer.writeByteArray(fVertices->fTexs, sizes.fTSize);
-    buffer.writeByteArray(fVertices->fColors, sizes.fCSize);
-    // if index-count is odd, we won't be 4-bytes aligned, so we call the pad version
-    buffer.writeByteArray(fVertices->fIndices, sizes.fISize);
-}
-
-sk_sp<SkVertices> SkVerticesPriv::Decode(SkReadBuffer& buffer) {
-    auto decode = [](SkReadBuffer& buffer) -> sk_sp<SkVertices> {
-        SkSafeRange safe;
-        bool hasCustomData = buffer.isVersionLT(SkPicturePriv::kVerticesRemoveCustomData_Version);
-
-        const uint32_t packed = buffer.readUInt();
-        const int vertexCount = safe.checkGE(buffer.readInt(), 0);
-        const int indexCount = safe.checkGE(buffer.readInt(), 0);
-        const int attrCount = hasCustomData ? safe.checkGE(buffer.readInt(), 0) : 0;
-        const SkVertices::VertexMode mode = safe.checkLE<SkVertices::VertexMode>(
-                packed & kMode_Mask, SkVertices::kLast_VertexMode);
-        const bool hasTexs = SkToBool(packed & kHasTexs_Mask);
-        const bool hasColors = SkToBool(packed & kHasColors_Mask);
-
-        // Check that the header fields and buffer are valid. If this is data with the experimental
-        // custom attributes feature - we don't support that any more.
-        // We also don't support serialized triangle-fan data. We stopped writing that long ago,
-        // so it should never appear in valid encoded data.
-        if (!safe || !buffer.isValid() || attrCount ||
-            mode == SkVertices::kTriangleFan_VertexMode) {
-            return nullptr;
-        }
-
-        const SkVertices::Desc desc{mode, vertexCount, indexCount, hasTexs, hasColors};
-        SkVertices::Sizes sizes(desc);
-        if (!sizes.isValid() || sizes.fArrays > buffer.available()) {
-            return nullptr;
-        }
-
-        SkVertices::Builder builder(desc);
-        if (!builder.isValid()) {
-            return nullptr;
-        }
-
-        buffer.readByteArray(builder.positions(), sizes.fVSize);
-        if (hasCustomData) {
-            size_t customDataSize = 0;
-            buffer.skipByteArray(&customDataSize);
-            if (customDataSize != 0) {
-                return nullptr;
-            }
-        }
-        buffer.readByteArray(builder.texCoords(), sizes.fTSize);
-        buffer.readByteArray(builder.colors(), sizes.fCSize);
-        buffer.readByteArray(builder.indices(), sizes.fISize);
-
-        if (!buffer.isValid()) {
-            return nullptr;
-        }
-
-        if (indexCount > 0) {
-            // validate that the indices are in range
-            const uint16_t* indices = builder.indices();
-            for (int i = 0; i < indexCount; ++i) {
-                if (indices[i] >= (unsigned)vertexCount) {
-                    return nullptr;
-                }
-            }
-        }
-
-        return builder.detach();
-    };
-
-    if (auto verts = decode(buffer)) {
-        return verts;
-    }
-    buffer.validate(false);
-    return nullptr;
-}
 
 void SkVertices::operator delete(void* p) {
     ::operator delete(p);
