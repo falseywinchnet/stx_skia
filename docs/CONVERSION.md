@@ -1637,10 +1637,20 @@ Fixed: destructible types aligned beyond 256 bytes, whose padding a footer canno
 which crashed at destruction, no longer compile; `reset()` reinitializes in place instead of
 replacing what may be a base-class subobject. See ../results/2026-10-27/ARENA_CONVERSION.md.
 
+## Compiled code nothing reaches
+
+A fixed-point symbol check over every compiled source found 21 objects nothing live reaches.
+The internal ones are removed: the legacy bitmap shader-context path and its kernels (images
+draw through the raster pipeline), the tracing machinery (tracing is compiled out), the SkSL
+type tables, the spinlock, the codec mask helpers, two unused math and hex helpers and a no-op
+port. `SkImageAndroid.h` loses its GPU and undefined declarations, so no compiled source
+includes a GPU header. Public API without callers awaits the owner. See
+../results/2026-10-27/DEAD_CODE_REMOVAL.md.
+
 ## Still required
 
-Refreshed 2026-10-27 after the arena. The whole-library AST inventory counts 309 excluded
-constructs in 44 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 after the dead-code removal. The whole-library AST inventory counts 276
+excluded constructs in 35 files, almost all `->` member arrows. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
@@ -1655,9 +1665,9 @@ conversion evidence. Each unit also fixes defects, as before.
 - **Shaders and colour (about 180).** skcms (`Transform_inl.h`, `skcms_public.h`),
   `SkColorSpace`, `SkColor`, `SkBlendMode`, and the triangle-colour and Perlin-noise shaders.
   GUI.Forms does not call the Perlin-noise shader.
-- **Raster pipeline and pixel kernels (about 65).** The bitmap-sampling procedures, row
-  blending and swizzles (`SkBitmapProcState`, `SkBlitRow_opts.h`, `SkSwizzler_opts.inc`,
-  `Sk4px.h`, `SkVx.h`). Imported optimized code stays the baseline. GUI.Forms' wasm build
+- **Raster pipeline and pixel kernels.** Row blending, mask blitting and swizzles
+  (`SkBlitRow_opts.h`, `SkBlitMask_opts.h`, `SkSwizzler_opts.inc`, `Sk4px.h`, `SkVx.h`). The
+  bitmap-sampling procedures were unreachable and are removed. Imported optimized code stays the baseline. GUI.Forms' wasm build
   (SSE4.1 emulated over SIMD128) and the planned Android NDK build (NEON) need these paths to
   keep compiling. New SIMD work follows the 128-bit portable policy and needs measurements.
 - **Canvas-adjacent state.** `SkRSXform`, `SkPoint3`, `SkMatrix22` and lattice iteration.

@@ -287,7 +287,12 @@ foreach(unit IN ITEMS src/core/SkDistanceFieldGen.cpp src/core/SkDocument.cpp
         src/utils/SkOSPath.cpp src/utils/mac/SkCreateCGImageRef.cpp src/utils/SkPatchUtils.cpp
         src/utils/SkMatrix22.cpp src/utils/win/SkAutoCoInitialize.cpp
         src/utils/win/SkDWriteGeometrySink.cpp src/utils/win/SkHRESULT.cpp
-        src/utils/win/SkIStream.cpp src/core/SkStream.cpp src/core/SkMD5.cpp)
+        src/utils/win/SkIStream.cpp src/core/SkStream.cpp src/core/SkMD5.cpp
+        src/core/SkATrace.cpp src/utils/SkEventTracer.cpp src/core/SkSLTypeShared.cpp
+        src/core/SkSpinlock.cpp src/core/SkMasks.cpp src/core/SkMathPriv.cpp src/core/SkUtils.cpp
+        src/core/SkBitmapProcState.cpp src/core/SkBitmapProcState_matrixProcs.cpp
+        src/core/SkBitmapProcState_opts.cpp src/core/SkBitmapProcState_opts_lasx.cpp
+        src/core/SkBitmapProcState_opts_ssse3.cpp src/shaders/SkBitmapProcShader.cpp)
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()

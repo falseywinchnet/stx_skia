@@ -28,7 +28,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/codec/SkSwizzler.cpp
     skia/src/codec/SkTiffUtility.cpp
     skia/src/core/SkAAClip.cpp
-    skia/src/core/SkATrace.cpp
     skia/src/core/SkAlphaRuns.cpp
     skia/src/core/SkAnalyticEdge.cpp
     skia/src/core/SkArenaAlloc.cpp
@@ -40,11 +39,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkBitmap.cpp
     skia/src/core/SkBitmapCache.cpp
     skia/src/core/SkBitmapDevice.cpp
-    skia/src/core/SkBitmapProcState.cpp
-    skia/src/core/SkBitmapProcState_matrixProcs.cpp
-    skia/src/core/SkBitmapProcState_opts.cpp
-    skia/src/core/SkBitmapProcState_opts_lasx.cpp
-    skia/src/core/SkBitmapProcState_opts_ssse3.cpp
     skia/src/core/SkBlendMode.cpp
     skia/src/core/SkBlendModeBlender.cpp
     skia/src/core/SkBlitMask_opts.cpp
@@ -129,8 +123,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkMaskFilter.cpp
     skia/src/core/SkMaskFilterBase.cpp
     skia/src/core/SkMaskGamma.cpp
-    skia/src/core/SkMasks.cpp
-    skia/src/core/SkMathPriv.cpp
     skia/src/core/SkMatrix.cpp
     skia/src/core/SkMatrixInvert.cpp
     skia/src/core/SkMemset_opts.cpp
@@ -193,7 +185,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkResourceCache.cpp
     skia/src/core/SkRuntimeBlender.cpp
     skia/src/core/SkRuntimeEffect.cpp
-    skia/src/core/SkSLTypeShared.cpp
     skia/src/core/SkSafeMath.cpp
     skia/src/core/SkScalar.cpp
     skia/src/core/SkScalerContext.cpp
@@ -206,7 +197,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkSemaphore.cpp
     skia/src/core/SkSharedMutex.cpp
     skia/src/core/SkSpecialImage.cpp
-    skia/src/core/SkSpinlock.cpp
     skia/src/core/SkSpriteBlitter_ARGB32.cpp
     skia/src/core/SkStream.cpp
     skia/src/core/SkStrike.cpp
@@ -233,7 +223,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkTypeface_remote.cpp
     skia/src/core/SkUTF.cpp
     skia/src/core/SkUnPreMultiply.cpp
-    skia/src/core/SkUtils.cpp
     skia/src/core/SkVertState.cpp
     skia/src/core/SkVertices.cpp
     skia/src/core/SkWriteBuffer.cpp
@@ -300,7 +289,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/image/SkSurface_Raster.cpp
     skia/src/image/SkTiledImageUtils.cpp
     skia/src/lazy/SkDiscardableMemoryPool.cpp
-    skia/src/ports/SkDiscardableMemory_none.cpp
     skia/src/ports/SkImageGeneratorCG.cpp
     skia/src/ports/SkLog_stdio.cpp
     skia/src/ports/SkMemory_malloc.cpp
@@ -308,7 +296,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/ports/SkOSFile_stdio.cpp
     skia/src/sfnt/SkOTTable_name.cpp
     skia/src/sfnt/SkOTUtils.cpp
-    skia/src/shaders/SkBitmapProcShader.cpp
     skia/src/shaders/SkBlendShader.cpp
     skia/src/shaders/SkColorFilterShader.cpp
     skia/src/shaders/SkColorShader.cpp
@@ -441,7 +428,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/utils/SkCharToGlyphCache.cpp
     skia/src/utils/SkCustomTypeface.cpp
     skia/src/utils/SkDashPath.cpp
-    skia/src/utils/SkEventTracer.cpp
     skia/src/utils/SkMultiPictureDocument.cpp
     skia/src/utils/SkOrderedFontMgr.cpp
     skia/src/utils/SkPatchUtils.cpp

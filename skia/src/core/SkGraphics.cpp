@@ -7,7 +7,6 @@
 
 #include "include/core/SkGraphics.h"
 
-#include "src/core/SkBitmapProcState.h"
 #include "src/core/SkBlitMask.h"
 #include "src/core/SkBlitRow.h"
 #include "src/core/SkCpu.h"
@@ -20,7 +19,6 @@ void SkGraphics::Init() {
     // SkGraphics::Init() must be thread-safe and idempotent.
     SkCpu::CacheRuntimeFeatures();
     SkOpts::Init();
-    SkOpts::Init_BitmapProcState();
     SkOpts::Init_BlitMask();
     SkOpts::Init_BlitRow();
     SkOpts::Init_Memset();

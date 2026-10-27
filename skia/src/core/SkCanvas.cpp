@@ -48,7 +48,6 @@
 #include "src/core/SkPaintPriv.h"
 #include "src/core/SkSpecialImage.h"
 #include "src/core/SkSurfacePriv.h"
-#include "src/core/SkTraceEvent.h"
 #include "src/core/SkVerticesPriv.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 #include "src/image/SkSurface_Base.h"
@@ -474,7 +473,6 @@ int SkCanvas::saveLayer(const SkRect* bounds, const SkPaint* paint) {
 }
 
 int SkCanvas::saveLayer(const SaveLayerRec& rec) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (rec.fPaint && (*this).nothingToDraw(*rec.fPaint)) {
         // no need for the layer (or any of the draws until the matching restore()
         (*this).save();
@@ -1155,7 +1153,6 @@ SkRecorder* SkCanvas::baseRecorder() const {
 
 void SkCanvas::drawDRRect(const SkRRect& outer, const SkRRect& inner,
                           const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (outer.isEmpty()) {
         return;
     }
@@ -1177,24 +1174,20 @@ void SkCanvas::drawDRRect(const SkRRect& outer, const SkRRect& inner,
 }
 
 void SkCanvas::drawPaint(const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     (*this).onDrawPaint(paint);
 }
 
 void SkCanvas::drawRect(const SkRect& r, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     // To avoid redundant logic in our culling code and various backends, we always sort rects
     // before passing them along.
     (*this).onDrawRect(r.makeSorted(), paint);
 }
 
 void SkCanvas::drawClippedToSaveBehind(const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     (*this).onDrawBehind(paint);
 }
 
 void SkCanvas::drawRegion(const SkRegion& region, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (region.isEmpty()) {
         return;
     }
@@ -1208,19 +1201,16 @@ void SkCanvas::drawRegion(const SkRegion& region, const SkPaint& paint) {
 }
 
 void SkCanvas::drawOval(const SkRect& r, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     // To avoid redundant logic in our culling code and various backends, we always sort rects
     // before passing them along.
     (*this).onDrawOval(r.makeSorted(), paint);
 }
 
 void SkCanvas::drawRRect(const SkRRect& rrect, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     (*this).onDrawRRect(rrect, paint);
 }
 
 void SkCanvas::drawPoints(PointMode mode, SkSpan<const SkPoint> pts, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (!pts.empty()) {
         (*this).onDrawPoints(mode, pts.size(), pts.data(), paint);
     }
@@ -1232,7 +1222,6 @@ void SkCanvas::drawVertices(const sk_sp<SkVertices>& vertices, SkBlendMode mode,
 }
 
 void SkCanvas::drawVertices(const SkVertices* vertices, SkBlendMode mode, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (nullptr == vertices) {
         return;
     }
@@ -1244,7 +1233,6 @@ void SkCanvas::drawVertices(const SkVertices* vertices, SkBlendMode mode, const 
 }
 
 void SkCanvas::drawPath(const SkPath& path, const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     (*this).onDrawPath(path, paint);
 }
 
@@ -1288,7 +1276,6 @@ void SkCanvas::drawImageNine(const SkImage* image, const SkIRect& center, const 
 
 void SkCanvas::drawImageLattice(const SkImage* image, const Lattice& lattice, const SkRect& dst,
                                 SkFilterMode filter, const SkPaint* paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (nullptr == image) {
         return;
     }
@@ -1316,7 +1303,6 @@ void SkCanvas::drawAtlas(const SkImage* atlas, SkSpan<const SkRSXform> xform,
                          SkSpan<const SkRect> tex, SkSpan<const SkColor> colors, SkBlendMode mode,
                          const SkSamplingOptions& sampling, const SkRect* cull,
                          const SkPaint* paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (nullptr == atlas) {
         return;
     }
@@ -1335,7 +1321,6 @@ void SkCanvas::drawAtlas(const SkImage* atlas, SkSpan<const SkRSXform> xform,
 void SkCanvas::experimental_DrawEdgeAAQuad(const SkRect& rect, const SkPoint clip[4],
                                            QuadAAFlags aaFlags, const SkColor4f& color,
                                            SkBlendMode mode) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     // Make sure the rect is sorted before passing it along
     (*this).onDrawEdgeAAQuad(rect.makeSorted(), clip, aaFlags, color, mode);
 }
@@ -1346,7 +1331,6 @@ void SkCanvas::experimental_DrawEdgeAAImageSet(const ImageSetEntry imageSet[], i
                                                const SkSamplingOptions& sampling,
                                                const SkPaint* paint,
                                                SrcRectConstraint constraint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     // Route single, rectangular quads to drawImageRect() to take advantage of image filter
     // optimizations that avoid a layer.
     if (paint && (*paint).getMaskFilter() && cnt == 1) {
@@ -1677,7 +1661,6 @@ void SkCanvas::onDrawImageLattice2(const SkImage* image, const Lattice& lattice,
 
 void SkCanvas::drawImage(const SkImage* image, SkScalar x, SkScalar y,
                          const SkSamplingOptions& sampling, const SkPaint* paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (nullptr == image) {
         return;
     }
@@ -1729,7 +1712,6 @@ void SkCanvas::onDrawVerticesObject(const SkVertices* vertices, SkBlendMode bmod
 void SkCanvas::drawPatch(const SkPoint cubics[12], const SkColor colors[4],
                          const SkPoint texCoords[4], SkBlendMode bmode,
                          const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (nullptr == cubics) {
         return;
     }
@@ -1889,7 +1871,6 @@ void SkCanvas::drawRoundRect(const SkRect& r, SkScalar rx, SkScalar ry,
 void SkCanvas::drawArc(const SkRect& oval, SkScalar startAngle,
                        SkScalar sweepAngle, bool useCenter,
                        const SkPaint& paint) {
-    TRACE_EVENT0("skia", TRACE_FUNC);
     if (oval.isEmpty() || !sweepAngle) {
         return;
     }
