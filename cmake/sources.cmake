@@ -88,8 +88,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkDeque.cpp
     skia/src/core/SkDescriptor.cpp
     skia/src/core/SkDevice.cpp
-    skia/src/core/SkDistanceFieldGen.cpp
-    skia/src/core/SkDocument.cpp
     skia/src/core/SkDraw.cpp
     skia/src/core/SkDraw_atlas.cpp
     skia/src/core/SkDraw_text.cpp
@@ -441,26 +439,18 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/text/GlyphRun.cpp
     skia/src/text/SlugFromBuffer.cpp
     skia/src/text/StrikeForGPU.cpp
-    skia/src/utils/SkCamera.cpp
     skia/src/utils/SkCharToGlyphCache.cpp
     skia/src/utils/SkCustomTypeface.cpp
     skia/src/utils/SkDashPath.cpp
     skia/src/utils/SkEventTracer.cpp
-    skia/src/utils/SkFloatToDecimal.cpp
-    skia/src/utils/SkJSONWriter.cpp
     skia/src/utils/SkMatrix22.cpp
     skia/src/utils/SkMultiPictureDocument.cpp
-    skia/src/utils/SkOSPath.cpp
     skia/src/utils/SkOrderedFontMgr.cpp
-    skia/src/utils/SkParse.cpp
-    skia/src/utils/SkParseColor.cpp
-    skia/src/utils/SkParsePath.cpp
     skia/src/utils/SkPatchUtils.cpp
     skia/src/utils/SkShaderUtils.cpp
     skia/src/utils/SkTextUtils.cpp
     skia/src/utils/mac/SkCTFont.cpp
     skia/src/utils/mac/SkCTFontCreateExactCopy.cpp
-    skia/src/utils/mac/SkCreateCGImageRef.cpp
     skia/src/utils/win/SkAutoCoInitialize.cpp
     skia/src/utils/win/SkDWrite.cpp
     skia/src/utils/win/SkDWriteFontFileStream.cpp

@@ -52,6 +52,11 @@ static_assert(!HasAnnotations<SkCanvas>);
 #if __has_include("include/utils/SkShadowUtils.h")
 #error Shadow utilities must not be installed.
 #endif
+#if __has_include("include/core/SkDocument.h") || __has_include("include/utils/SkCamera.h") || \
+    __has_include("include/utils/SkParse.h") || __has_include("include/utils/SkParsePath.h") || \
+    __has_include("include/utils/mac/SkCGUtils.h")
+#error Document, camera, parsing and CoreGraphics bridge headers must not be installed.
+#endif
 #if __has_include("include/effects/SkRuntimeEffect.h")
 #error Runtime compiler headers must not be installed.
 #endif

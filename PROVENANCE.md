@@ -287,3 +287,15 @@ the polygon utilities. SkCanvas loses private_draw_shadow_rec and onDrawShadowRe
 loses drawShadow, and the virtual enforcer and no-draw canvas lose their overrides. The
 upstream ShadowTest.cpp, PolyUtilsTest.cpp and TDPQueueTest.cpp sources are preserved and not
 built. tests/canvas_device.cpp and the installed-consumer test check the absence.
+
+## Unused utility removal
+
+SkDocument (with the PDF and XPS document headers in include/docs and
+SkMultiPictureDocumentPriv.h), SkCamera, SkJSONWriter, SkDistanceFieldGen, SkParse,
+SkParseColor, SkParsePath, SkFloatToDecimal, SkOSPath and the CoreGraphics image bridge
+(SkCGUtils.h, SkCreateCGImageRef.cpp, SkCGBase.h, SkCGGeometry.h) now live only in
+baseline/skia, unchanged with their notices. A symbol-level check of the candidate archive
+found no library object or test referencing them apart from each other, and GUI.Forms calls
+none of them. The reference build compiles the baseline sources. SkUniqueCFRef.h stays; a
+template-helper test uses it. tests/canvas_device.cpp and the installed-consumer test check
+the absence.

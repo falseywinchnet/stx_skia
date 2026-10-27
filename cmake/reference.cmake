@@ -280,6 +280,15 @@ list(APPEND stx_sources baseline/skia/src/utils/win/SkDWrite.cpp)
 list(REMOVE_ITEM stx_sources skia/src/core/SkMaskGamma.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkMaskGamma.cpp)
 
+# Removed from the candidate on 2026-10-27; the reference keeps compiling the originals.
+foreach(unit IN ITEMS src/core/SkDistanceFieldGen.cpp src/core/SkDocument.cpp
+        src/utils/SkCamera.cpp src/utils/SkJSONWriter.cpp src/utils/SkParse.cpp
+        src/utils/SkParseColor.cpp src/utils/SkParsePath.cpp src/utils/SkFloatToDecimal.cpp
+        src/utils/SkOSPath.cpp src/utils/mac/SkCreateCGImageRef.cpp)
+    list(REMOVE_ITEM stx_sources skia/${unit})
+    list(APPEND stx_sources baseline/skia/${unit})
+endforeach()
+
 if(NOT APPLE)
     list(FILTER stx_sources EXCLUDE REGEX "baseline/skia/src/utils/mac/.*\\.cpp$")
 endif()

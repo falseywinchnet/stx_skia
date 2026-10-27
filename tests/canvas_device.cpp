@@ -86,6 +86,15 @@ static_assert(!HasAnnotations<SkCanvas>);
     __has_include("src/core/SkTDPQueue.h")
 #error Shadow, polygon and priority-queue headers must not be part of the candidate.
 #endif
+// Documents, the camera, JSON writing, distance fields, parsing, path and float formatting
+// helpers and the CoreGraphics image bridge had no user in the library or GUI.Forms.
+#if __has_include("include/core/SkDocument.h") || __has_include("include/docs/SkPDFDocument.h") || \
+    __has_include("include/utils/SkCamera.h") || __has_include("include/utils/SkParse.h") || \
+    __has_include("include/utils/SkParsePath.h") || __has_include("include/utils/mac/SkCGUtils.h") || \
+    __has_include("src/core/SkDistanceFieldGen.h") || __has_include("src/utils/SkJSONWriter.h") || \
+    __has_include("src/utils/SkFloatToDecimal.h") || __has_include("src/utils/SkOSPath.h")
+#error Document, camera, parsing and other unused utility headers must not be part of the candidate.
+#endif
 #endif
 // The canvas's shadow entry point, detected by expression so that overloads count.
 struct SkDrawShadowRec;
