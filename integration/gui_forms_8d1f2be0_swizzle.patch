@@ -1,0 +1,355 @@
+--- a/src/controls/raster_canvas/raster_canvas.cpp
++++ b/src/controls/raster_canvas/raster_canvas.cpp
+@@ -1,6 +1,7 @@
+ #include "gui_forms/controls/raster_canvas/raster_canvas.hpp"
+ 
+ #include "gui_forms/window.hpp"
++#include "stx_skia/swizzle.hpp"
+ 
+ #include <array>
+ #include <algorithm>
+@@ -18,25 +19,17 @@
+         std::abs(origin.x) <= limit && std::abs(origin.y) <= limit;
+ }
+ 
+-[[nodiscard]] std::vector<std::byte> rgba_to_bgra(
++// Fills result with width x height pixels of source rows, source_row_bytes apart, as
++// tightly packed BGRA rows, reusing result's storage. False if the rows do not fit source.
++[[nodiscard]] bool rgba_to_bgra(
+     std::span<const std::byte> source, std::size_t source_row_bytes,
+-    std::uint32_t width, std::uint32_t height) {
+-    std::vector<std::byte> result(
+-        static_cast<std::size_t>(width) * height * 4U);
++    std::uint32_t width, std::uint32_t height, std::vector<std::byte>& result) {
+     const std::size_t tight_row = static_cast<std::size_t>(width) * 4U;
+-    for (std::uint32_t row = 0; row < height; ++row) {
+-        const std::byte* input = source.data() +
+-            static_cast<std::size_t>(row) * source_row_bytes;
+-        std::byte* output = result.data() + static_cast<std::size_t>(row) * tight_row;
+-        for (std::uint32_t column = 0; column < width; ++column) {
+-            const std::size_t pixel = static_cast<std::size_t>(column) * 4U;
+-            output[pixel] = input[pixel + 2U];
+-            output[pixel + 1U] = input[pixel + 1U];
+-            output[pixel + 2U] = input[pixel];
+-            output[pixel + 3U] = input[pixel + 3U];
+-        }
+-    }
+-    return result;
++    result.resize(tight_row * static_cast<std::size_t>(height));
++    const stx_skia::SwizzleResult swapped = stx_skia::swap_red_blue_rows(
++        result, stx_skia::RowBytes(tight_row), source, stx_skia::RowBytes(source_row_bytes),
++        stx_skia::PixelCount(width), stx_skia::RowCount(height));
++    return swapped == stx_skia::SwizzleResult::ok;
+ }
+ 
+ } // namespace
+@@ -138,6 +131,7 @@
+     const std::size_t count = static_cast<std::size_t>((width + side - 1) / side) *
+                               static_cast<std::size_t>((height + side - 1) / side);
+     tiles_.reserve(count);
++    std::vector<std::byte> converted;
+     try {
+         for (std::int32_t y = 0; y < height; y += side) {
+             for (std::int32_t x = 0; x < width; x += side) {
+@@ -153,11 +147,15 @@
+                 const std::size_t bytes = static_cast<std::size_t>(storage.height - 1) * snapshot.row_bytes() +
+                     static_cast<std::size_t>(storage.width) * 4U;
+                 std::span<const std::byte> pixels(snapshot.pixels().data() + offset, bytes);
+-                std::vector<std::byte> converted;
+                 std::uint64_t stride = snapshot.row_bytes();
+                 if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
+-                    converted = rgba_to_bgra(pixels, snapshot.row_bytes(),
+-                        static_cast<std::uint32_t>(storage.width), static_cast<std::uint32_t>(storage.height));
++                    if (!rgba_to_bgra(pixels, static_cast<std::size_t>(snapshot.row_bytes()),
++                            static_cast<std::uint32_t>(storage.width),
++                            static_cast<std::uint32_t>(storage.height), converted)) {
++                        last_resource_error_ = ImageResourceError::invalid_image_data;
++                        release_tiles(*owner);
++                        return false;
++                    }
+                 } else {
+                     // A load owns complete, tightly packed rows. The source is
+                     // a subrectangle of the document with its larger stride.
+@@ -218,6 +216,7 @@
+     const gui_drawing::BitmapDamageSnapshot changes = (*bitmap_).changes_since(presented_generation_);
+     if (changes.empty()) return true;
+     const gui_drawing::ImageSnapshot snapshot = (*bitmap_).snapshot();
++    std::vector<std::byte> converted;
+     for (std::size_t change = 0; change < changes.rectangles.size(); ++change) {
+         const gui_drawing::RectI dirty = changes.rectangles[change];
+         for (std::size_t index = 0; index < tiles_.size(); ++index) {
+@@ -229,11 +228,14 @@
+             const std::size_t required = static_cast<std::size_t>(rect.height - 1) * snapshot.row_bytes() +
+                 static_cast<std::size_t>(rect.width) * 4U;
+             std::span<const std::byte> patch(snapshot.pixels().data() + source_offset, required);
+-            std::vector<std::byte> converted;
+             std::uint64_t source_row_bytes = snapshot.row_bytes();
+             if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
+-                converted = rgba_to_bgra(patch, snapshot.row_bytes(),
+-                    static_cast<std::uint32_t>(rect.width), static_cast<std::uint32_t>(rect.height));
++                if (!rgba_to_bgra(patch, static_cast<std::size_t>(snapshot.row_bytes()),
++                        static_cast<std::uint32_t>(rect.width),
++                        static_cast<std::uint32_t>(rect.height), converted)) {
++                    last_resource_error_ = ImageResourceError::invalid_image_data;
++                    return false;
++                }
+                 patch = converted;
+                 source_row_bytes = static_cast<std::uint64_t>(rect.width) * 4U;
+             }
+--- a/src/render/coregraphics/raster/coregraphics_raster.cpp
++++ b/src/render/coregraphics/raster/coregraphics_raster.cpp
+@@ -1,6 +1,7 @@
+ #include "coregraphics_raster.hpp"
+ #include "../../../core/damage/device_damage/device_damage.hpp"
+ #include "../../../core/image/resource_pixels.hpp"
++#include "stx_skia/swizzle.hpp"
+ 
+ #include <CoreFoundation/CoreFoundation.h>
+ #include <CoreGraphics/CoreGraphics.h>
+@@ -349,13 +350,8 @@
+                 (*resource).encoded.size() ==
+                     tight_row_bytes * (*resource).metadata.height) {
+                 rgba.resize((*resource).encoded.size());
+-                for (std::size_t offset = 0; offset < rgba.size(); offset += 4U) {
+-                    rgba[offset] = (*resource).encoded[offset + 2U];
+-                    rgba[offset + 1U] = (*resource).encoded[offset + 1U];
+-                    rgba[offset + 2U] = (*resource).encoded[offset];
+-                    rgba[offset + 3U] = (*resource).encoded[offset + 3U];
+-                }
+-                have_rgba = true;
++                have_rgba = stx_skia::swap_red_blue(rgba, (*resource).encoded) ==
++                            stx_skia::SwizzleResult::ok;
+             }
+         } else if ((*resource).metadata.decoded_byte_count <=
+                    std::numeric_limits<std::size_t>::max()) {
+--- a/src/abi/drawing_platform_windows.cpp
++++ b/src/abi/drawing_platform_windows.cpp
+@@ -6,6 +6,7 @@
+ #include <windows.h>
+ 
+ #include "gui_forms/c_api.h"
++#include "stx_skia/swizzle.hpp"
+ 
+ #include <algorithm>
+ #include <cstdio>
+@@ -142,15 +143,17 @@
+     return info;
+ }
+ 
+-void copy_as_bgra(const ImageSnapshot& snapshot, void* destination) {
++// Writes the snapshot's pixels as BGRA to destination, which holds at least as many bytes and
++// does not overlap them. False only if the swap rejects the buffers; nothing is then written.
++[[nodiscard]] bool copy_as_bgra(const ImageSnapshot& snapshot, void* destination) {
+     const std::span<const std::byte> source = snapshot.pixels();
+-    std::byte* output = static_cast<std::byte*>(destination);
+-    std::copy(source.begin(), source.end(), output);
+-    if (snapshot.pixel_format == PixelFormat::rgba32_premultiplied) {
+-        for (std::size_t offset = 0; offset < source.size(); offset += 4U) {
+-            std::swap(output[offset], output[offset + 2U]);
+-        }
+-    }
++    const std::span<std::byte> output(static_cast<std::byte*>(destination), source.size());
++    if (snapshot.pixel_format != PixelFormat::rgba32_premultiplied) {
++        std::copy(source.begin(), source.end(), output.begin());
++        return true;
++    }
++    const stx_skia::SwizzleResult swapped = stx_skia::swap_red_blue(output, source);
++    return swapped == stx_skia::SwizzleResult::ok;
+ }
+ 
+ } // namespace
+@@ -393,7 +396,9 @@
+     const void* pixels = snapshot.pixels().data();
+     if (snapshot.pixel_format == PixelFormat::rgba32_premultiplied) {
+         converted.resize(snapshot.pixels().size());
+-        copy_as_bgra(snapshot, converted.data());
++        if (!copy_as_bgra(snapshot, converted.data())) {
++            throw std::runtime_error("surface pixel conversion failed");
++        }
+         pixels = converted.data();
+     }
+     const bool window_surface = kind == GD_NATIVE_SURFACE_HWND;
+@@ -437,7 +442,12 @@
+         if (dib != nullptr) DeleteObject(dib);
+         throw std::runtime_error("bitmap-backed HDC creation failed");
+     }
+-    copy_as_bgra(snapshot, pixels);
++    if (!copy_as_bgra(snapshot, pixels)) {
++        SelectObject(device, previous);
++        DeleteDC(device);
++        DeleteObject(dib);
++        throw std::runtime_error("bitmap-backed HDC pixel conversion failed");
++    }
+     std::scoped_lock lock(lease_mutex);
+     const std::uint64_t token = next_lease++;
+     if (token == 0U) {
+--- a/src/host/windows/application/windows_host.cpp
++++ b/src/host/windows/application/windows_host.cpp
+@@ -21,6 +21,7 @@
+ 
+ #include "gui_forms/engine/part_raster/part_raster.hpp"
+ #include "gui_forms/live_surface.hpp"
++#include "stx_skia/swizzle.hpp"
+ #include "gui_forms/text.hpp"
+ #include "../../../core/text/composite/text_composite.hpp"
+ #include "../../../render/text/glyph_run/glyph_run_raster.hpp"
+@@ -1486,13 +1487,9 @@
+             // The raster owns reusable conversion storage. Convert before any
+             // DC mutation; allocation failure leaves the active frame intact.
+             live_bgra_scratch_.resize(frame.pixels().size());
+-            const std::size_t byte_count = live_bgra_scratch_.size();
+-            for (std::size_t index = 0U; index < byte_count; index += 4U) {
+-                live_bgra_scratch_[index] = source[index + 2U];
+-                live_bgra_scratch_[index + 1U] = source[index + 1U];
+-                live_bgra_scratch_[index + 2U] = source[index];
+-                live_bgra_scratch_[index + 3U] = source[index + 3U];
+-            }
++            const stx_skia::SwizzleResult swapped =
++                stx_skia::swap_red_blue(live_bgra_scratch_, frame.pixels());
++            if (swapped != stx_skia::SwizzleResult::ok) return;
+             source = live_bgra_scratch_.data();
+         }
+         const int saved = SaveDC(memory_dc_);
+--- a/tests/canvas_tests.cpp
++++ b/tests/canvas_tests.cpp
+@@ -1,12 +1,17 @@
+ #include "gui_forms/canvas.hpp"
+ #include "gui_forms/window.hpp"
+ 
++#include <array>
++#include <cstddef>
++#include <cstdint>
+ #include <cstdlib>
+ #include <iostream>
+ #include <memory>
+ #include <chrono>
++#include <optional>
+ #include <stdexcept>
+ #include <string_view>
++#include <vector>
+ 
+ namespace {
+ 
+@@ -179,6 +184,98 @@
+     CHECK(window.image_resource_snapshot().resource_count == 1U);
+ }
+ 
++// Every tile resource of an RGBA canvas equals the BGRA canvas's for the same picture,
++// after publication and after strided edits that cross tile gutters.
++bool same_tile_resources(Window& first, Window& second) {
++    const std::vector<ImageId> first_ids = first.image_resources().image_ids();
++    const std::vector<ImageId> second_ids = second.image_resources().image_ids();
++    if (first_ids.size() != second_ids.size()) return false;
++    for (std::size_t index = 0; index < first_ids.size(); ++index) {
++        const std::optional<ImageResourceView> a = first.image_resources().find(first_ids[index]);
++        const std::optional<ImageResourceView> b = second.image_resources().find(second_ids[index]);
++        if (!a || !b) return false;
++        if ((*a).metadata.width != (*b).metadata.width ||
++            (*a).metadata.height != (*b).metadata.height ||
++            (*a).encoded.size() != (*b).encoded.size()) return false;
++        for (std::size_t byte = 0; byte < (*a).encoded.size(); ++byte) {
++            if ((*a).encoded[byte] != (*b).encoded[byte]) return false;
++        }
++    }
++    return true;
++}
++
++void edit_both(gui_drawing::Bitmap& rgba, gui_drawing::Bitmap& bgra, gui_drawing::RectI area,
++               std::uint32_t seed) {
++    gui_drawing::BitmapEditView rgba_edit = rgba.begin_edit(area);
++    gui_drawing::BitmapEditView bgra_edit = bgra.begin_edit(area);
++    std::uint32_t state = seed;
++    for (std::int32_t row = 0; row < area.height; ++row) {
++        for (std::int32_t column = 0; column < area.width; ++column) {
++            state = state * 1664525U + 1013904223U;
++            const std::byte red{static_cast<unsigned char>(state >> 24)};
++            const std::byte green{static_cast<unsigned char>(state >> 16)};
++            const std::byte blue{static_cast<unsigned char>(state >> 8)};
++            const std::size_t rgba_at = static_cast<std::size_t>(row) * rgba_edit.row_bytes +
++                static_cast<std::size_t>(column) * 4U;
++            const std::size_t bgra_at = static_cast<std::size_t>(row) * bgra_edit.row_bytes +
++                static_cast<std::size_t>(column) * 4U;
++            rgba_edit.writable_data[rgba_at] = red;
++            rgba_edit.writable_data[rgba_at + 1U] = green;
++            rgba_edit.writable_data[rgba_at + 2U] = blue;
++            rgba_edit.writable_data[rgba_at + 3U] = std::byte{255};
++            bgra_edit.writable_data[bgra_at] = blue;
++            bgra_edit.writable_data[bgra_at + 1U] = green;
++            bgra_edit.writable_data[bgra_at + 2U] = red;
++            bgra_edit.writable_data[bgra_at + 3U] = std::byte{255};
++        }
++    }
++    CHECK(rgba.commit_edit(rgba_edit.token) != 0U);
++    CHECK(bgra.commit_edit(bgra_edit.token) != 0U);
++}
++
++void rgba_tiles_match_bgra_tiles() {
++    constexpr std::uint32_t width = 1100;
++    constexpr std::uint32_t height = 600;
++    const std::shared_ptr<gui_drawing::Bitmap> rgba = std::make_shared<gui_drawing::Bitmap>(
++        width, height, gui_drawing::PixelFormat::rgba32_premultiplied);
++    const std::shared_ptr<gui_drawing::Bitmap> bgra =
++        std::make_shared<gui_drawing::Bitmap>(width, height);
++    std::uint32_t state = 0x9e3779b9U;
++    for (std::uint32_t y = 0; y < height; y += 7) {
++        for (std::uint32_t x = 0; x < width; x += 5) {
++            state = state * 1664525U + 1013904223U;
++            const gui_drawing::Color color = gui_drawing::Color::from_argb(state | 0xff000000U);
++            (*rgba).set_pixel(x, y, color);
++            (*bgra).set_pixel(x, y, color);
++        }
++    }
++    const std::shared_ptr<RasterCanvas> rgba_canvas = make_control<RasterCanvas>(StableId("rgba.tiles"));
++    const std::shared_ptr<RasterCanvas> bgra_canvas = make_control<RasterCanvas>(StableId("bgra.tiles"));
++    (*rgba_canvas).set_bitmap(rgba);
++    (*bgra_canvas).set_bitmap(bgra);
++    Window rgba_window(rgba_canvas, {200, 200});
++    Window bgra_window(bgra_canvas, {200, 200});
++    rgba_window.perform_layout();
++    bgra_window.perform_layout();
++    CHECK(rgba_window.image_resources().image_ids().size() == 6U);
++    CHECK(same_tile_resources(rgba_window, bgra_window));
++
++    // Across the vertical and horizontal tile boundaries, one column, one row, and a
++    // bottom-right edge tile.
++    const std::array<gui_drawing::RectI, 4> edits{gui_drawing::RectI{500, 300, 30, 230},
++                                                  gui_drawing::RectI{511, 0, 1, 600},
++                                                  gui_drawing::RectI{0, 512, 1100, 1},
++                                                  gui_drawing::RectI{1030, 590, 70, 10}};
++    std::uint32_t seed = 7U;
++    for (const gui_drawing::RectI area : edits) {
++        edit_both(*rgba, *bgra, area, seed);
++        seed += 101U;
++        CHECK((*rgba_canvas).synchronize_bitmap());
++        CHECK((*bgra_canvas).synchronize_bitmap());
++        CHECK(same_tile_resources(rgba_window, bgra_window));
++    }
++}
++
+ void tiled_updates_include_sampling_gutters_and_recover_resources() {
+     const std::shared_ptr<RasterCanvas> canvas = make_control<RasterCanvas>(StableId("tiles"));
+     const std::shared_ptr<gui_drawing::Bitmap> bitmap = std::make_shared<gui_drawing::Bitmap>(1025, 1025);
+@@ -282,6 +379,7 @@
+     derived_canvas_keeps_routing_presentation_and_resource_lifetime();
+     canvas_projects_bitmap_changes_as_local_window_damage();
+     canvas_converts_rgba_storage_without_changing_document_truth();
++    rgba_tiles_match_bgra_tiles();
+     tiled_updates_include_sampling_gutters_and_recover_resources();
+     explicit_window_quota_rolls_back_partial_tile_publication();
+     if (argc > 1 && std::string_view(argv[1]) == "--large") hundred_megapixel_publication_probe();
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -4057,3 +4057,13 @@
+     include(cmake/TestAreas.cmake)
+     gui_forms_label_test_areas(stx_zlib stx_png stx_conv stx_cng)
+ endif()
++
++# stx_skia fixture: hosts swap RGBA and BGRA rows with stx_skia's standalone kernel, which
++# links no Skia code. These targets compile the four converted loops.
++foreach(gui_forms_swizzle_target IN ITEMS gui_forms_controls gui_forms_coregraphics
++        gui_drawing_c_api gui_forms_host_windows gui_forms_windows_dib_lifecycle_tests
++        gui_forms_windows_tooltip_tests gui_forms_windows_prepared_text_tests)
++    if(TARGET ${gui_forms_swizzle_target})
++        target_link_libraries(${gui_forms_swizzle_target} PRIVATE stx_skia::swizzle)
++    endif()
++endforeach()

@@ -1546,8 +1546,14 @@ hosts.
 - **Losses:** recorded as well. Skia's run-time AVX2 version is faster, and Zen 5 code
   placement halves one path at x86-64-v2.
 
-The Windows-toolchain inspection and timing, wasm inspection and the GUI.Forms integration
-patch remain. See ../results/2026-10-27/SWAP_KERNEL.md.
+The GUI.Forms integration patch (`integration/gui_forms_8d1f2be0_swizzle.patch`) replaces
+GUI.Forms' four byte loops in the pinned fixture and passes `tools/verify_gui.sh`, which now
+includes canvas and CoreGraphics tests. Still open:
+- the Windows-toolchain inspection and timing;
+- the wasm inspection;
+- a Windows build of the patch's two Windows files.
+
+See ../results/2026-10-27/SWAP_KERNEL.md and SWAP_KERNEL_GUI_INTEGRATION.md.
 
 ## Still required
 

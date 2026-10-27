@@ -9,6 +9,7 @@ cmake -S build/gui-fixture -B build/gui-consumer-llvm22 -G Ninja \
 cmake --build build/gui-consumer-llvm22 -j "${BUILD_JOBS:-6}" --target \
     gui_forms_skia_smoke gui_drawing_skia_tests gui_drawing_raster_c_api_tests \
     gui_forms_prepared_text_skia_tests gui_forms_damage_clip_tests \
-    gui_forms_overlay_shadow_tests gui_forms_paint_group_tests
+    gui_forms_overlay_shadow_tests gui_forms_paint_group_tests \
+    gui_forms_canvas_tests gui_forms_coregraphics_smoke
 ctest --test-dir build/gui-consumer-llvm22 --output-on-failure \
-    -R '^(gui_forms_skia_smoke|gui_drawing_skia_tests|gui_drawing_raster_c_api_tests|gui_forms_prepared_text_skia_tests|gui_forms_damage_clip_tests|gui_forms_overlay_shadow_tests|gui_forms_paint_group_tests)$'
+    -R '^(gui_forms_skia_smoke|gui_drawing_skia_tests|gui_drawing_raster_c_api_tests|gui_forms_prepared_text_skia_tests|gui_forms_damage_clip_tests|gui_forms_overlay_shadow_tests|gui_forms_paint_group_tests|gui_forms_canvas_tests|gui_forms_coregraphics_smoke)$'

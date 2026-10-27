@@ -208,8 +208,8 @@ The SSE2 build that GUI.Forms ships was stable across every binary and alignment
 - **Windows:** object-code inspection and timing with the pinned MSYS2 CLANG64 toolchain.
   The machine was not reachable.
 - **wasm32:** SIMD128 object-code inspection.
-- **GUI.Forms integration:** the patch replacing its four existing loops, against the
-  pinned fixture.
+- **GUI.Forms integration:** since done in the pinned fixture; see
+  `SWAP_KERNEL_GUI_INTEGRATION.md`. Its two Windows files are not yet built.
 
 ## Gates
 
