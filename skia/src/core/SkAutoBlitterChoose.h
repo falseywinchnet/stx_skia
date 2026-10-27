@@ -8,7 +8,6 @@
 #ifndef SkAutoBlitterChoose_DEFINED
 #define SkAutoBlitterChoose_DEFINED
 
-#include "include/private/SkMacros.h"
 #include "src/core/SkArenaAlloc.h"
 #include "src/core/SkBlitter.h"
 #include "src/core/SkDraw.h"
@@ -29,16 +28,16 @@ using SkBlitterSizedArena = SkSTArenaAlloc<2736>;
 
 class [[nodiscard]] SkAutoBlitterChoose : SkNoncopyable {
 public:
-    SkAutoBlitterChoose() {}
+    SkAutoBlitterChoose() = default;
     SkAutoBlitterChoose(const skcpu::Draw& draw,
                         const SkMatrix* ctm,
                         const SkPaint& paint,
                         const SkRect& devBounds,
                         SkDrawCoverage drawCoverage = SkDrawCoverage::kNo) {
-        this->choose(draw, ctm, paint, devBounds, drawCoverage);
+        (*this).choose(draw, ctm, paint, devBounds, drawCoverage);
     }
 
-    SkBlitter*  operator->() { return fBlitter; }
+    // Borrows the chosen blitter, owned by this object's arena.
     SkBlitter*  get() const { return fBlitter; }
 
     SkBlitter* choose(const skcpu::Draw& draw,
@@ -52,7 +51,7 @@ public:
                                         paint,
                                         &fAlloc,
                                         drawCoverage,
-                                        draw.fRC->clipShader(),
+                                        (*draw.fRC).clipShader(),
                                         SkSurfacePropsCopyOrDefault(draw.fProps),
                                         devBounds);
         return fBlitter;

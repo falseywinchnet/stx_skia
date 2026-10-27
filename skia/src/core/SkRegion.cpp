@@ -20,7 +20,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <functional>
 
 using namespace skia_private;
 
@@ -1695,20 +1694,19 @@ bool SkRegion::Spanerator::next(int* left, int* right) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void visit_pairs(int pairCount, int y, const int32_t pairs[],
-                        const std::function<void(const SkIRect&)>& visitor) {
+                        SkRegionSpanVisitor& visitor) {
     for (int i = 0; i < pairCount; ++i) {
         const SkIRect span = {pairs[2 * i], y, pairs[2 * i + 1], y + 1};
-        visitor(span);
+        visitor.visitSpan(span);
     }
 }
 
-void SkRegionPriv::VisitSpans(const SkRegion& rgn,
-                              const std::function<void(const SkIRect&)>& visitor) {
+void SkRegionPriv::VisitSpans(const SkRegion& rgn, SkRegionSpanVisitor& visitor) {
     if (rgn.isEmpty()) {
         return;
     }
     if (rgn.isRect()) {
-        visitor(rgn.getBounds());
+        visitor.visitSpan(rgn.getBounds());
     } else {
         const int32_t* runs = (*rgn.fRunHead).readonly_runs();
         int index = 0;
@@ -1720,7 +1718,7 @@ void SkRegionPriv::VisitSpans(const SkRegion& rgn,
             index += 1;
             if (pairCount == 1) {
                 const SkIRect band = {runs[index], top, runs[index + 1], bot};
-                visitor(band);
+                visitor.visitSpan(band);
                 index += 2;
             } else if (pairCount > 1) {
                 // we have to loop repeated in Y, sending each interval in Y -> X order

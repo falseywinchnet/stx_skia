@@ -33,6 +33,7 @@ jobs:
           cmake -E compare_files build/baseline/scan-converters.raw build/candidate/scan-converters.raw
           cmake -E compare_files build/baseline/aa-scan-converters.raw build/candidate/aa-scan-converters.raw
           cmake -E compare_files build/baseline/region-clips.raw build/candidate/region-clips.raw
+          cmake -E compare_files build/baseline/blitters.raw build/candidate/blitters.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
@@ -81,6 +82,7 @@ jobs:
           cmake -E compare_files build/baseline/scan-converters.raw build/candidate/scan-converters.raw
           cmake -E compare_files build/baseline/aa-scan-converters.raw build/candidate/aa-scan-converters.raw
           cmake -E compare_files build/baseline/region-clips.raw build/candidate/region-clips.raw
+          cmake -E compare_files build/baseline/blitters.raw build/candidate/blitters.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw

@@ -15,8 +15,16 @@
 
 #include <atomic>
 #include <cstring>
-#include <functional>
 #include <new>
+
+// Receives the spans of SkRegionPriv::VisitSpans. The visitor is borrowed for that call only.
+class SkRegionSpanVisitor {
+public:
+    virtual void visitSpan(const SkIRect& span) = 0;
+
+protected:
+    ~SkRegionSpanVisitor() = default;
+};
 
 class SkRegionPriv {
 public:
@@ -24,10 +32,10 @@ public:
     using RunType = SkRegion::RunType;
     using RunHead = SkRegion::RunHead;
 
-    // Call the function with each span, in Y -> X ascending order.
+    // Call the visitor with each span, in Y -> X ascending order.
     // We pass a rect, but we will still ensure the span Y->X ordering, so often the height
     // of the rect may be 1. It should never be empty.
-    static void VisitSpans(const SkRegion& rgn, const std::function<void(const SkIRect&)>&);
+    static void VisitSpans(const SkRegion& rgn, SkRegionSpanVisitor& visitor);
 
 #ifdef SK_DEBUG
     static void Validate(const SkRegion& rgn);

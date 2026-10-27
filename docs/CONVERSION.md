@@ -1363,6 +1363,18 @@ bounded in Release. Candidate/reference suites pass 71/71 and 70/70; the new cor
 other shared artifact match, except the intentionally corrected sampling artifact; the
 instrumented suite reports PASS. See ../results/2026-10-26/REGION_CLIP_CONVERSION.md.
 
+## Blitters
+
+The base blitter and its clipping wrappers, the 32-bit, A8, raster-pipeline and sprite blitters
+and the blitter chooser are converted; the region span visitor takes a named interface instead
+of a `std::function`. Row loops address each row instead of stepping pointers past the last
+one; the BW mask template becomes a function template that forms only in-clip addresses and no
+longer draws padding bits; left-clipped 32-bit masks are read at the right column; the sprite
+source origin and coverage conversion no longer rely on undefined arithmetic. The upstream LCD
+row kernels are retained unchanged. Candidate/reference suites pass 72/72 and 71/71; the new
+corpus and every other shared artifact match, except the intentionally corrected sampling
+artifact; the instrumented suite reports PASS. See ../results/2026-10-26/BLITTER_CONVERSION.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

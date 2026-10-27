@@ -36,6 +36,10 @@ enum class SkDrawCoverage : bool;
     A SkBlitter subclass contains all the context needed to generate pixels
     for the destination and how src/generated pixels map to the destination.
     The coordinates passed to the blitX calls are in destination pixel space.
+
+    The runs[] and antialias[] arrays passed to blitAntiH() must be writable storage despite
+    their const parameter types: the clipping blitters split runs in place before forwarding
+    them.
 */
 class SkBlitter {
 public:
@@ -86,31 +90,21 @@ public:
 
     // (x, y), (x + 1, y)
     virtual void blitAntiH2(int x, int y, U8CPU a0, U8CPU a1) {
-        int16_t runs[3];
-        uint8_t aa[2];
-
-        runs[0] = 1;
-        runs[1] = 1;
-        runs[2] = 0;
-        aa[0] = SkToU8(a0);
-        aa[1] = SkToU8(a1);
-        this->blitAntiH(x, y, aa, runs);
+        int16_t runs[3] = {1, 1, 0};
+        uint8_t aa[2] = {SkToU8(a0), SkToU8(a1)};
+        (*this).blitAntiH(x, y, aa, runs);
     }
 
     // (x, y), (x, y + 1)
     virtual void blitAntiV2(int x, int y, U8CPU a0, U8CPU a1) {
-        int16_t runs[2];
-        uint8_t aa[1];
-
-        runs[0] = 1;
-        runs[1] = 0;
-        aa[0] = SkToU8(a0);
-        this->blitAntiH(x, y, aa, runs);
+        int16_t runs[2] = {1, 0};
+        uint8_t aa[1] = {SkToU8(a0)};
+        (*this).blitAntiH(x, y, aa, runs);
         // reset in case the clipping blitter modified runs
         runs[0] = 1;
         runs[1] = 0;
         aa[0] = SkToU8(a1);
-        this->blitAntiH(x, y + 1, aa, runs);
+        (*this).blitAntiH(x, y + 1, aa, runs);
     }
 
     /**
@@ -122,20 +116,22 @@ public:
     virtual int requestRowsPreserved() const { return 1; }
 
 
+    // The destination and the constant pixel value with which a caller may write it directly.
     struct DirectBlit {
         SkPixmap pm;
-        uint64_t value; // low bits match pixmap's bitdepth
+        uint64_t value = 0; // low bits match pixmap's bitdepth
     };
-    virtual std::optional<DirectBlit> canDirectBlit() { return {}; }
+    virtual std::optional<DirectBlit> canDirectBlit() { return std::nullopt; }
 
     /**
      * This function allocates memory for the blitter that the blitter then owns.
      * The memory can be used by the calling function at will, but it will be
-     * released when the blitter's destructor is called. This function returns
-     * nullptr if no persistent memory is needed by the blitter.
+     * released when the blitter's destructor is called, and replaced by the next call.
+     * This function returns nullptr if no persistent memory is needed by the blitter.
      */
     virtual void* allocBlitMemory(size_t sz) {
-        return fBlitMemory.reset(sz, SkAutoMalloc::kReuse_OnShrink);
+        void* memory = fBlitMemory.reset(sz, SkAutoMalloc::kReuse_OnShrink);
+        return memory;
     }
 
     ///@name non-virtual helpers
@@ -186,6 +182,7 @@ public:
 */
 class SkRectClipBlitter final : public SkBlitter {
 public:
+    // Borrows blitter, which must outlive this blitter's use.
     void init(SkBlitter* blitter, const SkIRect& clipRect) {
         SkASSERT(!clipRect.isEmpty());
         fBlitter = blitter;
@@ -201,16 +198,18 @@ public:
     void blitMask(const SkMask&, const SkIRect& clip) override;
 
     int requestRowsPreserved() const override {
-        return fBlitter->requestRowsPreserved();
+        const int rows = (*fBlitter).requestRowsPreserved();
+        return rows;
     }
 
     void* allocBlitMemory(size_t sz) override {
-        return fBlitter->allocBlitMemory(sz);
+        void* memory = (*fBlitter).allocBlitMemory(sz);
+        return memory;
     }
 
 private:
-    SkBlitter*  fBlitter;
-    SkIRect     fClipRect;
+    SkBlitter*  fBlitter = nullptr;
+    SkIRect     fClipRect = {0, 0, 0, 0};
 };
 
 /** Wraps another (real) blitter, and ensures that the real blitter is only
@@ -219,8 +218,9 @@ private:
 */
 class SkRgnClipBlitter final : public SkBlitter {
 public:
+    // Borrows both, which must outlive this blitter's use.
     void init(SkBlitter* blitter, const SkRegion* clipRgn) {
-        SkASSERT(clipRgn && !clipRgn->isEmpty());
+        SkASSERT(clipRgn && !(*clipRgn).isEmpty());
         fBlitter = blitter;
         fRgn = clipRgn;
     }
@@ -234,16 +234,18 @@ public:
     void blitMask(const SkMask&, const SkIRect& clip) override;
 
     int requestRowsPreserved() const override {
-        return fBlitter->requestRowsPreserved();
+        const int rows = (*fBlitter).requestRowsPreserved();
+        return rows;
     }
 
     void* allocBlitMemory(size_t sz) override {
-        return fBlitter->allocBlitMemory(sz);
+        void* memory = (*fBlitter).allocBlitMemory(sz);
+        return memory;
     }
 
 private:
-    SkBlitter*      fBlitter;
-    const SkRegion* fRgn;
+    SkBlitter*      fBlitter = nullptr;
+    const SkRegion* fRgn = nullptr;
 };
 
 #ifdef SK_DEBUG
@@ -267,25 +269,31 @@ public:
     void blitAntiV2(int x, int y, U8CPU a0, U8CPU a1) override;
 
     int requestRowsPreserved() const override {
-        return fBlitter->requestRowsPreserved();
+        const int rows = (*fBlitter).requestRowsPreserved();
+        return rows;
     }
 
     void* allocBlitMemory(size_t sz) override {
-        return fBlitter->allocBlitMemory(sz);
+        void* memory = (*fBlitter).allocBlitMemory(sz);
+        return memory;
     }
 
 private:
-    SkBlitter*  fBlitter;
-    SkIRect     fClipRect;
+    SkBlitter*  fBlitter = nullptr;
+    SkIRect     fClipRect = {0, 0, 0, 0};
 };
 #endif
 
 /** Factory to set up the appropriate most-efficient wrapper blitter
-    to apply a clip. Returns a pointer to a member, so lifetime must
-    be managed carefully.
+    to apply a clip. Returns either the given blitter or a pointer to a member, which
+    borrows the given blitter and clip: all three must outlive its use.
 */
 class SkBlitterClipper {
 public:
+    SkBlitterClipper() = default;
+    SkBlitterClipper(const SkBlitterClipper&) = delete;
+    SkBlitterClipper& operator=(const SkBlitterClipper&) = delete;
+
     SkBlitter*  apply(SkBlitter* blitter, const SkRegion* clip,
                       const SkIRect* bounds = nullptr);
 

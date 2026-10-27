@@ -284,7 +284,9 @@ void record_raster_clip(Output& output, const SkRasterClip& clip) {
     }
 }
 
-// Records each visited span; a named listener for SkRegionPriv::VisitSpans.
+// Records each visited span; a named listener for SkRegionPriv::VisitSpans. The reference
+// build's visitor parameter is a std::function; the candidate's is SkRegionSpanVisitor.
+#ifdef STX_SKIA_REFERENCE
 struct SpanRecorder {
     Output* fOutput;
 
@@ -292,6 +294,17 @@ struct SpanRecorder {
         record_rect(*fOutput, span);
     }
 };
+#else
+struct SpanRecorder final : SkRegionSpanVisitor {
+    explicit SpanRecorder(Output* output) : fOutput(output) {}
+
+    void visitSpan(const SkIRect& span) override {
+        record_rect(*fOutput, span);
+    }
+
+    Output* fOutput;
+};
+#endif
 
 void region_queries(Output& output, Sequence& sequence, const SkRegion& a, const SkRegion& b) {
     for (int op = 0; op < SkRegion::kOpCnt; ++op) {
@@ -363,8 +376,13 @@ void region_traversal(Output& output, Sequence& sequence, const SkRegion& region
         append(output, static_cast<int32_t>(-1));
     }
 
+#ifdef STX_SKIA_REFERENCE
     const SpanRecorder recorder{&output};
     SkRegionPriv::VisitSpans(region, std::function<void(const SkIRect&)>(recorder));
+#else
+    SpanRecorder recorder(&output);
+    SkRegionPriv::VisitSpans(region, recorder);
+#endif
 
     record_path(output, region.getBoundaryPath());
 }
