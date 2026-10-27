@@ -77,8 +77,9 @@ public:
         @param profile Precomputed blur profile computed by ComputeBlurProfile above.
         @param width Size of the pixels array.
         @param sigma Standard deviation of the gaussian blur kernel used to compute the profile;
-                     profile has ceil(6*sigma) elements, and width must be at least
-                     that size and at most INT32_MAX. Buffers must not overlap.
+                     profile has ceil(6*sigma) elements. width must be positive and at
+                     most INT32_MAX; a width below the profile size keeps the original
+                     narrow-rectangle lookup. Buffers must not overlap.
     */
 
     static void ComputeBlurredScanline(uint8_t* pixels, const uint8_t* profile,

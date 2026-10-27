@@ -267,6 +267,43 @@ bool analytic_and_ground_truth(Record& record) {
             }
         }
     }
+    // Padded extents below the profile size: a blurred hairline-wide point square or strip.
+    // c046c51 rejected these, so blurred draws fell back unblurred.
+    for (const float width : {0.25f, 0.5f, 0.75f, 7.0f}) {
+        for (const float height : {0.5f, 1.0f}) {
+            for (const float origin : {-2.0f, 10.25f}) {
+                const SkRect rectangle = SkRect::MakeXYWH(origin, origin, width, height);
+                for (const float sigma : {1.5f, 4.0f, 9.0f}) {
+                    for (const SkBlurStyle style : {kNormal_SkBlurStyle, kSolid_SkBlurStyle, kOuter_SkBlurStyle}) {
+                        SkAutoMaskFreeImage owner;
+                        SkMaskBuilder mask;
+                        const bool ok = SkBlurMask::BlurRect(sigma, &mask, rectangle, style);
+                        owner.reset(mask.image());
+                        if (!ok || !owner || !record.mask(mask)) return false;
+                        SkMaskBuilder metadata;
+                        if (!SkBlurMask::BlurRect(sigma, &metadata, rectangle, style, nullptr, SkMaskBuilder::kJustComputeBounds_CreateMode)) return false;
+                        if (metadata.fBounds != mask.fBounds || metadata.fRowBytes != mask.fRowBytes || metadata.fImage != nullptr) return false;
+                    }
+                }
+            }
+        }
+    }
+    // An inverse fill asks for the margin with saturated infinite bounds and no pixels.
+    // c046c51 rejected that query, so blurred inverse fills were drawn unblurred.
+    const SkMask bounded(nullptr, SkIRect::MakeXYWH(3, 4, 20, 10), 20, SkMask::kA8_Format);
+    const SkMask unbounded(nullptr, SkIRect::MakeLTRB(INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX), 0, SkMask::kA8_Format);
+    for (const float sigma : {0.75f, 1.5f, 2.5f, 8.0f}) {
+        for (const SkBlurStyle style : {kNormal_SkBlurStyle, kSolid_SkBlurStyle, kOuter_SkBlurStyle, kInner_SkBlurStyle}) {
+            SkMaskBuilder boundedDst;
+            SkMaskBuilder unboundedDst;
+            SkIVector boundedMargin = {-1, -1};
+            SkIVector unboundedMargin = {-2, -2};
+            const bool boundedOk = SkBlurMask::BoxBlur(&boundedDst, bounded, sigma, style, &boundedMargin);
+            const bool unboundedOk = SkBlurMask::BoxBlur(&unboundedDst, unbounded, sigma, style, &unboundedMargin);
+            if (!boundedOk || !unboundedOk || boundedMargin != unboundedMargin) return false;
+            if (boundedDst.fImage != nullptr || unboundedDst.fImage != nullptr) return false;
+        }
+    }
     for (const int width : {1, 7, 13}) {
         for (const int height : {1, 5}) {
             const size_t extent = static_cast<size_t>(width) * height;

@@ -122,7 +122,10 @@ bool SkBlurMask::BoxBlur(SkMaskBuilder* dst,
     if (dst == nullptr || !valid_style(style) || !std::isfinite(sigma) || sigma < 0) return false;
     const int64_t width = src.fBounds.width64();
     const int64_t height = src.fBounds.height64();
-    if (width <= 0 || height <= 0 || width > INT32_MAX || height > INT32_MAX) return false;
+    if (width <= 0 || height <= 0) return false;
+    // A metadata-only query computes just the margin. Inverse fills ask it with saturated
+    // infinite bounds, wider than INT32_MAX; only produced pixels need int extents.
+    if (src.fImage != nullptr && (width > INT32_MAX || height > INT32_MAX)) return false;
     if (src.fFormat != SkMask::kBW_Format &&
         src.fFormat != SkMask::kA8_Format &&
         src.fFormat != SkMask::kARGB32_Format &&
@@ -404,7 +407,23 @@ uint8_t SkBlurMask::ProfileLookup(const uint8_t *profile, int loc,
 void SkBlurMask::ComputeBlurredScanline(uint8_t* pixels, const uint8_t* profile,
                                        unsigned int width, SkScalar sigma) {
     const unsigned int profile_size = static_cast<unsigned int>(SkScalarCeilToInt(6 * sigma));
-    SkASSERT(profile_size > 0 && profile_size <= width && width <= INT32_MAX);
+    SkASSERT(profile_size > 0 && width > 0 && width <= INT32_MAX);
+    if (width < profile_size) {
+        // The original wrapped width - profile_size as unsigned, which selected the profile
+        // lookup with a negative sharp extent. Keep that result in signed 64-bit terms:
+        // |2x + 1 - width| <= width - 1 and center <= profile_size - 1, so every offset is
+        // below profile_size.
+        const int64_t narrow_center = static_cast<int64_t>(profile_size & ~1U) - 1;
+        const int64_t narrow_extent = static_cast<int64_t>(width) - profile_size - narrow_center;
+        for (unsigned int x = 0; x < width; ++x) {
+            const int64_t distance = 2 * static_cast<int64_t>(x) + 1 - static_cast<int64_t>(width);
+            const int64_t absolute = distance < 0 ? -distance : distance;
+            const int64_t offset = (absolute - narrow_extent) / 2;
+            SkASSERT_RELEASE(offset >= 0 && offset < static_cast<int64_t>(profile_size));
+            pixels[x] = profile[offset];
+        }
+        return;
+    }
     const unsigned int sharp_width = width - profile_size;
     // The nearest odd value below profile_size is the doubled profile center.
     const int center = static_cast<int>(profile_size & ~1U) - 1;
@@ -461,7 +480,6 @@ bool SkBlurMask::BlurRect(SkScalar sigma, SkMaskBuilder* dst, const SkRect& src,
     // Refuse inconsistent rounded geometry instead of publishing a partial mask.
     if (style == kInner_SkBlurStyle &&
         (sw <= 0 || sh <= 0 || innerBounds.width64() != sw || innerBounds.height64() != sh)) return false;
-    if (width < profileSize || height < profileSize) return false;
     SkMaskBuilder result(nullptr, bounds, static_cast<uint32_t>(width), SkMask::kA8_Format);
     const size_t dstSize = result.computeImageSize();
     if (dstSize == 0) return false;

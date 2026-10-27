@@ -43,6 +43,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <optional>
 #include <vector>
 
@@ -263,11 +264,8 @@ void draw_primitive(SkCanvas& canvas, Sequence& sequence) {
         const std::array<SkCanvas::PointMode, 3> modes{
             SkCanvas::kPoints_PointMode, SkCanvas::kLines_PointMode,
             SkCanvas::kPolygon_PointMode};
-        // Blurred points are drawn as blurred paths; see the path case below.
-        SkPaint pointPaint = paint;
-        pointPaint.setMaskFilter(nullptr);
         canvas.drawPoints(modes[sequence.pick(modes.size())],
-                          SkSpan<const SkPoint>(points.data(), points.size()), pointPaint);
+                          SkSpan<const SkPoint>(points.data(), points.size()), paint);
     } else if (kind == 10) {
         // Two-point lines with a dash take the dashed-line fast path.
         SkPaint dashed = paint;
@@ -279,11 +277,7 @@ void draw_primitive(SkCanvas& canvas, Sequence& sequence) {
         canvas.drawLine(pick_coordinate(sequence, -5, 30), y, pick_coordinate(sequence, 40, 70),
                         sequence.next() % 2 ? y : y + 13, dashed);
     } else if (kind == 11) {
-        // Blurred paths already differed from the reference before this unit (the candidate
-        // without it produces the same pixels), so the shared corpus draws paths unblurred.
-        SkPaint pathPaint = paint;
-        pathPaint.setMaskFilter(nullptr);
-        canvas.drawPath(random_path(sequence, -10, 110), pathPaint);
+        canvas.drawPath(random_path(sequence, -10, 110), paint);
     } else if (kind == 12) {
         SkRegion region;
         region.setRect(SkIRect::MakeXYWH(pick_int(sequence, 0, 50), pick_int(sequence, 0, 50),
@@ -643,6 +637,84 @@ void query_corpus(Output& output, Sequence& sequence) {
     }
 }
 
+// Draws a case with and without its blur on a fresh target. Returns false when the blur
+// was lost, which is how c046c51's rejected mask queries showed: the draw fell back to the
+// unblurred geometry.
+bool blur_applied(Output& output, const SkPath* path, const SkPoint* points, size_t count,
+                  const SkPaint& blurred) {
+    SkBitmap withBlur;
+    SkBitmap without;
+    withBlur.allocN32Pixels(96, 80);
+    without.allocN32Pixels(96, 80);
+    withBlur.eraseColor(0xFF808080);
+    without.eraseColor(0xFF808080);
+    SkPaint plain = blurred;
+    plain.setMaskFilter(nullptr);
+    SkCanvas blurredCanvas(withBlur);
+    SkCanvas plainCanvas(without);
+    if (path != nullptr) {
+        blurredCanvas.drawPath(*path, blurred);
+        plainCanvas.drawPath(*path, plain);
+    } else {
+        blurredCanvas.drawPoints(SkCanvas::kPoints_PointMode, SkSpan<const SkPoint>(points, count),
+                                 blurred);
+        plainCanvas.drawPoints(SkCanvas::kPoints_PointMode, SkSpan<const SkPoint>(points, count),
+                               plain);
+    }
+    const Target target{withBlur};
+    target.record(output);
+    ++output.cases;
+    bool differs = false;
+    for (int y = 0; y < withBlur.height(); ++y) {
+        const void* blurredRow = withBlur.getAddr(0, y);
+        const void* plainRow = without.getAddr(0, y);
+        if (std::memcmp(blurredRow, plainRow, withBlur.info().minRowBytes()) != 0) {
+            differs = true;
+        }
+    }
+    return differs;
+}
+
+// Blurred inverse fills and half-pixel butt- and square-capped points must stay blurred.
+bool blur_regressions(Output& output) {
+    SkPathBuilder builder;
+    builder.moveTo(20, 15);
+    builder.lineTo(70, 25);
+    builder.lineTo(35, 65);
+    builder.close();
+    builder.moveTo(30, 30);
+    builder.lineTo(50, 30);
+    builder.lineTo(40, 45);
+    builder.close();
+    const SkPath triangles = builder.detach();
+    const std::array<SkPathFillType, 2> inverseFills{SkPathFillType::kInverseWinding,
+                                                     SkPathFillType::kInverseEvenOdd};
+    const std::array<SkPoint, 3> points{SkPoint{10.5f, 12.25f}, SkPoint{60, 18},
+                                        SkPoint{33, 70.5f}};
+    const std::array<SkPaint::Cap, 2> caps{SkPaint::kButt_Cap, SkPaint::kSquare_Cap};
+    for (const float sigma : {1.5f, 4.0f}) {
+        for (const bool antiAlias : {false, true}) {
+            SkPaint paint;
+            paint.setColor(0xC0204080);
+            paint.setAntiAlias(antiAlias);
+            paint.setMaskFilter(SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, sigma, false));
+            for (const SkPathFillType fill : inverseFills) {
+                const SkPath inverse = triangles.makeFillType(fill);
+                if (!blur_applied(output, &inverse, nullptr, 0, paint)) return false;
+            }
+            for (const SkPaint::Cap cap : caps) {
+                SkPaint pointPaint = paint;
+                pointPaint.setStrokeWidth(0.5f);
+                pointPaint.setStrokeCap(cap);
+                if (!blur_applied(output, nullptr, points.data(), points.size(), pointPaint)) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 void canvas_corpus(Output& output) {
     Sequence sequence{};
     primitive_corpus(output, sequence);
@@ -658,6 +730,10 @@ int main(int argc, char** argv) {
     if (argc != 1 && argc != 2) return 2;
     Output output{};
     canvas_corpus(output);
+    if (!blur_regressions(output)) {
+        std::puts("canvas device: blur regression failed");
+        return 1;
+    }
     if (argc == 2 && !corpus::write_file(argv[1], output)) return 2;
     const unsigned long long hash = corpus::fnv1a(output.bytes);
     std::printf("canvas device: %zu cases, %zu bytes, hash=%llu PASS\n", output.cases,

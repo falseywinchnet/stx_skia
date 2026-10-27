@@ -39,7 +39,8 @@ are not committed.
 ## Mechanisms
 
 The mechanisms come from reading the code at c046c51 and following its failure returns. They
-match the probe pattern above. No build with the two rejections removed has been run yet.
+match the probe pattern above. The fix below confirms them: removing exactly these two
+rejections makes the restored canvas corpus byte-identical to the reference.
 
 1. **Inverse fills: the BoxBlur extent check.** `SkBlurMask::BoxBlur` now begins with:
 
@@ -79,17 +80,52 @@ match the probe pattern above. No build with the two rejections removed has been
 ## Effect on records
 
 - The canvas corpus's exclusion of blurred paths and points (`tests/canvas_device.cpp`) is
-  caused by this regression. It should be lifted once the regression is fixed.
+  caused by this regression. The fix below lifts it.
 - The c046c51 rejections that are documented remain separate decisions: invalid style and
   enumerations, non-finite inputs, padded coordinate limits, and the inconsistent-rounding
   rejection for fractional inner rectangles.
 
-## Suggested fix (not applied)
+## Fix
 
-- **BoxBlur:** apply the extent limit only when pixels are produced. A metadata-only query keeps
-  the original border computation.
-- **BlurRect:** remove the profile-size rejection. Restore the original narrow-rectangle result,
-  the profile lookup with the negative sharp width, in signed arithmetic that is defined. Relax
-  the matching `ComputeBlurredScanline` assertion.
-- **Tests:** add both inputs to the mask corpus and the canvas corpus, plus candidate-only
-  bound checks. Rerun the sequential gates.
+- **BoxBlur:** the non-positive extent rejection stays; the empty-input case is a documented
+  c046c51 decision that drawing never reaches. The INT32_MAX limit now applies only when the
+  source has pixels. The metadata-only margin query keeps the original border computation;
+  the blur filter's own destination preparation already returns an empty descriptor for those
+  bounds without allocating, and `SkDraw` uses only the margin.
+- **BlurRect:** the profile-size rejection is removed. `ComputeBlurredScanline` handles a width
+  below the profile size explicitly. It computes the original lookup offset,
+  (|2x + 1 − W| − ((W − P) − c)) / 2, in signed 64-bit arithmetic, where the original relied on
+  unsigned wraparound. The index is checked against the profile size in Release; the bound
+  proven above makes the check a guard, not a behavior. The scanline precondition and header
+  documentation now admit any positive width up to INT32_MAX.
+
+## Regression checks
+
+- **Mask corpus (`tests/mask.cpp`, shared):** 144 analytic rectangles with padded extents
+  below the profile size. Widths are 0.25, 0.5, 0.75 and 7, heights 0.5 and 1, at two origins,
+  with sigma 1.5, 4 and 9 in normal, solid and outer styles. Each has its metadata companion.
+  Both builds also check 16 metadata-only `BoxBlur` margin queries with saturated
+  `INT32_MIN`/`INT32_MAX` bounds: each must succeed, allocate nothing, and return the margin
+  of a bounded query with the same sigma and style.
+- **Canvas corpus (`tests/canvas_device.cpp`):** the primitive corpus draws its paths and points
+  with the paint's blur again. Sixteen explicit draws must differ from the same draw without its
+  blur, which is how the lost blur showed. They cover inverse winding and inverse even-odd
+  fills, and half-pixel butt- and square-capped points, each at sigma 1.5 and 4, with and
+  without anti-aliasing. The blurred pixels are also hashed into the corpus.
+
+## Verification
+
+M4 arm64, non-Apple LLVM, sequential AGENTS.md commands:
+
+- Candidate release: 73/73 PASS. Reference release: 72/72 PASS.
+- Canvas and device corpus: 3,856 cases, 279,848 bytes, identical hash 618473508008738493 in
+  both builds. The regression draws pass in both.
+- Mask corpus: 1,455,390 bytes, identical hash 4667190342981395946 in both builds (previously
+  1,267,548 bytes).
+- Shared raw artifacts: 33 of 34 common artifacts match byte for byte; `image-sampling-corrected.raw`
+  differs, an earlier intentional correction.
+- Complete deterministic instrumented suite: PASS; diagnostics unread.
+- House style: the lexical checker reports zero findings in the four changed files.
+
+No timing claim is made. The narrow-width loop runs only for padded extents below the profile
+size, and the wide and intermediate scanline paths are unchanged.

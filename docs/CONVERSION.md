@@ -1393,7 +1393,11 @@ The divergence comes from c046c51 and is not intended. Its BoxBlur extent check 
 metadata-only margin query for inverse fills. Its BlurRect profile-size check rejects narrow
 padded rectangles. In both cases the draw falls back unblurred. The original is safe on both
 inputs. Bisection: parent 0b9f2be matches the reference; c046c51 differs in 144 of 288 path
-probes (all inverse fills) and 12 of 216 point probes. No fix is applied yet. See
+probes (all inverse fills) and 12 of 216 point probes. Fixed: the BoxBlur extent limit applies
+only when pixels are produced, and narrow scanlines keep the original lookup in defined signed
+arithmetic. The canvas corpus draws blurred paths and points again and checks that 16 inverse-fill
+and half-pixel point draws stay blurred. The mask corpus adds 144 narrow rectangles and 16
+saturated margin queries. Both corpora match the reference byte for byte. See
 ../results/2026-10-27/BLURRED_PATH_DIVERGENCE.md.
 
 ## Still required
