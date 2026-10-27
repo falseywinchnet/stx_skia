@@ -31,6 +31,7 @@ jobs:
           cmake -E compare_files build/baseline/path-clipping.raw build/candidate/path-clipping.raw
           cmake -E compare_files build/baseline/scan-edges.raw build/candidate/scan-edges.raw
           cmake -E compare_files build/baseline/scan-converters.raw build/candidate/scan-converters.raw
+          cmake -E compare_files build/baseline/aa-scan-converters.raw build/candidate/aa-scan-converters.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
@@ -77,6 +78,7 @@ jobs:
           cmake -E compare_files build/baseline/path-clipping.raw build/candidate/path-clipping.raw
           cmake -E compare_files build/baseline/scan-edges.raw build/candidate/scan-edges.raw
           cmake -E compare_files build/baseline/scan-converters.raw build/candidate/scan-converters.raw
+          cmake -E compare_files build/baseline/aa-scan-converters.raw build/candidate/aa-scan-converters.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw

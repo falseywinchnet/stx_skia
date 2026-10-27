@@ -1340,6 +1340,17 @@ the intentionally corrected sampling artifact; the instrumented suite reports PA
 ../results/2026-10-26/SCAN_CONVERTERS_CONVERSION.md. Anti-aliased path fillers and hairlines
 remain.
 
+## Anti-aliased scan conversion
+
+The anti-aliased hairlines, rectangle fills and frames, the anti-aliased fill entry point and
+the analytic path filler are converted. The mask accumulator's rows no longer form pointers
+outside the mask, and its rectangle entry points check the mask in Release; trapezoid
+coverage and runs use typed arrays instead of one reinterpreted buffer; the integer-NaN test
+no longer negates `INT_MIN`; frame coordinates saturate instead of converting out of range.
+Candidate/reference suites pass 70/70 and 69/69; the new corpus and every other shared
+artifact match, except the intentionally corrected sampling artifact; the instrumented suite
+reports PASS. See ../results/2026-10-26/AA_SCAN_CONVERSION.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

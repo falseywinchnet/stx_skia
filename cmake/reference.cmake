@@ -501,3 +501,9 @@ foreach(unit IN ITEMS SkScan SkScan_Path SkScan_Hairline)
     list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
     list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
 endforeach()
+
+# Anti-aliased hairlines, rectangles and path fills before conversion.
+foreach(unit IN ITEMS SkScan_Antihair SkScan_AntiPath SkScan_AAAPath)
+    list(REMOVE_ITEM stx_sources skia/src/core/${unit}.cpp)
+    list(APPEND stx_sources baseline/skia/src/core/${unit}.cpp)
+endforeach()
