@@ -44,14 +44,16 @@ The remaining in-scope candidate, `tests/mipmap.cpp:425` (I01), is a valid contr
 `attachToCacheAndRef()` keeps a reference while the client pointer is reset, which is what
 the test exercises. It is left as is.
 
-## Observation for the owner
+## Correction: bounds helpers in Release
 
-`sk_collection_check_bounds` and `sk_collection_check_length` (used by `SkSpan`,
-`SkTDArray`, `AutoTArray` and others) report in Debug but expand to `SkUNREACHABLE` in
-Release. An out-of-range index through these "checked" accessors is therefore undefined
-behavior in Release, not a trap. Several I03 candidates rely on such accessors. Changing
-the helper to abort in Release would affect every container access and its cost has not
-been measured, so it is not changed here.
+An earlier version of this section said `sk_collection_check_bounds` and
+`sk_collection_check_length` make an out-of-range index undefined in Release. That was
+wrong. Their Release failure path is `SkUNREACHABLE`, which this tree defines as
+`__builtin_trap()` (Clang/GCC) or `__fastfail` (MSVC), so such an access terminates. A
+probe confirmed SIGTRAP for out-of-range `SkTDArray` and `SkSpan` reads. The I03 candidates
+resolved above still benefit from a local, evident bound. Some of them index raw arrays or
+`std::array` without these helpers. The measured cost of the alternatives is in
+`BOUNDS_FAILURE_MEASUREMENT.md`.
 
 ## Verification
 

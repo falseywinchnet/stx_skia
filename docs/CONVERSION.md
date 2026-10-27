@@ -1300,9 +1300,10 @@ The GUI.Forms code-integrity scanner reported 106 review candidates; 41 were in 
 sources or tests. All but one reviewed test contract are resolved with Release-evident
 bounds, empty-safe endpoints and checked size conversions; this also closes a latent
 `quad[3]` read in the stroker's line test. The 65 candidates in unconverted imported Skia
-are left for their conversion units. Release accessors built on
-`sk_collection_check_bounds` remain undefined (not trapped) out of range, an open owner
-decision. Suites pass 66/66 and 65/65, all shared artifacts match except the corrected
+are left for their conversion units. (An earlier note here said Release accessors built
+on `sk_collection_check_bounds` are undefined out of range; they trap. See
+../results/2026-10-26/BOUNDS_FAILURE_MEASUREMENT.md, which measures the alternatives and
+recommends keeping the trap.) Suites pass 66/66 and 65/65, all shared artifacts match except the corrected
 sampling artifact, and the instrumented suite reports PASS. See
 ../results/2026-10-26/CODE_INTEGRITY_SCAN.md.
 
