@@ -27,6 +27,7 @@
 #include "src/core/SkPathEffectBase.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 
+#include <cstdint>
 #include <optional>
 #include <utility>
 
@@ -41,7 +42,7 @@ SkPaint::SkPaint()
                  static_cast<unsigned>(SkPaint::kFill_Style),   // fStyle
                  0u}                                            // fPadding
 {
-    static_assert(sizeof(fBitfields) == sizeof(fBitfieldsUInt), "");
+    static_assert(sizeof(Bitfields) == sizeof(uint32_t));
 }
 
 SkPaint::SkPaint(const SkColor4f& color, SkColorSpace* colorSpace) : SkPaint() {
@@ -67,7 +68,11 @@ bool operator==(const SkPaint& a, const SkPaint& b) {
                        a.fColor4f == b.fColor4f &&
                        a.fWidth == b.fWidth &&
                        a.fMiterLimit == b.fMiterLimit &&
-                       a.fBitfieldsUInt == b.fBitfieldsUInt;
+                       a.fBitfields.fAntiAlias == b.fBitfields.fAntiAlias &&
+                       a.fBitfields.fDither == b.fBitfields.fDither &&
+                       a.fBitfields.fCapType == b.fBitfields.fCapType &&
+                       a.fBitfields.fJoinType == b.fBitfields.fJoinType &&
+                       a.fBitfields.fStyle == b.fBitfields.fStyle;
     return equal;
 }
 
@@ -195,13 +200,17 @@ const SkRect& SkPaint::computeFastBounds(const SkRect& orig, SkRect* storage) co
 const SkRect& SkPaint::doComputeFastBounds(const SkRect& origSrc,
                                            SkRect* storage,
                                            Style style) const {
-    SkASSERT(storage);
+    // The documented preconditions: storage, and (via canComputeFastBounds) a path effect
+    // that can bound its output. Ignoring a failed path effect would return bounds it never
+    // computed, which can cull a visible draw.
+    SkASSERT_RELEASE(storage != nullptr);
 
     const SkRect* src = &origSrc;
 
     SkRect tmpSrc = origSrc;
     if (getPathEffect()) {
-        SkAssertResult((*as_PEB(getPathEffect())).computeFastBounds(&tmpSrc));
+        const bool bounded = (*as_PEB(getPathEffect())).computeFastBounds(&tmpSrc);
+        SkASSERT_RELEASE(bounded);
         src = &tmpSrc;
     }
 

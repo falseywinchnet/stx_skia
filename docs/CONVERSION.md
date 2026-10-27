@@ -1452,6 +1452,13 @@ yield no triangles instead of a null procedure call. Atlas counts no longer narr
 the canvas or the base device. A new 879-case vertices corpus matches the reference. See
 ../results/2026-10-27/VERTICES_CONVERSION.md.
 
+## Paint and SkPaintPriv
+
+SkPaint and SkPaintPriv are converted, and the unused paint serialization and luminance helper
+are removed. Paint equality no longer reads an inactive union member, and the fast-bounds
+preconditions are now Release checks. A new 482-case paint corpus matches the reference. See
+../results/2026-10-27/PAINT_CONVERSION.md.
+
 ## Still required
 
 Refreshed 2026-10-27 from the whole-library AST inventory at 2333dc6. It counts 2,731 excluded
@@ -1466,7 +1473,7 @@ code this arm64 configuration does not compile, and zero findings is not convers
   count the kernel header's remaining configuration macros, or its LoongArch and 32-bit-ARM
   blocks, which this machine cannot compile and which keep their casts and declarations. Imported optimized code stays the baseline. New SIMD
   work follows the 128-bit portable policy and needs measurements.
-- **Canvas-adjacent state.** Clip stack and its device, paint and paint helpers, 4x4 matrices,
+- **Canvas-adjacent state.** Clip stack and its device, 4x4 matrices,
   drawables, annotations, the CPU recorder, `SkRSXform`, `SkPoint3`, `SkMatrix22`, path
   utilities, lattice iteration and shadow info.
 - **Shaders and color.** Triangle-color and Perlin-noise shaders, `SkColorSpace`, `SkColor`, and

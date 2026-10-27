@@ -580,7 +580,8 @@ public:
     bool canComputeFastBounds() const;
 
     /**     (to be made private)
-        Only call this if canComputeFastBounds() returned true. This takes a
+        Only call this if canComputeFastBounds() returned true; a path effect that cannot
+        compute its bounds, or a null storage, stops the program in Release. This takes a
         raw rectangle (the raw bounds of a shape), and adjusts it for stylistic
         effects in the paint (e.g. stroking). If needed, it uses the storage
         parameter. It returns the adjusted bounds that can then be used
@@ -641,25 +642,24 @@ private:
     SkColor4f       fColor4f;
     SkScalar        fWidth;
     SkScalar        fMiterLimit;
-    union {
-        struct {
-            unsigned    fAntiAlias : 1;
-            unsigned    fDither : 1;
-            unsigned    fCapType : 2;
-            unsigned    fJoinType : 2;
-            unsigned    fStyle : 2;
-            unsigned    fPadding : 24;  // 24 == 32 -1-1-2-2-2
-        } fBitfields;
-        uint32_t fBitfieldsUInt;
+    // The flags and enums, packed. Equality compares the fields, not the storage.
+    struct Bitfields {
+        unsigned    fAntiAlias : 1;
+        unsigned    fDither : 1;
+        unsigned    fCapType : 2;
+        unsigned    fJoinType : 2;
+        unsigned    fStyle : 2;
+        unsigned    fPadding : 24;  // 24 == 32 -1-1-2-2-2
     };
+    Bitfields fBitfields;
 
-    static_assert(::sk_is_trivially_relocatable<decltype(fPathEffect)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fShader)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fMaskFilter)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fColorFilter)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fBlender)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fColor4f)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fBitfields)>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkPathEffect>>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkShader>>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkMaskFilter>>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkColorFilter>>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkBlender>>::value);
+    static_assert(::sk_is_trivially_relocatable<SkColor4f>::value);
+    static_assert(::sk_is_trivially_relocatable<Bitfields>::value);
 
     friend class SkPaintPriv;
 };
