@@ -47,6 +47,7 @@ jobs:
           cmake -E compare_files build/baseline/stream-core.raw build/candidate/stream-core.raw
           cmake -E compare_files build/baseline/string-core.raw build/candidate/string-core.raw
           cmake -E compare_files build/baseline/tarray-core.raw build/candidate/tarray-core.raw
+          cmake -E compare_files build/baseline/block-list-core.raw build/candidate/block-list-core.raw
           cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
@@ -114,6 +115,7 @@ jobs:
           cmake -E compare_files build/baseline/stream-core.raw build/candidate/stream-core.raw
           cmake -E compare_files build/baseline/string-core.raw build/candidate/string-core.raw
           cmake -E compare_files build/baseline/tarray-core.raw build/candidate/tarray-core.raw
+          cmake -E compare_files build/baseline/block-list-core.raw build/candidate/block-list-core.raw
           cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
