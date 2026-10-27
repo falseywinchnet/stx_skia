@@ -375,7 +375,7 @@
                               NULL, NULL, GetModuleHandleW(NULL), NULL);
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -4057,3 +4057,21 @@
+@@ -4057,3 +4057,25 @@
      include(cmake/TestAreas.cmake)
      gui_forms_label_test_areas(stx_zlib stx_png stx_conv stx_cng)
  endif()
@@ -389,10 +389,14 @@
 +    endif()
 +    add_subdirectory("${STX_SKIA_SOURCE_ROOT}" "${CMAKE_CURRENT_BINARY_DIR}/stx-skia" EXCLUDE_FROM_ALL)
 +endif()
-+# These targets compile the four converted loops.
++# These targets compile the four converted loops; the last six Windows tests include
++# windows_host.cpp textually.
 +foreach(gui_forms_swizzle_target IN ITEMS gui_forms_controls gui_forms_coregraphics
 +        gui_drawing_c_api gui_forms_host_windows gui_forms_windows_dib_lifecycle_tests
-+        gui_forms_windows_tooltip_tests gui_forms_windows_prepared_text_tests)
++        gui_forms_windows_tooltip_tests gui_forms_windows_prepared_text_tests
++        gui_forms_windows_canvas_raster_tests gui_forms_windows_content_pixels_tests
++        gui_forms_windows_text_tests gui_forms_windows_damage_rectangles_tests
++        gui_forms_windows_part_composite_tests gui_forms_windows_control_snapshot_tests)
 +    if(TARGET ${gui_forms_swizzle_target})
 +        target_link_libraries(${gui_forms_swizzle_target} PRIVATE stx_skia::swizzle)
 +    endif()

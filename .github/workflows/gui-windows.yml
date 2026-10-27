@@ -86,12 +86,16 @@ jobs:
         working-directory: stx_skia
         run: |
           set -eu
+          # Every target that compiles windows_host.cpp, directly or by textual inclusion.
+          tests="gui_forms_canvas_tests gui_forms_windows_canvas_raster_tests gui_forms_windows_dib_lifecycle_tests
+            gui_forms_windows_tooltip_tests gui_forms_windows_live_surface_endpoint_tests
+            gui_forms_windows_content_pixels_tests gui_forms_windows_text_tests
+            gui_forms_windows_damage_rectangles_tests gui_forms_windows_part_composite_tests
+            gui_forms_windows_control_snapshot_tests"
           cmake --build build/gui-windows -j 4 --target gui_drawing_c_api gui_drawing_windows_probe \
-            gui_forms_host_windows gui_forms_canvas_tests gui_forms_windows_canvas_raster_tests \
-            gui_forms_windows_dib_lifecycle_tests gui_forms_windows_tooltip_tests \
-            gui_forms_windows_live_surface_endpoint_tests
-          ctest --test-dir build/gui-windows --output-on-failure -R \
-            '^(gui_forms_canvas_tests|gui_forms_windows_canvas_raster_tests|gui_forms_windows_dib_lifecycle_tests|gui_forms_windows_tooltip_tests|gui_forms_windows_live_surface_endpoint_tests)$'
+            gui_forms_host_windows $tests
+          names=$(echo $tests | tr ' ' '|')
+          ctest --test-dir build/gui-windows --output-on-failure -R "^($names)\$"
           # The drawing probe is a program, not a registered test; it needs its DLL beside it.
           probe=$(find build/gui-windows -name 'gui_drawing_windows_probe.exe' | head -1)
           library=$(find build/gui-windows -name '*gui_drawing_c_api*.dll' | head -1)
