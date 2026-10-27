@@ -8,7 +8,6 @@
 #include "include/core/SkM44.h"
 #include "include/core/SkMatrix.h"
 #include "include/core/SkRect.h"
-#include "include/private/SkDebug.h"
 #include "include/private/SkFloatingPoint.h"
 #include "src/core/SkMatrixInvert.h"
 #include "src/core/SkMatrixPriv.h"
@@ -32,17 +31,6 @@ bool SkM44::operator==(const SkM44& other) const {
 
     auto eq = (a0 == b0) & (a1 == b1) & (a2 == b2) & (a3 == b3);
     return (eq[0] & eq[1] & eq[2] & eq[3]) == ~0;
-}
-
-static void transpose_arrays(SkScalar dst[], const SkScalar src[]) {
-    dst[0]  = src[0]; dst[1]  = src[4]; dst[2]  = src[8];  dst[3]  = src[12];
-    dst[4]  = src[1]; dst[5]  = src[5]; dst[6]  = src[9];  dst[7]  = src[13];
-    dst[8]  = src[2]; dst[9]  = src[6]; dst[10] = src[10]; dst[11] = src[14];
-    dst[12] = src[3]; dst[13] = src[7]; dst[14] = src[11]; dst[15] = src[15];
-}
-
-void SkM44::getRowMajor(SkScalar v[]) const {
-    transpose_arrays(v, fMat);
 }
 
 SkM44& SkM44::setConcat(const SkM44& a, const SkM44& b) {
@@ -253,12 +241,6 @@ bool SkM44::invert(SkM44* inverse) const {
     return true;
 }
 
-SkM44 SkM44::transpose() const {
-    SkM44 trans(SkM44::kUninitialized_Constructor);
-    transpose_arrays(trans.fMat, fMat);
-    return trans;
-}
-
 SkM44& SkM44::setRotateUnitSinCos(SkV3 axis, SkScalar sinAngle, SkScalar cosAngle) {
     // Taken from "Essential Mathematics for Games and Interactive Applications"
     //             James M. Van Verth and Lars M. Bishop -- third edition
@@ -284,75 +266,4 @@ SkM44& SkM44::setRotate(SkV3 axis, SkScalar radians) {
         this->setIdentity();
     }
     return *this;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void SkM44::dump() const {
-    SkDebugf("|%g %g %g %g|\n"
-             "|%g %g %g %g|\n"
-             "|%g %g %g %g|\n"
-             "|%g %g %g %g|\n",
-             fMat[0], fMat[4], fMat[8],  fMat[12],
-             fMat[1], fMat[5], fMat[9],  fMat[13],
-             fMat[2], fMat[6], fMat[10], fMat[14],
-             fMat[3], fMat[7], fMat[11], fMat[15]);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-SkM44 SkM44::RectToRect(const SkRect& src, const SkRect& dst) {
-        if (src.isEmpty()) {
-        return SkM44();
-    } else if (dst.isEmpty()) {
-        return SkM44::Scale(0.f, 0.f, 0.f);
-    }
-
-    float sx = dst.width()  / src.width();
-    float sy = dst.height() / src.height();
-
-    float tx = dst.fLeft - sx * src.fLeft;
-    float ty = dst.fTop  - sy * src.fTop;
-
-    return SkM44{sx,  0.f, 0.f, tx,
-                 0.f, sy,  0.f, ty,
-                 0.f, 0.f, 1.f, 0.f,
-                 0.f, 0.f, 0.f, 1.f};
-}
-
-static SkV3 normalize(SkV3 v) {
-    const auto vlen = v.length();
-
-    return SkScalarNearlyZero(vlen) ? v : v * (1.0f / vlen);
-}
-
-static SkV4 v4(SkV3 v, SkScalar w) { return {v.x, v.y, v.z, w}; }
-
-SkM44 SkM44::LookAt(const SkV3& eye, const SkV3& center, const SkV3& up) {
-    SkV3 f = normalize(center - eye);
-    SkV3 u = normalize(up);
-    SkV3 s = normalize(f.cross(u));
-
-    SkM44 m(SkM44::kUninitialized_Constructor);
-    if (!SkM44::Cols(v4(s, 0), v4(s.cross(f), 0), v4(-f, 0), v4(eye, 1)).invert(&m)) {
-        m.setIdentity();
-    }
-    return m;
-}
-
-SkM44 SkM44::Perspective(float near, float far, float angle) {
-    SkASSERT(far > near);
-
-    float denomInv = sk_ieee_float_divide(1, far - near);
-    float halfAngle = angle * 0.5f;
-    SkASSERT(halfAngle != 0);
-    float cot = sk_ieee_float_divide(1, std::tan(halfAngle));
-
-    SkM44 m;
-    m.setRC(0, 0, cot);
-    m.setRC(1, 1, cot);
-    m.setRC(2, 2, (far + near) * denomInv);
-    m.setRC(2, 3, 2 * far * near * denomInv);
-    m.setRC(3, 2, -1);
-    return m;
 }
