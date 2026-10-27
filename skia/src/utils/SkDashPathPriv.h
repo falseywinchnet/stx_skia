@@ -29,9 +29,9 @@ bool FilterDashPath(SkPathBuilder* dst, const SkPath& src, SkStrokeRec*, const S
                     const SkPathEffectBase::DashInfo& info);
 
 #ifdef SK_BUILD_FOR_FUZZER
-const SkScalar kMaxDashCount = 10000;
+inline constexpr SkScalar kMaxDashCount = 10000;
 #else
-const SkScalar kMaxDashCount = 1000000;
+inline constexpr SkScalar kMaxDashCount = 1000000;
 #endif
 
     /** See comments for InternalFilter */

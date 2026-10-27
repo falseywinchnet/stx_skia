@@ -27,6 +27,7 @@ jobs:
           cmake -E compare_files build/baseline/curve-geometry.raw build/candidate/curve-geometry.raw
           cmake -E compare_files build/baseline/contour-measure.raw build/candidate/contour-measure.raw
           cmake -E compare_files build/baseline/stroke-geometry.raw build/candidate/stroke-geometry.raw
+          cmake -E compare_files build/baseline/dash-effects.raw build/candidate/dash-effects.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
@@ -69,6 +70,7 @@ jobs:
           cmake -E compare_files build/baseline/curve-geometry.raw build/candidate/curve-geometry.raw
           cmake -E compare_files build/baseline/contour-measure.raw build/candidate/contour-measure.raw
           cmake -E compare_files build/baseline/stroke-geometry.raw build/candidate/stroke-geometry.raw
+          cmake -E compare_files build/baseline/dash-effects.raw build/candidate/dash-effects.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
           cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw

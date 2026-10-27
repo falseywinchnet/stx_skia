@@ -13,7 +13,10 @@
 #include "include/core/SkPoint.h"
 #include "include/core/SkRect.h"
 #include "include/core/SkSpan.h"
+#include "include/private/SkAutoTArray.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <optional>
 
 class SkPathBuilder;
@@ -21,26 +24,17 @@ class SkStrokeRec;
 
 class SkPathEffectBase : public SkPathEffect {
 public:
-    SkPathEffectBase() {}
+    SkPathEffectBase() = default;
 
     /** \class PointData
 
         PointData aggregates all the information needed to draw the point
         primitives returned by an 'asPoints' call.
     */
+    // Owns its points; it can be moved but not copied.
     class PointData {
     public:
-        PointData()
-            : fFlags(0)
-            , fPoints(nullptr)
-            , fNumPoints(0) {
-            fSize.set(SK_Scalar1, SK_Scalar1);
-            // 'asPoints' needs to initialize/fill-in 'fClipRect' if it sets
-            // the kUseClip flag
-        }
-        ~PointData() {
-            delete [] fPoints;
-        }
+        PointData() = default;
 
         // TODO: consider using passed-in flags to limit the work asPoints does.
         // For example, a kNoPath flag could indicate don't bother generating
@@ -53,17 +47,23 @@ public:
             kUseClip_PointFlag            = 0x04,   // apply 'fClipRect' before drawing the points
         };
 
-        uint32_t           fFlags;      // flags that impact the drawing of the points
-        SkPoint*           fPoints;     // the center point of each generated point
-        int                fNumPoints;  // number of points in fPoints
-        SkVector           fSize;       // the size to draw the points
-        SkRect             fClipRect;   // clip required to draw the points (if kUseClip is set)
+        uint32_t           fFlags = 0;      // flags that impact the drawing of the points
+        skia_private::AutoTArray<SkPoint> fPoints;  // the center point of each generated point
+        int                fNumPoints = 0;  // number of points in fPoints
+        SkVector           fSize{SK_Scalar1, SK_Scalar1};  // the size to draw the points
+        // clip required to draw the points; 'asPoints' fills it in if it sets kUseClip
+        SkRect             fClipRect = SkRect::MakeEmpty();
         SkPath             fPath;       // 'stamp' to be used at each point (if kUsePath is set)
 
         SkPath             fFirst;      // If not empty, contains geometry for first point
         SkPath             fLast;       // If not empty, contains geometry for last point
 
-        SkSpan<SkPoint> points() { return {fPoints, (size_t)fNumPoints}; }
+        // Borrows fPoints until it is replaced or this record is destroyed.
+        SkSpan<SkPoint> points() & {
+            const SkSpan<SkPoint> view(fPoints.data(), static_cast<size_t>(fNumPoints));
+            return view;
+        }
+        SkSpan<SkPoint> points() && = delete;
     };
 
     /**
@@ -90,9 +90,9 @@ public:
 
     static sk_sp<SkPathEffect> Deserialize(const void* data, size_t size,
                                           const SkDeserialProcs* procs = nullptr) {
-        return sk_sp<SkPathEffect>(static_cast<SkPathEffect*>(
-                                  SkFlattenable::Deserialize(
-                                  kSkPathEffect_Type, data, size, procs).release()));
+        const sk_sp<SkPathEffect> effect(static_cast<SkPathEffect*>(
+                SkFlattenable::Deserialize(kSkPathEffect_Type, data, size, procs).release()));
+        return effect;
     }
 
     /**
@@ -113,13 +113,15 @@ public:
         return false;
     }
 
+    // fIntervals borrows the effect's intervals; the effect must outlive it.
     struct DashInfo {
-        SkSpan<const SkScalar> fIntervals;
-        SkScalar               fPhase;
+        SkSpan<const SkScalar> fIntervals{};
+        SkScalar               fPhase = 0;
     };
 
     virtual std::optional<DashInfo> asADash() const {
-        return {};
+        const std::optional<DashInfo> none{};
+        return none;
     }
 
 
@@ -138,19 +140,24 @@ private:
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 static inline SkPathEffectBase* as_PEB(SkPathEffect* effect) {
-    return static_cast<SkPathEffectBase*>(effect);
+    SkPathEffectBase* base = static_cast<SkPathEffectBase*>(effect);
+    return base;
 }
 
 static inline const SkPathEffectBase* as_PEB(const SkPathEffect* effect) {
-    return static_cast<const SkPathEffectBase*>(effect);
+    const SkPathEffectBase* base = static_cast<const SkPathEffectBase*>(effect);
+    return base;
 }
 
+// Borrows the effect owned by the caller's reference.
 static inline const SkPathEffectBase* as_PEB(const sk_sp<SkPathEffect>& effect) {
-    return static_cast<SkPathEffectBase*>(effect.get());
+    const SkPathEffectBase* base = static_cast<const SkPathEffectBase*>(effect.get());
+    return base;
 }
 
 static inline sk_sp<SkPathEffectBase> as_PEB_sp(sk_sp<SkPathEffect> effect) {
-    return sk_sp<SkPathEffectBase>(static_cast<SkPathEffectBase*>(effect.release()));
+    const sk_sp<SkPathEffectBase> base(static_cast<SkPathEffectBase*>(effect.release()));
+    return base;
 }
 
 #endif

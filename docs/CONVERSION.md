@@ -1283,6 +1283,17 @@ Debug-only stroker instrumentation is removed. Candidate/reference suites pass 6
 corrected sampling artifact; the instrumented suite reports PASS. See
 ../results/2026-10-26/STROKE_CONVERSION.md. Dashing and path-effect composition remain.
 
+## Dashing, the dash path effect and path-effect composition
+
+Dash filtering, the dash effect and sum/compose effects are converted: axis-aligned line
+clipping no longer indexes across struct fields, rectangle edges and last points are named
+optional records, and dash records start initialized. Point results from the dashed-point
+fast path now own their storage (the raw `new[]` record was copyable and would double
+free), and a null result no longer receives a write. Candidate/reference suites pass 66/66
+and 65/65; the new corpus and every other shared artifact match, except the intentionally
+corrected sampling artifact; the instrumented suite reports PASS after an oversized first
+corpus was reduced. See ../results/2026-10-26/DASH_CONVERSION.md.
+
 ## Still required
 
 - Finish reference-count/view compatibility cleanup; convert arrays, memory utilities and remaining

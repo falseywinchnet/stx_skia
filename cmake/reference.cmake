@@ -477,3 +477,8 @@ list(REMOVE_ITEM stx_sources skia/src/core/SkStroke.cpp skia/src/core/SkStrokerP
     skia/src/core/SkStrokeRec.cpp)
 list(APPEND stx_sources baseline/skia/src/core/SkStroke.cpp baseline/skia/src/core/SkStrokerPriv.cpp
     baseline/skia/src/core/SkStrokeRec.cpp)
+
+# Dashing and the dash path effect before conversion (SkPathEffect.cpp is selected above).
+list(REMOVE_ITEM stx_sources skia/src/utils/SkDashPath.cpp skia/src/effects/SkDashPathEffect.cpp)
+list(APPEND stx_sources baseline/skia/src/utils/SkDashPath.cpp
+    baseline/skia/src/effects/SkDashPathEffect.cpp)
