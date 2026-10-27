@@ -72,8 +72,6 @@ set(STX_SKIA_BASELINE_SOURCES
     skia/src/core/SkCanvas_Raster.cpp
     skia/src/core/SkCapabilities.cpp
     skia/src/core/SkChecksum.cpp
-    skia/src/core/SkClipStack.cpp
-    skia/src/core/SkClipStackDevice.cpp
     skia/src/core/SkColor.cpp
     skia/src/core/SkColorFilter.cpp
     skia/src/core/SkColorSpace.cpp

@@ -47,6 +47,14 @@
 #include <optional>
 #include <vector>
 
+// The clip stack and its device served only the PDF, SVG and XPS backends; the CPU canvas clips
+// through SkRasterClipStack. Their originals remain in baseline/skia.
+#ifndef STX_SKIA_REFERENCE
+#if __has_include("src/core/SkClipStack.h") || __has_include("src/core/SkClipStackDevice.h")
+#error The clip stack and its device must not be part of the candidate.
+#endif
+#endif
+
 namespace {
 
 using corpus::Output;

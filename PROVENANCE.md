@@ -244,3 +244,12 @@ implementation. The context packing utility moves to baseline/skia. The candidat
 removes compiler operations and their execution state while preserving ordinary
 raster arithmetic. New original tests/raster_pipeline.cpp verifies padded rows,
 precision selection, extension/reset and compiled callback execution.
+
+
+## Clip stack removal
+
+SkClipStack.cpp/.h and SkClipStackDevice.cpp/.h now live only in baseline/skia,
+unchanged with their notices. They served the PDF, SVG and XPS backends; nothing the
+CPU candidate or the reference profile compiles uses them, and the CPU canvas clips
+through SkRasterClipStack. tests/canvas_device.cpp checks that the candidate cannot
+reach either header. The upstream ClipStackTest.cpp source is preserved and not built.
