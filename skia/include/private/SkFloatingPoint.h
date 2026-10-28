@@ -20,25 +20,25 @@ inline constexpr float SK_FloatSqrt2 = 1.41421356f;
 inline constexpr float SK_FloatPI    = 3.14159265f;
 inline constexpr double SK_DoublePI  = 3.14159265358979323846264338327950288;
 
-static constexpr int sk_float_sgn(float x) {
+constexpr int sk_float_sgn(float x) {
     return (0.0f < x) - (x < 0.0f);
 }
 
-static constexpr float sk_float_degrees_to_radians(float degrees) {
+constexpr float sk_float_degrees_to_radians(float degrees) {
     return degrees * (SK_FloatPI / 180);
 }
 
-static constexpr float sk_float_radians_to_degrees(float radians) {
+constexpr float sk_float_radians_to_degrees(float radians) {
     return radians * (180 / SK_FloatPI);
 }
 
 // floor(double+0.5) vs. floorf(float+0.5f) give comparable performance, but upcasting to double
 // means tricky values like 0.49999997 and 2^24 get rounded correctly. If these were rounded
 // as floatf(x + .5f), they would be 1 higher than expected.
-#define sk_float_round(x) (float)sk_double_round((double)(x))
+#define sk_float_round(x) static_cast<float>(sk_double_round(static_cast<double>(x)))
 
 template <typename T, std::enable_if_t<std::is_floating_point_v<T>, bool> = true>
-static inline constexpr bool SkIsNaN(T x) {
+constexpr bool SkIsNaN(T x) {
     return x != x;
 }
 
@@ -47,7 +47,7 @@ static inline constexpr bool SkIsNaN(T x) {
 // NAN or ±Inf, which will result in NAN and continue resulting in NAN for the rest of the elements.
 // This generates better code than `std::isfinite` when building with clang-cl (April 2024).
 template <typename T, typename... Pack, std::enable_if_t<std::is_floating_point_v<T>, bool> = true>
-static inline bool SkIsFinite(T x, Pack... values) {
+inline bool SkIsFinite(T x, Pack... values) {
     T prod = x - x;
     prod = (prod * ... * values);
     // At this point, `prod` will either be NaN or 0.
@@ -55,8 +55,8 @@ static inline bool SkIsFinite(T x, Pack... values) {
 }
 
 template <typename T, std::enable_if_t<std::is_floating_point_v<T>, bool> = true>
-static inline bool SkIsFinite(const T array[], int count) {
-    T x = array[0];
+inline bool SkIsFinite(const T array[], int count) {
+    const T x = array[0];
     T prod = x - x;
     for (int i = 1; i < count; ++i) {
         prod *= array[i];
@@ -86,31 +86,31 @@ inline constexpr int64_t SK_MinS64FitsInFloat = -SK_MaxS64FitsInFloat;
 /**
  *  Return the closest int for the given float. Returns SK_MaxS32FitsInFloat for NaN.
  */
-static constexpr int sk_float_saturate2int(float x) {
+constexpr int sk_float_saturate2int(float x) {
     SK_CHECK_NAN(SK_MaxS32FitsInFloat)
     x = x < SK_MaxS32FitsInFloat ? x : SK_MaxS32FitsInFloat;
     x = x > SK_MinS32FitsInFloat ? x : SK_MinS32FitsInFloat;
-    return (int)x;
+    return static_cast<int>(x);
 }
 
 /**
  *  Return the closest int for the given double. Returns SK_MaxS32 for NaN.
  */
-static constexpr int sk_double_saturate2int(double x) {
+constexpr int sk_double_saturate2int(double x) {
     SK_CHECK_NAN(SK_MaxS32)
     x = x < SK_MaxS32 ? x : SK_MaxS32;
     x = x > SK_MinS32 ? x : SK_MinS32;
-    return (int)x;
+    return static_cast<int>(x);
 }
 
 /**
  *  Return the closest int64_t for the given float. Returns SK_MaxS64FitsInFloat for NaN.
  */
-static constexpr int64_t sk_float_saturate2int64(float x) {
+constexpr int64_t sk_float_saturate2int64(float x) {
     SK_CHECK_NAN(SK_MaxS64FitsInFloat)
     x = x < SK_MaxS64FitsInFloat ? x : SK_MaxS64FitsInFloat;
     x = x > SK_MinS64FitsInFloat ? x : SK_MinS64FitsInFloat;
-    return (int64_t)x;
+    return static_cast<int64_t>(x);
 }
 
 #undef SK_CHECK_NAN
@@ -119,20 +119,20 @@ static constexpr int64_t sk_float_saturate2int64(float x) {
 #define sk_float_round2int(x)   sk_float_saturate2int(sk_float_round(x))
 #define sk_float_ceil2int(x)    sk_float_saturate2int(std::ceil(x))
 
-#define sk_float_floor2int_no_saturate(x)   ((int)std::floor(x))
-#define sk_float_round2int_no_saturate(x)   ((int)sk_float_round(x))
-#define sk_float_ceil2int_no_saturate(x)    ((int)std::ceil(x))
+#define sk_float_floor2int_no_saturate(x)   (static_cast<int>(std::floor(x)))
+#define sk_float_round2int_no_saturate(x)   (static_cast<int>(sk_float_round(x)))
+#define sk_float_ceil2int_no_saturate(x)    (static_cast<int>(std::ceil(x)))
 
 #define sk_double_round(x)          (std::floor((x) + 0.5))
-#define sk_double_floor2int(x)      ((int)std::floor(x))
-#define sk_double_round2int(x)      ((int)std::round(x))
-#define sk_double_ceil2int(x)       ((int)std::ceil(x))
+#define sk_double_floor2int(x)      (static_cast<int>(std::floor(x)))
+#define sk_double_round2int(x)      (static_cast<int>(std::round(x)))
+#define sk_double_ceil2int(x)       (static_cast<int>(std::ceil(x)))
 
 // Cast double to float, ignoring any warning about too-large finite values being cast to float.
 // Clang thinks this is undefined, but it's actually implementation defined to return either
 // the largest float or infinity (one of the two bracketing representable floats).  Good enough!
 SK_NO_SANITIZE("float-cast-overflow")
-static constexpr float sk_double_to_float(double x) {
+constexpr float sk_double_to_float(double x) {
     return static_cast<float>(x);
 }
 
@@ -143,12 +143,12 @@ inline constexpr float SK_FloatNegativeInfinity = -SK_FloatInfinity;
 inline constexpr double SK_DoubleNaN = std::numeric_limits<double>::quiet_NaN();
 
 // Calculate the midpoint between a and b. Similar to std::midpoint in c++20.
-static constexpr float sk_float_midpoint(float a, float b) {
+constexpr float sk_float_midpoint(float a, float b) {
     // Use double math to avoid underflow and overflow.
     return static_cast<float>(0.5 * (static_cast<double>(a) + b));
 }
 
-static inline float sk_float_rsqrt (float x) { return 1.0f / std::sqrt(x); }
+inline float sk_float_rsqrt(float x) { return 1.0f / std::sqrt(x); }
 
 // IEEE defines how float divide behaves for non-finite values and zero-denoms, but C does not,
 // so we have a helper that suppresses the possible undefined-behavior warnings.
@@ -157,12 +157,12 @@ static inline float sk_float_rsqrt (float x) { return 1.0f / std::sqrt(x); }
 #pragma warning(disable : 4723)
 #endif
 SK_NO_SANITIZE("float-divide-by-zero")
-static constexpr float sk_ieee_float_divide(float numer, float denom) {
+constexpr float sk_ieee_float_divide(float numer, float denom) {
     return numer / denom;
 }
 
 SK_NO_SANITIZE("float-divide-by-zero")
-static constexpr double sk_ieee_double_divide(double numer, double denom) {
+constexpr double sk_ieee_double_divide(double numer, double denom) {
     return numer / denom;
 }
 #ifdef SK_BUILD_FOR_WIN

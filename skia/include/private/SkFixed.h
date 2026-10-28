@@ -12,6 +12,7 @@
 #include "include/private/SkDebug.h"
 #include "include/private/SkMath.h" // IWYU pragma: keep
 #include "include/private/SkTPin.h" // IWYU pragma: keep
+#include "include/private/SkTo.h"  // SkFixedDiv
 
 #include <cstdint>
 
@@ -22,7 +23,7 @@
 
 /** 32 bit signed integer used to represent fractions values with 16 bits to the right of the decimal point
 */
-typedef int32_t             SkFixed;
+using SkFixed = int32_t;
 #define SK_Fixed1           (1 << 16)
 #define SK_FixedHalf        (1 << 15)
 #define SK_FixedQuarter     (1 << 14)
@@ -42,9 +43,9 @@ typedef int32_t             SkFixed;
 #define SkFloatToFixed(x)   sk_float_saturate2int((x) * SK_Fixed1)
 
 #ifdef SK_DEBUG
-    static inline SkFixed SkFloatToFixed_Check(float x) {
-        int64_t n64 = (int64_t)(x * SK_Fixed1);
-        SkFixed n32 = (SkFixed)n64;
+    inline SkFixed SkFloatToFixed_Check(float x) {
+        const int64_t n64 = static_cast<int64_t>(x * SK_Fixed1);
+        const SkFixed n32 = static_cast<SkFixed>(n64);
         SkASSERT(n64 == n32);
         return n32;
     }
@@ -64,7 +65,7 @@ typedef int32_t             SkFixed;
         SkASSERT(n >= -32768 && n <= 32767);
         // Left shifting a negative value has undefined behavior in C, so we cast to unsigned before
         // shifting.
-        return (SkFixed)( (unsigned)n << 16 );
+        return static_cast<SkFixed>(static_cast<unsigned>(n) << 16);
     }
 #else
     // Left shifting a negative value has undefined behavior in C, so we cast to unsigned before
@@ -77,14 +78,14 @@ typedef int32_t             SkFixed;
 #define SkFixedCeilToInt(x)     (((x) + SK_Fixed1 - 1) >> 16)
 #define SkFixedFloorToInt(x)    ((x) >> 16)
 
-static inline SkFixed SkFixedRoundToFixed(SkFixed x) {
-    return (SkFixed)( (uint32_t)(x + SK_FixedHalf) & 0xFFFF0000 );
+inline SkFixed SkFixedRoundToFixed(SkFixed x) {
+    return static_cast<SkFixed>(static_cast<uint32_t>(x + SK_FixedHalf) & 0xFFFF0000);
 }
-static inline SkFixed SkFixedCeilToFixed(SkFixed x) {
-    return (SkFixed)( (uint32_t)(x + SK_Fixed1 - 1) & 0xFFFF0000 );
+inline SkFixed SkFixedCeilToFixed(SkFixed x) {
+    return static_cast<SkFixed>(static_cast<uint32_t>(x + SK_Fixed1 - 1) & 0xFFFF0000);
 }
-static inline SkFixed SkFixedFloorToFixed(SkFixed x) {
-    return (SkFixed)( (uint32_t)x & 0xFFFF0000 );
+inline SkFixed SkFixedFloorToFixed(SkFixed x) {
+    return static_cast<SkFixed>(static_cast<uint32_t>(x) & 0xFFFF0000);
 }
 
 #define SkFixedAve(a, b)    (((a) + (b)) >> 1)
@@ -93,8 +94,8 @@ static inline SkFixed SkFixedFloorToFixed(SkFixed x) {
 #define SkFixedDiv(numer, denom) \
     SkToS32(SkTPin<int64_t>((SkLeftShift((int64_t)(numer), 16) / (denom)), SK_MinS32, SK_MaxS32))
 
-static inline SkFixed SkFixedMul(SkFixed a, SkFixed b) {
-    return (SkFixed)((int64_t)a * b >> 16);
+inline SkFixed SkFixedMul(SkFixed a, SkFixed b) {
+    return static_cast<SkFixed>(static_cast<int64_t>(a) * b >> 16);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -126,7 +127,7 @@ static inline SkFixed SkFixedMul(SkFixed a, SkFixed b) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-typedef int64_t SkFixed3232;   // 32.32
+using SkFixed3232 = int64_t;   // 32.32
 
 #define SkFixed3232Max            SK_MaxS64
 #define SkFixed3232Min            (-SkFixed3232Max)

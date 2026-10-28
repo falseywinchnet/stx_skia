@@ -9,41 +9,43 @@
 #define SkFloatUtils_DEFINED
 
 #include "include/core/SkTypes.h"
-#include <limits.h>
-#include <float.h>
+#include <cfloat>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
 
 template <size_t size>
 class SkTypeWithSize {
 public:
     // Prevents using SkTypeWithSize<N> with non-specialized N.
-    typedef void UInt;
+    using UInt = void;
 };
 
 template <>
 class SkTypeWithSize<32> {
 public:
-    typedef uint32_t UInt;
+    using UInt = uint32_t;
 };
 
 template <>
 class SkTypeWithSize<64> {
 public:
-    typedef uint64_t UInt;
+    using UInt = uint64_t;
 };
 
 template <typename RawType>
 struct SkNumericLimits {
-    static const int digits = 0;
+    static constexpr int digits = 0;
 };
 
 template <>
 struct SkNumericLimits<double> {
-    static const int digits = DBL_MANT_DIG;
+    static constexpr int digits = DBL_MANT_DIG;
 };
 
 template <>
 struct SkNumericLimits<float> {
-    static const int digits = FLT_MANT_DIG;
+    static constexpr int digits = FLT_MANT_DIG;
 };
 
 //See
@@ -55,29 +57,29 @@ template <typename RawType, unsigned int ULPs>
 class SkFloatingPoint {
 public:
     /** Bits is a unsigned integer the same size as the floating point number. */
-    typedef typename SkTypeWithSize<sizeof(RawType) * CHAR_BIT>::UInt Bits;
+    using Bits = typename SkTypeWithSize<sizeof(RawType) * CHAR_BIT>::UInt;
 
     /** # of bits in a number. */
-    static const size_t kBitCount = CHAR_BIT * sizeof(RawType);
+    static constexpr size_t kBitCount = CHAR_BIT * sizeof(RawType);
 
     /** # of fraction bits in a number. */
-    static const size_t kFractionBitCount = SkNumericLimits<RawType>::digits - 1;
+    static constexpr size_t kFractionBitCount = SkNumericLimits<RawType>::digits - 1;
 
     /** # of exponent bits in a number. */
-    static const size_t kExponentBitCount = kBitCount - 1 - kFractionBitCount;
+    static constexpr size_t kExponentBitCount = kBitCount - 1 - kFractionBitCount;
 
     /** The mask for the sign bit. */
-    static const Bits kSignBitMask = static_cast<Bits>(1) << (kBitCount - 1);
+    static constexpr Bits kSignBitMask = static_cast<Bits>(1) << (kBitCount - 1);
 
     /** The mask for the fraction bits. */
-    static const Bits kFractionBitMask =
+    static constexpr Bits kFractionBitMask =
         ~static_cast<Bits>(0) >> (kExponentBitCount + 1);
 
     /** The mask for the exponent bits. */
-    static const Bits kExponentBitMask = ~(kSignBitMask | kFractionBitMask);
+    static constexpr Bits kExponentBitMask = ~(kSignBitMask | kFractionBitMask);
 
     /** How many ULP's (Units in the Last Place) to tolerate when comparing. */
-    static const size_t kMaxUlps = ULPs;
+    static constexpr size_t kMaxUlps = ULPs;
 
     /**
      *  Constructs a FloatingPoint from a raw floating-point number.
