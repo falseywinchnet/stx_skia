@@ -18,13 +18,8 @@ static void malloc_freeproc(void* context) {
 }
 
 // Makes empty table
-SkDataTable::SkDataTable() {
-    fCount = 0;
-    fElemSize = 0;   // 0 signals that we use fDir instead of fElems
-    fU.fDir = nullptr;
-    fFreeProc = nullptr;
-    fFreeProcContext = nullptr;
-}
+// fElemSize stays 0, which signals that we use fDir instead of fElems.
+SkDataTable::SkDataTable() = default;
 
 SkDataTable::SkDataTable(const void* array, size_t elemSize, int count,
                          FreeProc proc, void* context) {
@@ -32,7 +27,7 @@ SkDataTable::SkDataTable(const void* array, size_t elemSize, int count,
 
     fCount = count;
     fElemSize = elemSize;   // non-zero signals we use fElems instead of fDir
-    fU.fElems = (const char*)array;
+    fU.fElems = static_cast<const char*>(array);
     fFreeProc = proc;
     fFreeProcContext = context;
 }
@@ -54,7 +49,7 @@ SkDataTable::~SkDataTable() {
 }
 
 size_t SkDataTable::atSize(int index) const {
-    SkASSERT((unsigned)index < (unsigned)fCount);
+    SkASSERT(static_cast<unsigned>(index) < static_cast<unsigned>(fCount));
 
     if (fElemSize) {
         return fElemSize;
@@ -64,7 +59,7 @@ size_t SkDataTable::atSize(int index) const {
 }
 
 const void* SkDataTable::at(int index, size_t* size) const {
-    SkASSERT((unsigned)index < (unsigned)fCount);
+    SkASSERT(static_cast<unsigned>(index) < static_cast<unsigned>(fCount));
 
     if (fElemSize) {
         if (size) {
@@ -97,15 +92,15 @@ sk_sp<SkDataTable> SkDataTable::MakeCopyArrays(const void * const * ptrs,
         dataSize += sizes[i];
     }
 
-    size_t bufferSize = count * sizeof(Dir) + dataSize;
+    const size_t bufferSize = count * sizeof(Dir) + dataSize;
     void* buffer = sk_malloc_throw(bufferSize);
 
-    Dir* dir = (Dir*)buffer;
-    char* elem = (char*)(dir + count);
+    Dir* dir = static_cast<Dir*>(buffer);
+    char* elem = reinterpret_cast<char*>(dir + count);
     for (int i = 0; i < count; ++i) {
         dir[i].fPtr = elem;
         dir[i].fSize = sizes[i];
-        memcpy(elem, ptrs[i], sizes[i]);
+        std::memcpy(elem, ptrs[i], sizes[i]);
         elem += sizes[i];
     }
 
@@ -117,9 +112,9 @@ sk_sp<SkDataTable> SkDataTable::MakeCopyArray(const void* array, size_t elemSize
         return SkDataTable::MakeEmpty();
     }
 
-    size_t bufferSize = elemSize * count;
+    const size_t bufferSize = elemSize * count;
     void* buffer = sk_malloc_throw(bufferSize);
-    memcpy(buffer, array, bufferSize);
+    std::memcpy(buffer, array, bufferSize);
 
     return sk_sp<SkDataTable>(new SkDataTable(buffer, elemSize, count, malloc_freeproc, buffer));
 }

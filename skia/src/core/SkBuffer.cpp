@@ -10,12 +10,13 @@
 #include "include/private/SkAlign.h"
 #include "include/private/SkMalloc.h"
 
+#include <cstddef>
 #include <cstdint>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const void* SkRBuffer::skip(size_t size) {
-    if (fValid && size <= this->available()) {
+    if (fValid && size <= (*this).available()) {
         const void* pos = fPos;
         fPos += size;
         return pos;
@@ -25,7 +26,7 @@ const void* SkRBuffer::skip(size_t size) {
 }
 
 bool SkRBuffer::read(void* buffer, size_t size) {
-    if (const void* src = this->skip(size)) {
+    if (const void* src = (*this).skip(size)) {
         sk_careful_memcpy(buffer, src, size);
         return true;
     }
@@ -33,9 +34,9 @@ bool SkRBuffer::read(void* buffer, size_t size) {
 }
 
 bool SkRBuffer::skipToAlign4() {
-    intptr_t pos = reinterpret_cast<intptr_t>(fPos);
-    size_t n = SkAlign4(pos) - pos;
-    if (fValid && n <= this->available()) {
+    const intptr_t pos = reinterpret_cast<intptr_t>(fPos);
+    const size_t n = static_cast<size_t>(SkAlign4(pos) - pos);
+    if (fValid && n <= (*this).available()) {
         fPos += n;
         return true;
     } else {
@@ -61,11 +62,10 @@ void SkWBuffer::writeNoSizeCheck(const void* buffer, size_t size) {
 }
 
 size_t SkWBuffer::padToAlign4() {
-    size_t pos = this->pos();
-    size_t n = SkAlign4(pos) - pos;
+    const size_t pos = (*this).pos();
+    const size_t n = SkAlign4(pos) - pos;
 
-    if (n && fData)
-    {
+    if (n && fData) {
         char* p = fPos;
         char* stop = p + n;
         do {
@@ -75,16 +75,3 @@ size_t SkWBuffer::padToAlign4() {
     fPos += n;
     return n;
 }
-
-#if 0
-#ifdef SK_DEBUG
-    static void AssertBuffer32(const void* buffer)
-    {
-        SkASSERT(buffer);
-        SkASSERT(((size_t)buffer & 3) == 0);
-    }
-#else
-    #define AssertBuffer32(buffer)
-#endif
-
-#endif
