@@ -10,288 +10,248 @@
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkColorType.h"
 #include "include/core/SkTypes.h"
-#include "include/private/SkTo.h"
 #include "src/core/SkImageInfoPriv.h"
 #include "src/core/SkMathPriv.h"
-#include "src/core/SkMipmapBuilder.h"
+#include "src/core/SkSafeMath.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <new>
 
-//
-// ColorTypeFilter is the "Type" we pass to some downsample template functions.
-// It controls how we expand a pixel into a large type, with space between each component,
-// so we can then perform our simple filter (either box or triangle) and store the intermediates
-// in the expanded type.
-//
+SkMipmap::SkMipmap(void* allocation, size_t size) : SkCachedData(allocation, size) {}
+SkMipmap::SkMipmap(size_t size, SkDiscardableMemory* memory) : SkCachedData(size, memory) {}
+SkMipmap::~SkMipmap() {}
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-SkMipmap::SkMipmap(void* malloc, size_t size) : SkCachedData(malloc, size) {}
-SkMipmap::SkMipmap(size_t size, SkDiscardableMemory* dm) : SkCachedData(size, dm) {}
-
-SkMipmap::~SkMipmap() = default;
-
-size_t SkMipmap::AllocLevelsSize(int levelCount, size_t pixelSize) {
-    if (levelCount < 0) {
+size_t SkMipmap::AllocLevelsSize(int levelCount, size_t pixelBytes) {
+    if (levelCount <= 0) {
         return 0;
     }
-    int64_t size = sk_64_mul(levelCount + 1, sizeof(Level)) + pixelSize;
-    if (!SkTFitsIn<int32_t>(size)) {
+    SkSafeMath safe;
+    // Retain the original extra descriptor-sized tail allowance. Pixel storage
+    // begins immediately after the live descriptors, not after this allowance.
+    const size_t slots = safe.add(static_cast<size_t>(levelCount), 1);
+    const size_t descriptorBytes = safe.mul(slots, sizeof(Level));
+    const size_t allocationBytes = safe.add(descriptorBytes, pixelBytes);
+    if (!safe.ok() || allocationBytes > static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
         return 0;
     }
-    return SkTo<int32_t>(size);
+    return allocationBytes;
 }
 
-SkMipmap* SkMipmap::Build(const SkPixmap& src, SkDiscardableFactoryProc fact,
-                          bool computeContents) {
-    if (src.width() <= 1 && src.height() <= 1) {
+SkMipmap* SkMipmap::Build(const SkPixmap& source, SkDiscardableFactoryProc factory,
+                        bool computeContents) {
+    const SkImageInfo& sourceInfo = source.info();
+    const SkColorType colorType = source.colorType();
+    const SkAlphaType alphaType = source.alphaType();
+    if (!SkColorTypeIsValid(static_cast<unsigned>(colorType)) ||
+        !SkAlphaTypeIsValid(static_cast<unsigned>(alphaType)) ||
+        !SkImageInfoIsValid(sourceInfo)) {
         return nullptr;
     }
-
-    const SkColorType ct = src.colorType();
-    const SkAlphaType at = src.alphaType();
-
-    // whip through our loop to compute the exact size needed
-    size_t size = 0;
-    int countLevels = ComputeLevelCount(src.width(), src.height());
-    for (int currentMipLevel = countLevels; currentMipLevel >= 0; currentMipLevel--) {
-        SkISize mipSize = ComputeLevelSize(src.width(), src.height(), currentMipLevel);
-        size += SkColorTypeMinRowBytes(ct, mipSize.fWidth) * mipSize.fHeight;
-    }
-
-    size_t storageSize = SkMipmap::AllocLevelsSize(countLevels, size);
-    if (0 == storageSize) {
+    const int levelCount = ComputeLevelCount(source.width(), source.height());
+    if (levelCount == 0) {
         return nullptr;
     }
-
-    SkMipmap* mipmap;
-    if (fact) {
-        SkDiscardableMemory* dm = fact(storageSize);
-        if (nullptr == dm) {
-            return nullptr;
-        }
-        mipmap = new SkMipmap(storageSize, dm);
-    } else {
-        void* tmp = sk_malloc_canfail(storageSize);
-        if (!tmp) {
-            return nullptr;
-        }
-
-        mipmap = new SkMipmap(tmp, storageSize);
-    }
-
-    // init
-    mipmap->fCS = sk_ref_sp(src.info().colorSpace());
-    mipmap->fCount = countLevels;
-    mipmap->fLevels = (Level*)mipmap->writable_data();
-    SkASSERT(mipmap->fLevels);
-
-    Level* levels = mipmap->fLevels;
-    uint8_t*    baseAddr = (uint8_t*)&levels[countLevels];
-    uint8_t*    addr = baseAddr;
-    int         width = src.width();
-    int         height = src.height();
-    uint32_t    rowBytes;
-    SkPixmap    srcPM(src);
-
-    // Depending on architecture and other factors, the pixel data alignment may need to be as
-    // large as 8 (for F16 pixels). See the comment on SkMipmap::Level.
-    SkASSERT(SkIsAlign8((uintptr_t)addr));
-
-    std::unique_ptr<SkMipmapDownSampler> downsampler;
     if (computeContents) {
-        downsampler = MakeDownSampler(src);
-        if (!downsampler) {
-            delete mipmap;
+        if (source.addr() == nullptr || !sourceInfo.validRowBytes(source.rowBytes())) {
+            return nullptr;
+        }
+        const size_t sourceBytes = source.computeByteSize();
+        if (SkImageInfo::ByteSizeOverflowed(sourceBytes)) {
             return nullptr;
         }
     }
 
-    for (int i = 0; i < countLevels; ++i) {
-        width = std::max(1, width >> 1);
-        height = std::max(1, height >> 1);
-        rowBytes = SkToU32(SkColorTypeMinRowBytes(ct, width));
-
-        // We make the Info w/o any colorspace, since that storage is not under our control, and
-        // will not be deleted in a controlled fashion. When the caller is given the pixmap for
-        // a given level, we augment this pixmap with fCS (which we do manage).
-        new (&levels[i].fPixmap) SkPixmap(SkImageInfo::Make(width, height, ct, at), addr, rowBytes);
-        levels[i].fScale  = SkSize::Make(SkIntToScalar(width)  / src.width(),
-                                         SkIntToScalar(height) / src.height());
-
-        const SkPixmap& dstPM = levels[i].fPixmap;
-        if (downsampler) {
-            downsampler->buildLevel(dstPM, srcPM);
-        }
-        srcPM = dstPM;
-        addr += height * rowBytes;
+    // Sum the complete layout without touching source pixels or invoking the
+    // allocation callback. Each axis halves until both reach one.
+    SkSafeMath safe;
+    const size_t bytesPerPixel = static_cast<size_t>(SkColorTypeBytesPerPixel(colorType));
+    size_t pixelBytes = 0;
+    int levelWidth = source.width();
+    int levelHeight = source.height();
+    for (int index = 0; index < levelCount; ++index) {
+        levelWidth = std::max(1, levelWidth >> 1);
+        levelHeight = std::max(1, levelHeight >> 1);
+        const size_t rowBytes = safe.mul(static_cast<size_t>(levelWidth), bytesPerPixel);
+        const size_t levelBytes = safe.mul(rowBytes, static_cast<size_t>(levelHeight));
+        pixelBytes = safe.add(pixelBytes, levelBytes);
     }
-    SkASSERT(addr == baseAddr + size);
+    if (!safe.ok()) {
+        return nullptr;
+    }
+    const size_t allocationBytes = AllocLevelsSize(levelCount, pixelBytes);
+    if (allocationBytes == 0) {
+        return nullptr;
+    }
 
-    SkASSERT(mipmap->fLevels);
-    return mipmap;
+    std::unique_ptr<SkMipmapDownSampler> downsampler{};
+    if (computeContents) {
+        downsampler = MakeDownSampler(source);
+        if (!downsampler) {
+            return nullptr;
+        }
+    }
+
+    sk_sp<SkMipmap> owner{};
+    if (factory != nullptr) {
+        SkDiscardableMemory* memory = factory(allocationBytes);
+        if (memory == nullptr) {
+            return nullptr;
+        }
+        owner.reset(new SkMipmap(allocationBytes, memory));
+    } else {
+        void* allocation = sk_malloc_canfail(allocationBytes);
+        if (allocation == nullptr) {
+            return nullptr;
+        }
+        owner.reset(new SkMipmap(allocation, allocationBytes));
+    }
+
+    SkMipmap& mipmap = *owner;
+    mipmap.fCS = sk_ref_sp(sourceInfo.colorSpace());
+    mipmap.fCount = levelCount;
+    mipmap.fLevels = static_cast<Level*>(mipmap.writable_data());
+    SkASSERT(mipmap.fLevels != nullptr);
+    Level* levels = mipmap.fLevels;
+    uint8_t* allocation = static_cast<uint8_t*>(mipmap.writable_data());
+    const size_t descriptorBytes = static_cast<size_t>(levelCount) * sizeof(Level);
+    uint8_t* pixelBase = allocation + descriptorBytes;
+    SkASSERT(SkIsAlign8(reinterpret_cast<uintptr_t>(pixelBase)));
+
+    size_t pixelOffset = 0;
+    levelWidth = source.width();
+    levelHeight = source.height();
+    SkPixmap previous = source;
+    for (int index = 0; index < levelCount; ++index) {
+        levelWidth = std::max(1, levelWidth >> 1);
+        levelHeight = std::max(1, levelHeight >> 1);
+        // The first pass proves these products fit the allocation's signed
+        // 32-bit extent limit. No allocation or format dispatch occurs here.
+        const size_t rowBytes = static_cast<size_t>(levelWidth) * bytesPerPixel;
+        const size_t levelBytes = static_cast<size_t>(levelHeight) * rowBytes;
+        const SkImageInfo levelInfo = SkImageInfo::Make(levelWidth, levelHeight,
+                                                       colorType, alphaType);
+        const SkPixmap pixels(levelInfo, pixelBase + pixelOffset, rowBytes);
+        const SkScalar scaleX = SkIntToScalar(levelWidth) / source.width();
+        const SkScalar scaleY = SkIntToScalar(levelHeight) / source.height();
+        const SkSize scale = SkSize::Make(scaleX, scaleY);
+        // Discardable storage may vanish without element destructors. These
+        // descriptors therefore own no color-space reference or pixel storage;
+        // fCS owns the color space and getLevel adds it to the returned copy.
+        new (&levels[index]) Level{.fPixmap = pixels, .fScale = scale};
+        const SkPixmap& destination = levels[index].fPixmap;
+        if (downsampler) {
+            (*downsampler).buildLevel(destination, previous);
+        }
+        previous = destination;
+        pixelOffset += levelBytes;
+    }
+    SkASSERT(pixelOffset == pixelBytes);
+    SkMipmap* result = owner.release();
+    return result;
 }
 
 int SkMipmap::ComputeLevelCount(int baseWidth, int baseHeight) {
     if (baseWidth < 1 || baseHeight < 1) {
         return 0;
     }
-
-    // OpenGL's spec requires that each mipmap level have height/width equal to
-    // max(1, floor(original_height / 2^i)
-    // (or original_width) where i is the mipmap level.
-    // Continue scaling down until both axes are size 1.
-
     const int largestAxis = std::max(baseWidth, baseHeight);
     if (largestAxis < 2) {
-        // SkMipmap::Build requires a minimum size of 2.
         return 0;
     }
+    // floor(log2(largestAxis)); the base image is not stored in this object.
     const int leadingZeros = SkCLZ(static_cast<uint32_t>(largestAxis));
-    // If the value 00011010 has 3 leading 0s then it has 5 significant bits
-    // (the bits which are not leading zeros)
-    const int significantBits = (sizeof(uint32_t) * 8) - leadingZeros;
-    // This is making the assumption that the size of a byte is 8 bits
-    // and that sizeof(uint32_t)'s implementation-defined behavior is 4.
-    int mipLevelCount = significantBits;
-
-    // SkMipmap does not include the base mip level.
-    // For example, it contains levels 1-x instead of 0-x.
-    // This is because the image used to create SkMipmap is the base level.
-    // So subtract 1 from the mip level count.
-    if (mipLevelCount > 0) {
-        --mipLevelCount;
-    }
-
-    return mipLevelCount;
+    const int count = 31 - leadingZeros;
+    return count;
 }
 
 SkISize SkMipmap::ComputeLevelSize(int baseWidth, int baseHeight, int level) {
-    if (baseWidth < 1 || baseHeight < 1) {
-        return SkISize::Make(0, 0);
+    const int count = ComputeLevelCount(baseWidth, baseHeight);
+    if (level < 0 || level >= count) {
+        const SkISize empty = SkISize::Make(0, 0);
+        return empty;
     }
-
-    int maxLevelCount = ComputeLevelCount(baseWidth, baseHeight);
-    if (level >= maxLevelCount || level < 0) {
-        return SkISize::Make(0, 0);
-    }
-    // OpenGL's spec requires that each mipmap level have height/width equal to
-    // max(1, floor(original_height / 2^i)
-    // (or original_width) where i is the mipmap level.
-
-    // SkMipmap does not include the base mip level.
-    // For example, it contains levels 1-x instead of 0-x.
-    // This is because the image used to create SkMipmap is the base level.
-    // So subtract 1 from the mip level to get the index stored by SkMipmap.
-    int width = std::max(1, baseWidth >> (level + 1));
-    int height = std::max(1, baseHeight >> (level + 1));
-
-    return SkISize::Make(width, height);
+    const int width = std::max(1, baseWidth >> (level + 1));
+    const int height = std::max(1, baseHeight >> (level + 1));
+    const SkISize dimensions = SkISize::Make(width, height);
+    return dimensions;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-// Returns fractional level value. floor(level) is the index of the larger level.
-// < 0 means failure.
 float SkMipmap::ComputeLevel(SkSize scaleSize) {
     SkASSERT(scaleSize.width() >= 0 && scaleSize.height() >= 0);
-
 #ifndef SK_SUPPORT_LEGACY_ANISOTROPIC_MIPMAP_SCALE
-    // Use the smallest scale to match the GPU impl.
     const float scale = std::min(scaleSize.width(), scaleSize.height());
 #else
-    // Ideally we'd pick the smaller scale, to match Ganesh.  But ignoring one of the
-    // scales can produce some atrocious results, so for now we use the geometric mean.
-    // (https://bugs.chromium.org/p/skia/issues/detail?id=4863)
     const float scale = std::sqrt(scaleSize.width() * scaleSize.height());
 #endif
-
-    if (scale >= SK_Scalar1 || scale <= 0 || !SkIsFinite(scale)) {
-        return -1;
+    if (scale >= 1.0f || scale <= 0.0f || !SkIsFinite(scale)) {
+        return -1.0f;
     }
-
-    // The -0.5 bias here is to emulate GPU's sharpen mipmap option.
-    float L = std::max(-SkScalarLog2(scale) - 0.5f, 0.f);
-    if (!SkIsFinite(L)) {
-        return -1;
+    // Preserve the original half-level sharpening bias and operation order.
+    const float level = std::max(-SkScalarLog2(scale) - 0.5f, 0.0f);
+    if (!SkIsFinite(level)) {
+        return -1.0f;
     }
-    return L;
+    return level;
 }
 
-bool SkMipmap::extractLevel(SkSize scaleSize, Level* levelPtr) const {
-    if (nullptr == fLevels) {
+bool SkMipmap::extractLevel(SkSize scale, Level* output) const {
+    if (fLevels == nullptr) {
         return false;
     }
-
-    float L = ComputeLevel(scaleSize);
-    int level = sk_float_round2int(L);
+    const float fractionalLevel = ComputeLevel(scale);
+    int level = sk_float_round2int(fractionalLevel);
     if (level <= 0) {
         return false;
     }
-
-    if (level > fCount) {
-        level = fCount;
-    }
-    if (levelPtr) {
-        *levelPtr = fLevels[level - 1];
-        // need to augment with our colorspace
-        levelPtr->fPixmap.setColorSpace(fCS);
-    }
-    return true;
+    level = std::min(level, fCount);
+    const bool found = getLevel(level - 1, output);
+    return found;
 }
 
 bool SkMipmap::validForRootLevel(const SkImageInfo& root) const {
-    if (nullptr == fLevels) {
+    if (fLevels == nullptr) {
         return false;
     }
-
-    const SkISize dimension = root.dimensions();
-    if (dimension.width() <= 1 && dimension.height() <= 1) {
+    const SkISize dimensions = root.dimensions();
+    if (dimensions.width() <= 1 && dimensions.height() <= 1) {
         return false;
     }
-
-    if (fLevels[0].fPixmap. width() != std::max(1, dimension. width() >> 1) ||
-        fLevels[0].fPixmap.height() != std::max(1, dimension.height() >> 1)) {
+    const int firstWidth = std::max(1, dimensions.width() >> 1);
+    const int firstHeight = std::max(1, dimensions.height() >> 1);
+    if (fLevels[0].fPixmap.width() != firstWidth || fLevels[0].fPixmap.height() != firstHeight) {
         return false;
     }
-
-    for (int i = 0; i < this->countLevels(); ++i) {
-        if (fLevels[i].fPixmap.colorType() != root.colorType() ||
-            fLevels[i].fPixmap.alphaType() != root.alphaType()) {
+    for (int index = 0; index < fCount; ++index) {
+        const SkPixmap& pixels = fLevels[index].fPixmap;
+        if (pixels.colorType() != root.colorType() || pixels.alphaType() != root.alphaType()) {
             return false;
         }
     }
     return true;
 }
 
-// Helper which extracts a pixmap from the src bitmap
-//
-SkMipmap* SkMipmap::Build(const SkBitmap& src, SkDiscardableFactoryProc fact) {
-    SkPixmap srcPixmap;
-    if (!src.peekPixels(&srcPixmap)) {
+SkMipmap* SkMipmap::Build(const SkBitmap& source, SkDiscardableFactoryProc factory) {
+    SkPixmap pixels{};
+    if (!source.peekPixels(&pixels)) {
         return nullptr;
     }
-    return Build(srcPixmap, fact);
+    SkMipmap* mipmap = Build(pixels, factory);
+    return mipmap;
 }
 
 int SkMipmap::countLevels() const {
     return fCount;
 }
 
-bool SkMipmap::getLevel(int index, Level* levelPtr) const {
-    if (nullptr == fLevels) {
+bool SkMipmap::getLevel(int index, Level* output) const {
+    if (fLevels == nullptr || index < 0 || index >= fCount) {
         return false;
     }
-    if (index < 0) {
-        return false;
-    }
-    if (index > fCount - 1) {
-        return false;
-    }
-    if (levelPtr) {
-        *levelPtr = fLevels[index];
-        // need to augment with our colorspace
-        levelPtr->fPixmap.setColorSpace(fCS);
+    if (output != nullptr) {
+        *output = fLevels[index];
+        (*output).fPixmap.setColorSpace(fCS);
     }
     return true;
 }

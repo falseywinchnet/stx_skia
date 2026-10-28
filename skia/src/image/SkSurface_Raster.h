@@ -19,7 +19,6 @@
 #include <cstring>
 
 class SkCanvas;
-class SkCapabilities;
 class SkImage;
 class SkPaint;
 class SkPixelRef;
@@ -33,7 +32,7 @@ namespace skcpu { class RecorderImpl; }
 class SkSurface_Raster : public SkSurface_Base {
 public:
     SkSurface_Raster(const SkImageInfo&, void*, size_t rb,
-                     void (*releaseProc)(void* pixels, void* context), void* context,
+                     SkSurfaces::PixelsReleaseProc releaseProc, void* context,
                      const SkSurfaceProps*);
     SkSurface_Raster(const SkImageInfo& info, sk_sp<SkPixelRef>, const SkSurfaceProps*);
 
@@ -50,7 +49,10 @@ public:
                      const SkSurfaceProps*);
 
     // From SkSurface.h
-    SkImageInfo imageInfo() const override { return fBitmap.info(); }
+    SkImageInfo imageInfo() const override {
+        const SkImageInfo info = fBitmap.info();
+        return info;
+    }
 
     // From SkSurface_Base.h
     SkSurface_Base::Type type() const override { return SkSurface_Base::Type::kRaster; }
@@ -62,13 +64,13 @@ public:
     void onDraw(SkCanvas*, SkScalar, SkScalar, const SkSamplingOptions&, const SkPaint*) override;
     bool onCopyOnWrite(ContentChangeMode) override;
     void onRestoreBackingMutability() override;
-    sk_sp<const SkCapabilities> onCapabilities() override;
     SkRecorder* onGetBaseRecorder() const override;
 
 private:
-    skcpu::RecorderImpl* fRecorder;
+    // Observes the recorder supplied at construction; it must outlive the surface.
+    skcpu::RecorderImpl* fRecorder = nullptr;
     SkBitmap fBitmap;
-    bool fWeOwnThePixels;
+    bool fWeOwnThePixels = false;
 };
 
 #endif

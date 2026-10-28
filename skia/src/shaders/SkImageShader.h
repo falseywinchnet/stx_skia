@@ -19,6 +19,7 @@
 
 class SkArenaAlloc;
 class SkMatrix;
+class SkPixmap;
 class SkReadBuffer;
 class SkShader;
 class SkWriteBuffer;
@@ -40,29 +41,7 @@ public:
                                    const SkSamplingOptions&,
                                    const SkMatrix* localMatrix);
 
-    // TODO(skbug.com/40043877): Requires SkImage to be texture backed, and created SkShader can
-    // only be used on GPU-backed surfaces.
-    static sk_sp<SkShader> MakeSubset(sk_sp<SkImage>,
-                                      const SkRect& subset,
-                                      SkTileMode tmx,
-                                      SkTileMode tmy,
-                                      const SkSamplingOptions&,
-                                      const SkMatrix* localMatrix,
-                                      bool clampAsIfUnpremul = false);
-
-    // Given arguments for a call to SkCanvas::drawImageRect, returns a
-    // possibly adjusted 'dst' SkRect and a shader to apply to the paint such that calling
-    // SkCanvas::drawRect(newDst, *paint) produces
-    // visually equivalent results to the original drawImageRect() call.
-    static std::pair<SkRect, sk_sp<SkShader>> MakeForDrawRect(const SkImage* image,
-                                                              const SkPaint& paint,
-                                                              const SkSamplingOptions&,
-                                                              SkRect src,
-                                                              SkRect dst,
-                                                              bool strictSrcSubset);
-
     SkImageShader(sk_sp<SkImage>,
-                  const SkRect& subset,
                   SkTileMode tmx, SkTileMode tmy,
                   const SkSamplingOptions&,
                   bool raw,
@@ -78,28 +57,21 @@ public:
     SkTileMode tileModeY() const { return fTileModeY; }
     sk_sp<SkImage> image() const { return fImage; }
     SkSamplingOptions sampling() const { return fSampling; }
-    SkRect subset() const { return fSubset; }
     bool isRaw() const { return fRaw; }
 
 private:
     SK_FLATTENABLE_HOOKS(SkImageShader)
 
     void flatten(SkWriteBuffer&) const override;
-#ifdef SK_ENABLE_LEGACY_SHADERCONTEXT
-    Context* onMakeContext(const ContextRec&, SkArenaAlloc* storage) const override;
-#endif
     SkImage* onIsAImage(SkMatrix*, SkTileMode*) const override;
 
     bool appendStages(const SkStageRec&, const SkShaders::MatrixRec&) const override;
+    void appendColorStages(const SkStageRec&, const SkPixmap&, const SkSamplingOptions&) const;
 
     sk_sp<SkImage>          fImage;
     const SkSamplingOptions fSampling;
     const SkTileMode        fTileModeX;
     const SkTileMode        fTileModeY;
-
-    // TODO(skbug.com/40043877): This is only supported for GPU images currently.
-    // If subset == (0,0,w,h) of the image, then no subset is applied. Subset will not be empty.
-    const SkRect            fSubset;
 
     const bool              fRaw;
     const bool              fClampAsIfUnpremul;

@@ -21,15 +21,15 @@
 #include "include/core/SkRegion.h"
 #include "include/core/SkSize.h"
 #include "include/core/SkString.h"
-#include "include/core/SkTypeface.h"
 #include "include/private/SkMalloc.h"
-#include "src/core/SkAutoMalloc.h"
 #include "src/core/SkMathPriv.h"
 #include "src/core/SkMatrixPriv.h"
 #include "src/core/SkMipmapBuilder.h"
 #include "src/core/SkSafeMath.h"
 #include "src/core/SkWriteBuffer.h"
 
+#include <cstring>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -44,18 +44,22 @@ namespace {
     };
 
     static sk_sp<SkImage> MakeEmptyImage(int width, int height) {
-        return SkImages::DeferredFromGenerator(
-                std::make_unique<EmptyImageGenerator>(SkImageInfo::MakeN32Premul(width, height)));
+        const SkImageInfo info = SkImageInfo::MakeN32Premul(width, height);
+        std::unique_ptr<EmptyImageGenerator> generator = std::make_unique<EmptyImageGenerator>(info);
+        sk_sp<SkImage> image = SkImages::DeferredFromGenerator(std::move(generator));
+        return image;
     }
 
 } // anonymous namespace
 
 void SkReadBuffer::setMemory(const void* data, size_t size) {
-    this->validate(IsPtrAlign4(data) && (SkAlign4(size) == size));
-    if (!fError) {
-        fBase = fCurr = (const char*)data;
-        fStop = fBase + size;
-    }
+    const size_t maximum = static_cast<size_t>(std::numeric_limits<ptrdiff_t>::max());
+    const bool extentValid = size <= maximum && (data != nullptr || size == 0);
+    if (!validate(extentValid && IsPtrAlign4(data) && SkIsAlign4(size))) return;
+    fBase = static_cast<const char*>(data);
+    fCurr = fBase;
+    fStop = fBase;
+    if (size != 0) fStop += size;
 }
 
 void SkReadBuffer::setInvalid() {
@@ -67,201 +71,196 @@ void SkReadBuffer::setInvalid() {
 }
 
 const void* SkReadBuffer::skip(size_t size) {
-    size_t inc = SkAlign4(size);
-    this->validate(inc >= size);
-    const void* addr = fCurr;
-    this->validate(IsPtrAlign4(addr) && this->isAvailable(inc));
-    if (fError) {
-        return nullptr;
-    }
-
-    fCurr += inc;
-    return addr;
+    const size_t padded = SkAlign4(size);
+    if (!validate(padded >= size && isAvailable(padded))) return nullptr;
+    const void* address = fCurr;
+    if (padded != 0) fCurr += padded;
+    return address;
 }
 
-const void* SkReadBuffer::skip(size_t count, size_t size) {
-    return this->skip(SkSafeMath::Mul(count, size));
+const void* SkReadBuffer::skip(size_t count, size_t elementSize) {
+    const size_t bytes = SkSafeMath::Mul(count, elementSize);
+    const void* address = skip(bytes);
+    return address;
 }
 
 void SkReadBuffer::setDeserialProcs(const SkDeserialProcs& procs) {
     fProcs = procs;
-    this->setAllowSkSL(procs.fAllowSkSL);
 }
 
 bool SkReadBuffer::readBool() {
-    uint32_t value = this->readUInt();
-    // Boolean value should be either 0 or 1
-    this->validate(!(value & ~1));
-    return value != 0;
+    const uint32_t value = readUInt();
+    validate(value <= 1);
+    const bool result = value != 0;
+    return result;
 }
 
 SkColor SkReadBuffer::readColor() {
-    return this->readUInt();
+    const SkColor color = readUInt();
+    return color;
 }
 
 int32_t SkReadBuffer::readInt() {
-    const size_t inc = sizeof(int32_t);
-    if (!this->validate(IsPtrAlign4(fCurr) && this->isAvailable(inc))) {
-        return 0;
-    }
-    int32_t value = *((const int32_t*)fCurr);
-    fCurr += inc;
+    // Keep the original guarded word path; byte copying does not require a typed input object.
+    if (!validate(IsPtrAlign4(fCurr) && isAvailable(sizeof(int32_t)))) return 0;
+    int32_t value = 0;
+    std::memcpy(&value, fCurr, sizeof(value));
+    fCurr += sizeof(value);
     return value;
 }
 
 SkScalar SkReadBuffer::readScalar() {
-    const size_t inc = sizeof(SkScalar);
-    if (!this->validate(IsPtrAlign4(fCurr) && this->isAvailable(inc))) {
-        return 0;
-    }
-    SkScalar value = *((const SkScalar*)fCurr);
-    fCurr += inc;
+    if (!validate(IsPtrAlign4(fCurr) && isAvailable(sizeof(SkScalar)))) return 0;
+    SkScalar value = 0;
+    std::memcpy(&value, fCurr, sizeof(value));
+    fCurr += sizeof(value);
     return value;
 }
 
 uint32_t SkReadBuffer::readUInt() {
-    return this->readInt();
+    const int32_t value = readInt();
+    const uint32_t result = static_cast<uint32_t>(value);
+    return result;
 }
 
 int32_t SkReadBuffer::read32() {
-    return this->readInt();
+    const int32_t value = readInt();
+    return value;
 }
 
 uint8_t SkReadBuffer::peekByte() {
-    if (this->available() <= 0) {
-        fError = true;
-        return 0;
-    }
-    return *((const uint8_t*)fCurr);
+    if (!validate(isAvailable(1))) return 0;
+    const uint8_t value = static_cast<uint8_t>(*fCurr);
+    return value;
 }
 
 bool SkReadBuffer::readPad32(void* buffer, size_t bytes) {
-    if (const void* src = this->skip(bytes)) {
-        // buffer might be null if bytes is zero (see SkAutoMalloc), hence we call
-        // the careful version of memcpy.
-        sk_careful_memcpy(buffer, src, bytes);
-        return true;
-    }
-    return false;
+    if (!validate(buffer != nullptr || bytes == 0)) return false;
+    const void* source = skip(bytes);
+    if (!isValid()) return false;
+    if (bytes != 0) std::memcpy(buffer, source, bytes);
+    return true;
 }
 
 const char* SkReadBuffer::readString(size_t* len) {
-    *len = this->readUInt();
+    *len = readUInt();
 
     // The string is len characters and a terminating \0.
-    const char* c_str = this->skipT<char>(*len+1);
+    const size_t terminated = SkSafeMath::Add(*len, 1);
+    const char* c_str = skipT<char>(terminated);
 
-    if (this->validate(c_str && c_str[*len] == '\0')) {
+    if (validate(c_str && c_str[*len] == '\0')) {
         return c_str;
     }
     return nullptr;
 }
 
 void SkReadBuffer::readString(SkString* string) {
-    size_t len;
-    if (const char* c_str = this->readString(&len)) {
-        string->set(c_str, len);
+    size_t len = 0;
+    if (const char* c_str = readString(&len)) {
+        (*string).set(c_str, len);
         return;
     }
-    string->reset();
+    (*string).reset();
 }
 
 void SkReadBuffer::readColor4f(SkColor4f* color) {
-    if (!this->readPad32(color, sizeof(SkColor4f))) {
+    if (!readPad32(color, sizeof(SkColor4f))) {
         *color = {0, 0, 0, 0};
     }
 }
 
 void SkReadBuffer::readPoint(SkPoint* point) {
-    point->fX = this->readScalar();
-    point->fY = this->readScalar();
+    (*point).fX = readScalar();
+    (*point).fY = readScalar();
 }
 
 void SkReadBuffer::readPoint3(SkPoint3* point) {
-    this->readPad32(point, sizeof(SkPoint3));
+    readPad32(point, sizeof(SkPoint3));
 }
 
 void SkReadBuffer::read(SkM44* matrix) {
-    if (this->isValid()) {
-        if (const float* m = (const float*)this->skip(sizeof(float) * 16)) {
-            *matrix = SkM44::ColMajor(m);
-        }
-    }
-    if (!this->isValid()) {
+    float entries[16]{};
+    if (!readPad32(entries, sizeof(entries))) {
         *matrix = SkM44();
+        return;
     }
+    *matrix = SkM44::ColMajor(entries);
 }
 
 void SkReadBuffer::readMatrix(SkMatrix* matrix) {
     size_t size = 0;
-    if (this->isValid()) {
-        size = SkMatrixPriv::ReadFromMemory(matrix, fCurr, this->available());
-        (void)this->validate((SkAlign4(size) == size) && (0 != size));
+    if (isValid()) {
+        size = SkMatrixPriv::ReadFromMemory(matrix, fCurr, available());
+        (void)validate((SkAlign4(size) == size) && (0 != size));
     }
-    if (!this->isValid()) {
-        matrix->reset();
+    if (!isValid()) {
+        (*matrix).reset();
     }
-    (void)this->skip(size);
+    (void)skip(size);
 }
 
 void SkReadBuffer::readIRect(SkIRect* rect) {
-    if (!this->readPad32(rect, sizeof(SkIRect))) {
-        rect->setEmpty();
+    if (!readPad32(rect, sizeof(SkIRect))) {
+        (*rect).setEmpty();
     }
 }
 
 void SkReadBuffer::readRect(SkRect* rect) {
-    if (!this->readPad32(rect, sizeof(SkRect))) {
-        rect->setEmpty();
+    if (!readPad32(rect, sizeof(SkRect))) {
+        (*rect).setEmpty();
     }
 }
 
 SkRect SkReadBuffer::readRect() {
-    SkRect r;
-    if (!this->readPad32(&r, sizeof(SkRect))) {
+    SkRect r{};
+    if (!readPad32(&r, sizeof(SkRect))) {
         r.setEmpty();
     }
     return r;
 }
 
 SkSamplingOptions SkReadBuffer::readSampling() {
-    if (!this->isVersionLT(SkPicturePriv::kAnisotropicFilter)) {
-        int maxAniso = this->readInt();
+    if (!isVersionLT(SkPicturePriv::kAnisotropicFilter)) {
+        int maxAniso = readInt();
         if (maxAniso != 0) {
-            return SkSamplingOptions::Aniso(maxAniso);
+            const SkSamplingOptions sampling = SkSamplingOptions::Aniso(maxAniso);
+            return sampling;
         }
     }
-    if (this->readBool()) {
-        float B = this->readScalar();
-        float C = this->readScalar();
-        return SkSamplingOptions({B, C});
+    if (readBool()) {
+        float B = readScalar();
+        float C = readScalar();
+        const SkSamplingOptions sampling(SkCubicResampler{B, C});
+        return sampling;
     } else {
-        SkFilterMode filter = this->read32LE(SkFilterMode::kLinear);
-        SkMipmapMode mipmap = this->read32LE(SkMipmapMode::kLinear);
-        return SkSamplingOptions(filter, mipmap);
+        SkFilterMode filter = read32LE(SkFilterMode::kLinear);
+        SkMipmapMode mipmap = read32LE(SkMipmapMode::kLinear);
+        const SkSamplingOptions sampling(filter, mipmap);
+        return sampling;
     }
 }
 
 void SkReadBuffer::readRRect(SkRRect* rrect) {
     size_t size = 0;
     if (!fError) {
-        size = rrect->readFromMemory(fCurr, this->available());
-        if (!this->validate((SkAlign4(size) == size) && (0 != size))) {
-            rrect->setEmpty();
+        size = (*rrect).readFromMemory(fCurr, available());
+        if (!validate((SkAlign4(size) == size) && (0 != size))) {
+            (*rrect).setEmpty();
         }
     }
-    (void)this->skip(size);
+    (void)skip(size);
 }
 
 void SkReadBuffer::readRegion(SkRegion* region) {
     size_t size = 0;
     if (!fError) {
-        size = region->readFromMemory(fCurr, this->available());
-        if (!this->validate((SkAlign4(size) == size) && (0 != size))) {
-            region->setEmpty();
+        size = (*region).readFromMemory(fCurr, available());
+        if (!validate((SkAlign4(size) == size) && (0 != size))) {
+            (*region).setEmpty();
         }
     }
-    (void)this->skip(size);
+    (void)skip(size);
 }
 
 std::optional<SkPath> SkReadBuffer::readPath() {
@@ -270,89 +269,92 @@ std::optional<SkPath> SkReadBuffer::readPath() {
     }
 
     size_t size = 0;
-    auto path = SkPath::ReadFromMemory(fCurr, this->available(), &size);
+    std::optional<SkPath> path = SkPath::ReadFromMemory(fCurr, available(), &size);
 
-    // todo: consider moving this 4-byte-alignment check elsewhere
-    //       i.e. why is that a burden on SkPath?
-    //            why don't we just skipAlign4() or something?
-    (void)this->validate(SkAlign4(size) == size && path.has_value());
+    // Path records must already include their four-byte padding.
+    (void)validate(SkAlign4(size) == size && path.has_value());
 
     // we move forward, regardless of if the path succeeded
-    (void)this->skip(size);
+    (void)skip(size);
 
     return path;
 }
 
 bool SkReadBuffer::readArray(void* value, size_t size, size_t elementSize) {
-    const uint32_t count = this->readUInt();
-    return this->validate(size == count) &&
-           this->readPad32(value, SkSafeMath::Mul(size, elementSize));
+    const uint32_t count = readUInt();
+    if (!validate(size == count)) return false;
+    const size_t bytes = SkSafeMath::Mul(size, elementSize);
+    const bool read = readPad32(value, bytes);
+    return read;
 }
 
 bool SkReadBuffer::readByteArray(void* value, size_t size) {
-    return this->readArray(value, size, sizeof(uint8_t));
+    const bool read = readArray(value, size, sizeof(uint8_t));
+    return read;
 }
 
 bool SkReadBuffer::readColorArray(SkSpan<SkColor> colors) {
-    return this->readArray(colors.data(), colors.size(), sizeof(SkColor));
+    const bool read = readArray(colors.data(), colors.size(), sizeof(SkColor));
+    return read;
 }
 
 bool SkReadBuffer::readColor4fArray(SkSpan<SkColor4f> colors) {
-    return this->readArray(colors.data(), colors.size(), sizeof(SkColor4f));
+    const bool read = readArray(colors.data(), colors.size(), sizeof(SkColor4f));
+    return read;
 }
 
 bool SkReadBuffer::readIntArray(SkSpan<int32_t> values) {
-    return this->readArray(values.data(), values.size(), sizeof(int32_t));
+    const bool read = readArray(values.data(), values.size(), sizeof(int32_t));
+    return read;
 }
 
 bool SkReadBuffer::readPointArray(SkSpan<SkPoint> points) {
-    return this->readArray(points.data(), points.size(), sizeof(SkPoint));
+    const bool read = readArray(points.data(), points.size(), sizeof(SkPoint));
+    return read;
 }
 
 bool SkReadBuffer::readScalarArray(SkSpan<SkScalar> values) {
-    return this->readArray(values.data(), values.size(), sizeof(SkScalar));
+    const bool read = readArray(values.data(), values.size(), sizeof(SkScalar));
+    return read;
 }
 
 const void* SkReadBuffer::skipByteArray(size_t* size) {
-    const uint32_t count = this->readUInt();
-    const void* buf = this->skip(count);
+    const uint32_t count = readUInt();
+    const void* buf = skip(count);
     if (size) {
-        *size = this->isValid() ? count : 0;
+        *size = isValid() ? count : 0;
     }
     return buf;
 }
 
 sk_sp<SkData> SkReadBuffer::readByteArrayAsData() {
-    size_t numBytes = this->getArrayCount();
-    if (!this->validate(this->isAvailable(numBytes))) {
-        return nullptr;
-    }
-
-    SkAutoMalloc buffer(numBytes);
-    if (!this->readByteArray(buffer.get(), numBytes)) {
-        return nullptr;
-    }
-    return SkData::MakeFromMalloc(buffer.release(), numBytes);
+    const size_t bytes = readUInt();
+    const void* source = skip(bytes);
+    if (!isValid()) return nullptr;
+    // Validate the complete record before allocating its independently owned copy.
+    sk_sp<SkData> data = SkData::MakeWithCopy(source, bytes);
+    return data;
 }
 
 uint32_t SkReadBuffer::getArrayCount() {
-    const size_t inc = sizeof(uint32_t);
-    if (!this->validate(IsPtrAlign4(fCurr) && this->isAvailable(inc))) {
-        return 0;
-    }
-    return *((const uint32_t*)fCurr);
+    if (!validate(IsPtrAlign4(fCurr) && isAvailable(sizeof(uint32_t)))) return 0;
+    uint32_t count = 0;
+    std::memcpy(&count, fCurr, sizeof(count));
+    return count;
 }
 
 static sk_sp<SkImage> deserialize_image(sk_sp<SkData> data, SkDeserialProcs dProcs,
                                         std::optional<SkAlphaType> alphaType) {
-    sk_sp<SkImage> image;
+    sk_sp<SkImage> image{};
     if (dProcs.fImageDataProc) {
         image = dProcs.fImageDataProc(data, alphaType, dProcs.fImageCtx);
     } else if (dProcs.fImageProc) {
+        const void* bytes = (*data).data();
+        const size_t size = (*data).size();
 #if !defined(SK_LEGACY_DESERIAL_IMAGE_PROC)
-        image = dProcs.fImageProc(data->data(), data->size(), dProcs.fImageCtx);
+        image = dProcs.fImageProc(bytes, size, dProcs.fImageCtx);
 #else
-        image = dProcs.fImageProc(data->data(), data->size(), alphaType, dProcs.fImageCtx);
+        image = dProcs.fImageProc(bytes, size, alphaType, dProcs.fImageCtx);
 #endif
     }
     return image;
@@ -360,40 +362,43 @@ static sk_sp<SkImage> deserialize_image(sk_sp<SkData> data, SkDeserialProcs dPro
 
 static sk_sp<SkImage> add_mipmaps(sk_sp<SkImage> img, sk_sp<SkData> data,
                                   SkDeserialProcs dProcs, std::optional<SkAlphaType> alphaType) {
-    SkMipmapBuilder builder(img->imageInfo());
+    const SkImageInfo info = (*img).imageInfo();
+    SkMipmapBuilder builder(info);
 
-    SkReadBuffer buffer(data->data(), data->size());
+    const void* bytes = (*data).data();
+    const size_t byteCount = (*data).size();
+    SkReadBuffer buffer(bytes, byteCount);
     int count = buffer.read32();
     if (builder.countLevels() != count) {
         return img;
     }
     for (int i = 0; i < count; ++i) {
-        size_t size = buffer.read32();
+        const int32_t recordedSize = buffer.read32();
+        const size_t size = static_cast<size_t>(recordedSize);
         const void* ptr = buffer.skip(size);
         if (!ptr) {
             return img;
         }
-        // This use of SkData::MakeWithoutCopy is safe because the image goes
-        // out of scope after we read the pixels from it, so we are sure the
-        // data (from buffer) outlives the image.
-        sk_sp<SkImage> mip = deserialize_image(SkData::MakeWithoutCopy(ptr, size), dProcs,
-                                               alphaType);
+        // The callback contract requires copying bytes retained beyond this call.
+        // This borrowed level and its local image are consumed while data is alive.
+        sk_sp<SkData> borrowed = SkData::MakeWithoutCopy(ptr, size);
+        sk_sp<SkImage> mip = deserialize_image(std::move(borrowed), dProcs, alphaType);
         if (!mip) {
             return img;
         }
 
         SkPixmap pm = builder.level(i);
-        if (mip->dimensions() != pm.dimensions()) {
+        if ((*mip).dimensions() != pm.dimensions()) {
             return img;
         }
-        if (!mip->readPixels(nullptr, pm, 0, 0)) {
+        if (!(*mip).readPixels(nullptr, pm, 0, 0)) {
             return img;
         }
     }
     if (!buffer.isValid()) {
         return img;
     }
-    sk_sp<SkImage> raster = img->makeRasterImage(nullptr);
+    sk_sp<SkImage> raster = (*img).makeRasterImage(nullptr);
     if (!raster) {
         return img;
     }
@@ -403,20 +408,19 @@ static sk_sp<SkImage> add_mipmaps(sk_sp<SkImage> img, sk_sp<SkData> data,
 }
 
 
-// If we see a corrupt stream, we return null (fail). If we just fail trying to decode
-// the image, we don't fail, but return a 1x1 empty image.
+// Invalid byte-array records fail. A missing callback image produces a non-drawing placeholder.
 sk_sp<SkImage> SkReadBuffer::readImage() {
-    uint32_t flags = this->read32();
+    const uint32_t flags = readUInt();
 
     std::optional<SkAlphaType> alphaType = std::nullopt;
     if (flags & SkWriteBufferImageFlags::kUnpremul) {
         alphaType = kUnpremul_SkAlphaType;
     }
-    sk_sp<SkImage> image;
+    sk_sp<SkImage> image{};
     {
-        sk_sp<SkData> data = this->readByteArrayAsData();
+        sk_sp<SkData> data = readByteArrayAsData();
         if (!data) {
-            this->validate(false);
+            validate(false);
             return nullptr;
         }
         image = deserialize_image(data, fProcs, alphaType);
@@ -424,143 +428,58 @@ sk_sp<SkImage> SkReadBuffer::readImage() {
 
     // This flag is not written by new SKPs anymore.
     if (flags & SkWriteBufferImageFlags::kHasSubsetRect) {
-        SkIRect subset;
-        this->readIRect(&subset);
+        SkIRect subset{};
+        readIRect(&subset);
         if (image) {
-            image = image->makeSubset(nullptr, subset, {});
+            image = (*image).makeSubset(nullptr, subset, {});
         }
     }
 
     if (flags & SkWriteBufferImageFlags::kHasMipmap) {
-        sk_sp<SkData> data = this->readByteArrayAsData();
+        sk_sp<SkData> data = readByteArrayAsData();
         if (!data) {
-            this->validate(false);
+            validate(false);
             return nullptr;
         }
         if (image) {
             image = add_mipmaps(image, std::move(data), fProcs, alphaType);
         }
     }
-    return image ? image : MakeEmptyImage(1, 1);
+    if (!image) image = MakeEmptyImage(1, 1);
+    return image;
 }
 
-sk_sp<SkTypeface> SkReadBuffer::readTypeface() {
-    // Read 32 bits (signed)
-    //   0 -- return null (empty font)
-    //  >0 -- index
-    //  <0 -- custom (serial procs) : negative size in bytes
 
-    int32_t index = this->read32();
-    if (index == 0) {
-        return nullptr;
-    } else if (index > 0) {
-        if (!this->validate(index <= fTFCount)) {
-            return nullptr;
-        }
-        return fTFArray[index - 1];
-    } else {    // custom
-        size_t size = sk_negate_to_size_t(index);
-        const void* data = this->skip(size);
-        if (!this->validate(data && fProcs.fTypefaceStreamProc)) {
-            return nullptr;
-        }
-        SkMemoryStream s(data, size, false);
-        return fProcs.fTypefaceStreamProc(s, fProcs.fTypefaceCtx);
-    }
-}
 
 SkFlattenable* SkReadBuffer::readRawFlattenable() {
-    if (!this->isValid()) {
+    if (!isValid()) {
         return nullptr;
     }
-    SkFlattenable::Factory factory = nullptr;
-
-    if (fFactoryCount > 0) {
-        int32_t index = this->read32();
-        if (0 == index || !this->isValid()) {
-            return nullptr; // writer failed to give us the flattenable
-        }
-        if (index < 0) {
-            this->validate(false);
-            return nullptr;
-        }
-        index -= 1;     // we stored the index-base-1
-        if ((unsigned)index >= (unsigned)fFactoryCount) {
-            this->validate(false);
-            return nullptr;
-        }
-        factory = fFactoryArray[index];
-    } else {
-        if (this->peekByte() != 0) {
-            // If the first byte is non-zero, the flattenable is specified by a string.
-            size_t ignored_length;
-            if (const char* name = this->readString(&ignored_length)) {
-                factory = SkFlattenable::NameToFactory(name);
-                fFlattenableDict.set(fFlattenableDict.count() + 1, factory);
-            }
-        } else {
-            // Read the index.  We are guaranteed that the first byte
-            // is zeroed, so we must shift down a byte.
-            uint32_t index = this->readUInt() >> 8;
-            if (index == 0) {
-                return nullptr; // writer failed to give us the flattenable
-            }
-
-            if (SkFlattenable::Factory* found = fFlattenableDict.find(index)) {
-                factory = *found;
-            }
-        }
-
-        if (!this->validate(factory != nullptr)) {
-            return nullptr;
-        }
-    }
-
-    // if we get here, factory may still be null, but if that is the case, the
-    // failure was ours, not the writer.
-    sk_sp<SkFlattenable> obj;
-    uint32_t sizeRecorded = this->read32();
-    if (factory) {
-        size_t offset = this->offset();
-        obj = (*factory)(*this);
-        // check that we read the amount we expected
-        size_t sizeRead = this->offset() - offset;
-        if (sizeRecorded != sizeRead) {
-            this->validate(false);
-            return nullptr;
-        }
-    } else {
-        // we must skip the remaining data
-        this->skip(sizeRecorded);
-    }
-    if (!this->isValid()) {
-        return nullptr;
-    }
-    return obj.release();
+    // The writer's null marker is a zero word. Named effects and picture factory
+    // indices are unsupported; rejecting them needs no name table or factory array.
+    const uint32_t token = readUInt();
+    validate(token == 0);
+    return nullptr;
 }
 
-SkFlattenable* SkReadBuffer::readFlattenable(SkFlattenable::Type ft) {
-    SkFlattenable* obj = this->readRawFlattenable();
-    if (obj && obj->getFlattenableType() != ft) {
-        this->validate(false);
-        obj->unref();
-        return nullptr;
-    }
-    return obj;
+SkFlattenable* SkReadBuffer::readFlattenable(SkFlattenable::Type) {
+    SkFlattenable* effect = readRawFlattenable();
+    return effect;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-int32_t SkReadBuffer::checkInt(int32_t min, int32_t max) {
-    SkASSERT(min <= max);
-    int32_t value = this->read32();
-    if (value < min || value > max) {
-        this->validate(false);
-        value = min;
+int32_t SkReadBuffer::checkInt(int32_t minimum, int32_t maximum) {
+    SkASSERT(minimum <= maximum);
+    int32_t value = read32();
+    if (value < minimum || value > maximum) {
+        validate(false);
+        value = minimum;
     }
     return value;
 }
 
 SkLegacyFQ SkReadBuffer::checkFilterQuality() {
-    return this->checkRange<SkLegacyFQ>(kNone_SkLegacyFQ, kLast_SkLegacyFQ);
+    const SkLegacyFQ quality = checkRange<SkLegacyFQ>(kNone_SkLegacyFQ, kLast_SkLegacyFQ);
+    return quality;
 }

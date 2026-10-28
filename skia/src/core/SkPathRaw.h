@@ -27,6 +27,7 @@
  *  It is the responsibility of the creator to ensure that the spans in SkPathRaw point to valid
  *  data that outlives the SkPathRaw instance.
  */
+// A non-owning view of path storage. Every span borrows storage that must outlive the view.
 struct SkPathRaw {
     SkSpan<const SkPoint>    fPoints;
     SkSpan<const SkPathVerb> fVerbs;
@@ -50,12 +51,17 @@ struct SkPathRaw {
 
     std::optional<SkRect> isRect() const;
 
-    SkPathIter iter() const { return {fPoints, fVerbs, fConics}; }
+    // The iterator borrows the same arrays as this view.
+    SkPathIter iter() const {
+        const SkPathIter iterator(fPoints, fVerbs, fConics);
+        return iterator;
+    }
 
     static SkPathRaw Empty(SkPathFillType ft = SkPathFillType::kDefault) {
-        return {
+        const SkPathRaw empty{
             {}, {}, {}, SkRect::MakeEmpty(), ft, SkPathConvexity::kConvex_Degenerate, 0,
         };
+        return empty;
     }
 };
 

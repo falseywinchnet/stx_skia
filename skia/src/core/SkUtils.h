@@ -13,11 +13,6 @@
 #include <cstring>
 #include <type_traits> // is_trivially_copyable
 
-namespace SkHexadecimalDigits {
-    extern const char gUpper[16];  // 0-9A-F
-    extern const char gLower[16];  // 0-9a-f
-}  // namespace SkHexadecimalDigits
-
 ///////////////////////////////////////////////////////////////////////////////
 
 // If T is an 8-byte GCC or Clang vector extension type, it would naturally pass or return in the

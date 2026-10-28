@@ -19,8 +19,10 @@ class SkPaint;
 // blitRect.
 class SkSpriteBlitter : public SkBlitter {
 public:
-    SkSpriteBlitter(const SkPixmap& source);
+    // Borrows the source's pixels, which must outlive the blitter.
+    explicit SkSpriteBlitter(const SkPixmap& source);
 
+    // Borrows the destination's pixels and the paint, which must outlive the blitter.
     virtual bool setup(const SkPixmap& dst, int left, int top, const SkPaint&);
 
     // blitH, blitAntiH, blitV and blitMask should not be called on an SkSpriteBlitter.
@@ -37,8 +39,10 @@ public:
 protected:
     SkPixmap        fDst;
     const SkPixmap  fSource;
-    int             fLeft, fTop;
-    const SkPaint*  fPaint;
+    // The destination position of the source's top-left pixel.
+    int             fLeft = 0;
+    int             fTop = 0;
+    const SkPaint*  fPaint = nullptr;
 
 private:
     using INHERITED = SkBlitter;

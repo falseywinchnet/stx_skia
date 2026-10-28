@@ -11,25 +11,18 @@
 #include "include/core/SkData.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkRefCnt.h"
-#include "include/core/SkSpan.h"
 #include "include/core/SkTypes.h"
-#include "include/private/SkPixelStorage.h"
-#include "include/private/SkTDArray.h"
-#include "src/capture/SkCaptureManager.h"
 #include "src/core/SkMipmap.h"
 
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 
-class GrDirectContext;
-class GrImageContext;
 class SkBitmap;
 class SkColorSpace;
 class SkPixmap;
 class SkRecorder;
 class SkSurface;
-enum SkYUVColorSpace : int;
 struct SkIRect;
 struct SkISize;
 struct SkImageInfo;
@@ -48,14 +41,13 @@ public:
                                   RequiredProperties) const override;
 
     sk_sp<SkImage> makeSubset(SkRecorder*, const SkIRect&, RequiredProperties) const override;
-    size_t textureSize() const override { return 0; }
 
     // Methods that we want to use elsewhere in Skia, but not be a part of the public API.
     virtual bool onPeekPixels(SkPixmap*) const { return false; }
 
     virtual const SkBitmap* onPeekBitmap() const { return nullptr; }
 
-    virtual bool onReadPixels(GrDirectContext*,
+    virtual bool onReadPixels(
                               const SkImageInfo& dstInfo,
                               void* dstPixels,
                               size_t dstRowBytes,
@@ -63,17 +55,14 @@ public:
                               int srcY,
                               CachingHint) const = 0;
 
-    virtual bool readPixelsGraphite(SkRecorder*, const SkPixmap& dst, int srcX, int srcY) const {
-        return false;
-    }
-
     virtual bool onHasMipmaps() const = 0;
-    virtual bool onIsProtected() const = 0;
 
     virtual SkMipmap* onPeekMips() const { return nullptr; }
 
     sk_sp<SkMipmap> refMips() const {
-        return sk_ref_sp(this->onPeekMips());
+        SkMipmap* borrowed = onPeekMips();
+        sk_sp<SkMipmap> mips = sk_ref_sp(borrowed);
+        return mips;
     }
 
     /**
@@ -85,83 +74,29 @@ public:
                                              RescaleMode,
                                              ReadPixelsCallback,
                                              ReadPixelsContext) const;
-    /**
-     * Default implementation does a rescale/read/yuv conversion and then calls the callback.
-     */
-    virtual void onAsyncRescaleAndReadPixelsYUV420(SkYUVColorSpace,
-                                                   bool readAlpha,
-                                                   sk_sp<SkColorSpace> dstColorSpace,
-                                                   SkIRect srcRect,
-                                                   SkISize dstSize,
-                                                   RescaleGamma,
-                                                   RescaleMode,
-                                                   ReadPixelsCallback,
-                                                   ReadPixelsContext) const;
-
-    virtual GrImageContext* context() const { return nullptr; }
-
-    /** this->context() try-casted to GrDirectContext. Useful for migrations – avoid otherwise! */
-    virtual GrDirectContext* directContext() const { return nullptr; }
-
-    // If this image is the current cached image snapshot of a surface then this is called when the
-    // surface is destroyed to indicate no further writes may happen to surface backing store.
-    virtual void generatingSurfaceIsDeleted() {}
-
     // return a read-only copy of the pixels. We promise to not modify them,
     // but only inspect them (or encode them).
-    virtual bool getROPixels(GrDirectContext*, SkBitmap*,
+    virtual bool getROPixels( SkBitmap*,
                              CachingHint = kAllow_CachingHint) const = 0;
 
     virtual sk_sp<SkImage> onMakeSubset(SkRecorder*, const SkIRect&, RequiredProperties) const = 0;
 
     virtual sk_sp<const SkData> onRefEncoded() const { return nullptr; }
 
-    virtual bool onAsLegacyBitmap(GrDirectContext*, SkBitmap*) const;
+    virtual bool onAsLegacyBitmap( SkBitmap*) const;
 
-    // Create the surface used by makeScaled. If this is a GPU backed image, the surface
-    // should be Ganesh or Graphite backed (as appropriate), otherwise this can raster backed.
+    // Create the CPU surface used by makeScaled.
     virtual sk_sp<SkSurface> onMakeSurface(SkRecorder*, const SkImageInfo&) const = 0;
 
-    enum class Type {
-        kRaster,
-        kRasterPinnable,
-        kLazy,
-        kLazyPicture,
-        kLazyTexture,
-        kGanesh,
-        kGaneshYUVA,
-        kGraphite,
-        kGraphiteYUVA,
-    };
-
+    enum class Type { kRaster, kLazy };
     virtual Type type() const = 0;
-
-    // True for picture-backed and codec-backed
     bool isLazyGenerated() const override {
-        return this->type() == Type::kLazy || this->type() == Type::kLazyPicture ||
-               this->type() == Type::kLazyTexture;
+        const bool lazy = type() == Type::kLazy;
+        return lazy;
     }
-
     bool isRasterBacked() const {
-        return this->type() == Type::kRaster || this->type() == Type::kRasterPinnable;
-    }
-
-    // True for images instantiated by Ganesh in GPU memory
-    bool isGaneshBacked() const {
-        return this->type() == Type::kGanesh || this->type() == Type::kGaneshYUVA;
-    }
-
-    // True for images instantiated by Graphite in GPU memory
-    bool isGraphiteBacked() const {
-        return this->type() == Type::kGraphite || this->type() == Type::kGraphiteYUVA;
-    }
-
-    bool isYUVA() const {
-        return this->type() == Type::kGaneshYUVA || this->type() == Type::kGraphiteYUVA;
-    }
-
-    bool isTextureBacked() const override {
-        return this->isGaneshBacked() || this->isGraphiteBacked();
+        const bool raster = type() == Type::kRaster;
+        return raster;
     }
 
     // Call when this image is part of the key to a resourcecache entry. This allows the cache
@@ -178,34 +113,38 @@ public:
         return nullptr;
     }
 
-    SkSpan<const sk_sp<SkPixelStorage>> getPixelStorages() const {
-        return fPixelStorages;
-    }
-
 protected:
-    SkImage_Base(const SkImageInfo& info, uint32_t uniqueID, sk_sp<SkPixelStorage> backingStorage);
-    // fPixelStorages is protected since SkImage_Raster needs access in ctor
-    skia_private::STArray<1, sk_sp<SkPixelStorage>> fPixelStorages;
+    SkImage_Base(const SkImageInfo& info, uint32_t uniqueID);
 private:
     // Set true by caches when they cache content that's derived from the current pixels.
 
-    mutable std::atomic<bool> fAddedToRasterCache;
+    mutable std::atomic<bool> fAddedToRasterCache{false};
 };
 
 static inline SkImage_Base* as_IB(SkImage* image) {
-    return static_cast<SkImage_Base*>(image);
+    SkImage_Base* base = static_cast<SkImage_Base*>(image);
+    return base;
 }
 
 static inline SkImage_Base* as_IB(const sk_sp<SkImage>& image) {
-    return static_cast<SkImage_Base*>(image.get());
+    SkImage_Base* base = static_cast<SkImage_Base*>(image.get());
+    return base;
 }
 
 static inline const SkImage_Base* as_IB(const SkImage* image) {
-    return static_cast<const SkImage_Base*>(image);
+    const SkImage_Base* base = static_cast<const SkImage_Base*>(image);
+    return base;
 }
 
 static inline const SkImage_Base* as_IB(const sk_sp<const SkImage>& image) {
-    return static_cast<const SkImage_Base*>(image.get());
+    const SkImage_Base* base = static_cast<const SkImage_Base*>(image.get());
+    return base;
 }
+
+// A returned borrow cannot extend the lifetime of a temporary owning handle.
+static SkImage_Base* as_IB(sk_sp<SkImage>&&) = delete;
+static SkImage_Base* as_IB(const sk_sp<SkImage>&&) = delete;
+static const SkImage_Base* as_IB(sk_sp<const SkImage>&&) = delete;
+static const SkImage_Base* as_IB(const sk_sp<const SkImage>&&) = delete;
 
 #endif

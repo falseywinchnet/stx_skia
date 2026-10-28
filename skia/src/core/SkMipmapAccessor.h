@@ -23,38 +23,53 @@ class SkImage;
 class SkImage_Base;
 enum class SkMipmapMode;
 
+// Selects CPU sampling levels. The arena owns the accessor and runs its destructor.
+// Retained bitmap/mipmap storage keeps returned pixel views alive until arena reset;
+// the input image and matrix need not outlive construction. Separate draws use
+// separate accessors. An accessor does not mutate the retained pixels.
 class SkMipmapAccessor : ::SkNoncopyable {
 public:
-    // Returns null on failure
-    static SkMipmapAccessor* Make(SkArenaAlloc*, const SkImage*, const SkMatrix& inv, SkMipmapMode);
+    // Image and arena must be nonnull. Returns null if no readable upper level
+    // can be acquired; any partial acquisition is released with the arena.
+    static SkMipmapAccessor* Make(SkArenaAlloc*, const SkImage*, const SkMatrix& inverse,
+                                  SkMipmapMode);
 
-    std::pair<SkPixmap, SkMatrix> level() const {
+    // Existing sampling callers consume (pixel view, base-to-level scale).
+    // These copied views borrow this accessor's retained storage.
+    std::pair<SkPixmap, SkMatrix> level() const & {
         SkASSERT(fUpper.addr() != nullptr);
-        return std::make_pair(fUpper, fUpperInv);
+        const std::pair<SkPixmap, SkMatrix> selected{fUpper, fUpperInv};
+        return selected;
     }
+    std::pair<SkPixmap, SkMatrix> level() const && = delete;
 
-    std::pair<SkPixmap, SkMatrix> lowerLevel() const {
+    // Only request the lower level when lowerWeight() is positive.
+    std::pair<SkPixmap, SkMatrix> lowerLevel() const & {
         SkASSERT(fLower.addr() != nullptr);
-        return std::make_pair(fLower, fLowerInv);
+        const std::pair<SkPixmap, SkMatrix> selected{fLower, fLowerInv};
+        return selected;
     }
+    std::pair<SkPixmap, SkMatrix> lowerLevel() const && = delete;
 
-    // 0....1. Will be 0 if there is no lowerLevel
+    // lower * weight + upper * (1 - weight); zero means upper-only sampling.
     float lowerWeight() const { return fLowerWeight; }
 
+    // Public only so SkArenaAlloc can construct it inside Make().
+    SkMipmapAccessor(const SkImage_Base*, const SkMatrix& inverse, SkMipmapMode);
+
 private:
-    SkPixmap     fUpper,
-                 fLower; // only valid for mip_linear
-    float        fLowerWeight;   // lower * weight + upper * (1 - weight)
-    SkMatrix     fUpperInv,
-                 fLowerInv;
+    // Owners precede borrowed views so their storage outlives those views.
+    SkBitmap fBaseStorage{};
+    sk_sp<const SkMipmap> fCurrMip{};
+    SkPixmap fUpper{};
+    SkPixmap fLower{};
+    float fLowerWeight = 0.0f;
+    SkMatrix fUpperInv = SkMatrix::I();
+    SkMatrix fLowerInv = SkMatrix::I();
 
-    // these manage lifetime for the buffers
-    SkBitmap              fBaseStorage;
-    sk_sp<const SkMipmap> fCurrMip;
-
-public:
-    // Don't call publicly -- this is only public for SkArenaAlloc to access it inside Make()
-    SkMipmapAccessor(const SkImage_Base*, const SkMatrix& inv, SkMipmapMode requestedMode);
+    // Acquires base pixels at most once after success. Failure leaves an empty
+    // upper view and permits a later fallback attempt, as in the original.
+    void loadUpperFromBase(const SkImage_Base&);
 };
 
 #endif

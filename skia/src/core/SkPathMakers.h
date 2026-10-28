@@ -18,22 +18,23 @@ public:
     : fCurrent(startIndex % N)
     , fAdvance(dir == SkPathDirection::kCW ? 1 : N - 1) { }
 
+    // The returned point borrows this iterator.
     const SkPoint& current() const {
-        SkASSERT(fCurrent < N);
-        return fPts[fCurrent];
+        // fCurrent is always reduced modulo N.
+        return fPts[fCurrent % N];
     }
 
     const SkPoint& next() {
         fCurrent = (fCurrent + fAdvance) % N;
-        return this->current();
+        return current();
     }
 
     protected:
-    SkPoint fPts[N];
+    SkPoint fPts[N] = {};
 
     private:
-    unsigned fCurrent;
-    unsigned fAdvance;
+    unsigned fCurrent = 0;
+    unsigned fAdvance = 1;   // 1 steps forward; N - 1 steps backward modulo N
 };
 
 class SkPath_RectPointIterator : public SkPath_PointIterator<4> {

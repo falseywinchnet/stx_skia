@@ -256,7 +256,3 @@ sk_sp<SkPathEffect> SkPath1DPathEffect::Make(const SkPath& path, SkScalar advanc
     }
     return sk_sp<SkPathEffect>(new SkPath1DPathEffectImpl(path, advance, phase, style));
 }
-
-void SkPath1DPathEffect::RegisterFlattenables() {
-    SK_REGISTER_FLATTENABLE(SkPath1DPathEffectImpl);
-}

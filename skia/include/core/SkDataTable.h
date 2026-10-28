@@ -25,7 +25,7 @@ public:
     /**
      *  Returns true if the table is empty (i.e. has no entries).
      */
-    bool isEmpty() const { return 0 == fCount; }
+    bool isEmpty() const { return fCount == 0; }
 
     /**
      *  Return the number of entries in the table. 0 for an empty table
@@ -49,7 +49,7 @@ public:
 
     template <typename T>
     const T* atT(int index, size_t* size = nullptr) const {
-        return reinterpret_cast<const T*>(this->at(index, size));
+        return reinterpret_cast<const T*>((*this).at(index, size));
     }
 
     /**
@@ -57,13 +57,13 @@ public:
      *  null byte had been copied into the table as well.
      */
     const char* atStr(int index) const {
-        size_t size;
-        const char* str = this->atT<const char>(index, &size);
+        size_t size = 0;
+        const char* str = (*this).atT<const char>(index, &size);
         SkASSERT(strlen(str) + 1 == size);
         return str;
     }
 
-    typedef void (*FreeProc)(void* context);
+    using FreeProc = void (*)(void* context);
 
     static sk_sp<SkDataTable> MakeEmpty();
 
@@ -94,19 +94,19 @@ public:
 
 private:
     struct Dir {
-        const void* fPtr;
-        uintptr_t   fSize;
+        const void* fPtr = nullptr;
+        uintptr_t   fSize = 0;
     };
 
-    int         fCount;
-    size_t      fElemSize;
+    int         fCount = 0;
+    size_t      fElemSize = 0;
     union {
         const Dir*  fDir;
         const char* fElems;
-    } fU;
+    } fU = {nullptr};
 
-    FreeProc    fFreeProc;
-    void*       fFreeProcContext;
+    FreeProc    fFreeProc = nullptr;
+    void*       fFreeProcContext = nullptr;
 
     SkDataTable();
     SkDataTable(const void* array, size_t elemSize, int count,

@@ -29,34 +29,39 @@ struct SkAnalyticEdge {
         kCCW = -1,  // counter clockwise
     };
 
-    SkAnalyticEdge* fNext;
-    SkAnalyticEdge* fPrev;
+    // Links borrow edges owned by the edge builder's arena (or a scan converter's sentinels).
+    SkAnalyticEdge* fNext = nullptr;
+    SkAnalyticEdge* fPrev = nullptr;
 
-    SkFixed fX;
-    SkFixed fDX;
-    SkFixed fUpperX;        // The x value when y = fUpperY
-    SkFixed fY;             // The current y
-    SkFixed fUpperY;        // The upper bound of y (our edge is from y = fUpperY to y = fLowerY)
-    SkFixed fLowerY;        // The lower bound of y (our edge is from y = fUpperY to y = fLowerY)
-    SkFixed fDY;            // abs(1/fDX); may be SK_MaxS32 when fDX is close to 0.
+    SkFixed fX = 0;
+    SkFixed fDX = 0;
+    SkFixed fUpperX = 0;    // The x value when y = fUpperY
+    SkFixed fY = 0;         // The current y
+    SkFixed fUpperY = 0;    // The upper bound of y (our edge is from y = fUpperY to y = fLowerY)
+    SkFixed fLowerY = 0;    // The lower bound of y (our edge is from y = fUpperY to y = fLowerY)
+    SkFixed fDY = 0;        // abs(1/fDX); may be SK_MaxS32 when fDX is close to 0.
                             // fDY is only used for blitting trapezoids.
 
-    Type fEdgeType;          // Remembers the *initial* edge type
+    Type fEdgeType = Type::kLine;  // Remembers the *initial* edge type
 
-    int8_t  fCurveCount;    // only used by kQuad(+) and kCubic(-)
+    // only used by kQuad(+) and kCubic(-); the sign selects the subclass in update().
+    int8_t  fCurveCount = 0;
     // The parametric subdivision shift (stepExponent) used to scale derivatives during
     // forward-differencing. In quadratics, it scales the first derivative during position
     // updates. In cubics, it scales the second derivative, while the first derivative
     // uses fToFixedShift instead.
-    uint8_t fCurveShift;
-    Winding fWinding;
+    uint8_t fCurveShift = 0;
+    Winding fWinding = Winding::kCW;
 
     static constexpr int kDefaultAccuracy = 2;  // default accuracy for snapping
 
     static inline SkFixed SnapY(SkFixed y) {
         constexpr int accuracy = kDefaultAccuracy;
         // This approach is safer than left shift, round, then right shift
-        return ((unsigned)y + (SK_Fixed1 >> (accuracy + 1))) >> (16 - accuracy) << (16 - accuracy);
+        const SkFixed snapped = static_cast<SkFixed>(
+                (static_cast<unsigned>(y) + (SK_Fixed1 >> (accuracy + 1))) >> (16 - accuracy)
+                << (16 - accuracy));
+        return snapped;
     }
 
     // Update fX, fY of this edge so fY = y
@@ -98,8 +103,8 @@ struct SkAnalyticEdge {
 
     void validate() const {
          SkASSERT(fPrev && fNext);
-         SkASSERT(fPrev->fNext == this);
-         SkASSERT(fNext->fPrev == this);
+         SkASSERT((*fPrev).fNext == this);
+         SkASSERT((*fNext).fPrev == this);
 
          SkASSERT(fUpperY < fLowerY);
          SkASSERT(fWinding == Winding::kCW || fWinding == Winding::kCCW);
@@ -108,13 +113,18 @@ struct SkAnalyticEdge {
 };
 
 struct SkAnalyticQuadraticEdge : public SkAnalyticEdge {
-    SkFixed fQx, fQy;
-    SkFixed fQDx, fQDy;
-    SkFixed fQDDx, fQDDy;
-    SkFixed fQLastX, fQLastY;
+    SkFixed fQx = 0;
+    SkFixed fQy = 0;
+    SkFixed fQDx = 0;
+    SkFixed fQDy = 0;
+    SkFixed fQDDx = 0;
+    SkFixed fQDDy = 0;
+    SkFixed fQLastX = 0;
+    SkFixed fQLastY = 0;
 
     // snap y to integer points in the middle of the curve to accelerate AAA path filling
-    SkFixed fSnappedX, fSnappedY;
+    SkFixed fSnappedX = 0;
+    SkFixed fSnappedY = 0;
 
     bool setQuadraticWithoutUpdate(const SkPoint pts[3], int shiftUp);
     bool setQuadratic(const SkPoint pts[3]);
@@ -130,15 +140,20 @@ struct SkAnalyticQuadraticEdge : public SkAnalyticEdge {
 };
 
 struct SkAnalyticCubicEdge : public SkAnalyticEdge {
-    SkFixed fCx, fCy;
-    SkFixed fCDx, fCDy;
-    SkFixed fCDDx, fCDDy;
-    SkFixed fCDDDx, fCDDDy;
-    SkFixed fCLastX, fCLastY;
+    SkFixed fCx = 0;
+    SkFixed fCy = 0;
+    SkFixed fCDx = 0;
+    SkFixed fCDy = 0;
+    SkFixed fCDDx = 0;
+    SkFixed fCDDy = 0;
+    SkFixed fCDDDx = 0;
+    SkFixed fCDDDy = 0;
+    SkFixed fCLastX = 0;
+    SkFixed fCLastY = 0;
 
-    SkFixed fSnappedY; // to make sure that y is increasing with smooth jump and snapping
+    SkFixed fSnappedY = 0; // to make sure that y is increasing with smooth jump and snapping
 
-    uint8_t fToFixedShift;        // applied to fCDx and fCDy
+    uint8_t fToFixedShift = 0;    // applied to fCDx and fCDy
 
     bool setCubicWithoutUpdate(const SkPoint pts[4], int shiftUp);
     bool setCubic(const SkPoint pts[4]);

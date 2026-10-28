@@ -14,7 +14,6 @@
 #include "include/core/SkRecorder.h"
 #include "include/core/SkRefCnt.h"
 #include "include/core/SkTypes.h"
-#include "include/private/SkTo.h"
 #include "src/core/SkMipmap.h"
 #include "src/image/SkImage_Base.h"
 
@@ -22,9 +21,9 @@
 #include <cstdint>
 #include <utility>
 
-class GrDirectContext;
 class SkColorSpace;
 class SkData;
+class SkPaint;
 class SkPixmap;
 class SkSurface;
 class SkImageShader;
@@ -48,7 +47,7 @@ public:
         if (!recorder) {
             return false;
         }
-        if (!recorder->cpuRecorder()) {
+        if (!(*recorder).cpuRecorder()) {
             return false;
         }
         return true;
@@ -59,20 +58,23 @@ public:
                                               RequiredProperties) const override;
 
     // From SkImage_Base.h
-    bool onReadPixels(GrDirectContext*, const SkImageInfo&, void*, size_t, int srcX, int srcY,
+    bool onReadPixels( const SkImageInfo&, void*, size_t, int srcX, int srcY,
                       CachingHint) const override;
     bool onPeekPixels(SkPixmap*) const override;
     const SkBitmap* onPeekBitmap() const override { return &fBitmap; }
 
-    bool getROPixels(GrDirectContext*, SkBitmap*, CachingHint) const override;
+    bool getROPixels( SkBitmap*, CachingHint) const override;
 
     sk_sp<SkImage> onMakeSubset(SkRecorder*, const SkIRect&, RequiredProperties) const override;
 
     sk_sp<SkSurface> onMakeSurface(SkRecorder*, const SkImageInfo&) const final;
 
-    SkPixelRef* getPixelRef() const { return fBitmap.pixelRef(); }
+    SkPixelRef* getPixelRef() const {
+        SkPixelRef* pixels = fBitmap.pixelRef();
+        return pixels;
+    }
 
-    bool onAsLegacyBitmap(GrDirectContext*, SkBitmap*) const override;
+    bool onAsLegacyBitmap( SkBitmap*) const override;
 
     sk_sp<SkImage> onReinterpretColorSpace(sk_sp<SkColorSpace>) const override;
 
@@ -81,13 +83,19 @@ public:
         // lifetime of derived/cached resources to the image. In this case, we only want cached
         // data (eg mips) tied to the lifetime of the underlying pixelRef.
         SkASSERT(fBitmap.pixelRef());
-        fBitmap.pixelRef()->notifyAddedToCache();
+        SkPixelRef& pixels = *fBitmap.pixelRef();
+        pixels.notifyAddedToCache();
     }
 
-    bool onHasMipmaps() const override { return SkToBool(fMips); }
-    bool onIsProtected() const override { return false; }
+    bool onHasMipmaps() const override {
+        const bool present = fMips != nullptr;
+        return present;
+    }
 
-    SkMipmap* onPeekMips() const override { return fMips.get(); }
+    SkMipmap* onPeekMips() const override {
+        SkMipmap* mips = fMips.get();
+        return mips;
+    }
 
     sk_sp<SkImage> onMakeWithMipmaps(sk_sp<SkMipmap>) const override;
 
@@ -124,8 +132,9 @@ protected:
     SkImage_Raster(const SkBitmap&, sk_sp<SkMipmap>, bool bitmapMayBeMutable);
 
 private:
+    // Bitmap retains the pixel ref. Mipmaps have independent owned storage.
     SkBitmap fBitmap;
-    sk_sp<SkMipmap> fMips;
+    sk_sp<SkMipmap> fMips = nullptr;
 };
 
 #endif // SkImage_Raster_DEFINED

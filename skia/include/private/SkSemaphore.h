@@ -9,28 +9,34 @@
 #define SkSemaphore_DEFINED
 
 #include "include/private/SkAPI.h"
+#include "include/private/SkAssert.h"
 #include "include/private/SkOnce.h"
 #include "include/private/SkThreadAnnotations.h"
 
 #include <algorithm>
 #include <atomic>
+#include <cstdint>
+#include <limits>
 
 class SkSemaphore {
 public:
-    constexpr SkSemaphore(int count = 0) : fCount(count), fOSSemaphore(nullptr) {}
+    // Nonnegative initial permits. Callers keep permit/waiter totals in int's
+    // representable range and stop every signal/wait before destruction.
+    constexpr SkSemaphore(int count = 0) : fCount(count) { SkASSERT(count >= 0); }
 
     // Cleanup the underlying OS semaphore.
     SK_SPI ~SkSemaphore();
 
-    // Increment the counter n times.
+    // Publish n nonnegative permits with release ordering.
     // Generally it's better to call signal(n) instead of signal() n times.
     void signal(int n = 1);
 
-    // Decrement the counter by 1,
-    // then if the counter is < 0, sleep this thread until the counter is >= 0.
+    // Claim one permit with acquire ordering; block if none was available.
+    // The count need not be nonnegative when a particular waiter is released.
     void wait();
 
-    // If the counter is positive, decrement it by 1 and return true, otherwise return false.
+    // Try one acquire CAS when permits appear available. Failure may be spurious
+    // or due to contention and consumes no permit. Never blocks or spins.
     SK_SPI bool try_wait();
 
 private:
@@ -47,36 +53,39 @@ private:
 
     SK_SPI void osSignal(int n);
     SK_SPI void osWait();
+    static void InitializeOSSemaphore(SkSemaphore& owner);
 
     std::atomic<int> fCount;
-    SkOnce           fOSSemaphoreOnce;
-    OSSemaphore*     fOSSemaphore;
+    SkOnce fOSSemaphoreOnce{};
+    // Sole owner at the OS boundary, initialized once and released by destructor.
+    // Keep constexpr construction without requiring C++23 constexpr unique_ptr.
+    OSSemaphore* fOSSemaphore = nullptr;
 };
 
 inline void SkSemaphore::signal(int n) {
-    int prev = fCount.fetch_add(n, std::memory_order_release);
+    SkASSERT(n >= 0);
+    const int previous = fCount.fetch_add(n, std::memory_order_release);
+    SkASSERT(previous < 0 || n <= std::numeric_limits<int>::max() - previous);
 
-    // We only want to call the OS semaphore when our logical count crosses
-    // from <0 to >=0 (when we need to wake sleeping threads).
-    //
-    // This is easiest to think about with specific examples of prev and n.
-    // If n == 5 and prev == -3, there are 3 threads sleeping and we signal
-    // std::min(-(-3), 5) == 3 times on the OS semaphore, leaving the count at 2.
-    //
-    // If prev >= 0, no threads are waiting, std::min(-prev, n) is always <= 0,
-    // so we don't call the OS semaphore, leaving the count at (prev + n).
-    int toSignal = std::min(-prev, n);
-    if (toSignal > 0) {
-        this->osSignal(toSignal);
+    // A negative previous count represents unsatisfied wait claims. Wake up to
+    // n of them even if the resulting count remains negative. Widen before
+    // negation so the minimum int representation cannot overflow this expression.
+    if (previous < 0 && n > 0) {
+        const int64_t waiting = -static_cast<int64_t>(previous);
+        const int64_t wakeCount = std::min(waiting, static_cast<int64_t>(n));
+        const int toSignal = static_cast<int>(wakeCount);
+        osSignal(toSignal);
     }
 }
 
 inline void SkSemaphore::wait() {
     // Since this fetches the value before the subtract, zero and below means that there are no
     // resources left, so the thread needs to wait.
-    if (fCount.fetch_sub(1, std::memory_order_acquire) <= 0) {
+    const int previous = fCount.fetch_sub(1, std::memory_order_acquire);
+    SkASSERT(previous > std::numeric_limits<int>::min());
+    if (previous <= 0) {
         SK_POTENTIALLY_BLOCKING_REGION_BEGIN;
-        this->osWait();
+        osWait();
         SK_POTENTIALLY_BLOCKING_REGION_END;
     }
 }

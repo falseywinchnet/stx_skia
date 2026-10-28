@@ -38,15 +38,6 @@ static constexpr int SkPopCount(uint32_t x) {
 }
 
 /**
- *  Return the integer square root of value, with a bias of bitBias
- */
-int32_t SkSqrtBits(int32_t value, int bitBias);
-
-/** Return the integer square root of n, treated as a SkFixed (16.16)
- */
-static inline int32_t SkSqrt32(int32_t n) { return SkSqrtBits(n, 15); }
-
-/**
  *  Returns (value < 0 ? 0 : value) efficiently (i.e. no compares or branches)
  */
 static inline int SkClampPos(int value) {

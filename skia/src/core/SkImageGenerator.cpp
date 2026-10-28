@@ -10,6 +10,7 @@
 #include "include/core/SkColorType.h"
 #include "include/private/SkAssert.h"
 #include "src/core/SkNextID.h"
+#include "src/core/SkImageInfoPriv.h"
 
 SkImageGenerator::SkImageGenerator(const SkImageInfo& info, uint32_t uniqueID)
     : fInfo(info)
@@ -17,28 +18,18 @@ SkImageGenerator::SkImageGenerator(const SkImageInfo& info, uint32_t uniqueID)
 {}
 
 bool SkImageGenerator::getPixels(const SkImageInfo& info, void* pixels, size_t rowBytes) {
-    if (kUnknown_SkColorType == info.colorType()) {
+    if (!SkImageInfoIsValid(info) || pixels == nullptr) {
         return false;
     }
-    if (nullptr == pixels) {
+    if (!info.validRowBytes(rowBytes)) {
         return false;
     }
-    if (rowBytes < info.minRowBytes()) {
+    const size_t extent = info.computeByteSize(rowBytes);
+    if (SkImageInfo::ByteSizeOverflowed(extent)) {
         return false;
     }
 
-    Options defaultOpts;
-    return this->onGetPixels(info, pixels, rowBytes, defaultOpts);
-}
-
-bool SkImageGenerator::queryYUVAInfo(const SkYUVAPixmapInfo::SupportedDataTypes& supportedDataTypes,
-                                     SkYUVAPixmapInfo* yuvaPixmapInfo) const {
-    SkASSERT(yuvaPixmapInfo);
-
-    return this->onQueryYUVAInfo(supportedDataTypes, yuvaPixmapInfo) &&
-           yuvaPixmapInfo->isSupported(supportedDataTypes);
-}
-
-bool SkImageGenerator::getYUVAPlanes(const SkYUVAPixmaps& yuvaPixmaps) {
-    return this->onGetYUVAPlanes(yuvaPixmaps);
+    const Options defaultOptions{};
+    const bool generated = onGetPixels(info, pixels, rowBytes, defaultOptions);
+    return generated;
 }

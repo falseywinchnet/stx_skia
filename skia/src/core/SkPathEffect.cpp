@@ -25,21 +25,25 @@ struct SkRect;
 ///////////////////////////////////////////////////////////////////////////////
 
 bool SkPathEffect::filterPath(SkPathBuilder* dst, const SkPath& src, SkStrokeRec* rec) const {
-    return this->filterPath(dst, src, rec, nullptr, SkMatrix::I());
+    const bool filtered = filterPath(dst, src, rec, nullptr, SkMatrix::I());
+    return filtered;
 }
 
 bool SkPathEffect::filterPath(SkPathBuilder* dst, const SkPath& src, SkStrokeRec* rec,
                               const SkRect* bounds, const SkMatrix& ctm) const {
-    return as_PEB(this)->onFilterPath(dst, src, rec, bounds, ctm);
+    const bool filtered = (*as_PEB(this)).onFilterPath(dst, src, rec, bounds, ctm);
+    return filtered;
 }
 
 bool SkPathEffectBase::asPoints(PointData* results, const SkPath& src,
                     const SkStrokeRec& rec, const SkMatrix& mx, const SkRect* rect) const {
-    return this->onAsPoints(results, src, rec, mx, rect);
+    const bool points = onAsPoints(results, src, rec, mx, rect);
+    return points;
 }
 
 bool SkPathEffect::needsCTM() const {
-    return as_PEB(this)->onNeedsCTM();
+    const bool needs = (*as_PEB(this)).onNeedsCTM();
+    return needs;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -88,36 +92,43 @@ public:
         if (!inner) {
             return outer;
         }
-        return sk_sp<SkPathEffect>(new SkComposePathEffect(outer, inner));
+        const sk_sp<SkPathEffect> composed(
+                new SkComposePathEffect(std::move(outer), std::move(inner)));
+        return composed;
     }
 
     SkComposePathEffect(sk_sp<SkPathEffect> outer, sk_sp<SkPathEffect> inner)
             : INHERITED(std::move(outer), std::move(inner)) {}
 
+    SkComposePathEffect(const SkComposePathEffect&) = delete;
+    SkComposePathEffect& operator=(const SkComposePathEffect&) = delete;
+
     bool onFilterPath(SkPathBuilder* builder, const SkPath& src, SkStrokeRec* rec,
                        const SkRect* cullRect, const SkMatrix& ctm) const override {
+        // The outer effect reads the inner result from tmp after the builder is detached.
         SkPath          tmp;
         const SkPath*   ptr = &src;
 
-        if (fPE1->filterPath(builder, src, rec, cullRect, ctm)) {
-            tmp = builder->detach();
+        if ((*fPE1).filterPath(builder, src, rec, cullRect, ctm)) {
+            tmp = (*builder).detach();
             ptr = &tmp;
         }
-        return fPE0->filterPath(builder, *ptr, rec, cullRect, ctm);
+        const bool filtered = (*fPE0).filterPath(builder, *ptr, rec, cullRect, ctm);
+        return filtered;
     }
 
     SK_FLATTENABLE_HOOKS(SkComposePathEffect)
 
     bool computeFastBounds(SkRect* bounds) const override {
         // inner (fPE1) is computed first, automatically updating bounds before computing outer.
-        return as_PEB(fPE1)->computeFastBounds(bounds) &&
-               as_PEB(fPE0)->computeFastBounds(bounds);
+        if (!(*as_PEB(fPE1)).computeFastBounds(bounds)) {
+            return false;
+        }
+        const bool computed = (*as_PEB(fPE0)).computeFastBounds(bounds);
+        return computed;
     }
 
 private:
-    // illegal
-    SkComposePathEffect(const SkComposePathEffect&);
-    SkComposePathEffect& operator=(const SkComposePathEffect&);
     friend class SkPathEffect;
 
     using INHERITED = SkPairPathEffect;
@@ -126,7 +137,9 @@ private:
 sk_sp<SkFlattenable> SkComposePathEffect::CreateProc(SkReadBuffer& buffer) {
     sk_sp<SkPathEffect> pe0(buffer.readPathEffect());
     sk_sp<SkPathEffect> pe1(buffer.readPathEffect());
-    return SkComposePathEffect::Make(std::move(pe0), std::move(pe1));
+    const sk_sp<SkFlattenable> effect =
+            SkComposePathEffect::Make(std::move(pe0), std::move(pe1));
+    return effect;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -150,32 +163,37 @@ public:
         if (!second) {
             return first;
         }
-        return sk_sp<SkPathEffect>(new SkSumPathEffect(first, second));
+        const sk_sp<SkPathEffect> summed(new SkSumPathEffect(std::move(first), std::move(second)));
+        return summed;
     }
 
     SkSumPathEffect(sk_sp<SkPathEffect> first, sk_sp<SkPathEffect> second)
             : INHERITED(std::move(first), std::move(second)) {}
 
+    SkSumPathEffect(const SkSumPathEffect&) = delete;
+    SkSumPathEffect& operator=(const SkSumPathEffect&) = delete;
+
     bool onFilterPath(SkPathBuilder* builder, const SkPath& src, SkStrokeRec* rec,
                       const SkRect* cullRect, const SkMatrix& ctm) const override {
         // always call both, even if the first one succeeds
-        bool filteredFirst = fPE0->filterPath(builder, src, rec, cullRect, ctm);
-        bool filteredSecond = fPE1->filterPath(builder, src, rec, cullRect, ctm);
-        return filteredFirst || filteredSecond;
+        const bool filteredFirst = (*fPE0).filterPath(builder, src, rec, cullRect, ctm);
+        const bool filteredSecond = (*fPE1).filterPath(builder, src, rec, cullRect, ctm);
+        const bool filtered = filteredFirst || filteredSecond;
+        return filtered;
     }
 
     SK_FLATTENABLE_HOOKS(SkSumPathEffect)
 
     bool computeFastBounds(SkRect* bounds) const override {
         // Unlike Compose(), PE0 modifies the path first for Sum
-        return as_PEB(fPE0)->computeFastBounds(bounds) &&
-               as_PEB(fPE1)->computeFastBounds(bounds);
+        if (!(*as_PEB(fPE0)).computeFastBounds(bounds)) {
+            return false;
+        }
+        const bool computed = (*as_PEB(fPE1)).computeFastBounds(bounds);
+        return computed;
     }
 
 private:
-    // illegal
-    SkSumPathEffect(const SkSumPathEffect&);
-    SkSumPathEffect& operator=(const SkSumPathEffect&);
     friend class SkPathEffect;
 
     using INHERITED = SkPairPathEffect;
@@ -184,28 +202,28 @@ private:
 sk_sp<SkFlattenable> SkSumPathEffect::CreateProc(SkReadBuffer& buffer) {
     sk_sp<SkPathEffect> pe0(buffer.readPathEffect());
     sk_sp<SkPathEffect> pe1(buffer.readPathEffect());
-    return SkSumPathEffect::Make(pe0, pe1);
+    const sk_sp<SkFlattenable> effect = SkSumPathEffect::Make(std::move(pe0), std::move(pe1));
+    return effect;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 sk_sp<SkPathEffect> SkPathEffect::MakeSum(sk_sp<SkPathEffect> first, sk_sp<SkPathEffect> second) {
-    return SkSumPathEffect::Make(std::move(first), std::move(second));
+    const sk_sp<SkPathEffect> effect = SkSumPathEffect::Make(std::move(first), std::move(second));
+    return effect;
 }
 
 sk_sp<SkPathEffect> SkPathEffect::MakeCompose(sk_sp<SkPathEffect> outer,
                                               sk_sp<SkPathEffect> inner) {
-    return SkComposePathEffect::Make(std::move(outer), std::move(inner));
+    const sk_sp<SkPathEffect> effect =
+            SkComposePathEffect::Make(std::move(outer), std::move(inner));
+    return effect;
 }
 
-void SkPathEffectBase::RegisterFlattenables() {
-    SK_REGISTER_FLATTENABLE(SkComposePathEffect);
-    SK_REGISTER_FLATTENABLE(SkSumPathEffect);
-}
 
 sk_sp<SkPathEffect> SkPathEffect::Deserialize(const void* data, size_t size,
                                               const SkDeserialProcs* procs) {
-    return sk_sp<SkPathEffect>(static_cast<SkPathEffect*>(
-                               SkFlattenable::Deserialize(
-                               kSkPathEffect_Type, data, size, procs).release()));
+    const sk_sp<SkPathEffect> effect(static_cast<SkPathEffect*>(
+            SkFlattenable::Deserialize(kSkPathEffect_Type, data, size, procs).release()));
+    return effect;
 }

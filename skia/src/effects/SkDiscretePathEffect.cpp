@@ -187,7 +187,3 @@ sk_sp<SkPathEffect> SkDiscretePathEffect::Make(SkScalar segLength, SkScalar devi
     }
     return sk_sp<SkPathEffect>(new SkDiscretePathEffectImpl(segLength, deviation, seedAssist));
 }
-
-void SkDiscretePathEffect::RegisterFlattenables() {
-    SkFlattenable::Register("SkDiscretePathEffect", SkDiscretePathEffectImpl::CreateProc);
-}

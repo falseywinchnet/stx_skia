@@ -22,7 +22,7 @@ class SkRegion;
 /** Defines a fixed-point rectangle, identical to the integer SkIRect, but its
     coordinates are treated as SkFixed rather than int32_t.
 */
-typedef SkIRect SkXRect;
+using SkXRect = SkIRect;
 
 class SkScan {
 public:
@@ -32,8 +32,8 @@ public:
      *      line(pts[1], pts[2])
      *      line(......, pts[count - 1])
      */
-    typedef void (*HairRgnProc)(SkSpan<const SkPoint>, const SkRegion*, SkBlitter*);
-    typedef void (*HairRCProc)(SkSpan<const SkPoint>, const SkRasterClip&, SkBlitter*);
+    using HairRgnProc = void (*)(SkSpan<const SkPoint>, const SkRegion*, SkBlitter*);
+    using HairRCProc = void (*)(SkSpan<const SkPoint>, const SkRasterClip&, SkBlitter*);
 
     // Paths of a certain size cannot be anti-aliased unless externally tiled (handled by SkDraw).
     // SkBitmapDevice automatically tiles, SkAAClip does not so SkRasterClipStack converts AA clips
@@ -96,10 +96,10 @@ private:
     exceed 32K
 */
 static inline void XRect_set(SkXRect* xr, const SkIRect& src) {
-    xr->fLeft = SkIntToFixed(src.fLeft);
-    xr->fTop = SkIntToFixed(src.fTop);
-    xr->fRight = SkIntToFixed(src.fRight);
-    xr->fBottom = SkIntToFixed(src.fBottom);
+    (*xr).fLeft = SkIntToFixed(src.fLeft);
+    (*xr).fTop = SkIntToFixed(src.fTop);
+    (*xr).fRight = SkIntToFixed(src.fRight);
+    (*xr).fBottom = SkIntToFixed(src.fBottom);
 }
 
 /** Assign an SkXRect from a SkRect, by promoting the src rect's coordinates
@@ -107,29 +107,29 @@ static inline void XRect_set(SkXRect* xr, const SkIRect& src) {
     exceed 32K
 */
 static inline void XRect_set(SkXRect* xr, const SkRect& src) {
-    xr->fLeft = SkScalarToFixed(src.fLeft);
-    xr->fTop = SkScalarToFixed(src.fTop);
-    xr->fRight = SkScalarToFixed(src.fRight);
-    xr->fBottom = SkScalarToFixed(src.fBottom);
+    (*xr).fLeft = SkScalarToFixed(src.fLeft);
+    (*xr).fTop = SkScalarToFixed(src.fTop);
+    (*xr).fRight = SkScalarToFixed(src.fRight);
+    (*xr).fBottom = SkScalarToFixed(src.fBottom);
 }
 
 /** Round the SkXRect coordinates, and store the result in the SkIRect.
 */
 static inline void XRect_round(const SkXRect& xr, SkIRect* dst) {
-    dst->fLeft = SkFixedRoundToInt(xr.fLeft);
-    dst->fTop = SkFixedRoundToInt(xr.fTop);
-    dst->fRight = SkFixedRoundToInt(xr.fRight);
-    dst->fBottom = SkFixedRoundToInt(xr.fBottom);
+    (*dst).fLeft = SkFixedRoundToInt(xr.fLeft);
+    (*dst).fTop = SkFixedRoundToInt(xr.fTop);
+    (*dst).fRight = SkFixedRoundToInt(xr.fRight);
+    (*dst).fBottom = SkFixedRoundToInt(xr.fBottom);
 }
 
 /** Round the SkXRect coordinates out (i.e. use floor for left/top, and ceiling
     for right/bottom), and store the result in the SkIRect.
 */
 static inline void XRect_roundOut(const SkXRect& xr, SkIRect* dst) {
-    dst->fLeft = SkFixedFloorToInt(xr.fLeft);
-    dst->fTop = SkFixedFloorToInt(xr.fTop);
-    dst->fRight = SkFixedCeilToInt(xr.fRight);
-    dst->fBottom = SkFixedCeilToInt(xr.fBottom);
+    (*dst).fLeft = SkFixedFloorToInt(xr.fLeft);
+    (*dst).fTop = SkFixedFloorToInt(xr.fTop);
+    (*dst).fRight = SkFixedCeilToInt(xr.fRight);
+    (*dst).fBottom = SkFixedCeilToInt(xr.fBottom);
 }
 
 #endif

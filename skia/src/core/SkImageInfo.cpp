@@ -49,7 +49,9 @@ int SkColorTypeBytesPerPixel(SkColorType ct) {
 }
 
 bool SkColorTypeIsAlwaysOpaque(SkColorType ct) {
-    return !(SkColorTypeChannelFlags(ct) & kAlpha_SkColorChannelFlag);
+    const uint32_t channels = SkColorTypeChannelFlags(ct);
+    const bool opaque = (channels & kAlpha_SkColorChannelFlag) == 0;
+    return opaque;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,131 +110,177 @@ SkColorInfo::SkColorInfo(SkColorInfo&&) = default;
 SkColorInfo& SkColorInfo::operator=(const SkColorInfo&) = default;
 SkColorInfo& SkColorInfo::operator=(SkColorInfo&&) = default;
 
-SkColorSpace* SkColorInfo::colorSpace() const { return fColorSpace.get(); }
+SkColorSpace* SkColorInfo::colorSpace() const {
+    SkColorSpace* space = fColorSpace.get();
+    return space;
+}
 sk_sp<SkColorSpace> SkColorInfo::refColorSpace() const { return fColorSpace; }
 
 bool SkColorInfo::operator==(const SkColorInfo& other) const {
-    return fColorType == other.fColorType && fAlphaType == other.fAlphaType &&
-           SkColorSpace::Equals(fColorSpace.get(), other.fColorSpace.get());
+    if (fColorType != other.fColorType || fAlphaType != other.fAlphaType) return false;
+    const bool equal_space = SkColorSpace::Equals(fColorSpace.get(), other.fColorSpace.get());
+    return equal_space;
 }
 
-bool SkColorInfo::operator!=(const SkColorInfo& other) const { return !(*this == other); }
+bool SkColorInfo::operator!=(const SkColorInfo& other) const {
+    const bool different = !(*this == other);
+    return different;
+}
 
 SkColorInfo SkColorInfo::makeAlphaType(SkAlphaType newAlphaType) const {
-    return SkColorInfo(this->colorType(), newAlphaType, this->refColorSpace());
+    SkColorInfo result = SkColorInfo(colorType(), newAlphaType, refColorSpace());
+    return result;
 }
 
 SkColorInfo SkColorInfo::makeColorType(SkColorType newColorType) const {
-    return SkColorInfo(newColorType, this->alphaType(), this->refColorSpace());
+    SkColorInfo result = SkColorInfo(newColorType, alphaType(), refColorSpace());
+    return result;
 }
 
 SkColorInfo SkColorInfo::makeColorSpace(sk_sp<SkColorSpace> cs) const {
-    return SkColorInfo(this->colorType(), this->alphaType(), std::move(cs));
+    SkColorInfo result = SkColorInfo(colorType(), alphaType(), std::move(cs));
+    return result;
 }
 
-int SkColorInfo::bytesPerPixel() const { return SkColorTypeBytesPerPixel(fColorType); }
+int SkColorInfo::bytesPerPixel() const {
+    const int bytes = SkColorTypeBytesPerPixel(fColorType);
+    return bytes;
+}
 
 bool SkColorInfo::gammaCloseToSRGB() const {
-    return fColorSpace && fColorSpace->gammaCloseToSRGB();
+    if (!fColorSpace) return false;
+    const bool close = (*fColorSpace).gammaCloseToSRGB();
+    return close;
 }
 
-int SkColorInfo::shiftPerPixel() const { return SkColorTypeShiftPerPixel(fColorType); }
+int SkColorInfo::shiftPerPixel() const {
+    const int shift = SkColorTypeShiftPerPixel(fColorType);
+    return shift;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 size_t SkImageInfo::computeOffset(int x, int y, size_t rowBytes) const {
-    SkASSERTF(x >= 0 && x < this->width(), "x=%d; width=%d\n", x, this->width());
-    SkASSERTF(y >= 0 && y < this->height(), "y=%d; height=%d\n", y, this->height());
-    return SkColorTypeComputeOffset(this->colorType(), x, y, rowBytes);
+    SkASSERTF(x >= 0 && x < width(), "x=%d; width=%d\n", x, width());
+    SkASSERTF(y >= 0 && y < height(), "y=%d; height=%d\n", y, height());
+    const size_t offset = SkColorTypeComputeOffset(colorType(), x, y, rowBytes);
+    return offset;
 }
 
 size_t SkImageInfo::computeByteSize(size_t rowBytes) const {
-    if (0 == this->height()) {
+    if (0 == height()) {
         return 0;
     }
     SkSafeMath safe;
-    size_t bytes = safe.add(safe.mul(safe.addInt(this->height(), -1), rowBytes),
-                            safe.mul(this->width(), this->bytesPerPixel()));
+    const int prior_rows = safe.addInt(height(), -1);
+    const size_t prior_bytes = safe.mul(static_cast<size_t>(prior_rows), rowBytes);
+    const size_t final_row = safe.mul(static_cast<size_t>(width()),
+                                      static_cast<size_t>(bytesPerPixel()));
+    const size_t bytes = safe.add(prior_bytes, final_row);
 
     // The CPU backend implements some memory operations on images using instructions that take a
     // signed 32-bit offset from the base. If we ever make an image larger than that, overflow can
     // cause us to read/write memory that starts 2GB *before* the buffer. (crbug.com/1264705)
     constexpr size_t kMaxSigned32BitSize = SK_MaxS32;
-    return (safe.ok() && (bytes <= kMaxSigned32BitSize)) ? bytes : SIZE_MAX;
+    if (!safe.ok() || bytes > kMaxSigned32BitSize) return SIZE_MAX;
+    return bytes;
 }
 
-SkColorSpace* SkImageInfo::colorSpace() const { return fColorInfo.colorSpace(); }
+SkColorSpace* SkImageInfo::colorSpace() const {
+    SkColorSpace* space = fColorInfo.colorSpace();
+    return space;
+}
 
-sk_sp<SkColorSpace> SkImageInfo::refColorSpace() const { return fColorInfo.refColorSpace(); }
+sk_sp<SkColorSpace> SkImageInfo::refColorSpace() const {
+    sk_sp<SkColorSpace> space = fColorInfo.refColorSpace();
+    return space;
+}
 
 SkImageInfo SkImageInfo::makeColorSpace(sk_sp<SkColorSpace> cs) const {
-    return Make(fDimensions, fColorInfo.makeColorSpace(std::move(cs)));
+    SkColorInfo color = fColorInfo.makeColorSpace(std::move(cs));
+    SkImageInfo result = Make(fDimensions, std::move(color));
+    return result;
 }
 
 SkImageInfo SkImageInfo::Make(int width, int height, SkColorType ct, SkAlphaType at) {
-    return Make(width, height, ct, at, nullptr);
+    SkImageInfo result = Make(width, height, ct, at, nullptr);
+    return result;
 }
 
 SkImageInfo SkImageInfo::Make(int width, int height, SkColorType ct, SkAlphaType at,
                               sk_sp<SkColorSpace> cs) {
-    return SkImageInfo({width, height}, {ct, at, std::move(cs)});
+    SkImageInfo result = SkImageInfo({width, height}, {ct, at, std::move(cs)});
+    return result;
 }
 
 SkImageInfo SkImageInfo::Make(SkISize dimensions, SkColorType ct, SkAlphaType at) {
-    return Make(dimensions, ct, at, nullptr);
+    SkImageInfo result = Make(dimensions, ct, at, nullptr);
+    return result;
 }
 
 SkImageInfo SkImageInfo::Make(SkISize dimensions, SkColorType ct, SkAlphaType at,
                         sk_sp<SkColorSpace> cs) {
-    return SkImageInfo(dimensions, {ct, at, std::move(cs)});
+    SkImageInfo result = SkImageInfo(dimensions, {ct, at, std::move(cs)});
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeN32(int width, int height, SkAlphaType at) {
-    return MakeN32(width, height, at, nullptr);
+    SkImageInfo result = MakeN32(width, height, at, nullptr);
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeN32(int width, int height, SkAlphaType at, sk_sp<SkColorSpace> cs) {
-    return Make({width, height}, kN32_SkColorType, at, std::move(cs));
+    SkImageInfo result = Make({width, height}, kN32_SkColorType, at, std::move(cs));
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeS32(int width, int height, SkAlphaType at) {
-    return SkImageInfo({width, height}, {kN32_SkColorType, at, SkColorSpace::MakeSRGB()});
+    sk_sp<SkColorSpace> space = SkColorSpace::MakeSRGB();
+    SkImageInfo result = SkImageInfo({width, height}, {kN32_SkColorType, at, std::move(space)});
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeN32Premul(int width, int height) {
-    return MakeN32Premul(width, height, nullptr);
+    SkImageInfo result = MakeN32Premul(width, height, nullptr);
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeN32Premul(int width, int height, sk_sp<SkColorSpace> cs) {
-    return Make({width, height}, kN32_SkColorType, kPremul_SkAlphaType, std::move(cs));
+    SkImageInfo result = Make({width, height}, kN32_SkColorType, kPremul_SkAlphaType, std::move(cs));
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeN32Premul(SkISize dimensions) {
-    return MakeN32Premul(dimensions, nullptr);
+    SkImageInfo result = MakeN32Premul(dimensions, nullptr);
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeN32Premul(SkISize dimensions, sk_sp<SkColorSpace> cs) {
-    return Make(dimensions, kN32_SkColorType, kPremul_SkAlphaType, std::move(cs));
+    SkImageInfo result = Make(dimensions, kN32_SkColorType, kPremul_SkAlphaType, std::move(cs));
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeA8(int width, int height) {
-    return Make({width, height}, kAlpha_8_SkColorType, kPremul_SkAlphaType, nullptr);
+    SkImageInfo result = Make({width, height}, kAlpha_8_SkColorType, kPremul_SkAlphaType, nullptr);
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeA8(SkISize dimensions) {
-    return Make(dimensions, kAlpha_8_SkColorType, kPremul_SkAlphaType, nullptr);
+    SkImageInfo result = Make(dimensions, kAlpha_8_SkColorType, kPremul_SkAlphaType, nullptr);
+    return result;
 }
 
 SkImageInfo SkImageInfo::MakeUnknown(int width, int height) {
-    return Make({width, height}, kUnknown_SkColorType, kUnknown_SkAlphaType, nullptr);
+    SkImageInfo result = Make({width, height}, kUnknown_SkColorType, kUnknown_SkAlphaType, nullptr);
+    return result;
 }
 
 #ifdef SK_DEBUG
 void SkImageInfo::validate() const {
     SkASSERT(fDimensions.width() >= 0);
     SkASSERT(fDimensions.height() >= 0);
-    SkASSERT(SkColorTypeIsValid(this->colorType()));
-    SkASSERT(SkAlphaTypeIsValid(this->alphaType()));
+    SkASSERT(SkColorTypeIsValid(colorType()));
+    SkASSERT(SkAlphaTypeIsValid(alphaType()));
 }
 #endif
 
@@ -280,6 +328,8 @@ bool SkColorTypeValidateAlphaType(SkColorType colorType, SkAlphaType alphaType,
         case kR8_unorm_SkColorType:
             alphaType = kOpaque_SkAlphaType;
             break;
+        default:
+            return false;
     }
     if (canonical) {
         *canonical = alphaType;

@@ -16,8 +16,10 @@
 
 // SkOnce provides call-once guarantees for Skia, much like std::once_flag/std::call_once().
 //
-// There should be no particularly error-prone gotcha use cases when using SkOnce.
-// It works correctly as a class member, a local, a global, a function-scoped static, whatever.
+// The winning call runs its target synchronously. Other callers spin until its
+// release publication, then observe its writes through acquire. The target and
+// arguments are borrowed for the call only; the target must not throw or reenter
+// this same flag. Finish all calls before destroying the flag or published state.
 
 class SkOnce {
 public:
@@ -25,7 +27,7 @@ public:
 
     template <typename Fn, typename... Args>
     void operator()(Fn&& fn, Args&&... args) {
-        auto state = fState.load(std::memory_order_acquire);
+        uint8_t state = fState.load(std::memory_order_acquire);
 
         if (state == Done) {
             return;
@@ -37,7 +39,8 @@ public:
                                                                   std::memory_order_relaxed)) {
             // Great!  We'll run fn() then notify the other threads by releasing Done into fState.
             fn(std::forward<Args>(args)...);
-            return fState.store(Done, std::memory_order_release);
+            fState.store(Done, std::memory_order_release);
+            return;
         }
 
         // Some other thread is calling fn().

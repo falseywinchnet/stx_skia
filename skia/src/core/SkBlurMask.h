@@ -15,32 +15,25 @@
 
 #include <cstdint>
 
-class SkRRect;
 enum SkBlurStyle : int;
 struct SkRect;
 
 class SkBlurMask {
 public:
+    // Analytic rectangle shortcut; failure leaves dst unchanged. An inner-style
+    // rectangle must have matching floor-sized and rounded extents. Both pixel
+    // creation modes allocate; no caller-provided output buffer is consumed.
     [[nodiscard]] static bool BlurRect(SkScalar sigma, SkMaskBuilder *dst, const SkRect &src,
                                        SkBlurStyle, SkIVector *margin = nullptr,
                                        SkMaskBuilder::CreateMode createMode =
                                            SkMaskBuilder::kComputeBoundsAndRenderImage_CreateMode);
-    [[nodiscard]] static bool BlurRRect(SkScalar sigma, SkMaskBuilder *dst, const SkRRect &src,
-                                        SkBlurStyle, SkIVector *margin = nullptr,
-                                        SkMaskBuilder::CreateMode createMode =
-                                            SkMaskBuilder::kComputeBoundsAndRenderImage_CreateMode);
-
-    // forceQuality will prevent BoxBlur from falling back to the low quality approach when sigma
-    // is very small -- this can be used predict the margin bump ahead of time without completely
-    // replicating the internal logic.  This permits not only simpler caching of blurred results,
-    // but also being able to predict precisely at what pixels the blurred profile of e.g. a
-    // rectangle will lie.
-    //
-    // Calling details:
-    // * calculate margin - if src.fImage is null, then this call only calculates the border.
-    // * failure          - if src.fImage is not null, failure is signal with dst->fImage being
-    //                      null.
-
+    // Source and destination descriptors/storage must not alias. Call with an
+    // empty destination; retain any prior allocation before resetting its view.
+    // A successful pixel-producing call transfers newly allocated storage through
+    // dst.image(); adopt it into SkAutoMaskFreeImage. Metadata-only sources do not
+    // allocate. Pixels require valid format alignment, live extents and strides.
+    // BoxBlur may replace dst on failure; callers must adopt any returned buffer.
+    // No effective blur returns false, except outer style succeeds with an empty mask.
     [[nodiscard]] static bool BoxBlur(SkMaskBuilder* dst,
                                       const SkMask& src,
                                       SkScalar sigma,
@@ -48,7 +41,7 @@ public:
                                       SkIVector* margin = nullptr);
 
     // the "ground truth" blur does a gaussian convolution; it's slow
-    // but useful for comparison purposes.
+    // but useful for comparison purposes. Failure leaves dst unchanged.
     [[nodiscard]] static bool BlurGroundTruth(SkScalar sigma,
                                               SkMaskBuilder* dst,
                                               const SkMask& src,
@@ -64,8 +57,8 @@ public:
 
     /** Look up the intensity of the (one dimnensional) blurred half-plane.
         @param profile The precomputed 1D blur profile; initialized by ComputeBlurProfile below.
-        @param loc the location to look up; The lookup will clamp invalid inputs, but
-                   meaningful data are available between 0 and blurred_width
+        @param loc the location to look up; Require 0 <= loc < blurredWidth <= INT32_MAX and
+                   0 <= sharpWidth <= blurredWidth; negative derived offsets clamp to zero
         @param blurred_width The width of the final, blurred rectangle
         @param sharp_width The width of the original, unblurred rectangle.
     */
@@ -73,7 +66,7 @@ public:
 
     /** Populate the profile of a 1D blurred halfplane.
         @param profile The 1D table to fill in
-        @param size    Should be 6*sigma bytes
+        @param size    Must be ceil(6*sigma) bytes, positive; sigma finite and positive
         @param sigma   The standard deviation of the gaussian blur kernel
     */
     static void ComputeBlurProfile(uint8_t* profile, int size, SkScalar sigma);
@@ -84,7 +77,9 @@ public:
         @param profile Precomputed blur profile computed by ComputeBlurProfile above.
         @param width Size of the pixels array.
         @param sigma Standard deviation of the gaussian blur kernel used to compute the profile;
-                     this implicitly gives the size of the pixels array.
+                     profile has ceil(6*sigma) elements. width must be positive and at
+                     most INT32_MAX; a width below the profile size keeps the original
+                     narrow-rectangle lookup. Buffers must not overlap.
     */
 
     static void ComputeBlurredScanline(uint8_t* pixels, const uint8_t* profile,

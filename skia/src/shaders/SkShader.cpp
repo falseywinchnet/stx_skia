@@ -19,33 +19,39 @@
 class SkImage;
 enum class SkTileMode;
 
-SkImage* SkShader::isAImage(SkMatrix* localMatrix, SkTileMode xy[2]) const {
-    return as_SB(this)->onIsAImage(localMatrix, xy);
+SkImage* SkShader::isAImage(SkMatrix* localMatrix, SkTileMode xy[2]) const & {
+    const SkShaderBase& shader = *as_SB(this);
+    SkImage* image = shader.onIsAImage(localMatrix, xy);
+    return image;
 }
 
 sk_sp<SkShader> SkShader::makeWithLocalMatrix(const SkMatrix& localMatrix) const {
-    const SkMatrix* lm = &localMatrix;
-
-    sk_sp<SkShader> baseShader;
-    SkMatrix otherLocalMatrix;
-    sk_sp<SkShader> proxy = as_SB(this)->makeAsALocalMatrixShader(&otherLocalMatrix);
+    SkMatrix combinedMatrix = localMatrix;
+    sk_sp<SkShader> baseShader{};
+    const SkShaderBase& shader = *as_SB(this);
+    SkMatrix otherLocalMatrix{};
+    sk_sp<SkShader> proxy = shader.makeAsALocalMatrixShader(&otherLocalMatrix);
     if (proxy) {
-        otherLocalMatrix = SkShaderBase::ConcatLocalMatrices(localMatrix, otherLocalMatrix);
-        lm = &otherLocalMatrix;
-        baseShader = proxy;
+        combinedMatrix = SkShaderBase::ConcatLocalMatrices(localMatrix, otherLocalMatrix);
+        baseShader = std::move(proxy);
     } else {
         baseShader = sk_ref_sp(const_cast<SkShader*>(this));
     }
 
-    return sk_make_sp<SkLocalMatrixShader>(std::move(baseShader), *lm);
+    sk_sp<SkShader> result = sk_make_sp<SkLocalMatrixShader>(std::move(baseShader), combinedMatrix);
+    return result;
 }
 
 sk_sp<SkShader> SkShader::makeWithColorFilter(sk_sp<SkColorFilter> filter) const {
-    return SkColorFilterShader::Make(sk_ref_sp(this), 1.0f, std::move(filter));
+    sk_sp<SkShader> shader = sk_ref_sp(this);
+    sk_sp<SkShader> result = SkColorFilterShader::Make(std::move(shader), 1.0f, std::move(filter));
+    return result;
 }
 
 sk_sp<SkShader> SkShader::makeWithWorkingColorSpace(sk_sp<SkColorSpace> inputCS,
                                                     sk_sp<SkColorSpace> outputCS) const {
-    return SkWorkingColorSpaceShader::Make(
-            sk_ref_sp(this), std::move(inputCS), std::move(outputCS), /*workInUnpremul=*/false);
+    sk_sp<SkShader> shader = sk_ref_sp(this);
+    sk_sp<SkShader> result = SkWorkingColorSpaceShader::Make(
+            std::move(shader), std::move(inputCS), std::move(outputCS), false);
+    return result;
 }

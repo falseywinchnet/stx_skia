@@ -9,30 +9,21 @@
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkCanvas.h"
-#include "include/core/SkCapabilities.h" // IWYU pragma: keep
-#include "include/core/SkColorSpace.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkPixmap.h"
 #include "include/core/SkRect.h"
 #include "include/core/SkRefCnt.h"
 #include "include/core/SkScalar.h"
-#include "include/core/SkSize.h"
 #include "include/core/SkSurfaceProps.h"
-#include "include/private/SkTemplates.h"
 #include "src/core/SkImageInfoPriv.h"
 #include "src/core/SkSurfacePriv.h"
 #include "src/image/SkSurface_Base.h"
 
 #include <cstddef>
 #include <cstdint>
-#include <utility>
 
-class GrBackendSemaphore;
-class GrRecordingContext;  // IWYU pragma: keep
 class SkPaint;
-class GrSurfaceCharacterization;
-namespace skgpu { namespace graphite { class Recorder; } }
 
 SkSurfaceProps::SkSurfaceProps()
     : fFlags(0)
@@ -57,7 +48,6 @@ SkSurface::SkSurface(int width, int height, const SkSurfaceProps* props)
 {
     SkASSERT(fWidth > 0);
     SkASSERT(fHeight > 0);
-    fGenerationID = 0;
 }
 
 SkSurface::SkSurface(const SkImageInfo& info, const SkSurfaceProps* props)
@@ -65,187 +55,149 @@ SkSurface::SkSurface(const SkImageInfo& info, const SkSurfaceProps* props)
 {
     SkASSERT(fWidth > 0);
     SkASSERT(fHeight > 0);
-    fGenerationID = 0;
 }
 
 uint32_t SkSurface::generationID() {
-    if (0 == fGenerationID) {
-        fGenerationID = asSB(this)->newGenerationID();
+    if (fGenerationID == 0) {
+        SkSurface_Base& base = *asSB(this);
+        fGenerationID = base.newGenerationID();
     }
     return fGenerationID;
 }
 
-void SkSurface::notifyContentWillChange(ContentChangeMode mode) {
-    sk_ignore_unused_variable(asSB(this)->aboutToDraw(mode));
+bool SkSurface::notifyContentWillChange(ContentChangeMode mode) {
+    SkSurface_Base& base = *asSB(this);
+    const bool prepared = base.aboutToDraw(mode);
+    return prepared;
 }
 
 SkCanvas* SkSurface::getCanvas() {
-    return asSB(this)->getCachedCanvas();
-}
-
-sk_sp<const SkCapabilities> SkSurface::capabilities() {
-    return asSB(this)->onCapabilities();
+    SkSurface_Base& base = *asSB(this);
+    SkCanvas* canvas = base.getCachedCanvas();
+    return canvas;
 }
 
 sk_sp<SkImage> SkSurface::makeImageSnapshot() {
-    return asSB(this)->refCachedImage();
+    SkSurface_Base& base = *asSB(this);
+    sk_sp<SkImage> image = base.refCachedImage();
+    return image;
 }
 
-sk_sp<SkImage> SkSurface::makeImageSnapshot(const SkIRect& srcBounds) {
-    const SkIRect surfBounds = { 0, 0, fWidth, fHeight };
-    SkIRect bounds = srcBounds;
-    if (!bounds.intersect(surfBounds)) {
+sk_sp<SkImage> SkSurface::makeImageSnapshot(const SkIRect& sourceBounds) {
+    const SkIRect surfaceBounds = {0, 0, fWidth, fHeight};
+    SkIRect bounds = sourceBounds;
+    if (!bounds.intersect(surfaceBounds)) {
         return nullptr;
     }
     SkASSERT(!bounds.isEmpty());
-    if (bounds == surfBounds) {
-        return this->makeImageSnapshot();
-    } else {
-        return asSB(this)->onNewImageSnapshot(&bounds);
+    if (bounds == surfaceBounds) {
+        sk_sp<SkImage> image = makeImageSnapshot();
+        return image;
     }
+    SkSurface_Base& base = *asSB(this);
+    sk_sp<SkImage> image = base.onNewImageSnapshot(&bounds);
+    return image;
 }
 
 sk_sp<SkImage> SkSurface::makeTemporaryImage() {
-    return asSB(this)->onMakeTemporaryImage();
+    SkSurface_Base& base = *asSB(this);
+    sk_sp<SkImage> image = base.onMakeTemporaryImage();
+    return image;
 }
 
 sk_sp<SkSurface> SkSurface::makeSurface(const SkImageInfo& info) {
-    return asSB(this)->onNewSurface(info);
+    SkSurface_Base& base = *asSB(this);
+    sk_sp<SkSurface> surface = base.onNewSurface(info);
+    return surface;
 }
 
 sk_sp<SkSurface> SkSurface::makeSurface(int width, int height) {
-    return this->makeSurface(this->imageInfo().makeWH(width, height));
+    const SkImageInfo currentInfo = imageInfo();
+    const SkImageInfo requestedInfo = currentInfo.makeWH(width, height);
+    sk_sp<SkSurface> surface = makeSurface(requestedInfo);
+    return surface;
 }
 
-void SkSurface::draw(SkCanvas* canvas, SkScalar x, SkScalar y, const SkSamplingOptions& sampling,
-                     const SkPaint* paint) {
-    asSB(this)->onDraw(canvas, x, y, sampling, paint);
+void SkSurface::draw(SkCanvas* canvas, SkScalar x, SkScalar y,
+                     const SkSamplingOptions& sampling, const SkPaint* paint) {
+    SkSurface_Base& base = *asSB(this);
+    base.onDraw(canvas, x, y, sampling, paint);
 }
 
-bool SkSurface::peekPixels(SkPixmap* pmap) {
-    return this->getCanvas()->peekPixels(pmap);
+bool SkSurface::peekPixels(SkPixmap* pixels) {
+    SkCanvas& canvas = *getCanvas();
+    const bool available = canvas.peekPixels(pixels);
+    return available;
 }
 
-bool SkSurface::readPixels(const SkPixmap& pm, int srcX, int srcY) {
-    return this->getCanvas()->readPixels(pm, srcX, srcY);
+bool SkSurface::readPixels(const SkPixmap& pixels, int sourceX, int sourceY) {
+    SkCanvas& canvas = *getCanvas();
+    const bool copied = canvas.readPixels(pixels, sourceX, sourceY);
+    return copied;
 }
 
-bool SkSurface::readPixels(const SkImageInfo& dstInfo, void* dstPixels, size_t dstRowBytes,
-                           int srcX, int srcY) {
-    return this->readPixels({dstInfo, dstPixels, dstRowBytes}, srcX, srcY);
+bool SkSurface::readPixels(const SkImageInfo& destinationInfo, void* destinationPixels,
+                           size_t destinationRowBytes, int sourceX, int sourceY) {
+    const SkPixmap destination(destinationInfo, destinationPixels, destinationRowBytes);
+    const bool copied = readPixels(destination, sourceX, sourceY);
+    return copied;
 }
 
-bool SkSurface::readPixels(const SkBitmap& bitmap, int srcX, int srcY) {
-    SkPixmap pm;
-    return bitmap.peekPixels(&pm) && this->readPixels(pm, srcX, srcY);
+bool SkSurface::readPixels(const SkBitmap& bitmap, int sourceX, int sourceY) {
+    SkPixmap pixels;
+    if (!bitmap.peekPixels(&pixels)) {
+        return false;
+    }
+    const bool copied = readPixels(pixels, sourceX, sourceY);
+    return copied;
 }
 
 void SkSurface::asyncRescaleAndReadPixels(const SkImageInfo& info,
-                                          const SkIRect& srcRect,
-                                          RescaleGamma rescaleGamma,
-                                          RescaleMode rescaleMode,
-                                          ReadPixelsCallback callback,
-                                          ReadPixelsContext context) {
-    if (!SkIRect::MakeWH(this->width(), this->height()).contains(srcRect) ||
-        !SkImageInfoIsValid(info)) {
+                                         const SkIRect& sourceRect,
+                                         RescaleGamma rescaleGamma,
+                                         RescaleMode rescaleMode,
+                                         ReadPixelsCallback callback,
+                                         ReadPixelsContext context) {
+    const SkIRect bounds = SkIRect::MakeWH(width(), height());
+    if (!bounds.contains(sourceRect) || !SkImageInfoIsValid(info)) {
         callback(context, nullptr);
         return;
     }
-    asSB(this)->onAsyncRescaleAndReadPixels(
-            info, srcRect, rescaleGamma, rescaleMode, callback, context);
+    SkSurface_Base& base = *asSB(this);
+    base.onAsyncRescaleAndReadPixels(info, sourceRect, rescaleGamma, rescaleMode,
+                                   callback, context);
 }
 
-void SkSurface::asyncRescaleAndReadPixelsYUV420(SkYUVColorSpace yuvColorSpace,
-                                                sk_sp<SkColorSpace> dstColorSpace,
-                                                const SkIRect& srcRect,
-                                                const SkISize& dstSize,
-                                                RescaleGamma rescaleGamma,
-                                                RescaleMode rescaleMode,
-                                                ReadPixelsCallback callback,
-                                                ReadPixelsContext context) {
-    if (!SkIRect::MakeWH(this->width(), this->height()).contains(srcRect) || dstSize.isZero() ||
-        (dstSize.width() & 0b1) || (dstSize.height() & 0b1)) {
-        callback(context, nullptr);
+void SkSurface::writePixels(const SkPixmap& pixels, int x, int y) {
+    if (pixels.addr() == nullptr || pixels.width() <= 0 || pixels.height() <= 0) {
         return;
     }
-    asSB(this)->onAsyncRescaleAndReadPixelsYUV420(yuvColorSpace,
-                                                  /*readAlpha=*/false,
-                                                  std::move(dstColorSpace),
-                                                  srcRect,
-                                                  dstSize,
-                                                  rescaleGamma,
-                                                  rescaleMode,
-                                                  callback,
-                                                  context);
-}
-
-void SkSurface::asyncRescaleAndReadPixelsYUVA420(SkYUVColorSpace yuvColorSpace,
-                                                 sk_sp<SkColorSpace> dstColorSpace,
-                                                 const SkIRect& srcRect,
-                                                 const SkISize& dstSize,
-                                                 RescaleGamma rescaleGamma,
-                                                 RescaleMode rescaleMode,
-                                                 ReadPixelsCallback callback,
-                                                 ReadPixelsContext context) {
-    if (!SkIRect::MakeWH(this->width(), this->height()).contains(srcRect) || dstSize.isZero() ||
-        (dstSize.width() & 0b1) || (dstSize.height() & 0b1)) {
-        callback(context, nullptr);
+    const SkIRect sourceBounds = SkIRect::MakeXYWH(x, y, pixels.width(), pixels.height());
+    const SkIRect destinationBounds = SkIRect::MakeWH(width(), height());
+    if (!SkIRect::Intersects(sourceBounds, destinationBounds)) {
         return;
     }
-    asSB(this)->onAsyncRescaleAndReadPixelsYUV420(yuvColorSpace,
-                                                  /*readAlpha=*/true,
-                                                  std::move(dstColorSpace),
-                                                  srcRect,
-                                                  dstSize,
-                                                  rescaleGamma,
-                                                  rescaleMode,
-                                                  callback,
-                                                  context);
-}
-
-void SkSurface::writePixels(const SkPixmap& pmap, int x, int y) {
-    if (pmap.addr() == nullptr || pmap.width() <= 0 || pmap.height() <= 0) {
+    ContentChangeMode mode = kRetain_ContentChangeMode;
+    if (sourceBounds.contains(destinationBounds)) {
+        mode = kDiscard_ContentChangeMode;
+    }
+    SkSurface_Base& base = *asSB(this);
+    if (!base.aboutToDraw(mode)) {
         return;
     }
+    base.onWritePixels(pixels, x, y);
+}
 
-    const SkIRect srcR = SkIRect::MakeXYWH(x, y, pmap.width(), pmap.height());
-    const SkIRect dstR = SkIRect::MakeWH(this->width(), this->height());
-    if (SkIRect::Intersects(srcR, dstR)) {
-        ContentChangeMode mode = kRetain_ContentChangeMode;
-        if (srcR.contains(dstR)) {
-            mode = kDiscard_ContentChangeMode;
-        }
-        if (!asSB(this)->aboutToDraw(mode)) {
-            return;
-        }
-        asSB(this)->onWritePixels(pmap, x, y);
+void SkSurface::writePixels(const SkBitmap& source, int x, int y) {
+    SkPixmap pixels;
+    if (!source.peekPixels(&pixels)) {
+        return;
     }
+    writePixels(pixels, x, y);
 }
 
-void SkSurface::writePixels(const SkBitmap& src, int x, int y) {
-    SkPixmap pm;
-    if (src.peekPixels(&pm)) {
-        this->writePixels(pm, x, y);
-    }
-}
-
-GrRecordingContext* SkSurface::recordingContext() const {
-    return asConstSB(this)->onGetRecordingContext();
-}
-
-skgpu::graphite::Recorder* SkSurface::recorder() const { return asConstSB(this)->onGetRecorder(); }
-
-SkRecorder* SkSurface::baseRecorder() const { return asConstSB(this)->onGetBaseRecorder(); }
-
-bool SkSurface::wait(int numSemaphores, const GrBackendSemaphore* waitSemaphores,
-                     bool deleteSemaphoresAfterWait) {
-    return asSB(this)->onWait(numSemaphores, waitSemaphores, deleteSemaphoresAfterWait);
-}
-
-bool SkSurface::characterize(GrSurfaceCharacterization* characterization) const {
-    return asConstSB(this)->onCharacterize(characterization);
-}
-
-bool SkSurface::isCompatible(const GrSurfaceCharacterization& characterization) const {
-    return asConstSB(this)->onIsCompatible(characterization);
+SkRecorder* SkSurface::baseRecorder() const {
+    const SkSurface_Base& base = *asConstSB(this);
+    SkRecorder* recorder = base.onGetBaseRecorder();
+    return recorder;
 }

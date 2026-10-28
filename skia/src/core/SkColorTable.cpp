@@ -11,31 +11,41 @@
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkWriteBuffer.h"
 
-sk_sp<SkColorTable> SkColorTable::Make(const uint8_t tableA[256],
-                                       const uint8_t tableR[256],
-                                       const uint8_t tableG[256],
-                                       const uint8_t tableB[256]) {
-    if (!tableA && !tableR && !tableG && !tableB) {
-        return nullptr; // The table is the identity
-    }
+#include <algorithm>
+#include <array>
+#include <utility>
 
-    SkBitmap table;
-    if (!table.tryAllocPixels(SkImageInfo::MakeA8(256, 4))) {
+// Each channel is copied once into its own 256-byte row. Null channels are
+// identity maps; select that case before traversing the row.
+static void CopyChannelTable(const uint8_t* source, uint8_t* destination) {
+    if (source != nullptr) {
+        std::copy_n(source, 256, destination);
+        return;
+    }
+    for (int value = 0; value < 256; ++value) {
+        destination[value] = static_cast<uint8_t>(value);
+    }
+}
+
+sk_sp<SkColorTable> SkColorTable::Make(const uint8_t tableA[256],
+                                     const uint8_t tableR[256],
+                                     const uint8_t tableG[256],
+                                     const uint8_t tableB[256]) {
+    if (tableA == nullptr && tableR == nullptr && tableG == nullptr && tableB == nullptr) {
+        return nullptr; // The table is the identity.
+    }
+    SkBitmap table{};
+    const SkImageInfo tableInfo = SkImageInfo::MakeA8(256, 4);
+    if (!table.tryAllocPixels(tableInfo)) {
         return nullptr;
     }
-    uint8_t *a = table.getAddr8(0,0),
-            *r = table.getAddr8(0,1),
-            *g = table.getAddr8(0,2),
-            *b = table.getAddr8(0,3);
-    for (int i = 0; i < 256; i++) {
-        a[i] = tableA ? tableA[i] : i;
-        r[i] = tableR ? tableR[i] : i;
-        g[i] = tableG ? tableG[i] : i;
-        b[i] = tableB ? tableB[i] : i;
-    }
+    CopyChannelTable(tableA, table.getAddr8(0, 0));
+    CopyChannelTable(tableR, table.getAddr8(0, 1));
+    CopyChannelTable(tableG, table.getAddr8(0, 2));
+    CopyChannelTable(tableB, table.getAddr8(0, 3));
     table.setImmutable();
-
-    return sk_sp<SkColorTable>(new SkColorTable(table));
+    sk_sp<SkColorTable> result(new SkColorTable(std::move(table)));
+    return result;
 }
 
 void SkColorTable::flatten(SkWriteBuffer& buffer) const {
@@ -43,9 +53,14 @@ void SkColorTable::flatten(SkWriteBuffer& buffer) const {
 }
 
 sk_sp<SkColorTable> SkColorTable::Deserialize(SkReadBuffer& buffer) {
-    uint8_t argb[4*256];
-    if (buffer.readByteArray(argb, sizeof(argb))) {
-        return SkColorTable::Make(argb+0*256, argb+1*256, argb+2*256, argb+3*256);
+    std::array<uint8_t, 4 * 256> channels{};
+    if (!buffer.readByteArray(channels.data(), channels.size())) {
+        return nullptr;
     }
-    return nullptr;
+    const uint8_t* alpha = channels.data();
+    const uint8_t* red = alpha + 256;
+    const uint8_t* green = red + 256;
+    const uint8_t* blue = green + 256;
+    sk_sp<SkColorTable> table = Make(alpha, red, green, blue);
+    return table;
 }

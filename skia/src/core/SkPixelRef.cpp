@@ -18,17 +18,15 @@
 #include <utility>
 
 uint32_t SkNextID::ImageID() {
-    // We never set the low bit.... see SkPixelRef::genIDIsUnique().
+    // Reserve the low bit for SkPixelRef's unique-generation tag.
     static std::atomic<uint32_t> nextID{2};
 
-    uint32_t id;
+    uint32_t id = 0;
     do {
         id = nextID.fetch_add(2, std::memory_order_relaxed);
     } while (id == 0);
     return id;
 }
-
-///////////////////////////////////////////////////////////////////////////////
 
 SkPixelRef::SkPixelRef(int width, int height, void* pixels, size_t rowBytes)
     : SkPixelStorage(SkPixelStorage::Type::kPixelRef)
@@ -36,14 +34,13 @@ SkPixelRef::SkPixelRef(int width, int height, void* pixels, size_t rowBytes)
     , fHeight(height)
     , fPixels(pixels)
     , fRowBytes(rowBytes)
+    , fTaggedGenID(0)
+    , fGenIDChangeListeners()
     , fAddedToCache(false)
-{
-    this->needsNewGenID();
-    fMutability = kMutable;
-}
+    , fMutability(kMutable) {}
 
 SkPixelRef::~SkPixelRef() {
-    this->callGenIDChangeListeners();
+    callGenIDChangeListeners();
 }
 
 // This is undefined if there are clients in-flight trying to use us
@@ -54,61 +51,62 @@ void SkPixelRef::android_only_reset(int width, int height, size_t rowBytes) {
     // note: we do not change fPixels
 
     // conservative, since its possible the "new" settings are the same as the old.
-    this->notifyPixelsChanged();
+    notifyPixelsChanged();
 }
 
 void SkPixelRef::needsNewGenID() {
     fTaggedGenID.store(0);
-    SkASSERT(!this->genIDIsUnique()); // This method isn't threadsafe, so the assert should be fine.
+    SkASSERT(!genIDIsUnique()); // This method isn't threadsafe, so the assert should be fine.
 }
 
 uint32_t SkPixelRef::getGenerationID() const {
     uint32_t id = fTaggedGenID.load();
-    if (0 == id) {
-        uint32_t next = SkNextID::ImageID() | 1u;
+    if (id == 0) {
+        const uint32_t identity = SkNextID::ImageID();
+        const uint32_t next = identity | 1U;
         if (fTaggedGenID.compare_exchange_strong(id, next)) {
-            id = next;  // There was no race or we won the race.  fTaggedGenID is next now.
-        } else {
-            // We lost a race to set fTaggedGenID. compare_exchange() filled id with the winner.
+            id = next;
         }
-        // We can't quite SkASSERT(this->genIDIsUnique()). It could be non-unique
-        // if we got here via the else path (pretty unlikely, but possible).
+        // On a lost race, compare_exchange_strong has filled id with the winner.
+        // The winning generation may be shared, so its unique tag is not asserted.
     }
-    return id & ~1u;  // Mask off bottom unique bit.
+    // The unique tag is private; callers receive only the identity.
+    const uint32_t generation = id & ~1U;
+    return generation;
 }
 
 void SkPixelRef::addGenIDChangeListener(sk_sp<SkIDChangeListener> listener) {
-    if (!listener || !this->genIDIsUnique()) {
+    if (!listener || !genIDIsUnique()) {
         // No point in tracking this if we're not going to call it.
         return;
     }
-    SkASSERT(!listener->shouldDeregister());
+    SkASSERT(!(*listener).shouldDeregister());
     fGenIDChangeListeners.add(std::move(listener));
 }
 
-// we need to be called *before* the genID gets changed or zerod
+// Notify while the old generation is still available to cache invalidation.
 void SkPixelRef::callGenIDChangeListeners() {
     // We don't invalidate ourselves if we think another SkPixelRef is sharing our genID.
-    if (this->genIDIsUnique()) {
+    if (genIDIsUnique()) {
         fGenIDChangeListeners.changed();
         if (fAddedToCache.exchange(false)) {
-            SkNotifyBitmapGenIDIsStale(this->getGenerationID());
+            const uint32_t generation = getGenerationID();
+            SkNotifyBitmapGenIDIsStale(generation);
         }
     } else {
-        // Listeners get at most one shot, so even though these weren't triggered or not, blow them
-        // away.
+        // A registration has one opportunity; shared generations discard it.
         fGenIDChangeListeners.reset();
     }
 }
 
 void SkPixelRef::notifyPixelsChanged() {
 #ifdef SK_DEBUG
-    if (this->isImmutable()) {
+    if (isImmutable()) {
         SkDebugf("========== notifyPixelsChanged called on immutable pixelref");
     }
 #endif
-    this->callGenIDChangeListeners();
-    this->needsNewGenID();
+    callGenIDChangeListeners();
+    needsNewGenID();
 }
 
 void SkPixelRef::setImmutable() {
@@ -136,18 +134,35 @@ void SkPixelRef::restoreMutability() {
     fMutability = kMutable;
 }
 
-sk_sp<SkPixelRef> SkMakePixelRefWithProc(int width, int height, size_t rowBytes, void* addr,
-                                         void (*releaseProc)(void* addr, void* ctx), void* ctx) {
-    SkASSERT(width >= 0 && height >= 0);
-    if (nullptr == releaseProc) {
-        return sk_make_sp<SkPixelRef>(width, height, addr, rowBytes);
+namespace {
+// The callback owns the pixel allocation. It runs before base-class cache
+// invalidation, so change listeners must never inspect the released pixels.
+class CallbackPixelRef final : public SkPixelRef {
+public:
+    CallbackPixelRef(int width, int height, void* pixels, size_t row_bytes,
+                     void (*release)(void*, void*), void* context)
+        : SkPixelRef(width, height, pixels, row_bytes),
+          fRelease(release), fContext(context) {}
+
+    ~CallbackPixelRef() override {
+        fRelease(pixels(), fContext);
     }
-    struct PixelRef final : public SkPixelRef {
-        void (*fReleaseProc)(void*, void*);
-        void* fReleaseProcContext;
-        PixelRef(int w, int h, void* s, size_t r, void (*proc)(void*, void*), void* ctx)
-            : SkPixelRef(w, h, s, r), fReleaseProc(proc), fReleaseProcContext(ctx) {}
-        ~PixelRef() override { fReleaseProc(this->pixels(), fReleaseProcContext); }
-    };
-    return sk_sp<SkPixelRef>(new PixelRef(width, height, addr, rowBytes, releaseProc, ctx));
+
+private:
+    void (*fRelease)(void*, void*);
+    void* fContext;
+};
+}
+
+sk_sp<SkPixelRef> SkMakePixelRefWithProc(int width, int height, size_t row_bytes,
+                                      void* pixels, void (*release)(void*, void*),
+                                      void* context) {
+    SkASSERT(width >= 0 && height >= 0);
+    if (release == nullptr) {
+        sk_sp<SkPixelRef> result = sk_make_sp<SkPixelRef>(width, height, pixels, row_bytes);
+        return result;
+    }
+    sk_sp<SkPixelRef> result(new CallbackPixelRef(width, height, pixels, row_bytes,
+                                               release, context));
+    return result;
 }

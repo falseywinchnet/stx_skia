@@ -32,8 +32,8 @@ template <typename S> constexpr size_t   SkToSizeT(S x) { return SkTo<size_t>(x)
 
 /** @return false or true based on the condition
 */
-template <typename T> static constexpr bool SkToBool(const T& x) {
-    return (bool)x;
+template <typename T> constexpr bool SkToBool(const T& x) {
+    return static_cast<bool>(x);
 }
 
 #endif  // SkTo_DEFINED

@@ -16,18 +16,18 @@ namespace skcpu {
 class Recorder;
 }
 
+// The library's CPU recorder is the only SkRecorder: callers receive recorders but cannot derive
+// new kinds, because the library downcasts every SkRecorder by its type().
 class SK_API SkRecorder {
 public:
-    SkRecorder() = default;
     virtual ~SkRecorder() = default;
     SkRecorder(const SkRecorder&) = delete;
     SkRecorder(SkRecorder&&) = delete;
     SkRecorder& operator=(const SkRecorder&) = delete;
 
+    // Only the CPU recorder is admitted; GPU backends are not built.
     enum class Type {
         kCPU,
-        kGanesh,
-        kGraphite,
     };
 
     virtual Type type() const = 0;
@@ -35,15 +35,8 @@ public:
     virtual skcpu::Recorder* cpuRecorder() = 0;
 
 private:
-
-    /**
-    * Attempts to create and return an SkCaptureCanvas that wraps the provided base canvas.
-    * Returns nullptr if capture is not enabled.
-    */
-    virtual SkCanvas* makeCaptureCanvas(SkCanvas*) = 0;
-    virtual void createCaptureBreakpoint(SkSurface*) = 0;
-
-    friend class SkSurface_Base; // for capture functionality
+    SkRecorder() = default;
+    friend class skcpu::Recorder;
 };
 
 #endif

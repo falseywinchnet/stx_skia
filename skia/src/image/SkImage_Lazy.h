@@ -14,8 +14,6 @@
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkRefCnt.h"
 #include "include/core/SkTypes.h"
-#include "include/core/SkYUVAPixmaps.h"
-#include "include/private/SkIDChangeListener.h"
 #include "include/private/SkMutex.h"
 #include "src/image/SkImage_Base.h"
 
@@ -23,10 +21,8 @@
 #include <cstdint>
 #include <memory>
 
-class GrDirectContext;
 class SharedGenerator;
 class SkBitmap;
-class SkCachedData;
 class SkData;
 class SkPixmap;
 class SkRecorder;
@@ -39,12 +35,14 @@ public:
     struct Validator {
         Validator(sk_sp<SharedGenerator>, const SkColorType*, sk_sp<SkColorSpace>);
 
-        explicit operator bool() const { return fSharedGenerator.get(); }
+        explicit operator bool() const {
+            const bool valid = fSharedGenerator != nullptr;
+            return valid;
+        }
 
-        sk_sp<SharedGenerator> fSharedGenerator;
+        sk_sp<SharedGenerator> fSharedGenerator = nullptr;
         SkImageInfo            fInfo;
-        sk_sp<SkColorSpace>    fColorSpace;
-        uint32_t               fUniqueID;
+        uint32_t               fUniqueID = 0;
     };
 
     explicit SkImage_Lazy(Validator* validator);
@@ -58,13 +56,11 @@ public:
 
     // From SkImage_Base.h
     bool onHasMipmaps() const override {
-        // TODO: Should we defer to the generator? The generator interface currently doesn't have
-        // a way to provide content for levels other than via SkImageGenerator::generateTexture().
+        // CPU generators supply only the root pixel level.
         return false;
     }
-    bool onIsProtected() const override;
 
-    bool onReadPixels(GrDirectContext*, const SkImageInfo&, void*, size_t, int srcX, int srcY,
+    bool onReadPixels( const SkImageInfo&, void*, size_t, int srcX, int srcY,
                       CachingHint) const override;
     sk_sp<const SkData> onRefEncoded() const override;
 
@@ -72,55 +68,35 @@ public:
 
     sk_sp<SkSurface> onMakeSurface(SkRecorder*, const SkImageInfo&) const override;
 
-    bool getROPixels(GrDirectContext*, SkBitmap*, CachingHint) const override;
+    bool getROPixels( SkBitmap*, CachingHint) const override;
     SkImage_Base::Type type() const override { return SkImage_Base::Type::kLazy; }
 
     sk_sp<SkImage> onReinterpretColorSpace(sk_sp<SkColorSpace>) const final;
 
-    void addUniqueIDListener(sk_sp<SkIDChangeListener>) const;
-    sk_sp<SkCachedData> getPlanes(const SkYUVAPixmapInfo::SupportedDataTypes& supportedDataTypes,
-                                  SkYUVAPixmaps* pixmaps) const;
-
-    // Be careful with this. You need to acquire the mutex, as the generator might be shared
-    // among several images.
-    sk_sp<SharedGenerator> generator() const;
-
-protected:
-    virtual bool readPixelsProxy(GrDirectContext*, const SkPixmap&) const { return false; }
-
 private:
+    // Converted images share the generator but carry their own color type/space.
+    // Generator calls are serialized by SharedGenerator::fMutex. Immutable
+    // generator metadata can be read without locking. Subsets become raster images.
+    sk_sp<SharedGenerator> fSharedGenerator = nullptr;
 
-    class ScopedGenerator;
-
-    // Note that this->imageInfo() is not necessarily the info from the generator. It may be
-    // cropped by onMakeSubset and its color type/space may be changed by
-    // onMakeColorTypeAndColorSpace.
-    sk_sp<SharedGenerator> fSharedGenerator;
-
-    // Repeated calls to onMakeColorTypeAndColorSpace will result in a proliferation of unique IDs
+    // Repeated calls to makeColorTypeAndColorSpace will result in a proliferation of unique IDs
     // and SkImage_Lazy instances. Cache the result of the last successful call.
     mutable SkMutex        fOnMakeColorTypeAndSpaceMutex;
-    mutable sk_sp<SkImage> fOnMakeColorTypeAndSpaceResult;
-    // When the SkImage_Lazy goes away, we will iterate over all the listeners to inform them
-    // of the unique ID's demise. This is used to remove cached textures from GrContext.
-    mutable SkIDChangeListener::List fUniqueIDListeners;
+    mutable sk_sp<SkImage> fOnMakeColorTypeAndSpaceResult = nullptr;
+
 };
 
-// Ref-counted tuple(SkImageGenerator, SkMutex) which allows sharing one generator among N images
+// Shared ownership of one CPU generator. The generator object and its immutable
+// metadata live until the last image releases this owner; mutable calls lock it.
 class SharedGenerator final : public SkNVRefCnt<SharedGenerator> {
 public:
-    static sk_sp<SharedGenerator> Make(std::unique_ptr<SkImageGenerator> gen);
-
-    // This is thread safe.  It is a const field set in the constructor.
-    const SkImageInfo& getInfo() const;
-
-    bool isTextureGenerator();
-
-    std::unique_ptr<SkImageGenerator> fGenerator;
-    SkMutex                           fMutex;
+    static sk_sp<SharedGenerator> Make(std::unique_ptr<SkImageGenerator> generator);
 
 private:
-    explicit SharedGenerator(std::unique_ptr<SkImageGenerator> gen);
+    explicit SharedGenerator(std::unique_ptr<SkImageGenerator> generator);
+    std::unique_ptr<SkImageGenerator> fGenerator;
+    SkMutex fMutex;
+    friend class SkImage_Lazy;
 };
 
 #endif

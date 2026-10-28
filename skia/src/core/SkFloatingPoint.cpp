@@ -19,11 +19,11 @@
 static double magnitude(double a) {
     static constexpr int64_t extractMagnitude =
             0b0'11111111111'0000000000000000000000000000000000000000000000000000;
-    int64_t bits;
-    memcpy(&bits, &a, sizeof(bits));
+    int64_t bits = 0;
+    std::memcpy(&bits, &a, sizeof(bits));
     bits &= extractMagnitude;
-    double out;
-    memcpy(&out, &bits, sizeof(out));
+    double out = 0;
+    std::memcpy(&out, &bits, sizeof(out));
     return out;
 }
 
@@ -52,5 +52,5 @@ bool sk_doubles_nearly_equal_ulps(double a, double b, uint8_t maxUlpsDiff) {
 }
 
 bool sk_double_nearly_zero(double a) {
-    return a == 0 || fabs(a) < std::numeric_limits<float>::epsilon();
+    return a == 0 || std::fabs(a) < std::numeric_limits<float>::epsilon();
 }

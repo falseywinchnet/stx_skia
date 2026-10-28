@@ -19,7 +19,7 @@
  *  This macro allows clients to initialize a span with a single POD that will work with
  *  either implementation of SkSpan.
  *
- *  When we switch to std::span entirely, callsites can remove this macro, and juse type {{a}}
+ *  When we switch to std::span entirely, callsites can remove this macro, and use {{a}}
  */
 #ifdef SK_USE_LEGACY_SKSPAN
     #define SKSPAN_INIT_ONE(elem)   {elem}
@@ -36,6 +36,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <limits>
+#include <span>
 #include <utility>
 
 // Having this be an export works around IWYU churn related to
@@ -49,6 +50,25 @@
 #else
 #define SK_CHECK_IL_LIFETIME
 #endif
+
+namespace skia_private {
+// Keep non-containers out of overload resolution, including variant's conversion
+// probes. Validate element access here rather than failing inside the constructor.
+template <typename Container, typename Element, typename = void>
+struct SpanContainerTraits {
+    static constexpr bool compatible = false;
+};
+
+template <typename Container, typename Element>
+struct SpanContainerTraits<Container, Element,
+        std::void_t<decltype(std::data(std::declval<Container&>())),
+                    decltype(std::size(std::declval<Container&>()))>> {
+    using DataPointer = decltype(std::data(std::declval<Container&>()));
+    using Size = decltype(std::size(std::declval<Container&>()));
+    static constexpr bool compatible = std::is_convertible_v<DataPointer, Element*> &&
+                                       std::is_integral_v<Size>;
+};
+}
 
 /**
  * SkSpan holds a reference to contiguous data of type T along with a count. SkSpan does not own
@@ -65,9 +85,9 @@
  * Example:
  *     void routine(SkSpan<const int> a) { ... }
  *
- *     std::vector v = {1, 2, 3, 4, 5};
+ *     std::vector<int> values = {1, 2, 3, 4, 5};
  *
- *     routine(a);
+ *     routine(values);
  *
  * A word of caution when working with initializer_list, initializer_lists have a lifetime that is
  * limited to the current statement. The following is correct and safe:
@@ -78,8 +98,8 @@
  * The following is undefined, and will result in erratic execution:
  *
  * Bad Example:
- *     initializer_list l = {1, 2, 3, 4, 5};   // The data behind l dies at the ;.
- *     routine(l);
+ *     SkSpan<const int> borrowed = {1, 2, 3, 4, 5}; // Backing array ends here.
+ *     routine(borrowed);
  */
 template <typename T>
 class SkSpan {
@@ -96,45 +116,81 @@ public:
     constexpr SkSpan(const SkSpan& o) = default;
     template<size_t N> constexpr SkSpan(T(&a)[N]) : SkSpan(a, N) { }
     template<typename Container>
-    constexpr SkSpan(Container&& c) : SkSpan(std::data(c), std::size(c)) { }
+        requires skia_private::SpanContainerTraits<Container, T>::compatible
+    constexpr SkSpan(Container& c) : SkSpan(std::data(c), std::size(c)) { }
+    // Borrowed views may be temporary; owning containers must be lvalues.
+    template<typename U, size_t Extent,
+             typename = std::enable_if_t<std::is_convertible_v<U(*)[], T(*)[]>>>
+    constexpr SkSpan(std::span<U, Extent> view) : SkSpan(view.data(), view.size()) {}
     SkSpan(std::initializer_list<T> il SK_CHECK_IL_LIFETIME)
             : SkSpan(std::data(il), std::size(il)) {}
 
     constexpr SkSpan& operator=(const SkSpan& that) = default;
 
-    constexpr T& operator [] (size_t i) const {
-        return fPtr[sk_collection_check_bounds(i, this->size())];
+    constexpr T& operator[](size_t index) const {
+        const size_t checked = sk_collection_check_bounds(index, fSize);
+        return fPtr[checked];
     }
-    constexpr T& front() const { sk_collection_not_empty(this->empty()); return fPtr[0]; }
-    constexpr T& back()  const { sk_collection_not_empty(this->empty()); return fPtr[fSize - 1]; }
+    constexpr T& front() const {
+        sk_collection_not_empty(empty());
+        return fPtr[0];
+    }
+    constexpr T& back() const {
+        sk_collection_not_empty(empty());
+        return fPtr[fSize - 1];
+    }
     constexpr T* begin() const { return fPtr; }
-    constexpr T* end() const { return fPtr + fSize; }
-    constexpr auto rbegin() const { return std::make_reverse_iterator(this->end()); }
-    constexpr auto rend() const { return std::make_reverse_iterator(this->begin()); }
-    constexpr T* data() const { return this->begin(); }
-    constexpr size_t size() const { return fSize; }
-    constexpr bool empty() const { return fSize == 0; }
-    constexpr size_t size_bytes() const { return fSize * sizeof(T); }
-    constexpr SkSpan<T> first(size_t prefixLen) const {
-        return SkSpan{fPtr, sk_collection_check_length(prefixLen, fSize)};
+    constexpr T* end() const {
+        if (fSize == 0) return fPtr;
+        T* limit = fPtr + fSize;
+        return limit;
     }
-    constexpr SkSpan<T> last(size_t postfixLen) const {
-        return SkSpan{fPtr + (this->size() - postfixLen),
-                      sk_collection_check_length(postfixLen, fSize)};
+    constexpr std::reverse_iterator<T*> rbegin() const {
+        const std::reverse_iterator<T*> iterator(end());
+        return iterator;
+    }
+    constexpr std::reverse_iterator<T*> rend() const {
+        const std::reverse_iterator<T*> iterator(begin());
+        return iterator;
+    }
+    constexpr T* data() const { return fPtr; }
+    constexpr size_t size() const { return fSize; }
+    constexpr bool empty() const {
+        const bool no_elements = fSize == 0;
+        return no_elements;
+    }
+    constexpr size_t size_bytes() const {
+        const size_t bytes = fSize * sizeof(T);
+        return bytes;
+    }
+    constexpr SkSpan<T> first(size_t prefix_length) const {
+        const size_t length = sk_collection_check_length(prefix_length, fSize);
+        const SkSpan<T> view(fPtr, length);
+        return view;
+    }
+    constexpr SkSpan<T> last(size_t suffix_length) const {
+        const size_t length = sk_collection_check_length(suffix_length, fSize);
+        const size_t offset = fSize - length;
+        const SkSpan<T> view = subspan(offset, length);
+        return view;
     }
     constexpr SkSpan<T> subspan(size_t offset) const {
-        return this->subspan(offset, this->size() - offset);
+        const size_t checked_offset = sk_collection_check_length(offset, fSize);
+        const size_t remaining = fSize - checked_offset;
+        const SkSpan<T> view = subspan(checked_offset, remaining);
+        return view;
     }
     constexpr SkSpan<T> subspan(size_t offset, size_t count) const {
-        const size_t safeOffset = sk_collection_check_length(offset, fSize);
-
-        // Should read offset + count > size(), but that could overflow. We know that safeOffset
-        // is <= size, therefore the subtraction will not overflow.
-        if (count > this->size() - safeOffset) SK_UNLIKELY {
-            // The count is too large.
+        const size_t checked_offset = sk_collection_check_length(offset, fSize);
+        const size_t remaining = fSize - checked_offset;
+        if (count > remaining) SK_UNLIKELY {
             SkUNREACHABLE;
         }
-        return SkSpan{fPtr + safeOffset, count};
+        // An empty default span has no allocation on which to do pointer arithmetic.
+        T* start = fPtr;
+        if (checked_offset != 0) start += checked_offset;
+        const SkSpan<T> view(start, count);
+        return view;
     }
 
 private:
@@ -142,9 +198,17 @@ private:
     size_t fSize;
 };
 
+namespace skia_private {
+template <typename Container> struct SpanElement {
+    using type = std::remove_pointer_t<decltype(std::data(std::declval<Container&>()))>;
+};
+}
+
 template <typename Container>
-SkSpan(Container&&) ->
-        SkSpan<std::remove_pointer_t<decltype(std::data(std::declval<Container>()))>>;
+SkSpan(Container&) -> SkSpan<typename skia_private::SpanElement<Container>::type>;
+
+template <typename T, size_t Extent>
+SkSpan(std::span<T, Extent>) -> SkSpan<T>;
 
 #else
 

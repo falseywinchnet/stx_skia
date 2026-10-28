@@ -35,10 +35,7 @@ protected:
     bool onDoSaveBehind(const SkRect*) override;
 
     // No-op overrides for aborting rasterization earlier than SkNullBlitter.
-    void onDrawAnnotation(const SkRect&, const char[], SkData*) override {}
     void onDrawDRRect(const SkRRect&, const SkRRect&, const SkPaint&) override {}
-    void onDrawDrawable(SkDrawable*, const SkMatrix*) override {}
-    void onDrawTextBlob(const SkTextBlob*, SkScalar, SkScalar, const SkPaint&) override {}
     void onDrawPatch(const SkPoint[12], const SkColor[4], const SkPoint[4], SkBlendMode,
                      const SkPaint&) override {}
 
@@ -62,8 +59,6 @@ protected:
                   SkBlendMode, const SkSamplingOptions&, const SkRect*, const SkPaint*) override {}
 
     void onDrawVerticesObject(const SkVertices*, SkBlendMode, const SkPaint&) override {}
-    void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&) override {}
-    void onDrawPicture(const SkPicture*, const SkMatrix*, const SkPaint*) override {}
 
     void onDrawEdgeAAQuad(const SkRect&, const SkPoint[4], QuadAAFlags, const SkColor4f&,
                           SkBlendMode) override {}

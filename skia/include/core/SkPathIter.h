@@ -29,9 +29,10 @@ public:
         }
     };
 
+    // The iterator borrows the three arrays; they must outlive it. A record's points borrow
+    // either those arrays or (for a move or close) the iterator itself, until the next call.
     SkPathIter(SkSpan<const SkPoint> pts, SkSpan<const SkPathVerb> vbs, SkSpan<const float> cns)
-        : pIndex(0), vIndex(0), cIndex(0)
-        , fPoints(pts), fVerbs(vbs), fConics(cns)
+        : fPoints(pts), fVerbs(vbs), fConics(cns)
     {
         // For compat older iterators, we trim off a trailing Move.
         // SkPathData is defined to never create this pattern, so perhaps in the future
@@ -53,17 +54,21 @@ public:
 
     std::optional<SkPathVerb> peekNextVerb() const {
         if (vIndex < fVerbs.size()) {
-            return fVerbs[vIndex];
+            const SkPathVerb verb = fVerbs[vIndex];
+            return verb;
         }
         return {};
     }
 
 private:
-    size_t                   pIndex, vIndex, cIndex;
+    size_t                   pIndex = 0;   // next point
+    size_t                   vIndex = 0;   // next verb
+    size_t                   cIndex = 0;   // next conic weight
     SkSpan<const SkPoint>    fPoints;
     SkSpan<const SkPathVerb> fVerbs;
     SkSpan<const float>      fConics;
-    std::array<SkPoint, 2>   fClosePointStorage;
+    // [0] is the last point before a close; [1] is the current contour's first point.
+    std::array<SkPoint, 2>   fClosePointStorage = {};
 };
 
 class SkPathContourIter {
@@ -74,6 +79,7 @@ public:
         SkSpan<const float>      fConics;
     };
 
+    // Borrows the three arrays, which must outlive the iterator and its records.
     SkPathContourIter(SkSpan<const SkPoint> pts, SkSpan<const SkPathVerb> vbs,
                       SkSpan<const float> cns)
         : fPoints(pts), fVerbs(vbs), fConics(cns)

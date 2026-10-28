@@ -31,7 +31,6 @@ public:
     */
     static sk_sp<SkPathEffect> Make(SkScalar segLength, SkScalar dev, uint32_t seedAssist = 0);
 
-    static void RegisterFlattenables();
 };
 
 #endif

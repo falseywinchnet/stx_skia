@@ -11,7 +11,6 @@
 #include "include/core/SkBlendMode.h"
 #include "include/core/SkBlender.h"
 #include "include/core/SkColorFilter.h"
-#include "include/core/SkImageFilter.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPathEffect.h"
 #include "include/core/SkRect.h"
@@ -28,29 +27,26 @@
 #include "src/core/SkPathEffectBase.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 
+#include <cstdint>
+#include <optional>
 #include <utility>
-
-// define this to get a printf for out-of-range parameter in setters
-// e.g. setTextSize(-1)
-//#define SK_REPORT_API_RANGE_CHECK
-
 
 SkPaint::SkPaint()
     : fColor4f{0, 0, 0, 1}  // opaque black
     , fWidth{0}
     , fMiterLimit{SkPaintDefaults_MiterLimit}
-    , fBitfields{(unsigned)false,                   // fAntiAlias
-                 (unsigned)false,                   // fDither
-                 (unsigned)SkPaint::kDefault_Cap,   // fCapType
-                 (unsigned)SkPaint::kDefault_Join,  // fJoinType
-                 (unsigned)SkPaint::kFill_Style,    // fStyle
-                 0}                                 // fPadding
+    , fBitfields{0u,                                            // fAntiAlias
+                 0u,                                            // fDither
+                 static_cast<unsigned>(SkPaint::kDefault_Cap),  // fCapType
+                 static_cast<unsigned>(SkPaint::kDefault_Join), // fJoinType
+                 static_cast<unsigned>(SkPaint::kFill_Style),   // fStyle
+                 0u}                                            // fPadding
 {
-    static_assert(sizeof(fBitfields) == sizeof(fBitfieldsUInt), "");
+    static_assert(sizeof(Bitfields) == sizeof(uint32_t));
 }
 
 SkPaint::SkPaint(const SkColor4f& color, SkColorSpace* colorSpace) : SkPaint() {
-    this->setColor(color, colorSpace);
+    setColor(color, colorSpace);
 }
 
 SkPaint::SkPaint(const SkPaint& src) = default;
@@ -64,56 +60,46 @@ SkPaint& SkPaint::operator=(const SkPaint& src) = default;
 SkPaint& SkPaint::operator=(SkPaint&& src) = default;
 
 bool operator==(const SkPaint& a, const SkPaint& b) {
-#define EQUAL(field) (a.field == b.field)
-    return EQUAL(fPathEffect)
-        && EQUAL(fShader)
-        && EQUAL(fMaskFilter)
-        && EQUAL(fColorFilter)
-        && EQUAL(fBlender)
-        && EQUAL(fImageFilter)
-        && EQUAL(fColor4f)
-        && EQUAL(fWidth)
-        && EQUAL(fMiterLimit)
-        && EQUAL(fBitfieldsUInt)
-        ;
-#undef EQUAL
+    const bool equal = a.fPathEffect == b.fPathEffect &&
+                       a.fShader == b.fShader &&
+                       a.fMaskFilter == b.fMaskFilter &&
+                       a.fColorFilter == b.fColorFilter &&
+                       a.fBlender == b.fBlender &&
+                       a.fColor4f == b.fColor4f &&
+                       a.fWidth == b.fWidth &&
+                       a.fMiterLimit == b.fMiterLimit &&
+                       a.fBitfields.fAntiAlias == b.fBitfields.fAntiAlias &&
+                       a.fBitfields.fDither == b.fBitfields.fDither &&
+                       a.fBitfields.fCapType == b.fBitfields.fCapType &&
+                       a.fBitfields.fJoinType == b.fBitfields.fJoinType &&
+                       a.fBitfields.fStyle == b.fBitfields.fStyle;
+    return equal;
 }
 
-#define DEFINE_FIELD_REF(type) \
-    sk_sp<Sk##type> SkPaint::ref##type() const { return f##type; }
-DEFINE_FIELD_REF(ColorFilter)
-DEFINE_FIELD_REF(Blender)
-DEFINE_FIELD_REF(ImageFilter)
-DEFINE_FIELD_REF(MaskFilter)
-DEFINE_FIELD_REF(PathEffect)
-DEFINE_FIELD_REF(Shader)
-#undef DEFINE_FIELD_REF
+sk_sp<SkColorFilter> SkPaint::refColorFilter() const { return fColorFilter; }
+sk_sp<SkBlender> SkPaint::refBlender() const { return fBlender; }
+sk_sp<SkMaskFilter> SkPaint::refMaskFilter() const { return fMaskFilter; }
+sk_sp<SkPathEffect> SkPaint::refPathEffect() const { return fPathEffect; }
+sk_sp<SkShader> SkPaint::refShader() const { return fShader; }
 
-#define DEFINE_FIELD_SET(Field) \
-    void SkPaint::set##Field(sk_sp<Sk##Field> f) { f##Field = std::move(f); }
-DEFINE_FIELD_SET(ColorFilter)
-DEFINE_FIELD_SET(ImageFilter)
-DEFINE_FIELD_SET(MaskFilter)
-DEFINE_FIELD_SET(PathEffect)
-DEFINE_FIELD_SET(Shader)
-#undef DEFINE_FIELD_SET
+void SkPaint::setColorFilter(sk_sp<SkColorFilter> f) { fColorFilter = std::move(f); }
+void SkPaint::setMaskFilter(sk_sp<SkMaskFilter> f) { fMaskFilter = std::move(f); }
+void SkPaint::setPathEffect(sk_sp<SkPathEffect> f) { fPathEffect = std::move(f); }
+void SkPaint::setShader(sk_sp<SkShader> f) { fShader = std::move(f); }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void SkPaint::reset() { *this = SkPaint(); }
 
+// The enum setters keep the previous value when given a value outside their enumeration.
 void SkPaint::setStyle(Style style) {
-    if ((unsigned)style < kStyleCount) {
-        fBitfields.fStyle = style;
-    } else {
-#ifdef SK_REPORT_API_RANGE_CHECK
-        SkDebugf("SkPaint::setStyle(%d) out of range\n", style);
-#endif
+    if (static_cast<unsigned>(style) < kStyleCount) {
+        fBitfields.fStyle = static_cast<unsigned>(style);
     }
 }
 
 void SkPaint::setStroke(bool isStroke) {
-    fBitfields.fStyle = isStroke ? kStroke_Style : kFill_Style;
+    fBitfields.fStyle = static_cast<unsigned>(isStroke ? kStroke_Style : kFill_Style);
 }
 
 void SkPaint::setColor(SkColor color) {
@@ -121,8 +107,8 @@ void SkPaint::setColor(SkColor color) {
 }
 
 void SkPaint::setColor(const SkColor4f& color, SkColorSpace* colorSpace) {
-    SkColorSpaceXformSteps steps{colorSpace,          kUnpremul_SkAlphaType,
-                                 sk_srgb_singleton(), kUnpremul_SkAlphaType};
+    const SkColorSpaceXformSteps steps{colorSpace,          kUnpremul_SkAlphaType,
+                                       sk_srgb_singleton(), kUnpremul_SkAlphaType};
     fColor4f = color.pinAlpha();
     steps.apply(fColor4f.vec());
 }
@@ -132,79 +118,68 @@ void SkPaint::setAlphaf(float a) {
 }
 
 void SkPaint::setARGB(U8CPU a, U8CPU r, U8CPU g, U8CPU b) {
-    this->setColor(SkColorSetARGB(a, r, g, b));
+    setColor(SkColorSetARGB(a, r, g, b));
 }
 
+// A null blender is source-over.
 std::optional<SkBlendMode> SkPaint::asBlendMode() const {
-    return fBlender ? as_BB(fBlender)->asBlendMode()
-                    : SkBlendMode::kSrcOver;
+    if (!fBlender) {
+        const std::optional<SkBlendMode> srcOver = SkBlendMode::kSrcOver;
+        return srcOver;
+    }
+    const std::optional<SkBlendMode> mode = (*as_BB(fBlender)).asBlendMode();
+    return mode;
 }
 
 SkBlendMode SkPaint::getBlendMode_or(SkBlendMode defaultMode) const {
-    return this->asBlendMode().value_or(defaultMode);
+    const SkBlendMode mode = asBlendMode().value_or(defaultMode);
+    return mode;
 }
 
 bool SkPaint::isSrcOver() const {
-    return !fBlender || as_BB(fBlender)->asBlendMode() == SkBlendMode::kSrcOver;
+    const bool srcOver = !fBlender || (*as_BB(fBlender)).asBlendMode() == SkBlendMode::kSrcOver;
+    return srcOver;
 }
 
 void SkPaint::setBlendMode(SkBlendMode mode) {
-    this->setBlender(mode == SkBlendMode::kSrcOver ? nullptr : SkBlender::Mode(mode));
+    sk_sp<SkBlender> blender = mode == SkBlendMode::kSrcOver ? nullptr : SkBlender::Mode(mode);
+    setBlender(std::move(blender));
 }
 
 void SkPaint::setBlender(sk_sp<SkBlender> blender) {
     fBlender = std::move(blender);
 }
 
+// Negative (and NaN) widths and miter limits keep the previous value.
 void SkPaint::setStrokeWidth(SkScalar width) {
     if (width >= 0) {
         fWidth = width;
-    } else {
-#ifdef SK_REPORT_API_RANGE_CHECK
-        SkDebugf("SkPaint::setStrokeWidth() called with negative value\n");
-#endif
     }
 }
 
 void SkPaint::setStrokeMiter(SkScalar limit) {
     if (limit >= 0) {
         fMiterLimit = limit;
-    } else {
-#ifdef SK_REPORT_API_RANGE_CHECK
-        SkDebugf("SkPaint::setStrokeMiter() called with negative value\n");
-#endif
     }
 }
 
 void SkPaint::setStrokeCap(Cap ct) {
-    if ((unsigned)ct < kCapCount) {
-        fBitfields.fCapType = SkToU8(ct);
-    } else {
-#ifdef SK_REPORT_API_RANGE_CHECK
-        SkDebugf("SkPaint::setStrokeCap(%d) out of range\n", ct);
-#endif
+    if (static_cast<unsigned>(ct) < kCapCount) {
+        fBitfields.fCapType = static_cast<unsigned>(ct);
     }
 }
 
 void SkPaint::setStrokeJoin(Join jt) {
-    if ((unsigned)jt < kJoinCount) {
-        fBitfields.fJoinType = SkToU8(jt);
-    } else {
-#ifdef SK_REPORT_API_RANGE_CHECK
-        SkDebugf("SkPaint::setStrokeJoin(%d) out of range\n", jt);
-#endif
+    if (static_cast<unsigned>(jt) < kJoinCount) {
+        fBitfields.fJoinType = static_cast<unsigned>(jt);
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 bool SkPaint::canComputeFastBounds() const {
-    if (this->getImageFilter() && !this->getImageFilter()->canComputeFastBounds()) {
-        return false;
-    }
     // Pass nullptr for the bounds to determine if they can be computed
-    if (this->getPathEffect() &&
-        !as_PEB(this->getPathEffect())->computeFastBounds(nullptr)) {
+    if (getPathEffect() && !(*as_PEB(getPathEffect())).computeFastBounds(nullptr)) {
         return false;
     }
     return true;
@@ -213,44 +188,37 @@ bool SkPaint::canComputeFastBounds() const {
 const SkRect& SkPaint::computeFastBounds(const SkRect& orig, SkRect* storage) const {
     // Things like stroking, etc... will do math on the bounds rect, assuming that it's sorted.
     SkASSERT(orig.isSorted());
-    SkPaint::Style style = this->getStyle();
+    const SkPaint::Style style = getStyle();
     // ultra fast-case: filling with no effects that affect geometry
-    if (kFill_Style == style) {
-        uintptr_t effects = 0;
-        effects |= reinterpret_cast<uintptr_t>(this->getMaskFilter());
-        effects |= reinterpret_cast<uintptr_t>(this->getPathEffect());
-        effects |= reinterpret_cast<uintptr_t>(this->getImageFilter());
-        if (!effects) {
-            return orig;
-        }
+    if (kFill_Style == style && !getMaskFilter() && !getPathEffect()) {
+        return orig;
     }
 
-    return this->doComputeFastBounds(orig, storage, style);
+    return doComputeFastBounds(orig, storage, style);
 }
 
 const SkRect& SkPaint::doComputeFastBounds(const SkRect& origSrc,
                                            SkRect* storage,
                                            Style style) const {
-    SkASSERT(storage);
+    // The documented preconditions: storage, and (via canComputeFastBounds) a path effect
+    // that can bound its output. Ignoring a failed path effect would return bounds it never
+    // computed, which can cull a visible draw.
+    SkASSERT_RELEASE(storage != nullptr);
 
     const SkRect* src = &origSrc;
 
-    SkRect tmpSrc;
-    if (this->getPathEffect()) {
-        tmpSrc = origSrc;
-        SkAssertResult(as_PEB(this->getPathEffect())->computeFastBounds(&tmpSrc));
+    SkRect tmpSrc = origSrc;
+    if (getPathEffect()) {
+        const bool bounded = (*as_PEB(getPathEffect())).computeFastBounds(&tmpSrc);
+        SkASSERT_RELEASE(bounded);
         src = &tmpSrc;
     }
 
-    SkScalar radius = SkStrokeRec::GetInflationRadius(*this, style);
-    *storage = src->makeOutset(radius, radius);
+    const SkScalar radius = SkStrokeRec::GetInflationRadius(*this, style);
+    *storage = (*src).makeOutset(radius, radius);
 
-    if (this->getMaskFilter()) {
-        as_MFB(this->getMaskFilter())->computeFastBounds(*storage, storage);
-    }
-
-    if (this->getImageFilter()) {
-        *storage = this->getImageFilter()->computeFastBounds(*storage);
+    if (getMaskFilter()) {
+        (*as_MFB(getMaskFilter())).computeFastBounds(*storage, storage);
     }
 
     return *storage;
@@ -260,18 +228,12 @@ const SkRect& SkPaint::doComputeFastBounds(const SkRect& origSrc,
 
 // return true if the filter exists, and may affect alpha
 static bool affects_alpha(const SkColorFilter* cf) {
-    return cf && !as_CFB(cf)->isAlphaUnchanged();
-}
-
-// return true if the filter exists, and may affect alpha
-static bool affects_alpha(const SkImageFilter* imf) {
-    // TODO: check if we should allow imagefilters to broadcast that they don't affect alpha
-    // ala colorfilters
-    return imf != nullptr;
+    const bool affects = cf && !(*as_CFB(cf)).isAlphaUnchanged();
+    return affects;
 }
 
 bool SkPaint::nothingToDraw() const {
-    auto bm = this->asBlendMode();
+    const std::optional<SkBlendMode> bm = asBlendMode();
     if (!bm) {
         return false;
     }
@@ -281,8 +243,8 @@ bool SkPaint::nothingToDraw() const {
         case SkBlendMode::kDstOut:
         case SkBlendMode::kDstOver:
         case SkBlendMode::kPlus:
-            if (0 == this->getAlpha()) {
-                return !affects_alpha(fColorFilter.get()) && !affects_alpha(fImageFilter.get());
+            if (0 == getAlpha()) {
+                return !affects_alpha(fColorFilter.get());
             }
             break;
         case SkBlendMode::kDst:

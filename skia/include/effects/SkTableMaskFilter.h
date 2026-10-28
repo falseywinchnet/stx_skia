@@ -40,7 +40,6 @@ public:
     SkTableMaskFilter() = delete;
 
 private:
-    static void RegisterFlattenables();
     friend class SkFlattenable;
 };
 

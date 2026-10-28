@@ -23,18 +23,13 @@
 #include <atomic>
 #include <utility>
 
-SkImage_Base::SkImage_Base(const SkImageInfo& info, uint32_t uniqueID,
-                           sk_sp<SkPixelStorage> storage)
-        : SkImage(info, uniqueID)
-        , fAddedToRasterCache(false) {
-    if (storage) {
-        fPixelStorages.push_back(std::move(storage));
-    }
-}
+SkImage_Base::SkImage_Base(const SkImageInfo& info, uint32_t uniqueID)
+        : SkImage(info, uniqueID) {}
 
 SkImage_Base::~SkImage_Base() {
     if (fAddedToRasterCache.load()) {
-        SkNotifyBitmapGenIDIsStale(this->uniqueID());
+        const uint32_t id = uniqueID();
+        SkNotifyBitmapGenIDIsStale(id);
     }
 }
 
@@ -44,41 +39,50 @@ void SkImage_Base::onAsyncRescaleAndReadPixels(const SkImageInfo& info,
                                                RescaleMode rescaleMode,
                                                ReadPixelsCallback callback,
                                                ReadPixelsContext context) const {
-    SkBitmap src;
-    SkPixmap peek;
-    SkIRect srcRect;
-    if (this->peekPixels(&peek)) {
-        src.installPixels(peek);
-        srcRect = origSrcRect;
-    } else {
-        // Context TODO: Elevate GrDirectContext requirement to public API.
-        auto dContext = as_IB(this)->directContext();
-        src.setInfo(this->imageInfo().makeDimensions(origSrcRect.size()));
-        src.allocPixels();
-        if (!this->readPixels(dContext, src.pixmap(), origSrcRect.x(), origSrcRect.y())) {
+    SkBitmap source;
+    SkPixmap sourceView;
+    SkIRect sourceRect = SkIRect::MakeEmpty();
+    if (peekPixels(&sourceView)) {
+        if (!source.installPixels(sourceView)) {
             callback(context, nullptr);
             return;
         }
-        srcRect = SkIRect::MakeSize(src.dimensions());
+        sourceRect = origSrcRect;
+    } else {
+        const SkImageInfo currentInfo = imageInfo();
+        const SkISize sourceSize = origSrcRect.size();
+        const SkImageInfo sourceInfo = currentInfo.makeDimensions(sourceSize);
+        if (!source.tryAllocPixels(sourceInfo)) {
+            callback(context, nullptr);
+            return;
+        }
+        const SkPixmap pixels = source.pixmap();
+        const bool copied = readPixels(pixels, origSrcRect.x(), origSrcRect.y());
+        if (!copied) {
+            callback(context, nullptr);
+            return;
+        }
+        sourceRect = SkIRect::MakeSize(source.dimensions());
     }
-    return SkRescaleAndReadPixels(src, info, srcRect, rescaleGamma, rescaleMode, callback, context);
+    SkRescaleAndReadPixels(source, info, sourceRect, rescaleGamma, rescaleMode, callback, context);
 }
 
-bool SkImage_Base::onAsLegacyBitmap(GrDirectContext* dContext, SkBitmap* bitmap) const {
+bool SkImage_Base::onAsLegacyBitmap( SkBitmap* bitmap) const {
     // As the base-class, all we can do is make a copy (regardless of mode).
     // Subclasses that want to be more optimal should override.
-    SkImageInfo info = fInfo.makeColorType(kN32_SkColorType).makeColorSpace(nullptr);
-    if (!bitmap->tryAllocPixels(info)) {
+    const SkImageInfo colorInfo = fInfo.makeColorType(kN32_SkColorType);
+    const SkImageInfo info = colorInfo.makeColorSpace(nullptr);
+    if (!(*bitmap).tryAllocPixels(info)) {
         return false;
     }
 
-    if (!this->readPixels(
-                dContext, bitmap->info(), bitmap->getPixels(), bitmap->rowBytes(), 0, 0)) {
-        bitmap->reset();
+    if (!readPixels(
+                (*bitmap).info(), (*bitmap).getPixels(), (*bitmap).rowBytes(), 0, 0)) {
+        (*bitmap).reset();
         return false;
     }
 
-    bitmap->setImmutable();
+    (*bitmap).setImmutable();
     return true;
 }
 
@@ -89,30 +93,19 @@ sk_sp<SkImage> SkImage_Base::makeSubset(SkRecorder* recorder,
         return nullptr;
     }
 
-    const SkIRect bounds = SkIRect::MakeWH(this->width(), this->height());
+    const SkIRect bounds = SkIRect::MakeWH(width(), height());
     if (!bounds.contains(subset)) {
         return nullptr;
     }
 
-    return this->onMakeSubset(recorder, subset, requiredProps);
-}
-
-void SkImage_Base::onAsyncRescaleAndReadPixelsYUV420(SkYUVColorSpace,
-                                                     bool readAlpha,
-                                                     sk_sp<SkColorSpace> dstColorSpace,
-                                                     SkIRect srcRect,
-                                                     SkISize dstSize,
-                                                     RescaleGamma,
-                                                     RescaleMode,
-                                                     ReadPixelsCallback callback,
-                                                     ReadPixelsContext context) const {
-    // TODO: Call non-YUV asyncRescaleAndReadPixels and then make our callback convert to YUV and
-    // call client's callback.
-    callback(context, nullptr);
+    sk_sp<SkImage> image = onMakeSubset(recorder, subset, requiredProps);
+    return image;
 }
 
 sk_sp<SkImage> SkImage_Base::makeColorSpace(SkRecorder* recorder,
                                             sk_sp<SkColorSpace> target,
                                             RequiredProperties props) const {
-    return this->makeColorTypeAndColorSpace(recorder, this->colorType(), std::move(target), props);
+    const SkColorType targetType = colorType();
+    sk_sp<SkImage> image = makeColorTypeAndColorSpace(recorder, targetType, std::move(target), props);
+    return image;
 }

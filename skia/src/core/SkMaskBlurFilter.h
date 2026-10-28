@@ -26,7 +26,13 @@ public:
     // returns true iff the sigmas will result in an identity mask (no blurring)
     bool hasNoBlur() const;
 
-    // Given a src SkMask, generate dst SkMask returning the border width and height.
+    // Given a valid nonempty src mask, generate dst and return its border.
+    // Call only when hasNoBlur() is false. Below sigma 2 both sigmas must match.
+    // Admitted inputs are BW, A8, ARGB32 and LCD16 with naturally aligned pixels
+    // and valid row strides/extents. src and dst descriptors/storage cannot alias.
+    // dst must not own its previous allocation; the caller owns the produced
+    // pixels and must adopt them even when a later operation reports failure.
+    // Metadata-only input computes bounds without allocating pixel storage.
     SkIPoint blur(const SkMask& src, SkMaskBuilder* dst) const;
 
 private:

@@ -10,6 +10,7 @@
 #include "include/core/SkRefCnt.h"
 #include "include/private/SkAssert.h"
 #include "include/private/SkMalloc.h"
+#include "src/core/SkSafeMath.h"
 
 #include <cstring>
 
@@ -18,13 +19,8 @@ static void malloc_freeproc(void* context) {
 }
 
 // Makes empty table
-SkDataTable::SkDataTable() {
-    fCount = 0;
-    fElemSize = 0;   // 0 signals that we use fDir instead of fElems
-    fU.fDir = nullptr;
-    fFreeProc = nullptr;
-    fFreeProcContext = nullptr;
-}
+// fElemSize stays 0, which signals that we use fDir instead of fElems.
+SkDataTable::SkDataTable() = default;
 
 SkDataTable::SkDataTable(const void* array, size_t elemSize, int count,
                          FreeProc proc, void* context) {
@@ -32,7 +28,7 @@ SkDataTable::SkDataTable(const void* array, size_t elemSize, int count,
 
     fCount = count;
     fElemSize = elemSize;   // non-zero signals we use fElems instead of fDir
-    fU.fElems = (const char*)array;
+    fU.fElems = static_cast<const char*>(array);
     fFreeProc = proc;
     fFreeProcContext = context;
 }
@@ -54,7 +50,7 @@ SkDataTable::~SkDataTable() {
 }
 
 size_t SkDataTable::atSize(int index) const {
-    SkASSERT((unsigned)index < (unsigned)fCount);
+    SkASSERT_RELEASE(static_cast<unsigned>(index) < static_cast<unsigned>(fCount));
 
     if (fElemSize) {
         return fElemSize;
@@ -64,7 +60,7 @@ size_t SkDataTable::atSize(int index) const {
 }
 
 const void* SkDataTable::at(int index, size_t* size) const {
-    SkASSERT((unsigned)index < (unsigned)fCount);
+    SkASSERT_RELEASE(static_cast<unsigned>(index) < static_cast<unsigned>(fCount));
 
     if (fElemSize) {
         if (size) {
@@ -91,21 +87,26 @@ sk_sp<SkDataTable> SkDataTable::MakeCopyArrays(const void * const * ptrs,
     if (count <= 0) {
         return SkDataTable::MakeEmpty();
     }
+    SkASSERT_RELEASE(ptrs != nullptr && sizes != nullptr);
 
+    // The directory and the entries share one allocation; its size must not wrap.
+    SkSafeMath safe{};
     size_t dataSize = 0;
     for (int i = 0; i < count; ++i) {
-        dataSize += sizes[i];
+        SkASSERT_RELEASE(ptrs[i] != nullptr || sizes[i] == 0);
+        dataSize = safe.add(dataSize, sizes[i]);
     }
-
-    size_t bufferSize = count * sizeof(Dir) + dataSize;
+    const size_t bufferSize = safe.add(safe.mul(static_cast<size_t>(count), sizeof(Dir)),
+                                       dataSize);
+    SkASSERT_RELEASE(safe.ok());
     void* buffer = sk_malloc_throw(bufferSize);
 
-    Dir* dir = (Dir*)buffer;
-    char* elem = (char*)(dir + count);
+    Dir* dir = static_cast<Dir*>(buffer);
+    char* elem = reinterpret_cast<char*>(dir + count);
     for (int i = 0; i < count; ++i) {
         dir[i].fPtr = elem;
         dir[i].fSize = sizes[i];
-        memcpy(elem, ptrs[i], sizes[i]);
+        sk_careful_memcpy(elem, ptrs[i], sizes[i]);
         elem += sizes[i];
     }
 
@@ -116,10 +117,14 @@ sk_sp<SkDataTable> SkDataTable::MakeCopyArray(const void* array, size_t elemSize
     if (count <= 0) {
         return SkDataTable::MakeEmpty();
     }
+    // An element size of 0 would make the table read its storage as a directory.
+    SkASSERT_RELEASE(elemSize > 0 && array != nullptr);
 
-    size_t bufferSize = elemSize * count;
+    SkSafeMath safe{};
+    const size_t bufferSize = safe.mul(elemSize, static_cast<size_t>(count));
+    SkASSERT_RELEASE(safe.ok());
     void* buffer = sk_malloc_throw(bufferSize);
-    memcpy(buffer, array, bufferSize);
+    std::memcpy(buffer, array, bufferSize);
 
     return sk_sp<SkDataTable>(new SkDataTable(buffer, elemSize, count, malloc_freeproc, buffer));
 }
@@ -129,5 +134,7 @@ sk_sp<SkDataTable> SkDataTable::MakeArrayProc(const void* array, size_t elemSize
     if (count <= 0) {
         return SkDataTable::MakeEmpty();
     }
+    // An element size of 0 would make the table read the caller's array as a directory.
+    SkASSERT_RELEASE(elemSize > 0 && array != nullptr);
     return sk_sp<SkDataTable>(new SkDataTable(array, elemSize, count, proc, ctx));
 }

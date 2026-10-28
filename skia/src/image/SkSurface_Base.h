@@ -16,70 +16,38 @@
 #include "include/core/SkScalar.h"
 #include "include/core/SkSurface.h"
 #include "include/core/SkTypes.h"
-#include "include/private/SkPixelStorage.h"
-#include "src/capture/SkCaptureManager.h"
 #include "src/image/SkImage_Base.h"
 
 #include <cstdint>
 #include <memory>
 
-class GrBackendSemaphore;
-class GrBackendTexture;
-class GrRecordingContext;
-class SkCapabilities;
-class SkColorSpace;
 class SkPaint;
 class SkPixmap;
-class GrSurfaceCharacterization;
 class SkSurfaceProps;
-enum GrSurfaceOrigin : int;
-enum SkYUVColorSpace : int;
-namespace skgpu { namespace graphite { class Recorder; } }
 struct SkIRect;
-struct SkISize;
 struct SkImageInfo;
 
 class SkSurface_Base : public SkSurface {
 public:
-    SkSurface_Base(int width, int height, const SkSurfaceProps*, sk_sp<SkPixelStorage>);
-    SkSurface_Base(const SkImageInfo&, const SkSurfaceProps*, sk_sp<SkPixelStorage>);
+    SkSurface_Base(int width, int height, const SkSurfaceProps*);
+    SkSurface_Base(const SkImageInfo&, const SkSurfaceProps*);
     ~SkSurface_Base() override;
-
-    // From SkSurface.h
-    bool replaceBackendTexture(const GrBackendTexture&,
-                               GrSurfaceOrigin,
-                               ContentChangeMode,
-                               TextureReleaseProc,
-                               ReleaseContext) override {
-        return false;
-    }
 
     enum class Type {
         kNull,     // intentionally associating 0 with a null canvas
-        kGanesh,
-        kGraphite,
         kRaster,
     };
 
     virtual Type type() const = 0;
 
     // True for surfaces instantiated by pixels in CPU memory
-    bool isRasterBacked() const { return this->type() == Type::kRaster; }
-    // True for surfaces instantiated by Ganesh in GPU memory
-    bool isGaneshBacked() const { return this->type() == Type::kGanesh; }
-    // True for surfaces instantiated by Graphite in GPU memory
-    bool isGraphiteBacked() const { return this->type() == Type::kGraphite; }
-
-    virtual GrRecordingContext* onGetRecordingContext() const;
-    virtual skgpu::graphite::Recorder* onGetRecorder() const;
+    bool isRasterBacked() const {
+        const bool matches = type() == Type::kRaster;
+        return matches;
+    }
     virtual SkRecorder* onGetBaseRecorder() const;
 
-    /**
-     *  Allocate a canvas that will draw into this surface. We will cache this
-     *  canvas, to return the same object to the caller multiple times. We
-     *  take ownership, and will call unref() on the canvas when we go out of
-     *  scope.
-     */
+    // Returns a newly allocated canvas whose ownership transfers to this surface.
     virtual SkCanvas* onNewCanvas() = 0;
 
     virtual sk_sp<SkSurface> onNewSurface(const SkImageInfo&) = 0;
@@ -95,7 +63,10 @@ public:
      */
     virtual sk_sp<SkImage> onNewImageSnapshot(const SkIRect* subset = nullptr) { return nullptr; }
 
-    virtual sk_sp<SkImage> onMakeTemporaryImage() { return this->makeImageSnapshot(); }
+    virtual sk_sp<SkImage> onMakeTemporaryImage() {
+        sk_sp<SkImage> image = makeImageSnapshot();
+        return image;
+    }
 
     virtual void onWritePixels(const SkPixmap&, int x, int y) = 0;
 
@@ -108,28 +79,7 @@ public:
                                              RescaleMode,
                                              ReadPixelsCallback,
                                              ReadPixelsContext);
-    /**
-     * Default implementation does a rescale/read/yuv conversion and then calls the callback.
-     */
-    virtual void onAsyncRescaleAndReadPixelsYUV420(SkYUVColorSpace,
-                                                   bool readAlpha,
-                                                   sk_sp<SkColorSpace> dstColorSpace,
-                                                   SkIRect srcRect,
-                                                   SkISize dstSize,
-                                                   RescaleGamma,
-                                                   RescaleMode,
-                                                   ReadPixelsCallback,
-                                                   ReadPixelsContext);
-
-    /**
-     *  Default implementation:
-     *
-     *  image = this->newImageSnapshot();
-     *  if (image) {
-     *      image->draw(canvas, ...);
-     *      image->unref();
-     *  }
-     */
+    // Draw a temporary owned snapshot into the supplied canvas synchronously.
     virtual void onDraw(SkCanvas*, SkScalar x, SkScalar y, const SkSamplingOptions&,const SkPaint*);
 
     /**
@@ -153,46 +103,22 @@ public:
      */
     virtual void onRestoreBackingMutability() {}
 
-    /**
-     * Caused the current backend 3D API to wait on the passed in semaphores before executing new
-     * commands on the gpu. Any previously submitting commands will not be blocked by these
-     * semaphores.
-     */
-    virtual bool onWait(int numSemaphores, const GrBackendSemaphore* waitSemaphores,
-                        bool deleteSemaphoresAfterWait) {
-        return false;
-    }
-
-    virtual bool onCharacterize(GrSurfaceCharacterization*) const { return false; }
-    virtual bool onIsCompatible(const GrSurfaceCharacterization&) const { return false; }
-
-    virtual sk_sp<const SkCapabilities> onCapabilities() = 0;
-
-    sk_sp<SkPixelStorage> getPixelStorage() const { return fPixelStorage; }
-
-    /**
-     * If capturing, signals to the capture manager and capture canvas to break off the recording
-     * SkPicture into a new SkPicture.
-     */
-    void createCaptureBreakpoint();
-
     inline SkCanvas* getCachedCanvas();
     inline sk_sp<SkImage> refCachedImage();
 
-    bool hasCachedImage() const { return fCachedImage != nullptr; }
+    bool hasCachedImage() const {
+        const bool present = fCachedImage != nullptr;
+        return present;
+    }
 
     // called by SkSurface to compute a new genID
     uint32_t newGenerationID();
 
 private:
-    // fCachedCanvas is the raw pointer to the canvas that is returned to the client.
-    // It can point to either the base canvas or a capture canvas wrapper.
-    SkCanvas* fCachedCanvas = nullptr;
-    // SkSurface_Base must always own the base canvas. During capture, SkCaptureManager owns any
-    // wrapping capture canvas that fCachedCanvas may point to.
-    std::unique_ptr<SkCanvas> fOwnedBaseCanvas = nullptr;
-    sk_sp<SkImage>            fCachedImage  = nullptr;
-
+    // Canvas ownership is exclusive; getCachedCanvas returns a borrow valid only
+    // while this surface lives. Snapshot images may independently outlive it.
+    std::unique_ptr<SkCanvas> fCanvas = nullptr;
+    sk_sp<SkImage> fCachedImage = nullptr;
 
     // Returns false if drawing should not take place (allocation failure).
     [[nodiscard]] bool aboutToDraw(ContentChangeMode mode);
@@ -204,45 +130,36 @@ private:
     friend class SkCanvas;
     friend class SkSurface;
 
-protected:
-    sk_sp<SkPixelStorage>     fPixelStorage = nullptr;
 };
 
 SkCanvas* SkSurface_Base::getCachedCanvas() {
-    if (nullptr == fCachedCanvas) {
-        fOwnedBaseCanvas = std::unique_ptr<SkCanvas>(this->onNewCanvas());
-        if (fOwnedBaseCanvas) {
-            fOwnedBaseCanvas->setSurfaceBase(this);
-        }
-        // Try to wrap base canvas in capture wrapper
-        if (this->baseRecorder()) {
-            fCachedCanvas = this->baseRecorder()->makeCaptureCanvas(fOwnedBaseCanvas.get());
-        }
-        if (!fCachedCanvas) {
-            fCachedCanvas = fOwnedBaseCanvas.get();
+    if (!fCanvas) {
+        SkCanvas* created = onNewCanvas();
+        fCanvas.reset(created);
+        if (fCanvas) {
+            (*fCanvas).setSurfaceBase(this);
         }
     }
-    return fCachedCanvas;
+    SkCanvas* canvas = fCanvas.get();
+    return canvas;
 }
 
 sk_sp<SkImage> SkSurface_Base::refCachedImage() {
-    if (fCachedImage) {
-        return fCachedImage;
+    if (!fCachedImage) {
+        fCachedImage = onNewImageSnapshot();
     }
-    this->createCaptureBreakpoint();
-
-    fCachedImage = this->onNewImageSnapshot();
-
-    SkASSERT(!fCachedCanvas || fCachedCanvas->getSurfaceBase() == this);
+    SkASSERT(!fCanvas || (*fCanvas).getSurfaceBase() == this);
     return fCachedImage;
 }
 
 static inline SkSurface_Base* asSB(SkSurface* surface) {
-    return static_cast<SkSurface_Base*>(surface);
+    SkSurface_Base* base = static_cast<SkSurface_Base*>(surface);
+    return base;
 }
 
 static inline const SkSurface_Base* asConstSB(const SkSurface* surface) {
-    return static_cast<const SkSurface_Base*>(surface);
+    const SkSurface_Base* base = static_cast<const SkSurface_Base*>(surface);
+    return base;
 }
 
 #endif

@@ -11,10 +11,11 @@
 #include "include/core/SkColor.h"
 #include "include/core/SkRect.h"
 #include "include/private/SkAssert.h"
+#include "include/private/SkDebug.h"
 #include "src/core/SkAutoMalloc.h"
 #include "src/core/SkBlitter.h"
+
 #include <cstdint>
-#include "include/private/SkDebug.h"
 
 class SkPath;
 class SkRegion;
@@ -55,15 +56,13 @@ public:
     void copyToMask(SkMaskBuilder*) const;
 
     bool quickContains(const SkIRect& r) const {
-        return this->quickContains(r.fLeft, r.fTop, r.fRight, r.fBottom);
+        return (*this).quickContains(r.fLeft, r.fTop, r.fRight, r.fBottom);
     }
 
 #ifdef SK_DEBUG
     void validate() const;
-    void debug(bool compress_y=false) const;
 #else
     void validate() const {}
-    void debug(bool compress_y=false) const {}
 #endif
 
 private:
@@ -71,8 +70,9 @@ private:
     struct RunHead;
     friend class SkAAClipBlitter;
 
-    SkIRect  fBounds;
-    RunHead* fRunHead;
+    SkIRect  fBounds = {0, 0, 0, 0};
+    // Shared, reference-counted runs released by freeRuns(); nullptr when empty.
+    RunHead* fRunHead = nullptr;
 
     void freeRuns();
 
@@ -91,14 +91,18 @@ private:
 
 class SkAAClipBlitter : public SkBlitter {
 public:
-    SkAAClipBlitter() : fScanlineScratch(nullptr) {}
+    SkAAClipBlitter() = default;
     ~SkAAClipBlitter() override;
 
+    SkAAClipBlitter(const SkAAClipBlitter&) = delete;
+    SkAAClipBlitter& operator=(const SkAAClipBlitter&) = delete;
+
+    // Borrows both: the blitter and the clip must outlive this blitter's use.
     void init(SkBlitter* blitter, const SkAAClip* aaclip) {
-        SkASSERT(aaclip && !aaclip->isEmpty());
+        SkASSERT(aaclip && !(*aaclip).isEmpty());
         fBlitter = blitter;
         fAAClip = aaclip;
-        fAAClipBounds = aaclip->getBounds();
+        fAAClipBounds = (*aaclip).getBounds();
     }
 
     void blitH(int x, int y, int width) override;
@@ -108,21 +112,19 @@ public:
     void blitMask(const SkMask&, const SkIRect& clip) override;
 
 private:
-    SkBlitter*      fBlitter;
-    const SkAAClip* fAAClip;
-    SkIRect         fAAClipBounds;
+    SkBlitter*      fBlitter = nullptr;
+    const SkAAClip* fAAClip = nullptr;
+    SkIRect         fAAClipBounds{};
 
     // point into fScanlineScratch
-    int16_t*        fRuns;
-    SkAlpha*        fAA;
+    int16_t*        fRuns = nullptr;
+    SkAlpha*        fAA = nullptr;
 
-    enum {
-        kSize = 32 * 32
-    };
+    static constexpr size_t kSize = 32 * 32;
     SkAutoSMalloc<kSize> fGrayMaskScratch;  // used for blitMask
-    void* fScanlineScratch;  // enough for a mask at 32bit, or runs+aa
+    SkAutoMalloc fScanlineScratch;  // enough for a mask at 32bit, or runs+aa
 
-    void ensureRunsAndAA();
+    void ensureScratch(int activeWidth);
 };
 
 #endif

@@ -13,10 +13,10 @@
 bool SkWritePixelsRec::trim(int dstWidth, int dstHeight) {
     // fInfo.minRowBytes() returns 0 if the size doesn't fit in `size_t`.
     const size_t minRowBytes = fInfo.minRowBytes();
-    if (nullptr == fPixels || fRowBytes < minRowBytes || minRowBytes == 0) {
+    if (fPixels == nullptr || fRowBytes < minRowBytes || minRowBytes == 0) {
         return false;
     }
-    if (0 >= fInfo.width() || 0 >= fInfo.height()) {
+    if (fInfo.width() <= 0 || fInfo.height() <= 0) {
         return false;
     }
     // negating the largest negative integer (below) is UB
@@ -38,17 +38,21 @@ bool SkWritePixelsRec::trim(int dstWidth, int dstHeight) {
     if (y > 0) {
         y = 0;
     }
-    // here x,y are either 0 or negative (safe to cast to size_t)
-    // we negate and add them so UBSAN (pointer-overflow) doesn't get confused.
+    // x and y are nonpositive and cannot be INT_MIN. Convert their magnitudes
+    // to byte offsets before changing the pointer or the published rectangle.
     SkSafeMath safeMath;
-    const size_t y_offset = safeMath.mul(-y, fRowBytes);
-    const size_t x_offset = safeMath.mul(-x, fInfo.bytesPerPixel());
+    const size_t skipped_rows = static_cast<size_t>(-y);
+    const size_t skipped_columns = static_cast<size_t>(-x);
+    const size_t pixel_bytes = static_cast<size_t>(fInfo.bytesPerPixel());
+    const size_t y_offset = safeMath.mul(skipped_rows, fRowBytes);
+    const size_t x_offset = safeMath.mul(skipped_columns, pixel_bytes);
     const size_t total = safeMath.add(y_offset, x_offset);
     if (!safeMath.ok()) {
         return false;
     }
 
-    fPixels = ((const char*)fPixels + total);
+    const char* pixels = static_cast<const char*>(fPixels);
+    fPixels = pixels + total;
     // the intersect may have shrunk info's logical size
     fInfo = fInfo.makeDimensions(dstR.size());
     fX = dstR.x();

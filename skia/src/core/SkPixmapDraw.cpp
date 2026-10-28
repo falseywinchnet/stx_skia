@@ -12,6 +12,7 @@
 #include "include/core/SkBlendMode.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkImageInfo.h"
+#include "include/core/SkImage.h"
 #include "include/core/SkMatrix.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPixmap.h"
@@ -28,8 +29,8 @@ struct SkSamplingOptions;
 
 bool SkPixmap::scalePixels(const SkPixmap& actualDst, const SkSamplingOptions& sampling) const {
     // We may need to tweak how we interpret these just a little below, so we make copies.
-    SkPixmap src = *this,
-             dst = actualDst;
+    SkPixmap src = *this;
+    SkPixmap dst = actualDst;
 
     // Can't do anthing with empty src or dst
     if (src.width() <= 0 || src.height() <= 0 ||
@@ -39,7 +40,8 @@ bool SkPixmap::scalePixels(const SkPixmap& actualDst, const SkSamplingOptions& s
 
     // no scaling involved?
     if (src.width() == dst.width() && src.height() == dst.height()) {
-        return src.readPixels(dst);
+        const bool copied = src.readPixels(dst);
+        return copied;
     }
 
     // If src and dst are both unpremul, we'll fake the source out to appear as if premul,
@@ -49,8 +51,10 @@ bool SkPixmap::scalePixels(const SkPixmap& actualDst, const SkSamplingOptions& s
     bool clampAsIfUnpremul = false;
     if (src.alphaType() == kUnpremul_SkAlphaType &&
         dst.alphaType() == kUnpremul_SkAlphaType) {
-        src.reset(src.info().makeAlphaType(kPremul_SkAlphaType), src.addr(), src.rowBytes());
-        dst.reset(dst.info().makeAlphaType(kOpaque_SkAlphaType), dst.addr(), dst.rowBytes());
+        const SkImageInfo src_info = src.info().makeAlphaType(kPremul_SkAlphaType);
+        const SkImageInfo dst_info = dst.info().makeAlphaType(kOpaque_SkAlphaType);
+        src.reset(src_info, src.addr(), src.rowBytes());
+        dst.reset(dst_info, dst.addr(), dst.rowBytes());
 
         // We'll need to tell the image shader to clamp to [0,1] instead of the
         // usual [0,a] when using a bicubic scaling (kHigh_SkFilterQuality).
@@ -63,10 +67,12 @@ bool SkPixmap::scalePixels(const SkPixmap& actualDst, const SkSamplingOptions& s
     }
     bitmap.setImmutable();        // Don't copy when we create an image.
 
-    SkMatrix scale = SkMatrix::RectToRectOrIdentity(SkRect::Make(src.bounds()),
-                                                    SkRect::Make(dst.bounds()));
+    const SkRect src_rect = SkRect::Make(src.bounds());
+    const SkRect dst_rect = SkRect::Make(dst.bounds());
+    SkMatrix scale = SkMatrix::RectToRectOrIdentity(src_rect, dst_rect);
+    sk_sp<SkImage> image = bitmap.asImage();
 
-    sk_sp<SkShader> shader = SkImageShader::Make(bitmap.asImage(),
+    sk_sp<SkShader> shader = SkImageShader::Make(std::move(image),
                                                  SkTileMode::kClamp,
                                                  SkTileMode::kClamp,
                                                  sampling,
@@ -82,6 +88,7 @@ bool SkPixmap::scalePixels(const SkPixmap& actualDst, const SkSamplingOptions& s
     SkPaint paint;
     paint.setBlendMode(SkBlendMode::kSrc);
     paint.setShader(std::move(shader));
-    surface->getCanvas()->drawPaint(paint);
+    SkCanvas* canvas = (*surface).getCanvas();
+    (*canvas).drawPaint(paint);
     return true;
 }

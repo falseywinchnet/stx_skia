@@ -49,9 +49,14 @@ public:
        Normally this is called once with 'dst' nullptr to get the required size, then again with an
        allocated 'dst' pointer to do the actual encoding.
 
+       src is exactly srcLength bytes and needs no terminating NUL. src and dst
+       must not overlap and the input must remain unchanged during this call.
+       Whitespace is ignored; two or three final symbols may omit padding.
+
        @param dst nullptr or a pointer to a buffer large enough to receive the result
 
-       @param dstLength assigned the length dst is required to be. Must not be nullptr.
+       @param dstLength assigned the required length on success, zero on failure.
+                        Must not be nullptr. Failure leaves dst unchanged.
     */
     [[nodiscard]] static Error Decode(const void* src, size_t  srcLength,
                                       void* dst, size_t* dstLength);

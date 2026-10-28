@@ -22,12 +22,6 @@ class SkPath;
 class SkPathBuilder;
 struct SkRect;
 
-#ifdef SK_DEBUG
-extern bool gDebugStrokerErrorSet;
-extern SkScalar gDebugStrokerError;
-extern int gMaxRecursion[];
-#endif
-
 /** \class SkStroke
     SkStroke is the utility class that constructs paths by stroking
     geometries (lines, rects, ovals, roundrects, paths). This is
@@ -40,17 +34,23 @@ public:
     explicit SkStroke(const SkPaint&);
     SkStroke(const SkPaint&, SkScalar width);   // width overrides paint.getStrokeWidth()
 
-    SkPaint::Cap getCap() const { return (SkPaint::Cap)fCap; }
+    SkPaint::Cap getCap() const {
+        const SkPaint::Cap cap = static_cast<SkPaint::Cap>(fCap);
+        return cap;
+    }
     void         setCap(SkPaint::Cap);
 
-    SkPaint::Join getJoin() const { return (SkPaint::Join)fJoin; }
+    SkPaint::Join getJoin() const {
+        const SkPaint::Join join = static_cast<SkPaint::Join>(fJoin);
+        return join;
+    }
     void          setJoin(SkPaint::Join);
 
     void    setMiterLimit(SkScalar);
     void    setWidth(SkScalar);
 
-    bool    getDoFill() const { return SkToBool(fDoFill); }
-    void    setDoFill(bool doFill) { fDoFill = SkToU8(doFill); }
+    bool    getDoFill() const { return fDoFill; }
+    void    setDoFill(bool doFill) { fDoFill = doFill; }
 
     /**
      *  ResScale is the "intended" resolution for the output.
@@ -76,10 +76,12 @@ public:
     ////////////////////////////////////////////////////////////////
 
 private:
-    SkScalar    fWidth, fMiterLimit;
-    SkScalar    fResScale;
-    uint8_t     fCap, fJoin;
-    bool        fDoFill;
+    SkScalar    fWidth = 0;
+    SkScalar    fMiterLimit = 0;
+    SkScalar    fResScale = 1;
+    uint8_t     fCap = 0;
+    uint8_t     fJoin = 0;
+    bool        fDoFill = false;
 
     friend class SkPaint;
 };

@@ -147,8 +147,9 @@ public:
     SkAlphaType alphaType() const { return fAlphaType; }
 
     bool isOpaque() const {
-        return SkAlphaTypeIsOpaque(fAlphaType)
-            || SkColorTypeIsAlwaysOpaque(fColorType);
+        if (SkAlphaTypeIsOpaque(fAlphaType)) return true;
+        const bool opaque = SkColorTypeIsAlwaysOpaque(fColorType);
+        return opaque;
     }
 
     bool gammaCloseToSRGB() const;
@@ -253,10 +254,12 @@ public:
         @return        created SkImageInfo
     */
     static SkImageInfo Make(SkISize dimensions, const SkColorInfo& colorInfo) {
-        return SkImageInfo(dimensions, colorInfo);
+        SkImageInfo result = SkImageInfo(dimensions, colorInfo);
+        return result;
     }
     static SkImageInfo Make(SkISize dimensions, SkColorInfo&& colorInfo) {
-        return SkImageInfo(dimensions, std::move(colorInfo));
+        SkImageInfo result = SkImageInfo(dimensions, std::move(colorInfo));
+        return result;
     }
 
     /** Creates SkImageInfo from integral dimensions width and height, kN32_SkColorType,
@@ -361,24 +364,37 @@ public:
         @return  created SkImageInfo
     */
     static SkImageInfo MakeUnknown() {
-        return MakeUnknown(0, 0);
+        SkImageInfo result = MakeUnknown(0, 0);
+        return result;
     }
 
     /** Returns pixel count in each row.
 
         @return  pixel width
     */
-    int width() const { return fDimensions.width(); }
+    int width() const {
+        const int result = fDimensions.width();
+        return result;
+    }
 
     /** Returns pixel row count.
 
         @return  pixel height
     */
-    int height() const { return fDimensions.height(); }
+    int height() const {
+        const int result = fDimensions.height();
+        return result;
+    }
 
-    SkColorType colorType() const { return fColorInfo.colorType(); }
+    SkColorType colorType() const {
+        const SkColorType result = fColorInfo.colorType();
+        return result;
+    }
 
-    SkAlphaType alphaType() const { return fColorInfo.alphaType(); }
+    SkAlphaType alphaType() const {
+        const SkAlphaType result = fColorInfo.alphaType();
+        return result;
+    }
 
     /** Returns SkColorSpace, the range of colors. The reference count of
         SkColorSpace is unchanged. The returned SkColorSpace is immutable.
@@ -402,7 +418,10 @@ public:
 
         @return  true if either dimension is zero or smaller
     */
-    bool isEmpty() const { return fDimensions.isEmpty(); }
+    bool isEmpty() const {
+        const bool result = fDimensions.isEmpty();
+        return result;
+    }
 
     /** Returns the dimensionless SkColorInfo that represents the same color type,
         alpha type, and color space as this SkImageInfo.
@@ -418,7 +437,10 @@ public:
 
         @return  true if SkAlphaType is kOpaque_SkAlphaType
     */
-    bool isOpaque() const { return fColorInfo.isOpaque(); }
+    bool isOpaque() const {
+        const bool result = fColorInfo.isOpaque();
+        return result;
+    }
 
     /** Returns SkISize { width(), height() }.
 
@@ -430,7 +452,10 @@ public:
 
         @return  integral rectangle from origin to width() and height()
     */
-    SkIRect bounds() const { return SkIRect::MakeSize(fDimensions); }
+    SkIRect bounds() const {
+        const SkIRect result = SkIRect::MakeSize(fDimensions);
+        return result;
+    }
 
     /** Returns true if associated SkColorSpace is not nullptr, and SkColorSpace gamma
         is approximately the same as sRGB.
@@ -438,7 +463,10 @@ public:
 
         @return  true if SkColorSpace gamma is approximately the same as sRGB
     */
-    bool gammaCloseToSRGB() const { return fColorInfo.gammaCloseToSRGB(); }
+    bool gammaCloseToSRGB() const {
+        const bool result = fColorInfo.gammaCloseToSRGB();
+        return result;
+    }
 
     /** Creates SkImageInfo with the same SkColorType, SkColorSpace, and SkAlphaType,
         with dimensions set to width and height.
@@ -448,7 +476,8 @@ public:
         @return           created SkImageInfo
     */
     SkImageInfo makeWH(int newWidth, int newHeight) const {
-        return Make({newWidth, newHeight}, fColorInfo);
+        SkImageInfo result = Make({newWidth, newHeight}, fColorInfo);
+        return result;
     }
 
     /** Creates SkImageInfo with the same SkColorType, SkColorSpace, and SkAlphaType,
@@ -458,7 +487,8 @@ public:
         @return          created SkImageInfo
     */
     SkImageInfo makeDimensions(SkISize newSize) const {
-        return Make(newSize, fColorInfo);
+        SkImageInfo result = Make(newSize, fColorInfo);
+        return result;
     }
 
     /** Creates SkImageInfo with same SkColorType, SkColorSpace, width, and height,
@@ -470,7 +500,9 @@ public:
         @return              created SkImageInfo
     */
     SkImageInfo makeAlphaType(SkAlphaType newAlphaType) const {
-        return Make(fDimensions, fColorInfo.makeAlphaType(newAlphaType));
+        SkColorInfo color = fColorInfo.makeAlphaType(newAlphaType);
+        SkImageInfo result = Make(fDimensions, std::move(color));
+        return result;
     }
 
     /** Creates SkImageInfo with same SkAlphaType, SkColorSpace, width, and height,
@@ -479,7 +511,9 @@ public:
         @return              created SkImageInfo
     */
     SkImageInfo makeColorType(SkColorType newColorType) const {
-        return Make(fDimensions, fColorInfo.makeColorType(newColorType));
+        SkColorInfo color = fColorInfo.makeColorType(newColorType);
+        SkImageInfo result = Make(fDimensions, std::move(color));
+        return result;
     }
 
     /** Creates SkImageInfo with same SkAlphaType, SkColorType, width, and height,
@@ -495,14 +529,20 @@ public:
 
         @return  bytes in pixel
     */
-    int bytesPerPixel() const { return fColorInfo.bytesPerPixel(); }
+    int bytesPerPixel() const {
+        const int result = fColorInfo.bytesPerPixel();
+        return result;
+    }
 
     /** Returns bit shift converting row bytes to row pixels.
         Returns zero for kUnknown_SkColorType.
 
         @return  one of: 0, 1, 2, 3; left shift to convert pixels to bytes
     */
-    int shiftPerPixel() const { return fColorInfo.shiftPerPixel(); }
+    int shiftPerPixel() const {
+        const int result = fColorInfo.shiftPerPixel();
+        return result;
+    }
 
     /** Returns minimum bytes per row, computed from pixel width() and SkColorType, which
         specifies bytesPerPixel(). SkBitmap maximum value for row bytes must fit
@@ -511,7 +551,9 @@ public:
         @return  width() times bytesPerPixel() as unsigned 64-bit integer
     */
     uint64_t minRowBytes64() const {
-        return (uint64_t)sk_64_mul(this->width(), this->bytesPerPixel());
+        const int64_t bytes = sk_64_mul(width(), bytesPerPixel());
+        const uint64_t result = static_cast<uint64_t>(bytes);
+        return result;
     }
 
     /** Returns minimum bytes per row, computed from pixel width() and SkColorType, which
@@ -521,11 +563,12 @@ public:
         @return  width() times bytesPerPixel() as size_t
     */
     size_t minRowBytes() const {
-        uint64_t minRowBytes = this->minRowBytes64();
+        const uint64_t minRowBytes = minRowBytes64();
         if (!SkTFitsIn<int32_t>(minRowBytes)) {
             return 0;
         }
-        return (size_t)minRowBytes;
+        const size_t bytes = static_cast<size_t>(minRowBytes);
+        return bytes;
     }
 
     /** Returns byte offset of pixel from pixel base address.
@@ -549,7 +592,9 @@ public:
         @return       true if SkImageInfo equals other
     */
     bool operator==(const SkImageInfo& other) const {
-        return fDimensions == other.fDimensions && fColorInfo == other.fColorInfo;
+        if (fDimensions != other.fDimensions) return false;
+        const bool equal_color = fColorInfo == other.fColorInfo;
+        return equal_color;
     }
 
     /** Compares SkImageInfo with other, and returns true if width, height, SkColorType,
@@ -559,14 +604,15 @@ public:
         @return       true if SkImageInfo is not equal to other
     */
     bool operator!=(const SkImageInfo& other) const {
-        return !(*this == other);
+        const bool different = !(*this == other);
+        return different;
     }
 
     /** Returns storage required by pixel array, given SkImageInfo dimensions, SkColorType,
         and rowBytes. rowBytes is assumed to be at least as large as minRowBytes().
 
         Returns zero if height is zero.
-        Returns SIZE_MAX if answer exceeds the range of size_t.
+        Returns SIZE_MAX if the answer exceeds size_t or the CPU signed-32-bit byte limit.
 
         @param rowBytes  size of pixel row or larger
         @return          memory required by pixel buffer
@@ -577,12 +623,14 @@ public:
         SkColorType. Uses minRowBytes() to compute bytes for pixel row.
 
         Returns zero if height is zero.
-        Returns SIZE_MAX if answer exceeds the range of size_t.
+        Returns SIZE_MAX if the answer exceeds size_t or the CPU signed-32-bit byte limit.
 
         @return  least memory required by pixel buffer
     */
     size_t computeMinByteSize() const {
-        return this->computeByteSize(this->minRowBytes());
+        const size_t row_bytes = minRowBytes();
+        const size_t bytes = computeByteSize(row_bytes);
+        return bytes;
     }
 
     /** Returns true if byteSize equals SIZE_MAX. computeByteSize() and
@@ -592,7 +640,8 @@ public:
         @return          true if computeByteSize() or computeMinByteSize() result exceeds size_t
     */
     static bool ByteSizeOverflowed(size_t byteSize) {
-        return SIZE_MAX == byteSize;
+        const bool overflowed = byteSize == SIZE_MAX;
+        return overflowed;
     }
 
     /** Returns true if rowBytes is valid for this SkImageInfo.
@@ -602,12 +651,13 @@ public:
                          aligned
     */
     bool validRowBytes(size_t rowBytes) const {
-        if (rowBytes < this->minRowBytes64()) {
+        if (rowBytes < minRowBytes64()) {
             return false;
         }
-        int shift = this->shiftPerPixel();
-        size_t alignedRowBytes = rowBytes >> shift << shift;
-        return alignedRowBytes == rowBytes;
+        const int shift = shiftPerPixel();
+        const size_t alignedRowBytes = rowBytes >> shift << shift;
+        const bool aligned = alignedRowBytes == rowBytes;
+        return aligned;
     }
 
     /** Creates an empty SkImageInfo with kUnknown_SkColorType, kUnknown_SkAlphaType,

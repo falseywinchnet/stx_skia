@@ -49,11 +49,14 @@ public:
      * provided variable.
      */
     static double EvalAt(double A, double B, double C, double D, double t) {
-        return std::fma(t, std::fma(t, std::fma(t, A, B), C), D);
+        const double value = std::fma(t, std::fma(t, std::fma(t, A, B), C), D);
+        return value;
     }
 
-    static double EvalAt(double coefficients[4], double t) {
-        return EvalAt(coefficients[0], coefficients[1], coefficients[2], coefficients[3], t);
+    static double EvalAt(const double coefficients[4], double t) {
+        const double value =
+                EvalAt(coefficients[0], coefficients[1], coefficients[2], coefficients[3], t);
+        return value;
     }
 };
 

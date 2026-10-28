@@ -7,19 +7,16 @@
 #include "include/core/SkCPURecorder.h"
 
 #include "include/core/SkTypes.h"
-#include "src/capture/SkCaptureManager.h"
 #include "src/core/SkCPUContextImpl.h"
 
 #include <memory>
 
 namespace skcpu {
 
+// The process-wide recorder lives until exit; surfaces and devices borrow it.
 Recorder* Recorder::TODO() {
-    static Recorder* gRecorder = ContextImpl::TODO()->makeRecorder().release();
+    static Recorder* gRecorder = (*ContextImpl::TODO()).makeRecorder().release();
     return gRecorder;
-}
-
-void Recorder::createCaptureBreakpoint(SkSurface*) {
 }
 
 }  // namespace skcpu

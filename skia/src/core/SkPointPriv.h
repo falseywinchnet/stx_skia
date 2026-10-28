@@ -11,30 +11,24 @@
 #include "include/core/SkPoint.h"
 #include "include/core/SkRect.h"
 
+// Point helpers retained by stroking, dashing, curve evaluation and distance fields.
+// Pointer arguments name one writable point; source and destination may be the same point.
 class SkPointPriv {
 public:
-    enum Side {
-        kLeft_Side  = -1,
-        kOn_Side    =  0,
-        kRight_Side =  1,
-    };
-
+    // Returns true when every coordinate of the count points is finite.
+    // A count of zero or less is vacuously finite and reads no points.
     static bool AreFinite(const SkPoint array[], int count) {
-        return SkIsFinite(&array[0].fX, count << 1);
+        for (int i = 0; i < count; ++i) {
+            if (!array[i].isFinite()) {
+                return false;
+            }
+        }
+        return true;
     }
-
-    static const SkScalar* AsScalars(const SkPoint& pt) { return &pt.fX; }
 
     static bool CanNormalize(SkScalar dx, SkScalar dy) {
-        return SkIsFinite(dx, dy) && (dx || dy);
-    }
-
-    static SkScalar DistanceToLineBetweenSqd(const SkPoint& pt, const SkPoint& a,
-                                             const SkPoint& b, Side* side = nullptr);
-
-    static SkScalar DistanceToLineBetween(const SkPoint& pt, const SkPoint& a,
-                                          const SkPoint& b, Side* side = nullptr) {
-        return SkScalarSqrt(DistanceToLineBetweenSqd(pt, a, b, side));
+        const bool normalizable = SkIsFinite(dx, dy) && (dx || dy);
+        return normalizable;
     }
 
     static SkScalar DistanceToLineSegmentBetweenSqd(const SkPoint& pt, const SkPoint& a,
@@ -42,86 +36,56 @@ public:
 
     static SkScalar DistanceToLineSegmentBetween(const SkPoint& pt, const SkPoint& a,
                                                  const SkPoint& b) {
-        return SkScalarSqrt(DistanceToLineSegmentBetweenSqd(pt, a, b));
+        const SkScalar distanceSquared = DistanceToLineSegmentBetweenSqd(pt, a, b);
+        const SkScalar distance = SkScalarSqrt(distanceSquared);
+        return distance;
     }
 
     static SkScalar DistanceToSqd(const SkPoint& pt, const SkPoint& a) {
-        SkScalar dx = pt.fX - a.fX;
-        SkScalar dy = pt.fY - a.fY;
-        return dx * dx + dy * dy;
+        const SkScalar dx = pt.fX - a.fX;
+        const SkScalar dy = pt.fY - a.fY;
+        const SkScalar distanceSquared = dx * dx + dy * dy;
+        return distanceSquared;
     }
 
     static bool EqualsWithinTolerance(const SkPoint& p1, const SkPoint& p2) {
-        return !CanNormalize(p1.fX - p2.fX, p1.fY - p2.fY);
+        const bool equal = !CanNormalize(p1.fX - p2.fX, p1.fY - p2.fY);
+        return equal;
     }
 
     static bool EqualsWithinTolerance(const SkPoint& pt, const SkPoint& p, SkScalar tol) {
-        return SkScalarNearlyZero(pt.fX - p.fX, tol)
-               && SkScalarNearlyZero(pt.fY - p.fY, tol);
+        const bool equal = SkScalarNearlyZero(pt.fX - p.fX, tol)
+                           && SkScalarNearlyZero(pt.fY - p.fY, tol);
+        return equal;
     }
 
     static SkScalar LengthSqd(const SkPoint& pt) {
-        return SkPoint::DotProduct(pt, pt);
+        const SkScalar lengthSquared = SkPoint::DotProduct(pt, pt);
+        return lengthSquared;
     }
 
-    static void Negate(SkIPoint& pt) {
-        pt.fX = -pt.fX;
-        pt.fY = -pt.fY;
-    }
-
+    // Writes src rotated a quarter turn counter-clockwise. dst may be &src.
     static void RotateCCW(const SkPoint& src, SkPoint* dst) {
-        // use a tmp in case src == dst
-        SkScalar tmp = src.fX;
-        dst->fX = src.fY;
-        dst->fY = -tmp;
+        const SkPoint rotated{src.fY, -src.fX};
+        *dst = rotated;
     }
 
     static void RotateCCW(SkPoint* pt) {
         RotateCCW(*pt, pt);
     }
 
+    // Writes src rotated a quarter turn clockwise. dst may be &src.
     static void RotateCW(const SkPoint& src, SkPoint* dst) {
-        // use a tmp in case src == dst
-        SkScalar tmp = src.fX;
-        dst->fX = -src.fY;
-        dst->fY = tmp;
+        const SkPoint rotated{-src.fY, src.fX};
+        *dst = rotated;
     }
 
     static void RotateCW(SkPoint* pt) {
         RotateCW(*pt, pt);
     }
 
+    // Same result as SkPoint::setLength.
     static bool SetLengthFast(SkPoint* pt, float length);
-
-    static SkPoint MakeOrthog(const SkPoint& vec, Side side = kLeft_Side) {
-        SkASSERT(side == kRight_Side || side == kLeft_Side);
-        return (side == kRight_Side) ? SkPoint{-vec.fY, vec.fX} : SkPoint{vec.fY, -vec.fX};
-    }
-
-    // counter-clockwise fan
-    static void SetRectFan(SkPoint v[], SkScalar l, SkScalar t, SkScalar r, SkScalar b,
-            size_t stride) {
-        SkASSERT(stride >= sizeof(SkPoint));
-
-        ((SkPoint*)((intptr_t)v + 0 * stride))->set(l, t);
-        ((SkPoint*)((intptr_t)v + 1 * stride))->set(l, b);
-        ((SkPoint*)((intptr_t)v + 2 * stride))->set(r, b);
-        ((SkPoint*)((intptr_t)v + 3 * stride))->set(r, t);
-    }
-
-    // tri strip with two counter-clockwise triangles
-    static void SetRectTriStrip(SkPoint v[], SkScalar l, SkScalar t, SkScalar r, SkScalar b,
-            size_t stride) {
-        SkASSERT(stride >= sizeof(SkPoint));
-
-        ((SkPoint*)((intptr_t)v + 0 * stride))->set(l, t);
-        ((SkPoint*)((intptr_t)v + 1 * stride))->set(l, b);
-        ((SkPoint*)((intptr_t)v + 2 * stride))->set(r, t);
-        ((SkPoint*)((intptr_t)v + 3 * stride))->set(r, b);
-    }
-    static void SetRectTriStrip(SkPoint v[], const SkRect& rect, size_t stride) {
-        SetRectTriStrip(v, rect.fLeft, rect.fTop, rect.fRight, rect.fBottom, stride);
-    }
 };
 
 #endif

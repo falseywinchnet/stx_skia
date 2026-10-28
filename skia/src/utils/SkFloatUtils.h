@@ -9,41 +9,44 @@
 #define SkFloatUtils_DEFINED
 
 #include "include/core/SkTypes.h"
-#include <limits.h>
-#include <float.h>
+#include <cfloat>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 
 template <size_t size>
 class SkTypeWithSize {
 public:
     // Prevents using SkTypeWithSize<N> with non-specialized N.
-    typedef void UInt;
+    using UInt = void;
 };
 
 template <>
 class SkTypeWithSize<32> {
 public:
-    typedef uint32_t UInt;
+    using UInt = uint32_t;
 };
 
 template <>
 class SkTypeWithSize<64> {
 public:
-    typedef uint64_t UInt;
+    using UInt = uint64_t;
 };
 
 template <typename RawType>
 struct SkNumericLimits {
-    static const int digits = 0;
+    static constexpr int digits = 0;
 };
 
 template <>
 struct SkNumericLimits<double> {
-    static const int digits = DBL_MANT_DIG;
+    static constexpr int digits = DBL_MANT_DIG;
 };
 
 template <>
 struct SkNumericLimits<float> {
-    static const int digits = FLT_MANT_DIG;
+    static constexpr int digits = FLT_MANT_DIG;
 };
 
 //See
@@ -55,29 +58,29 @@ template <typename RawType, unsigned int ULPs>
 class SkFloatingPoint {
 public:
     /** Bits is a unsigned integer the same size as the floating point number. */
-    typedef typename SkTypeWithSize<sizeof(RawType) * CHAR_BIT>::UInt Bits;
+    using Bits = typename SkTypeWithSize<sizeof(RawType) * CHAR_BIT>::UInt;
 
     /** # of bits in a number. */
-    static const size_t kBitCount = CHAR_BIT * sizeof(RawType);
+    static constexpr size_t kBitCount = CHAR_BIT * sizeof(RawType);
 
     /** # of fraction bits in a number. */
-    static const size_t kFractionBitCount = SkNumericLimits<RawType>::digits - 1;
+    static constexpr size_t kFractionBitCount = SkNumericLimits<RawType>::digits - 1;
 
     /** # of exponent bits in a number. */
-    static const size_t kExponentBitCount = kBitCount - 1 - kFractionBitCount;
+    static constexpr size_t kExponentBitCount = kBitCount - 1 - kFractionBitCount;
 
     /** The mask for the sign bit. */
-    static const Bits kSignBitMask = static_cast<Bits>(1) << (kBitCount - 1);
+    static constexpr Bits kSignBitMask = static_cast<Bits>(1) << (kBitCount - 1);
 
     /** The mask for the fraction bits. */
-    static const Bits kFractionBitMask =
+    static constexpr Bits kFractionBitMask =
         ~static_cast<Bits>(0) >> (kExponentBitCount + 1);
 
     /** The mask for the exponent bits. */
-    static const Bits kExponentBitMask = ~(kSignBitMask | kFractionBitMask);
+    static constexpr Bits kExponentBitMask = ~(kSignBitMask | kFractionBitMask);
 
     /** How many ULP's (Units in the Last Place) to tolerate when comparing. */
-    static const size_t kMaxUlps = ULPs;
+    static constexpr size_t kMaxUlps = ULPs;
 
     /**
      *  Constructs a FloatingPoint from a raw floating-point number.
@@ -87,13 +90,13 @@ public:
      *  to be also a NAN.  Therefore, don't expect this constructor to
      *  preserve the bits in x when x is a NAN.
      */
-    explicit SkFloatingPoint(const RawType& x) { fU.value = x; }
+    explicit SkFloatingPoint(const RawType& x) { std::memcpy(&fBits, &x, sizeof(fBits)); }
 
     /** Returns the exponent bits of this number. */
-    Bits exponent_bits() const { return kExponentBitMask & fU.bits; }
+    Bits exponent_bits() const { return kExponentBitMask & fBits; }
 
     /** Returns the fraction bits of this number. */
-    Bits fraction_bits() const { return kFractionBitMask & fU.bits; }
+    Bits fraction_bits() const { return kFractionBitMask & fBits; }
 
     /** Returns true iff this is NAN (not a number). */
     bool is_nan() const {
@@ -114,21 +117,11 @@ public:
         // Any comparison operation involving a NAN must return false.
         if (is_nan() || rhs.is_nan()) return false;
 
-        const Bits dist = DistanceBetweenSignAndMagnitudeNumbers(fU.bits,
-                                                                 rhs.fU.bits);
-        //SkDEBUGF("(%f, %f, %d) ", fU.value, rhs.fU.value, dist);
+        const Bits dist = DistanceBetweenSignAndMagnitudeNumbers(fBits, rhs.fBits);
         return dist <= kMaxUlps;
     }
 
 private:
-    /** The data type used to store the actual floating-point number. */
-    union FloatingPointUnion {
-        /** The raw floating-point number. */
-        RawType value;
-        /** The bits that represent the number. */
-        Bits bits;
-    };
-
     /**
      *  Converts an integer from the sign-and-magnitude representation to
      *  the biased representation. More precisely, let N be 2 to the
@@ -167,7 +160,9 @@ private:
         return (biased1 >= biased2) ? (biased1 - biased2) : (biased2 - biased1);
     }
 
-    FloatingPointUnion fU;
+    // The number's bits, copied in by the constructor. The intake code read them through a
+    // union after writing the float, which C++ leaves undefined.
+    Bits fBits = 0;
 };
 
 /** Interpolate along the function described by (keys[length], values[length])

@@ -29,6 +29,8 @@ struct SkStageRec {
     // An empty value can be used when it is expensive to compute,
     // in which case a heuristic will be used if necessary.
     SkRect fDstBounds;
+    // Add this device-space offset when a clip shader is evaluated in a tile.
+    SkPoint fDeviceOffset = {0, 0};
 };
 
 #endif // SkEffectPriv_DEFINED

@@ -12,9 +12,6 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace SkSL { class TraceHook; }
-// state shared by stack_checkpoint and stack_rewind
-struct SkRasterPipelineStage;
 enum class SkPerlinNoiseShaderType;
 
 namespace SkRasterPipelineContexts {
@@ -156,18 +153,6 @@ struct CallbackCtx {
     float* read_from = rgba;
 };
 
-struct RewindCtx {
-    float  r[kMaxStride_highp];
-    float  g[kMaxStride_highp];
-    float  b[kMaxStride_highp];
-    float  a[kMaxStride_highp];
-    float dr[kMaxStride_highp];
-    float dg[kMaxStride_highp];
-    float db[kMaxStride_highp];
-    float da[kMaxStride_highp];
-    std::byte* base;
-    SkRasterPipelineStage* stage;
-};
 
 constexpr size_t kRGBAChannels = 4;
 
@@ -200,115 +185,6 @@ struct EmbossCtx {
 
 struct TablesCtx {
     const uint8_t *r, *g, *b, *a;
-};
-
-using SkRPOffset = uint32_t;
-
-struct InitLaneMasksCtx {
-    uint8_t* tail;
-};
-
-struct ConstantCtx {
-    int32_t value;
-    SkRPOffset dst;
-};
-
-struct UniformCtx {
-    int32_t* dst;
-    const int32_t* src;
-};
-
-struct BinaryOpCtx {
-    SkRPOffset dst;
-    SkRPOffset src;
-};
-
-struct TernaryOpCtx {
-    SkRPOffset dst;
-    SkRPOffset delta;
-};
-
-struct MatrixMultiplyCtx {
-    SkRPOffset dst;
-    uint8_t leftColumns, leftRows, rightColumns, rightRows;
-};
-
-struct SwizzleCtx {
-    // If we are processing more than 16 pixels at a time, an 8-bit offset won't be sufficient and
-    // `offsets` will need to use uint16_t (or dial down the premultiplication).
-    static_assert(kMaxStride_highp <= 16);
-
-    SkRPOffset dst;
-    uint8_t offsets[4];  // values must be byte offsets (4 * highp-stride * component-index)
-};
-
-struct ShuffleCtx {
-    int32_t* ptr;
-    int count;
-    uint16_t offsets[16];  // values must be byte offsets (4 * highp-stride * component-index)
-};
-
-struct SwizzleCopyCtx {
-    int32_t* dst;
-    const int32_t* src;   // src values must _not_ overlap dst values
-    uint16_t offsets[4];  // values must be byte offsets (4 * highp-stride * component-index)
-};
-
-struct CopyIndirectCtx {
-    int32_t* dst;
-    const int32_t* src;
-    const uint32_t *indirectOffset;  // this applies to `src` or `dst` based on the op
-    uint32_t indirectLimit;          // the indirect offset is clamped to this upper bound
-    uint32_t slots;                  // the number of slots to copy
-};
-
-struct SwizzleCopyIndirectCtx : public CopyIndirectCtx {
-    uint16_t offsets[4];  // values must be byte offsets (4 * highp-stride * component-index)
-};
-
-struct BranchCtx {
-    int offset;  // contains the label ID during compilation, and the program offset when compiled
-};
-
-struct BranchIfAllLanesActiveCtx : public BranchCtx {
-    uint8_t* tail = nullptr;  // lanes past the tail are _never_ active, so we need to exclude them
-};
-
-struct BranchIfEqualCtx : public BranchCtx {
-    int value;
-    const int* ptr;
-};
-
-struct CaseOpCtx {
-    int expectedValue;
-    SkRPOffset offset;  // points to a pair of adjacent I32s: {I32 actualValue, I32 defaultMask}
-};
-
-struct TraceFuncCtx {
-    const int* traceMask;
-    SkSL::TraceHook* traceHook;
-    int funcIdx;
-};
-
-struct TraceScopeCtx {
-    const int* traceMask;
-    SkSL::TraceHook* traceHook;
-    int delta;
-};
-
-struct TraceLineCtx {
-    const int* traceMask;
-    SkSL::TraceHook* traceHook;
-    int lineNumber;
-};
-
-struct TraceVarCtx {
-    const int* traceMask;
-    SkSL::TraceHook* traceHook;
-    int slotIdx, numSlots;
-    const int* data;
-    const uint32_t *indirectOffset;  // can be null; if set, an offset applied to `data`
-    uint32_t indirectLimit;          // the indirect offset is clamped to this upper bound
 };
 
 }  // namespace SkRasterPipelineContexts

@@ -32,12 +32,15 @@ bool SkColorFilterBase::onAsAColorMatrix(float matrix[20]) const {
 
 SkPMColor4f SkColorFilterBase::onFilterColor4f(const SkPMColor4f& color,
                                                SkColorSpace* dstCS) const {
-    constexpr size_t kEnoughForCommonFilters = 2048;  // big enough for a tiny SkSL program
-    SkSTArenaAlloc<kEnoughForCommonFilters> alloc;
-    SkRasterPipeline    pipeline(&alloc);
+    constexpr size_t kEnoughForCommonFilters = 2048;
+    SkSTArenaAlloc<kEnoughForCommonFilters> alloc{};
+    // Owners precede the pipeline which borrows their output and context.
+    SkPMColor4f dst{};
+    SkRasterPipelineContexts::MemoryCtx dstPtr = {&dst, 0};
+    SkRasterPipeline pipeline(&alloc);
     pipeline.appendConstantColor(&alloc, color.vec());
     SkSurfaceProps props{}; // default OK; colorFilters don't render text
-    SkStageRec rec = {&pipeline,
+    const SkStageRec rec = {&pipeline,
                       &alloc,
                       kRGBA_F32_SkColorType,
                       dstCS,
@@ -45,14 +48,12 @@ SkPMColor4f SkColorFilterBase::onFilterColor4f(const SkPMColor4f& color,
                       props,
                       SkRect::MakeEmpty()};
 
-    if (as_CFB(this)->appendStages(rec, color.fA == 1)) {
-        SkPMColor4f dst;
-        SkRasterPipelineContexts::MemoryCtx dstPtr = {&dst, 0};
+    if (appendStages(rec, color.fA == 1.0f)) {
         pipeline.append(SkRasterPipelineOp::store_f32, &dstPtr);
         pipeline.run(0,0, 1,1);
         return dst;
     }
 
     SkDEBUGFAIL("onFilterColor4f unimplemented for this filter");
-    return SkPMColor4f{0,0,0,0};
+    return dst;
 }

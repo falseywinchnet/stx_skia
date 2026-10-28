@@ -10,7 +10,7 @@
 
 uint32_t SkPixelStorage::NextId() {
     static std::atomic<uint32_t> gNextID{1};
-    uint32_t id;
+    uint32_t id = 0;
     do {
         id = gNextID.fetch_add(1, std::memory_order_relaxed);
     } while (id == 0);

@@ -24,23 +24,20 @@ public:
 
     GradientType asGradient(GradientInfo* info, SkMatrix* localMatrix) const override;
 
-    const SkPoint& start() const { return fStart; }
-    const SkPoint& end() const { return fEnd; }
+    const SkPoint& start() const & { return fStart; }
+    const SkPoint& start() const && = delete;
+    const SkPoint& end() const & { return fEnd; }
+    const SkPoint& end() const && = delete;
 protected:
-    SkLinearGradient(SkReadBuffer& buffer);
     void flatten(SkWriteBuffer& buffer) const override;
 
     void appendGradientStages(SkArenaAlloc* alloc, SkRasterPipeline* tPipeline,
                               SkRasterPipeline* postPipeline) const final;
 
 private:
-    friend void ::SkRegisterLinearGradientShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkLinearGradient)
 
-    class LinearGradient4fContext;
-
     friend class SkGradientShader;
-    using INHERITED = SkGradientBaseShader;
     const SkPoint fStart;
     const SkPoint fEnd;
 };

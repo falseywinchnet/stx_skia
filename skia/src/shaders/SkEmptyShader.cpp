@@ -14,11 +14,11 @@
 class SkReadBuffer;
 
 sk_sp<SkFlattenable> SkEmptyShader::CreateProc(SkReadBuffer&) {
-    return SkShaders::Empty();
+    sk_sp<SkFlattenable> shader = SkShaders::Empty();
+    return shader;
 }
 
-sk_sp<SkShader> SkShaders::Empty() { return sk_make_sp<SkEmptyShader>(); }
-
-void SkRegisterEmptyShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkEmptyShader);
+sk_sp<SkShader> SkShaders::Empty() {
+    sk_sp<SkShader> shader = sk_make_sp<SkEmptyShader>();
+    return shader;
 }

@@ -21,7 +21,7 @@ std::unique_ptr<const Context> Context::Make() {
 }
 
 std::unique_ptr<Recorder> Context::makeRecorder() const {
-    return std::make_unique<RecorderImpl>(static_cast<const ContextImpl*>(this));
+    return std::make_unique<RecorderImpl>();
 }
 
 const ContextImpl* ContextImpl::TODO() {

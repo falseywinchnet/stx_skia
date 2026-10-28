@@ -24,7 +24,6 @@
 class SkBlender;
 class SkColorFilter;
 class SkColorSpace;
-class SkImageFilter;
 class SkMaskFilter;
 class SkPathEffect;
 class SkShader;
@@ -66,12 +65,12 @@ public:
     explicit SkPaint(const SkColor4f& color, SkColorSpace* colorSpace = nullptr);
 
     /** Makes a shallow copy of SkPaint. SkPathEffect, SkShader,
-        SkMaskFilter, SkColorFilter, and SkImageFilter are shared
+        SkMaskFilter, SkColorFilter and SkBlender are shared
         between the original paint and the copy. Objects containing SkRefCnt increment
         their references by one.
 
         The referenced objects SkPathEffect, SkShader, SkMaskFilter, SkColorFilter,
-        and SkImageFilter cannot be modified after they are created.
+        and SkBlender cannot be modified after they are created.
         This prevents objects with SkRefCnt from being modified once SkPaint refers to them.
 
         @param paint  original to copy
@@ -94,13 +93,13 @@ public:
     SkPaint(SkPaint&& paint);
 
     /** Decreases SkPaint SkRefCnt of owned objects: SkPathEffect, SkShader,
-        SkMaskFilter, SkColorFilter, and SkImageFilter. If the
+        SkMaskFilter, SkColorFilter and SkBlender. If the
         objects containing SkRefCnt go to zero, they are deleted.
     */
     ~SkPaint();
 
     /** Makes a shallow copy of SkPaint. SkPathEffect, SkShader,
-        SkMaskFilter, SkColorFilter, and SkImageFilter are shared
+        SkMaskFilter, SkColorFilter and SkBlender are shared
         between the original paint and the copy. Objects containing SkRefCnt in the
         prior destination are decreased by one, and the referenced objects are deleted if the
         resulting count is zero. Objects containing SkRefCnt in the parameter paint
@@ -129,7 +128,7 @@ public:
 
     /** Compares a and b, and returns true if a and b are equivalent. May return false
         if SkPathEffect, SkShader, SkMaskFilter, SkColorFilter,
-        or SkImageFilter have identical contents but different pointers.
+        or SkBlender have identical contents but different pointers.
 
         @param a  SkPaint to compare
         @param b  SkPaint to compare
@@ -139,7 +138,7 @@ public:
 
     /** Compares a and b, and returns true if a and b are not equivalent. May return true
         if SkPathEffect, SkShader, SkMaskFilter, SkColorFilter,
-        or SkImageFilter have identical contents but different pointers.
+        or SkBlender have identical contents but different pointers.
 
         @param a  SkPaint to compare
         @param b  SkPaint to compare
@@ -160,7 +159,7 @@ public:
         @return  antialiasing state
     */
     bool isAntiAlias() const {
-        return SkToBool(fBitfields.fAntiAlias);
+        return fBitfields.fAntiAlias != 0;
     }
 
     /** Requests, but does not require, that edge pixels draw opaque or with
@@ -173,7 +172,7 @@ public:
         @return  dithering state
     */
     bool isDither() const {
-        return SkToBool(fBitfields.fDither);
+        return fBitfields.fDither != 0;
     }
 
     /** Requests, but does not require, to distribute color error.
@@ -201,7 +200,7 @@ public:
 
     /** Returns whether the geometry is filled, stroked, or filled and stroked.
     */
-    Style getStyle() const { return (Style)fBitfields.fStyle; }
+    Style getStyle() const { return static_cast<Style>(fBitfields.fStyle); }
 
     /** Sets whether the geometry is filled, stroked, or filled and stroked.
         Has no effect if style is not a legal SkPaint::Style value.
@@ -251,7 +250,7 @@ public:
     void setColor(const SkColor4f& color, SkColorSpace* colorSpace = nullptr);
 
     void setColor4f(const SkColor4f& color, SkColorSpace* colorSpace = nullptr) {
-        this->setColor(color, colorSpace);
+        setColor(color, colorSpace);
     }
 
     /** Retrieves alpha from the color used when stroking and filling.
@@ -262,7 +261,7 @@ public:
 
     // Helper that scales the alpha by 255.
     uint8_t getAlpha() const {
-        return static_cast<uint8_t>(sk_float_round2int(this->getAlphaf() * 255));
+        return static_cast<uint8_t>(sk_float_round2int(getAlphaf() * 255));
     }
 
     /** Replaces alpha, leaving RGB
@@ -277,7 +276,7 @@ public:
 
     // Helper that accepts an int between 0 and 255, and divides it by 255.0
     void setAlpha(U8CPU a) {
-        this->setAlphaf(a * (1.0f / 255));
+        setAlphaf(a * (1.0f / 255));
     }
 
     /** Sets color used when drawing solid fills. The color components range from 0 to 255.
@@ -372,7 +371,7 @@ public:
 
     /** Returns the geometry drawn at the beginning and end of strokes.
     */
-    Cap getStrokeCap() const { return (Cap)fBitfields.fCapType; }
+    Cap getStrokeCap() const { return static_cast<Cap>(fBitfields.fCapType); }
 
     /** Sets the geometry drawn at the beginning and end of strokes.
 
@@ -383,7 +382,7 @@ public:
 
     /** Returns the geometry drawn at the corners of strokes.
     */
-    Join getStrokeJoin() const { return (Join)fBitfields.fJoinType; }
+    Join getStrokeJoin() const { return static_cast<Join>(fBitfields.fJoinType); }
 
     /** Sets the geometry drawn at the corners of strokes.
 
@@ -559,34 +558,6 @@ public:
     */
     void setMaskFilter(sk_sp<SkMaskFilter> maskFilter);
 
-    /** Returns SkImageFilter if set, or nullptr.
-        Does not alter SkImageFilter SkRefCnt.
-
-        @return  SkImageFilter if previously set, nullptr otherwise
-    */
-    SkImageFilter* getImageFilter() const { return fImageFilter.get(); }
-
-    /** Returns SkImageFilter if set, or nullptr.
-        Increases SkImageFilter SkRefCnt by one.
-
-        @return  SkImageFilter if previously set, nullptr otherwise
-
-        example: https://fiddle.skia.org/c/@Paint_refImageFilter
-    */
-    sk_sp<SkImageFilter> refImageFilter() const;
-
-    /** Sets SkImageFilter to imageFilter, decreasing SkRefCnt of the previous
-        SkImageFilter. Pass nullptr to clear SkImageFilter, and remove SkImageFilter effect
-        on drawing.
-
-        Increments imageFilter SkRefCnt by one.
-
-        @param imageFilter  how SkImage is sampled when transformed
-
-        example: https://fiddle.skia.org/c/@Paint_setImageFilter
-    */
-    void setImageFilter(sk_sp<SkImageFilter> imageFilter);
-
     /** Returns true if SkPaint prevents all drawing;
         otherwise, the SkPaint may or may not allow drawing.
 
@@ -609,7 +580,8 @@ public:
     bool canComputeFastBounds() const;
 
     /**     (to be made private)
-        Only call this if canComputeFastBounds() returned true. This takes a
+        Only call this if canComputeFastBounds() returned true; a path effect that cannot
+        compute its bounds, or a null storage, stops the program in Release. This takes a
         raw rectangle (the raw bounds of a shape), and adjusts it for stylistic
         effects in the paint (e.g. stroking). If needed, it uses the storage
         parameter. It returns the adjusted bounds that can then be used
@@ -642,7 +614,7 @@ public:
     */
     const SkRect& computeFastStrokeBounds(const SkRect& orig,
                                           SkRect* storage) const {
-        return this->doComputeFastBounds(orig, storage, kStroke_Style);
+        return doComputeFastBounds(orig, storage, kStroke_Style);
     }
 
     /**     (to be made private)
@@ -665,32 +637,29 @@ private:
     sk_sp<SkShader>       fShader;
     sk_sp<SkMaskFilter>   fMaskFilter;
     sk_sp<SkColorFilter>  fColorFilter;
-    sk_sp<SkImageFilter>  fImageFilter;
     sk_sp<SkBlender>      fBlender;
 
     SkColor4f       fColor4f;
     SkScalar        fWidth;
     SkScalar        fMiterLimit;
-    union {
-        struct {
-            unsigned    fAntiAlias : 1;
-            unsigned    fDither : 1;
-            unsigned    fCapType : 2;
-            unsigned    fJoinType : 2;
-            unsigned    fStyle : 2;
-            unsigned    fPadding : 24;  // 24 == 32 -1-1-2-2-2
-        } fBitfields;
-        uint32_t fBitfieldsUInt;
+    // The flags and enums, packed. Equality compares the fields, not the storage.
+    struct Bitfields {
+        unsigned    fAntiAlias : 1;
+        unsigned    fDither : 1;
+        unsigned    fCapType : 2;
+        unsigned    fJoinType : 2;
+        unsigned    fStyle : 2;
+        unsigned    fPadding : 24;  // 24 == 32 -1-1-2-2-2
     };
+    Bitfields fBitfields;
 
-    static_assert(::sk_is_trivially_relocatable<decltype(fPathEffect)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fShader)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fMaskFilter)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fColorFilter)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fImageFilter)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fBlender)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fColor4f)>::value);
-    static_assert(::sk_is_trivially_relocatable<decltype(fBitfields)>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkPathEffect>>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkShader>>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkMaskFilter>>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkColorFilter>>::value);
+    static_assert(::sk_is_trivially_relocatable<sk_sp<SkBlender>>::value);
+    static_assert(::sk_is_trivially_relocatable<SkColor4f>::value);
+    static_assert(::sk_is_trivially_relocatable<Bitfields>::value);
 
     friend class SkPaintPriv;
 };

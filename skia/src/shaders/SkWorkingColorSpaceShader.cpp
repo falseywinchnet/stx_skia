@@ -15,6 +15,7 @@
 #include "src/core/SkArenaAlloc.h"
 #include "src/core/SkColorSpaceXformSteps.h"
 #include "src/core/SkEffectPriv.h"
+#include "src/core/SkPicturePriv.h"
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkWriteBuffer.h"
 #include "src/shaders/SkShaderBase.h"
@@ -34,14 +35,10 @@ sk_sp<SkShader> SkWorkingColorSpaceShader::Make(sk_sp<SkShader> shader,
         // then there's no additional conversion for children and no additional conversion
         // applied to the shader's output.
         return shader;
-    } else {
-        // Otherwise there's some conversion that has to happen on the input side or the output side
-        // that makes this not a no-op.
-        return sk_sp(new SkWorkingColorSpaceShader(std::move(shader),
-                                                   std::move(inputCS),
-                                                   std::move(outputCS),
-                                                   workInUnpremul));
     }
+    sk_sp<SkShader> wrapped(new SkWorkingColorSpaceShader(
+            std::move(shader), std::move(inputCS), std::move(outputCS), workInUnpremul));
+    return wrapped;
 }
 
 bool SkWorkingColorSpaceShader::appendStages(const SkStageRec& rec,
@@ -53,36 +50,34 @@ bool SkWorkingColorSpaceShader::appendStages(const SkStageRec& rec,
 
     // TODO(b/431253455): Should get the dstAT from `rec`
     const SkAlphaType dstAT = kPremul_SkAlphaType;
-    auto [inputCS, outputCS, workingAT]  = this->workingSpace(dstCS, dstAT);
+    const WorkingSpace spaces = workingSpace(dstCS, dstAT);
+    const SkColorInfo dst = {rec.fDstColorType, dstAT, dstCS};
+    const SkColorInfo input = {rec.fDstColorType, spaces.alphaType, spaces.inputSpace};
+    const SkColorInfo output = {rec.fDstColorType, spaces.alphaType, spaces.outputSpace};
 
-    SkColorInfo dst    = {rec.fDstColorType, dstAT,     dstCS},
-                input  = {rec.fDstColorType, workingAT, inputCS},
-                output = {rec.fDstColorType, workingAT, outputCS};
-
-    const auto* dstToInput  = rec.fAlloc->make<SkColorSpaceXformSteps>(dst, input);
-    const auto* outputToDst = rec.fAlloc->make<SkColorSpaceXformSteps>(output, dst);
+    SkArenaAlloc& arena = *rec.fAlloc;
+    const SkColorSpaceXformSteps* dstToInput = arena.make<SkColorSpaceXformSteps>(dst, input);
+    const SkColorSpaceXformSteps* outputToDst = arena.make<SkColorSpaceXformSteps>(output, dst);
     // NOTE: There is no inputToOutput steps to apply because it is assumed that the child shader
     // is responsible for such conversion (or input == output and it's a no-op).
 
     // Alpha-only image shaders reference the paint color, which is already in the destination
     // color space. We need to transform it to the working space for consistency.
     SkColor4f paintColorInWorkingSpace = rec.fPaintColor.makeOpaque();
-    dstToInput->apply(paintColorInWorkingSpace.vec());
+    (*dstToInput).apply(paintColorInWorkingSpace.vec());
 
-    // TODO(b/431253455): The working rec should have its alpha type set to `workingAT`
-    SkStageRec workingRec = {rec.fPipeline,
-                             rec.fAlloc,
-                             rec.fDstColorType,
-                             fInputSpace.get(),
-                             paintColorInWorkingSpace,
-                             rec.fSurfaceProps,
-                             rec.fDstBounds};
+    // Preserve bounds, tile placement and future context fields; only the
+    // color-space-dependent inputs change for the child. Surface props stay borrowed.
+    SkStageRec workingRec = rec;
+    workingRec.fDstCS = spaces.inputSpace.get();
+    workingRec.fPaintColor = paintColorInWorkingSpace;
 
-    if (!as_SB(fShader)->appendStages(workingRec, mRec)) {
+    const SkShaderBase& shader = *as_SB(fShader);
+    if (!shader.appendStages(workingRec, mRec)) {
         return false;
     }
 
-    outputToDst->apply(rec.fPipeline);
+    (*outputToDst).apply(rec.fPipeline);
     return true;
 }
 
@@ -92,12 +87,14 @@ void SkWorkingColorSpaceShader::flatten(SkWriteBuffer& buffer) const {
 
     buffer.writeBool(SkToBool(fInputSpace));
     if (fInputSpace) {
-        buffer.writeDataAsByteArray(fInputSpace->serialize().get());
+        const sk_sp<SkData> data = (*fInputSpace).serialize();
+        buffer.writeDataAsByteArray(data.get());
     }
 
     buffer.writeBool(SkToBool(fOutputSpace));
     if (fOutputSpace) {
-        buffer.writeDataAsByteArray(fOutputSpace->serialize().get());
+        const sk_sp<SkData> data = (*fOutputSpace).serialize();
+        buffer.writeDataAsByteArray(data.get());
     }
 }
 
@@ -108,37 +105,35 @@ sk_sp<SkFlattenable> SkWorkingColorSpaceShader::CreateProc(SkReadBuffer& buffer)
     // will be null.
     const bool legacyWorkingCS = buffer.isVersionLT(SkPicturePriv::kWorkingColorSpaceOutput);
 
-    bool workInUnpremul = !legacyWorkingCS && buffer.readBool();
+    const bool workInUnpremul = !legacyWorkingCS && buffer.readBool();
 
     // The input/output spaces are allowed to be null, but if we think we have a non-null CS, then
     // it better be deserializable.
-    sk_sp<SkColorSpace> inputSpace;
+    sk_sp<SkColorSpace> inputSpace{};
     if (legacyWorkingCS || buffer.readBool()) {
-        auto data = buffer.readByteArrayAsData();
+        sk_sp<SkData> data = buffer.readByteArrayAsData();
         if (!buffer.validate(data != nullptr)) {
             return nullptr;
         }
-        inputSpace = SkColorSpace::Deserialize(data->data(), data->size());
+        inputSpace = SkColorSpace::Deserialize((*data).data(), (*data).size());
         if (!buffer.validate(inputSpace != nullptr)) {
             return nullptr;
         }
     }
 
-    sk_sp<SkColorSpace> outputSpace;
+    sk_sp<SkColorSpace> outputSpace{};
     if (!legacyWorkingCS && buffer.readBool()) {
-        auto data = buffer.readByteArrayAsData();
+        sk_sp<SkData> data = buffer.readByteArrayAsData();
         if (!buffer.validate(data != nullptr)) {
             return nullptr;
         }
-        outputSpace = SkColorSpace::Deserialize(data->data(), data->size());
+        outputSpace = SkColorSpace::Deserialize((*data).data(), (*data).size());
         if (!buffer.validate(outputSpace != nullptr)) {
             return nullptr;
         }
     }
 
-    return Make(std::move(shader), std::move(inputSpace), std::move(outputSpace), workInUnpremul);
-}
-
-void SkRegisterWorkingColorSpaceShaderFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkWorkingColorSpaceShader);
+    sk_sp<SkFlattenable> wrapped = Make(std::move(shader), std::move(inputSpace),
+                                         std::move(outputSpace), workInUnpremul);
+    return wrapped;
 }

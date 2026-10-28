@@ -14,6 +14,7 @@
 #include "include/core/SkRefCnt.h"
 #include "include/private/SkAssert.h"
 #include "include/private/SkCPUTypes.h"
+#include "include/private/SkTemplates.h"
 #include "src/core/SkBlitRow.h"
 #include "src/core/SkBlitter.h"
 #include "src/shaders/SkShaderBase.h"
@@ -31,7 +32,8 @@ struct SkMask;
 
 class SkRasterBlitter : public SkBlitter {
 public:
-    SkRasterBlitter(const SkPixmap& device) : fDevice(device) {}
+    // Borrows the device's pixels, which must outlive the blitter.
+    explicit SkRasterBlitter(const SkPixmap& device) : fDevice(device) {}
 
 protected:
     const SkPixmap fDevice;
@@ -50,7 +52,7 @@ public:
 
 protected:
     sk_sp<SkShader>         fShader;
-    SkShaderBase::Context* fShaderContext;
+    SkShaderBase::Context* fShaderContext = nullptr;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -67,9 +69,9 @@ public:
     void blitAntiV2(int x, int y, U8CPU a0, U8CPU a1) override;
 
 protected:
-    SkColor   fColor;
-    SkPMColor fPMColor;
-    SkAlpha   fSrcA;
+    SkColor   fColor = 0;
+    SkPMColor fPMColor = 0;
+    SkAlpha   fSrcA = 0;
 };
 
 class SkARGB32_Opaque_Blitter : public SkARGB32_Blitter {
@@ -108,10 +110,11 @@ public:
     void blitMask(const SkMask&, const SkIRect&) override;
 
 private:
-    SkPMColor*          fBuffer;
-    SkBlitRow::Proc32   fProc32;
-    SkBlitRow::Proc32   fProc32Blend;
-    bool fShadeDirectlyIntoDevice;
+    // One row of shaded pixels, as wide as the device.
+    skia_private::AutoTMalloc<SkPMColor> fBuffer;
+    SkBlitRow::Proc32   fProc32 = nullptr;
+    SkBlitRow::Proc32   fProc32Blend = nullptr;
+    bool fShadeDirectlyIntoDevice = false;
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

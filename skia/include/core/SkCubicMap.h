@@ -25,7 +25,8 @@ public:
     SkCubicMap(SkPoint p1, SkPoint p2);
 
     static bool IsLinear(SkPoint p1, SkPoint p2) {
-        return SkScalarNearlyEqual(p1.fX, p1.fY) && SkScalarNearlyEqual(p2.fX, p2.fY);
+        const bool linear = SkScalarNearlyEqual(p1.fX, p1.fY) && SkScalarNearlyEqual(p2.fX, p2.fY);
+        return linear;
     }
 
     float computeYFromX(float x) const;
@@ -39,8 +40,8 @@ private:
         kSolver_Type,   // general monotonic cubic solver
     };
 
-    SkPoint fCoeff[3];
-    Type    fType;
+    SkPoint fCoeff[3] = {};
+    Type    fType = kSolver_Type;
 };
 
 #endif

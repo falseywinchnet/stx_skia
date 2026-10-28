@@ -14,6 +14,8 @@
 #include "include/private/SkDebug.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 
+#include <utility>
+
 class SkBitmap;
 class SkReadBuffer;
 class SkWriteBuffer;
@@ -21,7 +23,7 @@ struct SkStageRec;
 
 class SkTableColorFilter final : public SkColorFilterBase {
 public:
-    SkTableColorFilter(sk_sp<SkColorTable> table) : fTable(table) {
+    explicit SkTableColorFilter(sk_sp<SkColorTable> table) : fTable(std::move(table)) {
         SkASSERT(fTable);
     }
 
@@ -31,10 +33,13 @@ public:
 
     void flatten(SkWriteBuffer& buffer) const override;
 
-    const SkBitmap& bitmap() const { return fTable->bitmap(); }
+    const SkBitmap& bitmap() const & {
+        const SkBitmap& image = (*fTable).bitmap();
+        return image;
+    }
+    const SkBitmap& bitmap() const && = delete;
 
 private:
-    friend void ::SkRegisterTableColorFilterFlattenable();
     SK_FLATTENABLE_HOOKS(SkTableColorFilter)
 
     sk_sp<SkColorTable> fTable;

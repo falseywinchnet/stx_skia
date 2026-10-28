@@ -12,6 +12,7 @@
 #include "include/core/SkFlattenable.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 
+#include <array>
 #include <cstdint>
 
 class SkReadBuffer;
@@ -33,16 +34,20 @@ public:
 
     Domain domain() const { return fDomain; }
     SkColorFilters::Clamp clamp() const { return fClamp; }
-    const float* matrix() const { return fMatrix; }
+    // Pipeline contexts borrow these 20 coefficients; retain the filter through execution.
+    const float* matrix() const & {
+        const float* coefficients = fMatrix.data();
+        return coefficients;
+    }
+    const float* matrix() const && = delete;
 
 private:
-    friend void ::SkRegisterMatrixColorFilterFlattenable();
     SK_FLATTENABLE_HOOKS(SkMatrixColorFilter)
 
     void flatten(SkWriteBuffer&) const override;
     bool onAsAColorMatrix(float matrix[20]) const override;
 
-    float fMatrix[20];
+    std::array<float, 20> fMatrix; // Four RGBA rows, each with a translation coefficient.
     bool fAlphaIsUnchanged;
     Domain fDomain;
     Clamp fClamp;

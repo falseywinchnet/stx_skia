@@ -14,13 +14,11 @@
 #include "include/private/SkFloatingPoint.h"
 #include "include/private/SkTo.h"
 
-#include <cstring>
 #include <utility>
 
 template <typename T> T pin_unsorted(T value, T limit0, T limit1) {
     if (limit1 < limit0) {
-        using std::swap;
-        swap(limit0, limit1);
+        std::swap(limit0, limit1);
     }
     // now the limits are sorted
     SkASSERT(limit0 <= limit1);
@@ -35,73 +33,80 @@ template <typename T> T pin_unsorted(T value, T limit0, T limit1) {
 
 // return X coordinate of intersection with horizontal line at Y
 static SkScalar sect_with_horizontal(const SkPoint src[2], SkScalar Y) {
-    SkScalar dy = src[1].fY - src[0].fY;
+    const SkScalar dy = src[1].fY - src[0].fY;
     if (SkScalarNearlyZero(dy)) {
-        return sk_float_midpoint(src[0].fX, src[1].fX);
-    } else {
-        // need the extra precision so we don't compute a value that exceeds
-        // our original limits
-        double X0 = src[0].fX;
-        double Y0 = src[0].fY;
-        double X1 = src[1].fX;
-        double Y1 = src[1].fY;
-        double result = X0 + ((double)Y - Y0) * (X1 - X0) / (Y1 - Y0);
-
-        // The computed X value might still exceed [X0..X1] due to quantum flux
-        // when the doubles were added and subtracted, so we have to pin the
-        // answer :(
-        return (float)pin_unsorted(result, X0, X1);
+        const SkScalar midpoint = sk_float_midpoint(src[0].fX, src[1].fX);
+        return midpoint;
     }
+    // need the extra precision so we don't compute a value that exceeds
+    // our original limits
+    const double X0 = src[0].fX;
+    const double Y0 = src[0].fY;
+    const double X1 = src[1].fX;
+    const double Y1 = src[1].fY;
+    const double result = X0 + (static_cast<double>(Y) - Y0) * (X1 - X0) / (Y1 - Y0);
+
+    // The computed X value might still exceed [X0..X1] due to quantum flux
+    // when the doubles were added and subtracted, so we have to pin the
+    // answer :(
+    const SkScalar x = static_cast<float>(pin_unsorted(result, X0, X1));
+    return x;
 }
 
 // return Y coordinate of intersection with vertical line at X
 static SkScalar sect_with_vertical(const SkPoint src[2], SkScalar X) {
-    SkScalar dx = src[1].fX - src[0].fX;
+    const SkScalar dx = src[1].fX - src[0].fX;
     if (SkScalarNearlyZero(dx)) {
-        return sk_float_midpoint(src[0].fY, src[1].fY);
-    } else {
-        // need the extra precision so we don't compute a value that exceeds
-        // our original limits
-        double X0 = src[0].fX;
-        double Y0 = src[0].fY;
-        double X1 = src[1].fX;
-        double Y1 = src[1].fY;
-        double result = Y0 + ((double)X - X0) * (Y1 - Y0) / (X1 - X0);
-        return (float)result;
+        const SkScalar midpoint = sk_float_midpoint(src[0].fY, src[1].fY);
+        return midpoint;
     }
+    // need the extra precision so we don't compute a value that exceeds
+    // our original limits
+    const double X0 = src[0].fX;
+    const double Y0 = src[0].fY;
+    const double X1 = src[1].fX;
+    const double Y1 = src[1].fY;
+    const double result = Y0 + (static_cast<double>(X) - X0) * (Y1 - Y0) / (X1 - X0);
+    const SkScalar y = static_cast<float>(result);
+    return y;
 }
 
 static SkScalar sect_clamp_with_vertical(const SkPoint src[2], SkScalar x) {
-    SkScalar y = sect_with_vertical(src, x);
+    const SkScalar y = sect_with_vertical(src, x);
     // Our caller expects y to be between src[0].fY and src[1].fY (unsorted), but due to the
     // numerics of floats/doubles, we might have computed a value slightly outside of that,
     // so we have to manually clamp afterwards.
     // See skbug.com/40038736
-    return pin_unsorted(y, src[0].fY, src[1].fY);
+    const SkScalar clamped = pin_unsorted(y, src[0].fY, src[1].fY);
+    return clamped;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static inline bool nestedLT(SkScalar a, SkScalar b, SkScalar dim) {
-    return a <= b && (a < b || dim > 0);
+    const bool less = a <= b && (a < b || dim > 0);
+    return less;
 }
 
 // returns true if outer contains inner, even if inner is empty.
 // note: outer.contains(inner) always returns false if inner is empty.
 static inline bool containsNoEmptyCheck(const SkRect& outer,
                                         const SkRect& inner) {
-    return  outer.fLeft <= inner.fLeft && outer.fTop <= inner.fTop &&
-            outer.fRight >= inner.fRight && outer.fBottom >= inner.fBottom;
+    const bool contains = outer.fLeft <= inner.fLeft && outer.fTop <= inner.fTop &&
+                          outer.fRight >= inner.fRight && outer.fBottom >= inner.fBottom;
+    return contains;
 }
 
+// src and dst may be the same array.
 bool SkLineClipper::IntersectLine(const SkPoint src[2], const SkRect& clip,
                                   SkPoint dst[2]) {
-    SkRect bounds;
+    SkRect bounds = SkRect::MakeEmpty();
 
     bounds.set(src[0], src[1]);
     if (containsNoEmptyCheck(clip, bounds)) {
         if (src != dst) {
-            memcpy(dst, src, 2 * sizeof(SkPoint));
+            dst[0] = src[0];
+            dst[1] = src[1];
         }
         return true;
     }
@@ -114,7 +119,8 @@ bool SkLineClipper::IntersectLine(const SkPoint src[2], const SkRect& clip,
         return false;
     }
 
-    int index0, index1;
+    int index0 = 0;
+    int index1 = 1;
 
     if (src[0].fY < src[1].fY) {
         index0 = 0;
@@ -124,8 +130,7 @@ bool SkLineClipper::IntersectLine(const SkPoint src[2], const SkRect& clip,
         index1 = 0;
     }
 
-    SkPoint tmp[2];
-    memcpy(tmp, src, sizeof(tmp));
+    SkPoint tmp[2] = {src[0], src[1]};
 
     // now compute Y intersections
     if (tmp[index0].fY < clip.fTop) {
@@ -162,7 +167,8 @@ bool SkLineClipper::IntersectLine(const SkPoint src[2], const SkRect& clip,
     bounds.set(tmp[0], tmp[1]);
     SkASSERT(containsNoEmptyCheck(clip, bounds));
 #endif
-    memcpy(dst, tmp, sizeof(tmp));
+    dst[0] = tmp[0];
+    dst[1] = tmp[1];
     return true;
 }
 
@@ -171,17 +177,20 @@ bool SkLineClipper::IntersectLine(const SkPoint src[2], const SkRect& clip,
 // or descending.
 static bool is_between_unsorted(SkScalar value,
                                 SkScalar limit0, SkScalar limit1) {
+    bool between = false;
     if (limit0 < limit1) {
-        return limit0 <= value && value <= limit1;
+        between = limit0 <= value && value <= limit1;
     } else {
-        return limit1 <= value && value <= limit0;
+        between = limit1 <= value && value <= limit0;
     }
+    return between;
 }
 #endif
 
 int SkLineClipper::ClipLine(const SkPoint pts[2], const SkRect& clip, SkPoint lines[kMaxPoints],
                             bool canCullToTheRight) {
-    int index0, index1;
+    int index0 = 0;
+    int index1 = 1;
 
     if (pts[0].fY < pts[1].fY) {
         index0 = 0;
@@ -202,8 +211,7 @@ int SkLineClipper::ClipLine(const SkPoint pts[2], const SkRect& clip, SkPoint li
 
     // Chop in Y to produce a single segment, stored in tmp[0..1]
 
-    SkPoint tmp[2];
-    memcpy(tmp, pts, sizeof(tmp));
+    SkPoint tmp[2] = {pts[0], pts[1]};
 
     // now compute intersections
     if (pts[index0].fY < clip.fTop) {
@@ -217,11 +225,10 @@ int SkLineClipper::ClipLine(const SkPoint pts[2], const SkRect& clip, SkPoint li
 
     // Chop it into 1..3 segments that are wholly within the clip in X.
 
-    // temp storage for up to 3 segments
-    SkPoint resultStorage[kMaxPoints];
-    SkPoint* result;    // points to our results, either tmp or resultStorage
+    // Up to 3 segments; when the line is wholly outside in X only the first two are used.
+    SkPoint result[kMaxPoints] = {};
     int lineCount = 1;
-    bool reverse;
+    bool reverse = false;
 
     if (pts[0].fX < pts[1].fX) {
         index0 = 0;
@@ -234,40 +241,43 @@ int SkLineClipper::ClipLine(const SkPoint pts[2], const SkRect& clip, SkPoint li
     }
 
     if (tmp[index1].fX <= clip.fLeft) {  // wholly to the left
-        tmp[0].fX = tmp[1].fX = clip.fLeft;
-        result = tmp;
+        tmp[0].fX = clip.fLeft;
+        tmp[1].fX = clip.fLeft;
+        result[0] = tmp[0];
+        result[1] = tmp[1];
         reverse = false;
     } else if (tmp[index0].fX >= clip.fRight) {    // wholly to the right
         if (canCullToTheRight) {
             return 0;
         }
-        tmp[0].fX = tmp[1].fX = clip.fRight;
-        result = tmp;
+        tmp[0].fX = clip.fRight;
+        tmp[1].fX = clip.fRight;
+        result[0] = tmp[0];
+        result[1] = tmp[1];
         reverse = false;
     } else {
-        result = resultStorage;
-        SkPoint* r = result;
+        int r = 0;
 
         if (tmp[index0].fX < clip.fLeft) {
-            r->set(clip.fLeft, tmp[index0].fY);
+            result[r].set(clip.fLeft, tmp[index0].fY);
             r += 1;
-            r->set(clip.fLeft, sect_clamp_with_vertical(tmp, clip.fLeft));
-            SkASSERT(is_between_unsorted(r->fY, tmp[0].fY, tmp[1].fY));
+            result[r].set(clip.fLeft, sect_clamp_with_vertical(tmp, clip.fLeft));
+            SkASSERT(is_between_unsorted(result[r].fY, tmp[0].fY, tmp[1].fY));
         } else {
-            *r = tmp[index0];
+            result[r] = tmp[index0];
         }
         r += 1;
 
         if (tmp[index1].fX > clip.fRight) {
-            r->set(clip.fRight, sect_clamp_with_vertical(tmp, clip.fRight));
-            SkASSERT(is_between_unsorted(r->fY, tmp[0].fY, tmp[1].fY));
+            result[r].set(clip.fRight, sect_clamp_with_vertical(tmp, clip.fRight));
+            SkASSERT(is_between_unsorted(result[r].fY, tmp[0].fY, tmp[1].fY));
             r += 1;
-            r->set(clip.fRight, tmp[index1].fY);
+            result[r].set(clip.fRight, tmp[index1].fY);
         } else {
-            *r = tmp[index1];
+            result[r] = tmp[index1];
         }
 
-        lineCount = SkToInt(r - result);
+        lineCount = r;
     }
 
     // Now copy the results into the caller's lines[] parameter
@@ -277,7 +287,9 @@ int SkLineClipper::ClipLine(const SkPoint pts[2], const SkRect& clip, SkPoint li
             lines[lineCount - i] = result[i];
         }
     } else {
-        memcpy(lines, result, (lineCount + 1) * sizeof(SkPoint));
+        for (int i = 0; i <= lineCount; i++) {
+            lines[i] = result[i];
+        }
     }
     return lineCount;
 }

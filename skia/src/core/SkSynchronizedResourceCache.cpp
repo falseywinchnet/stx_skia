@@ -16,66 +16,85 @@ SkSynchronizedResourceCache::SkSynchronizedResourceCache(size_t byteLimit)
 SkSynchronizedResourceCache::~SkSynchronizedResourceCache() = default;
 
 size_t SkSynchronizedResourceCache::getTotalBytesUsed() const {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::getTotalBytesUsed();
+    SkAutoMutexExclusive lock(fMutex);
+    const size_t result = SkResourceCache::getTotalBytesUsed();
+    return result;
 }
 
 size_t SkSynchronizedResourceCache::getTotalByteLimit() const {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::getTotalByteLimit();
+    SkAutoMutexExclusive lock(fMutex);
+    const size_t result = SkResourceCache::getTotalByteLimit();
+    return result;
 }
 
 size_t SkSynchronizedResourceCache::setTotalByteLimit(size_t newLimit) {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::setTotalByteLimit(newLimit);
+    SkAutoMutexExclusive lock(fMutex);
+    const size_t result = SkResourceCache::setTotalByteLimit(newLimit);
+    return result;
 }
 
 SkResourceCache::DiscardableFactory SkSynchronizedResourceCache::discardableFactory() const {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::discardableFactory();
+    SkAutoMutexExclusive lock(fMutex);
+    const DiscardableFactory result = SkResourceCache::discardableFactory();
+    return result;
 }
 
 SkCachedData* SkSynchronizedResourceCache::newCachedData(size_t bytes) {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::newCachedData(bytes);
+    SkAutoMutexExclusive lock(fMutex);
+    SkCachedData* const result = SkResourceCache::newCachedData(bytes);
+    return result;
 }
 
 void SkSynchronizedResourceCache::dump() const {
-    SkAutoMutexExclusive am(fMutex);
+    SkAutoMutexExclusive lock(fMutex);
     SkResourceCache::dump();
 }
 
 size_t SkSynchronizedResourceCache::setSingleAllocationByteLimit(size_t size) {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::setSingleAllocationByteLimit(size);
+    SkAutoMutexExclusive lock(fMutex);
+    const size_t result = SkResourceCache::setSingleAllocationByteLimit(size);
+    return result;
 }
 
 size_t SkSynchronizedResourceCache::getSingleAllocationByteLimit() const {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::getSingleAllocationByteLimit();
+    SkAutoMutexExclusive lock(fMutex);
+    const size_t result = SkResourceCache::getSingleAllocationByteLimit();
+    return result;
 }
 
 size_t SkSynchronizedResourceCache::getEffectiveSingleAllocationByteLimit() const {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::getEffectiveSingleAllocationByteLimit();
+    SkAutoMutexExclusive lock(fMutex);
+    const size_t result = SkResourceCache::getEffectiveSingleAllocationByteLimit();
+    return result;
 }
 
 void SkSynchronizedResourceCache::purgeAll() {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::purgeAll();
+    SkAutoMutexExclusive lock(fMutex);
+    SkResourceCache::purgeAll();
 }
 
 bool SkSynchronizedResourceCache::find(const Key& key, FindVisitor visitor, void* context) {
-    SkAutoMutexExclusive am(fMutex);
-    return SkResourceCache::find(key, visitor, context);
+    SkAutoMutexExclusive lock(fMutex);
+    const bool result = SkResourceCache::find(key, visitor, context);
+    return result;
 }
 
 void SkSynchronizedResourceCache::add(Rec* rec, void* payload) {
-    SkAutoMutexExclusive am(fMutex);
+    SkAutoMutexExclusive lock(fMutex);
     SkResourceCache::add(rec, payload);
 }
 
 void SkSynchronizedResourceCache::visitAll(Visitor visitor, void* context) {
-    SkAutoMutexExclusive am(fMutex);
+    SkAutoMutexExclusive lock(fMutex);
     SkResourceCache::visitAll(visitor, context);
+}
+
+void SkSynchronizedResourceCache::purgeSharedID(uint64_t sharedID) {
+    SkAutoMutexExclusive lock(fMutex);
+    SkResourceCache::purgeSharedID(sharedID);
+}
+
+void SkSynchronizedResourceCache::checkMessages() {
+    SkAutoMutexExclusive lock(fMutex);
+    SkResourceCache::checkMessages();
 }

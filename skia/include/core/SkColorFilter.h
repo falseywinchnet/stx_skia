@@ -27,7 +27,7 @@ struct SkDeserialProcs;
 /**
 *  ColorFilters are optional objects in the drawing pipeline. When present in
 *  a paint, they are called with the "src" colors, and return new colors, which
-*  are then passed onto the next stage (either ImageFilter or Xfermode).
+*  are then passed to the remaining raster stages and compositing.
 *
 *  All subclasses are required to be reentrant-safe : it must be legal to share
 *  the same instance between several threads.
@@ -65,7 +65,7 @@ public:
 
     /** Return a colorfilter that will compute this filter in a specific color space. By default all
      *  filters operate in the destination (surface) color space. This allows filters like Blend and
-     *  Matrix, or runtime color filters to perform their math in a known space.
+     *  Matrix to perform their math in a known space.
      */
     sk_sp<SkColorFilter> makeWithWorkingColorSpace(sk_sp<SkColorSpace>) const;
 
@@ -83,8 +83,11 @@ class SK_API SkColorFilters {
 public:
     static sk_sp<SkColorFilter> Compose(const sk_sp<SkColorFilter>& outer,
                                         sk_sp<SkColorFilter> inner) {
-        return outer ? outer->makeComposed(std::move(inner))
-                     : std::move(inner);
+        if (!outer) {
+            return inner;
+        }
+        sk_sp<SkColorFilter> composed = (*outer).makeComposed(std::move(inner));
+        return composed;
     }
 
     // Blends between the constant color (src) and input color (dst) based on the SkBlendMode.
@@ -104,7 +107,6 @@ public:
 
     static sk_sp<SkColorFilter> LinearToSRGBGamma();
     static sk_sp<SkColorFilter> SRGBToLinearGamma();
-    static sk_sp<SkColorFilter> Lerp(float t, sk_sp<SkColorFilter> dst, sk_sp<SkColorFilter> src);
 
     /**
      *  Create a table colorfilter, copying the table into the filter, and
@@ -113,7 +115,7 @@ public:
      *      r' = table[r];
      *      g' = table[g];
      *      b' = table[b];
-     *  Components are operated on in unpremultiplied space. If the incomming
+     *  Components are operated on in unpremultiplied space. If the incoming
      *  colors are premultiplied, they are temporarily unpremultiplied, then
      *  the table is applied, and then the result is remultiplied.
      */

@@ -1,0 +1,149 @@
+name: Native CPU package
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure and test
+        run: |
+          set -eu
+          sh tools/build_native.sh baseline
+          sh tools/build_native.sh candidate
+          cmake -E compare_files build/baseline/gradient-geometry.raw build/candidate/gradient-geometry.raw
+          cmake -E compare_files build/baseline/geometry-primitives.raw build/candidate/geometry-primitives.raw
+          cmake -E compare_files build/baseline/matrix-transforms.raw build/candidate/matrix-transforms.raw
+          cmake -E compare_files build/baseline/path-construction.raw build/candidate/path-construction.raw
+          cmake -E compare_files build/baseline/curve-geometry.raw build/candidate/curve-geometry.raw
+          cmake -E compare_files build/baseline/contour-measure.raw build/candidate/contour-measure.raw
+          cmake -E compare_files build/baseline/stroke-geometry.raw build/candidate/stroke-geometry.raw
+          cmake -E compare_files build/baseline/dash-effects.raw build/candidate/dash-effects.raw
+          cmake -E compare_files build/baseline/path-clipping.raw build/candidate/path-clipping.raw
+          cmake -E compare_files build/baseline/scan-edges.raw build/candidate/scan-edges.raw
+          cmake -E compare_files build/baseline/scan-converters.raw build/candidate/scan-converters.raw
+          cmake -E compare_files build/baseline/aa-scan-converters.raw build/candidate/aa-scan-converters.raw
+          cmake -E compare_files build/baseline/region-clips.raw build/candidate/region-clips.raw
+          cmake -E compare_files build/baseline/blitters.raw build/candidate/blitters.raw
+          cmake -E compare_files build/baseline/canvas-device.raw build/candidate/canvas-device.raw
+          cmake -E compare_files build/baseline/mask-cache.raw build/candidate/mask-cache.raw
+          cmake -E compare_files build/baseline/vertices.raw build/candidate/vertices.raw
+          cmake -E compare_files build/baseline/paint.raw build/candidate/paint.raw
+          cmake -E compare_files build/baseline/m44.raw build/candidate/m44.raw
+          cmake -E compare_files build/baseline/matrix-invert.raw build/candidate/matrix-invert.raw
+          cmake -E compare_files build/baseline/raster-clip-stack.raw build/candidate/raster-clip-stack.raw
+          cmake -E compare_files build/baseline/android-clip.raw build/candidate/android-clip.raw
+          cmake -E compare_files build/baseline/patch-utils.raw build/candidate/patch-utils.raw
+          cmake -E compare_files build/baseline/memset.raw build/candidate/memset.raw
+          cmake -E compare_files build/baseline/stream-core.raw build/candidate/stream-core.raw
+          cmake -E compare_files build/baseline/string-core.raw build/candidate/string-core.raw
+          cmake -E compare_files build/baseline/tarray-core.raw build/candidate/tarray-core.raw
+          cmake -E compare_files build/baseline/block-list-core.raw build/candidate/block-list-core.raw
+          cmake -E compare_files build/baseline/arena-core.raw build/candidate/arena-core.raw
+          cmake -E compare_files build/baseline/utf-core.raw build/candidate/utf-core.raw
+          cmake -E compare_files build/baseline/buffer-core.raw build/candidate/buffer-core.raw
+          cmake -E compare_files build/baseline/template-core.raw build/candidate/template-core.raw
+          cmake -E compare_files build/baseline/numeric-core.raw build/candidate/numeric-core.raw
+          cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
+          cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
+          cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
+          cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
+          cmake -E compare_files build/baseline/shader-working-space.raw build/candidate/shader-working-space.raw
+          cmake -E compare_files build/baseline/color-plans.raw build/candidate/color-plans.raw
+          cmake -E compare_files build/baseline/color-adjustments.raw build/candidate/color-adjustments.raw
+          cmake -E compare_files build/baseline/color-composition.raw build/candidate/color-composition.raw
+          cmake -E compare_files build/baseline/shader-blends.raw build/candidate/shader-blends.raw
+          cmake -E compare_files build/baseline/layers.raw build/candidate/layers.raw
+          cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
+          cmake -E compare_files build/baseline/conversions.raw build/candidate/conversions.raw
+          cmake -E compare_files build/baseline/pixmap.raw build/candidate/pixmap.raw
+          cmake -E compare_files build/baseline/mask.raw build/candidate/mask.raw
+          cmake -E compare_files build/baseline/mask-filter.raw build/candidate/mask-filter.raw
+          cmake -E compare_files build/baseline/flattenable.raw build/candidate/flattenable.raw
+          sh tools/verify_installed.sh
+      - name: Fill kernel timings (informational)
+        run: |
+          grep -m1 "model name" /proc/cpuinfo || true
+          python3 tools/measure_fill.py build/baseline build/candidate
+      - name: Instrumented deterministic suite
+        run: sh tools/build_native.sh candidate-sanitize
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-python
+      - name: Configure and test
+        run: |
+          set -eu
+          sh tools/build_native.sh baseline
+          sh tools/build_native.sh candidate
+          cmake -E compare_files build/baseline/gradient-geometry.raw build/candidate/gradient-geometry.raw
+          cmake -E compare_files build/baseline/geometry-primitives.raw build/candidate/geometry-primitives.raw
+          cmake -E compare_files build/baseline/matrix-transforms.raw build/candidate/matrix-transforms.raw
+          cmake -E compare_files build/baseline/path-construction.raw build/candidate/path-construction.raw
+          cmake -E compare_files build/baseline/curve-geometry.raw build/candidate/curve-geometry.raw
+          cmake -E compare_files build/baseline/contour-measure.raw build/candidate/contour-measure.raw
+          cmake -E compare_files build/baseline/stroke-geometry.raw build/candidate/stroke-geometry.raw
+          cmake -E compare_files build/baseline/dash-effects.raw build/candidate/dash-effects.raw
+          cmake -E compare_files build/baseline/path-clipping.raw build/candidate/path-clipping.raw
+          cmake -E compare_files build/baseline/scan-edges.raw build/candidate/scan-edges.raw
+          cmake -E compare_files build/baseline/scan-converters.raw build/candidate/scan-converters.raw
+          cmake -E compare_files build/baseline/aa-scan-converters.raw build/candidate/aa-scan-converters.raw
+          cmake -E compare_files build/baseline/region-clips.raw build/candidate/region-clips.raw
+          cmake -E compare_files build/baseline/blitters.raw build/candidate/blitters.raw
+          cmake -E compare_files build/baseline/canvas-device.raw build/candidate/canvas-device.raw
+          cmake -E compare_files build/baseline/mask-cache.raw build/candidate/mask-cache.raw
+          cmake -E compare_files build/baseline/vertices.raw build/candidate/vertices.raw
+          cmake -E compare_files build/baseline/paint.raw build/candidate/paint.raw
+          cmake -E compare_files build/baseline/m44.raw build/candidate/m44.raw
+          cmake -E compare_files build/baseline/matrix-invert.raw build/candidate/matrix-invert.raw
+          cmake -E compare_files build/baseline/raster-clip-stack.raw build/candidate/raster-clip-stack.raw
+          cmake -E compare_files build/baseline/android-clip.raw build/candidate/android-clip.raw
+          cmake -E compare_files build/baseline/patch-utils.raw build/candidate/patch-utils.raw
+          cmake -E compare_files build/baseline/memset.raw build/candidate/memset.raw
+          cmake -E compare_files build/baseline/stream-core.raw build/candidate/stream-core.raw
+          cmake -E compare_files build/baseline/string-core.raw build/candidate/string-core.raw
+          cmake -E compare_files build/baseline/tarray-core.raw build/candidate/tarray-core.raw
+          cmake -E compare_files build/baseline/block-list-core.raw build/candidate/block-list-core.raw
+          cmake -E compare_files build/baseline/arena-core.raw build/candidate/arena-core.raw
+          cmake -E compare_files build/baseline/utf-core.raw build/candidate/utf-core.raw
+          cmake -E compare_files build/baseline/buffer-core.raw build/candidate/buffer-core.raw
+          cmake -E compare_files build/baseline/template-core.raw build/candidate/template-core.raw
+          cmake -E compare_files build/baseline/numeric-core.raw build/candidate/numeric-core.raw
+          cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
+          cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
+          cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
+          cmake -E compare_files build/baseline/shader-coordinates.raw build/candidate/shader-coordinates.raw
+          cmake -E compare_files build/baseline/shader-working-space.raw build/candidate/shader-working-space.raw
+          cmake -E compare_files build/baseline/color-plans.raw build/candidate/color-plans.raw
+          cmake -E compare_files build/baseline/color-adjustments.raw build/candidate/color-adjustments.raw
+          cmake -E compare_files build/baseline/color-composition.raw build/candidate/color-composition.raw
+          cmake -E compare_files build/baseline/shader-blends.raw build/candidate/shader-blends.raw
+          cmake -E compare_files build/baseline/layers.raw build/candidate/layers.raw
+          cmake -E compare_files build/baseline/render.raw build/candidate/render.raw
+          cmake -E compare_files build/baseline/conversions.raw build/candidate/conversions.raw
+          cmake -E compare_files build/baseline/pixmap.raw build/candidate/pixmap.raw
+          cmake -E compare_files build/baseline/mask.raw build/candidate/mask.raw
+          cmake -E compare_files build/baseline/mask-filter.raw build/candidate/mask-filter.raw
+          cmake -E compare_files build/baseline/flattenable.raw build/candidate/flattenable.raw
+          sh tools/verify_installed.sh
+      - name: Fill kernel timings (informational)
+        run: |
+          powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name"
+          python tools/measure_fill.py build/baseline build/candidate

@@ -12,8 +12,10 @@
 #include <memory>
 
 namespace skcpu {
+class ContextImpl;
 class Recorder;
 
+// Only the library's ContextImpl derives from Context, which makeRecorder() relies on.
 class SK_API Context {
 public:
     struct Options {};
@@ -23,8 +25,9 @@ public:
     static std::unique_ptr<const Context> Make(const Options&);
     static std::unique_ptr<const Context> Make();
 
-protected:
+private:
     Context() = default;
+    friend class ContextImpl;
 };
 }  // namespace skcpu
 

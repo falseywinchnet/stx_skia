@@ -23,9 +23,6 @@ enum SkSegType {
 };
 
 
-void SkPathMeasure_segTo(const SkPoint pts[], unsigned segType,
-                   SkScalar startT, SkScalar stopT, SkPath* dst);
-
 // for testing
 
 class SkPathMeasure;

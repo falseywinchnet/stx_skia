@@ -14,39 +14,93 @@
 #include "include/core/SkPoint.h"
 #include "include/core/SkPoint3.h"
 #include "include/core/SkRect.h"
-#include "include/core/SkTypeface.h"
 #include "include/private/SkAssert.h"
 #include "include/private/SkTFitsIn.h"
-#include "include/private/SkTo.h"
+#include "src/core/SkSafeMath.h"
 #include "src/core/SkMatrixPriv.h"
 #include "src/core/SkMipmap.h"
-#include "src/core/SkPaintPriv.h"
-#include "src/core/SkPtrRecorder.h"
 #include "src/image/SkImage_Base.h"
 
 #include <cstring>
+#include <limits>
 #include <utility>
 
 class SkMatrix;
-class SkPaint;
 class SkRegion;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-SkBinaryWriteBuffer::SkBinaryWriteBuffer(const SkSerialProcs& p)
-        : SkWriteBuffer(p), fFactorySet(nullptr), fTFSet(nullptr) {}
+SkBinaryWriteBuffer::SkBinaryWriteBuffer(const SkSerialProcs& procs)
+        : SkWriteBuffer(procs) {}
 
-SkBinaryWriteBuffer::SkBinaryWriteBuffer(void* storage, size_t storageSize, const SkSerialProcs& p)
-        : SkWriteBuffer(p), fFactorySet(nullptr), fTFSet(nullptr), fWriter(storage, storageSize) {}
+SkBinaryWriteBuffer::SkBinaryWriteBuffer(void* storage, size_t storageSize, const SkSerialProcs& procs)
+        : SkWriteBuffer(procs) {
+    reset(storage, storageSize);
+}
 
 SkBinaryWriteBuffer::~SkBinaryWriteBuffer() {}
 
 bool SkBinaryWriteBuffer::usingInitialStorage() const {
-    return fWriter.usingInitialStorage();
+    const bool initial = fWriter.usingInitialStorage();
+    return initial;
+}
+
+void SkBinaryWriteBuffer::reset(void* storage, size_t storageSize) {
+    const uintptr_t address = reinterpret_cast<uintptr_t>(storage);
+    SkASSERT_RELEASE(SkIsAlign4(address));
+    SkASSERT_RELEASE(storage != nullptr || storageSize == 0);
+    fWriter.reset(storage, storageSize);
+    fFlattenableDict.reset();
+}
+
+void SkBinaryWriteBuffer::write(const void* buffer, size_t bytes) {
+    SkASSERT_RELEASE(SkIsAlign4(bytes));
+    SkASSERT_RELEASE(buffer != nullptr || bytes == 0);
+    if (bytes != 0) fWriter.write(buffer, bytes);
+}
+
+void SkBinaryWriteBuffer::writePad32(const void* buffer, size_t bytes) {
+    SkASSERT_RELEASE(buffer != nullptr || bytes == 0);
+    SkASSERT_RELEASE(bytes <= std::numeric_limits<size_t>::max() - 3);
+    if (bytes != 0) fWriter.writePad(buffer, bytes);
+}
+
+void SkBinaryWriteBuffer::writeToMemory(void* destination) const {
+    const size_t bytes = fWriter.bytesWritten();
+    if (bytes == 0) return;
+    SkASSERT_RELEASE(destination != nullptr);
+    fWriter.flatten(destination);
+}
+
+sk_sp<SkData> SkBinaryWriteBuffer::snapshotAsData() const {
+    if (fWriter.bytesWritten() == 0) {
+        sk_sp<SkData> empty = SkData::MakeEmpty();
+        return empty;
+    }
+    sk_sp<SkData> snapshot = fWriter.snapshotAsData();
+    return snapshot;
+}
+
+namespace {
+// All typed arrays use the same count prefix and raw four-byte-aligned payload.
+void write_array(SkWriter32& writer, const void* values, size_t count, size_t elementSize) {
+    SkASSERT_RELEASE(count <= static_cast<size_t>(std::numeric_limits<int32_t>::max()));
+    SkASSERT_RELEASE(values != nullptr || count == 0);
+    SkSafeMath safe{};
+    const size_t bytes = safe.mul(count, elementSize);
+    SkASSERT_RELEASE(safe.ok());
+    const uint32_t encodedCount = static_cast<uint32_t>(count);
+    writer.write32(encodedCount);
+    writer.write(values, bytes);
+}
 }
 
 void SkBinaryWriteBuffer::writeByteArray(const void* data, size_t size) {
-    fWriter.write32(SkToU32(size));
+    SkASSERT_RELEASE(data != nullptr || size == 0);
+    SkASSERT_RELEASE(size <= std::numeric_limits<uint32_t>::max());
+    SkASSERT_RELEASE(size <= std::numeric_limits<size_t>::max() - 3);
+    const uint32_t count = static_cast<uint32_t>(size);
+    fWriter.write32(count);
     fWriter.writePad(data, size);
 }
 
@@ -59,8 +113,7 @@ void SkBinaryWriteBuffer::writeScalar(SkScalar value) {
 }
 
 void SkBinaryWriteBuffer::writeScalarArray(SkSpan<const SkScalar> values) {
-    fWriter.write32(SkToInt(values.size()));
-    fWriter.write(values.data(), values.size_bytes());
+    write_array(fWriter, values.data(), values.size(), sizeof(SkScalar));
 }
 
 void SkBinaryWriteBuffer::writeInt(int32_t value) {
@@ -68,8 +121,7 @@ void SkBinaryWriteBuffer::writeInt(int32_t value) {
 }
 
 void SkBinaryWriteBuffer::writeIntArray(SkSpan<const int32_t> values) {
-    fWriter.write32(SkToInt(values.size()));
-    fWriter.write(values.data(), values.size_bytes());
+    write_array(fWriter, values.data(), values.size(), sizeof(int32_t));
 }
 
 void SkBinaryWriteBuffer::writeUInt(uint32_t value) {
@@ -77,7 +129,10 @@ void SkBinaryWriteBuffer::writeUInt(uint32_t value) {
 }
 
 void SkBinaryWriteBuffer::writeString(std::string_view value) {
-    fWriter.writeString(value.data(), value.size());
+    const size_t bytes = value.size();
+    SkASSERT_RELEASE(bytes <= std::numeric_limits<uint32_t>::max());
+    SkASSERT_RELEASE(bytes <= std::numeric_limits<size_t>::max() - 8);
+    fWriter.writeString(value.data(), bytes);
 }
 
 void SkBinaryWriteBuffer::writeColor(SkColor color) {
@@ -85,8 +140,7 @@ void SkBinaryWriteBuffer::writeColor(SkColor color) {
 }
 
 void SkBinaryWriteBuffer::writeColorArray(SkSpan<const SkColor> values) {
-    fWriter.write32(SkToInt(values.size()));
-    fWriter.write(values.data(), values.size_bytes());
+    write_array(fWriter, values.data(), values.size(), sizeof(SkColor));
 }
 
 void SkBinaryWriteBuffer::writeColor4f(const SkColor4f& color) {
@@ -94,8 +148,7 @@ void SkBinaryWriteBuffer::writeColor4f(const SkColor4f& color) {
 }
 
 void SkBinaryWriteBuffer::writeColor4fArray(SkSpan<const SkColor4f> values) {
-    fWriter.write32(SkToInt(values.size()));
-    fWriter.write(values.data(), values.size_bytes());
+    write_array(fWriter, values.data(), values.size(), sizeof(SkColor4f));
 }
 
 void SkBinaryWriteBuffer::writePoint(const SkPoint& point) {
@@ -104,16 +157,16 @@ void SkBinaryWriteBuffer::writePoint(const SkPoint& point) {
 }
 
 void SkBinaryWriteBuffer::writePoint3(const SkPoint3& point) {
-    this->writePad32(&point, sizeof(SkPoint3));
+    writePad32(&point, sizeof(SkPoint3));
 }
 
 void SkBinaryWriteBuffer::writePointArray(SkSpan<const SkPoint> values) {
-    fWriter.write32(SkToInt(values.size()));
-    fWriter.write(values.data(), values.size_bytes());
+    write_array(fWriter, values.data(), values.size(), sizeof(SkPoint));
 }
 
 void SkBinaryWriteBuffer::write(const SkM44& matrix) {
-    fWriter.write(SkMatrixPriv::M44ColMajor(matrix), sizeof(float) * 16);
+    const float* entries = SkMatrixPriv::M44ColMajor(matrix);
+    fWriter.write(entries, sizeof(float) * 16);
 }
 
 void SkBinaryWriteBuffer::writeMatrix(const SkMatrix& matrix) {
@@ -140,21 +193,14 @@ void SkBinaryWriteBuffer::writePath(const SkPath& path) {
     fWriter.writePath(path);
 }
 
-size_t SkBinaryWriteBuffer::writeStream(SkStream* stream, size_t length) {
-    fWriter.write32(SkToU32(length));
-    size_t bytesWritten = fWriter.readFromStream(stream, length);
-    if (bytesWritten < length) {
-        fWriter.reservePad(length - bytesWritten);
-    }
-    return bytesWritten;
-}
-
 bool SkBinaryWriteBuffer::writeToStream(SkWStream* stream) const {
-    return fWriter.writeToStream(stream);
+    SkASSERT_RELEASE(stream != nullptr);
+    const bool written = fWriter.writeToStream(stream);
+    return written;
 }
 
 static sk_sp<const SkData> serialize_image(const SkImage* image, SkSerialProcs procs) {
-    sk_sp<const SkData> data;
+    sk_sp<const SkData> data{};
     if (procs.fImageProc) {
         data = procs.fImageProc(const_cast<SkImage*>(image), procs.fImageCtx);
     }
@@ -163,7 +209,7 @@ static sk_sp<const SkData> serialize_image(const SkImage* image, SkSerialProcs p
     }
     // Check to see if the image's source was an encoded block of data.
     // If so, just use that.
-    data = image->refEncodedData();
+    data = (*image).refEncodedData();
     if (data) {
         return data;
     }
@@ -177,22 +223,25 @@ static sk_sp<SkData> serialize_mipmap(const SkMipmap* mipmap, SkSerialProcs proc
             encoded_size:32
             encoded_data (padded)
     */
-    const int count = mipmap->countLevels();
+    const int count = (*mipmap).countLevels();
 
     // This buffer does not need procs because it is just writing SkDatas
-    SkBinaryWriteBuffer buffer({});
+    const SkSerialProcs plain{};
+    SkBinaryWriteBuffer buffer(plain);
     buffer.write32(count);
     for (int i = 0; i < count; ++i) {
-        SkMipmap::Level level;
-        if (mipmap->getLevel(i, &level)) {
+        SkMipmap::Level level{};
+        if ((*mipmap).getLevel(i, &level)) {
             sk_sp<SkImage> levelImage = SkImages::RasterFromPixmap(level.fPixmap, nullptr, nullptr);
+            if (!levelImage) return nullptr;
             sk_sp<const SkData> levelData = serialize_image(levelImage.get(), procs);
             buffer.writeDataAsByteArray(levelData.get());
         } else {
             return nullptr;
         }
     }
-    return buffer.snapshotAsData();
+    sk_sp<SkData> snapshot = buffer.snapshotAsData();
+    return snapshot;
 }
 
 /*  Format:
@@ -203,112 +252,67 @@ static sk_sp<SkData> serialize_mipmap(const SkMipmap* mipmap, SkSerialProcs proc
  */
 void SkBinaryWriteBuffer::writeImage(const SkImage* image) {
     uint32_t flags = 0;
-    const SkMipmap* mips = as_IB(image)->onPeekMips();
+    SkASSERT_RELEASE(image != nullptr);
+    const SkImage_Base* base = as_IB(image);
+    const SkMipmap* mips = (*base).onPeekMips();
     if (mips) {
         flags |= SkWriteBufferImageFlags::kHasMipmap;
     }
-    if (image->alphaType() == kUnpremul_SkAlphaType) {
+    if ((*image).alphaType() == kUnpremul_SkAlphaType) {
         flags |= SkWriteBufferImageFlags::kUnpremul;
     }
 
-    this->write32(flags);
+    write32(flags);
 
     sk_sp<const SkData> data = serialize_image(image, fProcs);
     SkASSERT(data);
-    this->writeDataAsByteArray(data.get());
+    writeDataAsByteArray(data.get());
 
     if (flags & SkWriteBufferImageFlags::kHasMipmap) {
         sk_sp<SkData> mipData = serialize_mipmap(mips, fProcs);
-        this->writeDataAsByteArray(mipData.get());
+        writeDataAsByteArray(mipData.get());
     }
 }
 
-void SkBinaryWriteBuffer::writeTypeface(SkTypeface* obj) {
-    // Write 32 bits (signed)
-    //   0 -- empty font
-    //  >0 -- index
-    //  <0 -- custom (serial procs)
 
-    if (obj == nullptr) {
-        fWriter.write32(0);
-    } else if (fProcs.fTypefaceProc) {
-        auto data = fProcs.fTypefaceProc(obj, fProcs.fTypefaceCtx);
-        if (data) {
-            size_t size = data->size();
-            if (!SkTFitsIn<int32_t>(size)) {
-                size = 0;               // fall back to default font
-            }
-            int32_t ssize = SkToS32(size);
-            fWriter.write32(-ssize);    // negative to signal custom
-            if (size) {
-                this->writePad32(data->data(), size);
-            }
-            return;
-        }
-        // no data means fall through for std behavior
-    }
-    fWriter.write32(fTFSet ? fTFSet->add(obj) : 0);
-}
-
-void SkBinaryWriteBuffer::writePaint(const SkPaint& paint) {
-    SkPaintPriv::Flatten(paint, *this);
-}
-
-void SkBinaryWriteBuffer::setFactoryRecorder(sk_sp<SkFactorySet> rec) {
-    fFactorySet = std::move(rec);
-}
-
-void SkBinaryWriteBuffer::setTypefaceRecorder(sk_sp<SkRefCntSet> rec) {
-    fTFSet = std::move(rec);
-}
 
 void SkBinaryWriteBuffer::writeFlattenable(const SkFlattenable* flattenable) {
     if (nullptr == flattenable) {
-        this->write32(0);
+        write32(0);
         return;
     }
 
-    /*
-     *  We can write 1 of 2 versions of the flattenable:
-     *
-     *  1. index into fFactorySet: This assumes the writer will later resolve the function-ptrs
-     *     into strings for its reader. SkPicture does exactly this, by writing a table of names
-     *     (matching the indices) up front in its serialized form.
-     *
-     *  2. string name of the flattenable or index into fFlattenableDict:  We store the string to
-     *     allow the reader to specify its own factories after write time. In order to improve
-     *     compression, if we have already written the string, we write its index instead.
-     */
+    // Ordinary streams carry inline type names, then dictionary indices on reuse.
+    const char* name = (*flattenable).getTypeName();
+    SkASSERT_RELEASE(name != nullptr && name[0] != '\0');
 
-    if (SkFlattenable::Factory factory = flattenable->getFactory(); factory && fFactorySet) {
-        this->write32(fFactorySet->add(factory));
+    if (uint32_t* indexPtr = fFlattenableDict.find(name)) {
+        // We will write the index as a 32-bit int.  We want the first byte
+        // that we send to be zero - this will act as a sentinel that we
+        // have an index (not a string).  This means that we will send the
+        // the index shifted left by 8.  The remaining 24-bits should be
+        // plenty to store the index.  Note that this strategy depends on
+        // being little endian, and type names being non-empty.
+        SkASSERT_RELEASE(*indexPtr <= 0x00ffffffU);
+        const uint32_t token = *indexPtr << 8;
+        writeUInt(token);
     } else {
-        const char* name = flattenable->getTypeName();
-        SkASSERT(name);
-        SkASSERT(0 != strcmp("", name));
-
-        if (uint32_t* indexPtr = fFlattenableDict.find(name)) {
-            // We will write the index as a 32-bit int.  We want the first byte
-            // that we send to be zero - this will act as a sentinel that we
-            // have an index (not a string).  This means that we will send the
-            // the index shifted left by 8.  The remaining 24-bits should be
-            // plenty to store the index.  Note that this strategy depends on
-            // being little endian, and type names being non-empty.
-            SkASSERT(0 == *indexPtr >> 24);
-            this->write32(*indexPtr << 8);
-        } else {
-            this->writeString(name);
-            fFlattenableDict.set(name, fFlattenableDict.count() + 1);
-        }
+        const int count = fFlattenableDict.count();
+        SkASSERT_RELEASE(count < 0x00ffffff);
+        writeString(name);
+        const uint32_t index = static_cast<uint32_t>(count) + 1;
+        fFlattenableDict.set(name, index);
     }
 
     // make room for the size of the flattened object
     (void)fWriter.reserve(sizeof(uint32_t));
     // record the current size, so we can subtract after the object writes.
-    size_t offset = fWriter.bytesWritten();
+    const size_t offset = fWriter.bytesWritten();
     // now flatten the object
-    flattenable->flatten(*this);
-    size_t objSize = fWriter.bytesWritten() - offset;
+    (*flattenable).flatten(*this);
+    const size_t objSize = fWriter.bytesWritten() - offset;
+    SkASSERT_RELEASE(objSize <= std::numeric_limits<uint32_t>::max());
+    const uint32_t encodedSize = static_cast<uint32_t>(objSize);
     // record the obj's size
-    fWriter.overwriteTAt(offset - sizeof(uint32_t), SkToU32(objSize));
+    fWriter.overwriteTAt(offset - sizeof(uint32_t), encodedSize);
 }

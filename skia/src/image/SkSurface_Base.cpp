@@ -9,8 +9,6 @@
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkCanvas.h"
-#include "include/core/SkCapabilities.h"
-#include "include/core/SkColorSpace.h" // IWYU pragma: keep
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkPixmap.h"
@@ -19,44 +17,36 @@
 #include "include/core/SkScalar.h"
 #include "include/core/SkSize.h"
 #include "include/core/SkSurface.h"
-#include "src/capture/SkCaptureCanvas.h"
-#include "src/capture/SkCaptureManager.h"
 #include "src/image/SkRescaleAndReadPixels.h"
 
 #include <atomic>
 #include <cstdint>
 
-class GrRecordingContext;
 class SkPaint;
 class SkSurfaceProps;
-namespace skgpu { namespace graphite { class Recorder; } }
 
-SkSurface_Base::SkSurface_Base(int width, int height, const SkSurfaceProps* props,
-                               sk_sp<SkPixelStorage> storage)
-        : SkSurface(width, height, props), fPixelStorage(std::move(storage)) {}
+SkSurface_Base::SkSurface_Base(int width, int height, const SkSurfaceProps* props)
+        : SkSurface(width, height, props) {}
 
-SkSurface_Base::SkSurface_Base(const SkImageInfo& info, const SkSurfaceProps* props,
-                               sk_sp<SkPixelStorage> storage)
-        : SkSurface(info, props), fPixelStorage(std::move(storage)) {}
+SkSurface_Base::SkSurface_Base(const SkImageInfo& info, const SkSurfaceProps* props)
+        : SkSurface(info, props) {}
 
 SkSurface_Base::~SkSurface_Base() {
-    // in case the canvas outsurvives us, we null the callback
-    if (fCachedCanvas) {
-        fCachedCanvas->setSurfaceBase(nullptr);
-        fCachedCanvas->onSurfaceDelete();
+    // Revoke the observer before notifying and destroying the owned canvas.
+    if (fCanvas) {
+        (*fCanvas).setSurfaceBase(nullptr);
+        (*fCanvas).onSurfaceDelete();
     }
 }
 
-GrRecordingContext* SkSurface_Base::onGetRecordingContext() const { return nullptr; }
 
-skgpu::graphite::Recorder* SkSurface_Base::onGetRecorder() const { return nullptr; }
 SkRecorder* SkSurface_Base::onGetBaseRecorder() const { return nullptr; }
 
 void SkSurface_Base::onDraw(SkCanvas* canvas, SkScalar x, SkScalar y,
                             const SkSamplingOptions& sampling, const SkPaint* paint) {
-    auto image = this->makeTemporaryImage();
+    sk_sp<SkImage> image = makeTemporaryImage();
     if (image) {
-        canvas->drawImage(image.get(), x, y, sampling, paint);
+        (*canvas).drawImage(image.get(), x, y, sampling, paint);
     }
 }
 
@@ -66,82 +56,68 @@ void SkSurface_Base::onAsyncRescaleAndReadPixels(const SkImageInfo& info,
                                                  RescaleMode rescaleMode,
                                                  SkSurface::ReadPixelsCallback callback,
                                                  SkSurface::ReadPixelsContext context) {
-    SkBitmap src;
-    SkPixmap peek;
-    SkIRect srcRect;
-    if (this->peekPixels(&peek)) {
-        src.installPixels(peek);
-        srcRect = origSrcRect;
+    SkBitmap source;
+    SkPixmap sourceView;
+    SkIRect sourceRect = SkIRect::MakeEmpty();
+    if (peekPixels(&sourceView)) {
+        source.installPixels(sourceView);
+        sourceRect = origSrcRect;
     } else {
-        src.setInfo(this->imageInfo().makeDimensions(origSrcRect.size()));
-        src.allocPixels();
-        if (!this->readPixels(src, origSrcRect.x(), origSrcRect.y())) {
+        const SkISize sourceSize = origSrcRect.size();
+        const SkImageInfo surfaceInfo = imageInfo();
+        const SkImageInfo sourceInfo = surfaceInfo.makeDimensions(sourceSize);
+        if (!source.tryAllocPixels(sourceInfo)) {
             callback(context, nullptr);
             return;
         }
-        srcRect = SkIRect::MakeSize(src.dimensions());
+        const bool read = readPixels(source, origSrcRect.x(), origSrcRect.y());
+        if (!read) {
+            callback(context, nullptr);
+            return;
+        }
+        sourceRect = SkIRect::MakeSize(source.dimensions());
     }
-    return SkRescaleAndReadPixels(src, info, srcRect, rescaleGamma, rescaleMode, callback,
-                                  context);
-}
-
-void SkSurface_Base::onAsyncRescaleAndReadPixelsYUV420(
-        SkYUVColorSpace yuvColorSpace, bool readAlpha, sk_sp<SkColorSpace> dstColorSpace,
-        SkIRect srcRect, SkISize dstSize, RescaleGamma rescaleGamma, RescaleMode,
-        ReadPixelsCallback callback, ReadPixelsContext context) {
-    // TODO: Call non-YUV asyncRescaleAndReadPixels and then make our callback convert to YUV and
-    // call client's callback.
-    callback(context, nullptr);
+    SkRescaleAndReadPixels(source, info, sourceRect, rescaleGamma, rescaleMode,
+                          callback, context);
 }
 
 bool SkSurface_Base::outstandingImageSnapshot() const {
-    return fCachedImage && !fCachedImage->unique();
+    const bool shared = fCachedImage && !(*fCachedImage).unique();
+    return shared;
 }
 
 bool SkSurface_Base::aboutToDraw(ContentChangeMode mode) {
-    this->dirtyGenerationID();
+    dirtyGenerationID();
+    SkASSERT(!fCanvas || (*fCanvas).getSurfaceBase() == this);
 
-    SkASSERT(!fCachedCanvas || fCachedCanvas->getSurfaceBase() == this);
-
-    if (fCachedImage) {
-        // the surface may need to fork its backend, if its sharing it with
-        // the cached image. Note: we only call if there is an outstanding owner
-        // on the image (besides us).
-        bool unique = fCachedImage->unique();
-        if (!unique) {
-            if (!this->onCopyOnWrite(mode)) {
-                return false;
-            }
+    if (!fCachedImage) {
+        if (mode == kDiscard_ContentChangeMode) {
+            onDiscard();
         }
+        return true;
+    }
 
-        // regardless of copy-on-write, we must drop our cached image now, so
-        // that the next request will get our new contents.
-        fCachedImage.reset();
-
-        if (unique) {
-            // Our content isn't held by any image now, so we can consider that content mutable.
-            // Raster surfaces need to be told it's safe to consider its pixels mutable again.
-            // We make this call after the ->unref() so the subclass can assert there are no images.
-            this->onRestoreBackingMutability();
+    const bool exclusivelyCached = (*fCachedImage).unique();
+    if (!exclusivelyCached) {
+        const bool separated = onCopyOnWrite(mode);
+        if (!separated) {
+            return false;
         }
-    } else if (kDiscard_ContentChangeMode == mode) {
-        this->onDiscard();
+    }
+
+    // End the cached image's lifetime before making its backing mutable again.
+    // External image owners keep their allocation; failed separation above
+    // leaves both the cached snapshot and the surface backing unchanged.
+    fCachedImage.reset();
+    if (exclusivelyCached) {
+        onRestoreBackingMutability();
     }
     return true;
 }
 
 uint32_t SkSurface_Base::newGenerationID() {
-    SkASSERT(!fCachedCanvas || fCachedCanvas->getSurfaceBase() == this);
+    SkASSERT(!fCanvas || (*fCanvas).getSurfaceBase() == this);
     static std::atomic<uint32_t> nextID{1};
-    return nextID.fetch_add(1, std::memory_order_relaxed);
-}
-
-sk_sp<const SkCapabilities> SkSurface_Base::onCapabilities() {
-    return SkCapabilities::RasterBackend();
-}
-
-void SkSurface_Base::createCaptureBreakpoint() {
-    if (this->baseRecorder()) {
-        this->baseRecorder()->createCaptureBreakpoint(this);
-    }
+    const uint32_t generation = nextID.fetch_add(1, std::memory_order_relaxed);
+    return generation;
 }

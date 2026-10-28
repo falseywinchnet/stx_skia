@@ -70,8 +70,12 @@ private:
     // If fUsePersp, we need both of these matrices,
     // otherwise we can combine them, and only use fM43
 
+    // The pipeline reads these between update() calls: fM43's coefficients, and fM33's nine
+    // values in row-major order (copied into fM33Values, rather than read from SkMatrix's
+    // private layout).
     Matrix43 fM43;
     SkMatrix fM33;
+    float fM33Values[9] = {};
     const bool fIsOpaque;
     const bool fUsePersp;  // controls our stages, and what we do in update()
 };

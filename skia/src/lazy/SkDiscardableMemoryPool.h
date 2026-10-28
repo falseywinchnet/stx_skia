@@ -8,7 +8,6 @@
 #ifndef SkDiscardableMemoryPool_DEFINED
 #define SkDiscardableMemoryPool_DEFINED
 
-#include "include/private/SkMutex.h"
 #include "include/private/chromium/SkDiscardableMemory.h"
 
 #ifndef SK_LAZY_CACHE_STATS
@@ -27,6 +26,8 @@
  */
 class SkDiscardableMemoryPool : public SkDiscardableMemory::Factory {
 public:
+    // Each call is synchronized; separate calls are not one combined snapshot.
+    // Usage counts live allocation bytes, not block objects or allocator overhead.
     virtual size_t getRAMUsed() = 0;
     virtual void setRAMBudget(size_t budget) = 0;
     virtual size_t getRAMBudget() = 0;
@@ -38,7 +39,8 @@ public:
     /**
      * These two values are a count of the number of successful and
      * failed calls to SkDiscardableMemory::lock() for all DMs managed
-     * by this pool.
+     * by this pool. Diagnostic counters saturate at INT_MAX. Reads and reset
+     * are synchronized with block operations.
      */
     virtual int getCacheHits() = 0;
     virtual int getCacheMisses() = 0;
@@ -46,8 +48,9 @@ public:
     #endif
 
     /**
-     *  This non-global pool can be used for unit tests to verify that
-     *  the pool works.
+     *  Create an independent pool with the given allocation-byte budget. Blocks
+     *  retain their pool. create(0) and allocation/admission failure return null;
+     *  a successful create transfers a locked block to its caller.
      */
     static sk_sp<SkDiscardableMemoryPool> Make(size_t size);
 };

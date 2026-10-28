@@ -212,11 +212,3 @@ sk_sp<SkPathEffect> SkLine2DPathEffect::Make(SkScalar width, const SkMatrix& mat
 sk_sp<SkPathEffect> SkPath2DPathEffect::Make(const SkMatrix& matrix, const SkPath& path) {
     return sk_sp<SkPathEffect>(new SkPath2DPathEffectImpl(matrix, path));
 }
-
-void SkLine2DPathEffect::RegisterFlattenables() {
-    SK_REGISTER_FLATTENABLE(SkLine2DPathEffectImpl);
-}
-
-void SkPath2DPathEffect::RegisterFlattenables() {
-    SK_REGISTER_FLATTENABLE(SkPath2DPathEffectImpl);
-}

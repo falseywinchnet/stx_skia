@@ -6,237 +6,233 @@
  */
 
 #include "include/private/SkTDArray.h"
-
 #include "include/private/SkMalloc.h"
-#include "include/private/SkTFitsIn.h"
-#include "include/private/SkTo.h"
 
 #include <climits>
-#include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <new>
+
+namespace {
+constexpr int expanded_capacity(int requested, int elementBytes) {
+    int expanded = INT_MAX;
+    if (INT_MAX - requested > 4) {
+        const int growth = 4 + ((requested + 4) >> 2);
+        if (INT_MAX - requested > growth) expanded = requested + growth;
+    }
+    if (elementBytes == 1 && expanded <= INT_MAX - 15) {
+        expanded = (expanded + 15) & ~15;
+    }
+    return expanded;
+}
+static_assert(expanded_capacity(1, 1) == 16);
+static_assert(expanded_capacity(1, 4) == 6);
+static_assert(expanded_capacity(INT_MAX - 16, 1) == INT_MAX);
+static_assert(expanded_capacity(INT_MAX, 1) == INT_MAX);
+}
 
 SkTDStorage::SkTDStorage(int sizeOfT) : fSizeOfT{sizeOfT} {
-    SkASSERT(sizeOfT > 0);
+    SkASSERT_RELEASE(sizeOfT > 0);
 }
 
 SkTDStorage::SkTDStorage(const void* src, int size, int sizeOfT)
-        : fSizeOfT{sizeOfT}
-        , fCapacity{size}
-        , fSize{size} {
-    if (size > 0) {
-        SkASSERT(sizeOfT > 0);
-        SkASSERT(src != nullptr);
-        size_t storageSize = this->safe_bytes(size);
-        fStorage = static_cast<std::byte*>(sk_malloc_throw(storageSize));
-        memcpy(fStorage, src, storageSize);
-    }
+        : SkTDStorage(sizeOfT) {
+    SkASSERT_RELEASE(size >= 0);
+    if (size == 0) return;
+    SkASSERT_RELEASE(src != nullptr);
+    const size_t storageSize = safe_bytes(size);
+    fStorage = static_cast<std::byte*>(sk_malloc_throw(storageSize));
+    memcpy(fStorage, src, storageSize);
+    fCapacity = size;
+    fSize = size;
 }
 
 SkTDStorage::SkTDStorage(const SkTDStorage& that)
         : SkTDStorage{that.fStorage, that.fSize, that.fSizeOfT} {}
 
 SkTDStorage& SkTDStorage::operator=(const SkTDStorage& that) {
-    if (this != &that) {
-        if (that.fSize <= fCapacity) {
-            fSize = that.fSize;
-            if (fSize > 0) {
-                memcpy(fStorage, that.data(), that.size_bytes());
-            }
-        } else {
-            *this = SkTDStorage{that.data(), that.size(), that.fSizeOfT};
-        }
+    SkASSERT_RELEASE(fSizeOfT == that.fSizeOfT);
+    if (this == &that) return *this;
+    if (that.fSize > fCapacity) {
+        SkTDStorage replacement(that);
+        swap(replacement);
+        return *this;
     }
+    if (that.fSize > 0) {
+        const size_t byteCount = that.size_bytes();
+        memcpy(fStorage, that.fStorage, byteCount);
+    }
+    fSize = that.fSize;
     return *this;
 }
 
 SkTDStorage::SkTDStorage(SkTDStorage&& that)
         : fSizeOfT{that.fSizeOfT}
-        , fStorage(std::exchange(that.fStorage, nullptr))
-        , fCapacity{that.fCapacity}
-        , fSize{that.fSize} {}
+        , fStorage{std::exchange(that.fStorage, nullptr)}
+        , fCapacity{std::exchange(that.fCapacity, 0)}
+        , fSize{std::exchange(that.fSize, 0)} {}
 
 SkTDStorage& SkTDStorage::operator=(SkTDStorage&& that) {
-    if (this != &that) {
-        this->~SkTDStorage();
-        new (this) SkTDStorage{std::move(that)};
-    }
+    SkASSERT_RELEASE(fSizeOfT == that.fSizeOfT);
+    if (this == &that) return *this;
+    reset();
+    fStorage = std::exchange(that.fStorage, nullptr);
+    fCapacity = std::exchange(that.fCapacity, 0);
+    fSize = std::exchange(that.fSize, 0);
     return *this;
 }
 
-SkTDStorage::~SkTDStorage() {
-    sk_free(fStorage);
-}
+SkTDStorage::~SkTDStorage() { sk_free(fStorage); }
 
 void SkTDStorage::reset() {
-    const int sizeOfT = fSizeOfT;
-    this->~SkTDStorage();
-    new (this) SkTDStorage{sizeOfT};
+    sk_free(fStorage);
+    fStorage = nullptr;
+    fCapacity = 0;
+    fSize = 0;
 }
 
 void SkTDStorage::swap(SkTDStorage& that) {
-    SkASSERT(fSizeOfT == that.fSizeOfT);
-    using std::swap;
-    swap(fStorage, that.fStorage);
-    swap(fCapacity, that.fCapacity);
-    swap(fSize, that.fSize);
+    SkASSERT_RELEASE(fSizeOfT == that.fSizeOfT);
+    std::swap(fStorage, that.fStorage);
+    std::swap(fCapacity, that.fCapacity);
+    std::swap(fSize, that.fSize);
 }
 
 void SkTDStorage::resize(int newSize) {
-    SkASSERT(newSize >= 0);
-    if (newSize > fCapacity) {
-        this->reserve(newSize);
-    }
+    SkASSERT_RELEASE(newSize >= 0);
+    if (newSize > fCapacity) reserve(newSize);
     fSize = newSize;
 }
 
 void SkTDStorage::reserve(int newCapacity) {
-    SkASSERT(newCapacity >= 0);
-    if (newCapacity > fCapacity) {
-        // Establish the maximum number of elements that includes a valid count for end. In the
-        // largest case end() = &fArray[INT_MAX] which is 1 after the last indexable element.
-        static constexpr int kMaxCount = INT_MAX;
-
-        // Assume that the array will max out.
-        int expandedReserve = kMaxCount;
-        if (kMaxCount - newCapacity > 4) {
-            // Add 1/4 more than we need. Add 4 to ensure this grows by at least 1. Pin to
-            // kMaxCount if no room for 1/4 growth.
-            int growth = 4 + ((newCapacity + 4) >> 2);
-            // Read this line as: if (count + growth < kMaxCount) { ... }
-            // It's rewritten to avoid signed integer overflow.
-            if (kMaxCount - newCapacity > growth) {
-                expandedReserve = newCapacity + growth;
-            }
-        }
-
-
-        // With a T size of 1, the above allocator produces the progression of 7, 15, ... Since,
-        // the sizeof max_align_t is often 16, there is no reason to allocate anything less than
-        // 16 bytes. This eliminates a realloc when pushing back bytes to an SkTDArray.
-        if (fSizeOfT == 1) {
-            // Round up to the multiple of 16.
-            expandedReserve = (expandedReserve + 15) & ~15;
-        }
-
-        fCapacity = expandedReserve;
-        size_t newStorageSize = this->safe_bytes(fCapacity);
-        fStorage = static_cast<std::byte*>(sk_realloc_throw(fStorage, newStorageSize));
-    }
+    SkASSERT_RELEASE(newCapacity >= 0);
+    if (newCapacity <= fCapacity) return;
+    const int expanded = expanded_capacity(newCapacity, fSizeOfT);
+    const size_t storageSize = safe_bytes(expanded);
+    fStorage = static_cast<std::byte*>(sk_realloc_throw(fStorage, storageSize));
+    fCapacity = expanded;
 }
 
 void SkTDStorage::shrink_to_fit() {
-    if (fCapacity != fSize) {
-        fCapacity = fSize;
-        // Because calling realloc with size of 0 is implementation defined, force to a good state
-        // by freeing fStorage.
-        if (fCapacity > 0) {
-            fStorage =
-                static_cast<std::byte*>(sk_realloc_throw(fStorage, this->safe_bytes(fCapacity)));
-        } else {
-            sk_free(fStorage);
-            fStorage = nullptr;
-        }
+    if (fCapacity == fSize) return;
+    if (fSize == 0) {
+        reset();
+        return;
     }
+    const size_t storageSize = safe_bytes(fSize);
+    fStorage = static_cast<std::byte*>(sk_realloc_throw(fStorage, storageSize));
+    fCapacity = fSize;
 }
 
 void SkTDStorage::erase(int index, int count) {
-    SkASSERT(count >= 0);
-    SkASSERT(fSize >= count);
-    SkASSERT(0 <= index && index <= fSize);
-
-    if (count > 0) {
-        // Check that the resulting size fits in an int. This will abort if not.
-        const int newCount = this->calculateSizeOrDie(-count);
-        this->moveTail(index, index + count, fSize);
-        this->resize(newCount);
-    }
+    SkASSERT_RELEASE(index >= 0 && index <= fSize);
+    SkASSERT_RELEASE(count >= 0 && count <= fSize - index);
+    if (count == 0) return;
+    moveTail(index, index + count, fSize);
+    fSize -= count;
 }
 
 void SkTDStorage::removeShuffle(int index) {
-    SkASSERT(fSize > 0);
-    SkASSERT(0 <= index && index < fSize);
-    // Check that the new count is valid.
-    const int newCount = this->calculateSizeOrDie(-1);
-    this->moveTail(index, fSize - 1, fSize);
-    this->resize(newCount);
+    SkASSERT_RELEASE(index >= 0 && index < fSize);
+    moveTail(index, fSize - 1, fSize);
+    --fSize;
 }
 
-void* SkTDStorage::prepend() {
-    return this->insert(/*index=*/0);
+void* SkTDStorage::prepend() & {
+    void* result = insert(0);
+    return result;
 }
 
 void SkTDStorage::append() {
     if (fSize < fCapacity) {
-        fSize++;
-    } else {
-        this->insert(fSize);
+        ++fSize;
+        return;
     }
+    insert(fSize);
 }
 
 void SkTDStorage::append(int count) {
-    SkASSERT(count >= 0);
-    // Read as: if (fSize + count <= fCapacity) {...}. This is a UB safe way to avoid the add.
-    if (fCapacity - fSize >= count) {
+    SkASSERT_RELEASE(count >= 0);
+    if (count <= fCapacity - fSize) {
         fSize += count;
-    } else {
-        this->insert(fSize, count, nullptr);
+        return;
     }
+    insert(fSize, count, nullptr);
 }
 
-void* SkTDStorage::append(const void* src, int count) {
-    return this->insert(fSize, count, src);
+void* SkTDStorage::append(const void* src, int count) & {
+    void* result = insert(fSize, count, src);
+    return result;
 }
 
-void* SkTDStorage::insert(int index) {
-    return this->insert(index, /*count=*/1, nullptr);
+void* SkTDStorage::insert(int index) & {
+    void* result = insert(index, 1, nullptr);
+    return result;
 }
 
-void* SkTDStorage::insert(int index, int count, const void* src) {
-    SkASSERT(0 <= index && index <= fSize);
-    SkASSERT(count >= 0);
-
-    if (count > 0) {
-        const int oldCount = fSize;
-        const int newCount = this->calculateSizeOrDie(count);
-        this->resize(newCount);
-        this->moveTail(index + count, index, oldCount);
-
-        if (src != nullptr) {
-            this->copySrc(index, src, count);
+void* SkTDStorage::insert(int index, int count, const void* src) & {
+    SkASSERT_RELEASE(index >= 0 && index <= fSize);
+    SkASSERT_RELEASE(count >= 0 && count <= INT_MAX - fSize);
+    if (count == 0) {
+        void* result = address(index);
+        return result;
+    }
+    const int oldCount = fSize;
+    const int newCount = oldCount + count;
+    const size_t insertedBytes = safe_bytes(count);
+    const size_t insertionOffset = bytes(index);
+    size_t sourceOffset = 0;
+    bool internalSource = false;
+    if (src != nullptr && fStorage != nullptr) {
+        // Compare integer addresses, not ordered pointers into unrelated allocations.
+        const uintptr_t sourceAddress = reinterpret_cast<uintptr_t>(src);
+        const uintptr_t storageAddress = reinterpret_cast<uintptr_t>(fStorage);
+        if (sourceAddress >= storageAddress) {
+            const uintptr_t offset = sourceAddress - storageAddress;
+            if (offset < bytes(fCapacity)) {
+                sourceOffset = static_cast<size_t>(offset);
+                const size_t liveBytes = bytes(oldCount);
+                SkASSERT_RELEASE(sourceOffset <= liveBytes);
+                SkASSERT_RELEASE(insertedBytes <= liveBytes - sourceOffset);
+                internalSource = true;
+            }
         }
     }
-
-    return this->address(index);
+    resize(newCount);
+    moveTail(index + count, index, oldCount);
+    std::byte* destination = fStorage + insertionOffset;
+    if (internalSource) {
+        // The tail shift preserves the old source in at most two pieces outside
+        // the new gap. Copy those pieces without allocating a snapshot.
+        size_t prefixBytes = 0;
+        if (sourceOffset < insertionOffset) {
+            prefixBytes = std::min(insertedBytes, insertionOffset - sourceOffset);
+            memmove(destination, fStorage + sourceOffset, prefixBytes);
+        }
+        const size_t suffixBytes = insertedBytes - prefixBytes;
+        if (suffixBytes > 0) {
+            const size_t shiftedOffset = sourceOffset + prefixBytes + insertedBytes;
+            memmove(destination + prefixBytes, fStorage + shiftedOffset, suffixBytes);
+        }
+    } else if (src != nullptr) {
+        memmove(destination, src, insertedBytes);
+    }
+    return destination;
 }
 
 bool operator==(const SkTDStorage& a, const SkTDStorage& b) {
-    return a.size() == b.size() && (a.empty() || !memcmp(a.data(), b.data(), a.bytes(a.size())));
-}
-
-int SkTDStorage::calculateSizeOrDie(int delta) {
-    // Check that count will not go negative.
-    SkASSERT_RELEASE(-fSize <= delta);
-
-    // We take care to avoid overflow here.
-    // Because count and delta are both signed 32-bit ints, the sum of count and delta is at
-    // most 4294967294, which fits fine in uint32_t. Proof follows in assert.
-    static_assert(UINT32_MAX >= (uint32_t)INT_MAX + (uint32_t)INT_MAX);
-    uint32_t testCount = (uint32_t)fSize + (uint32_t)delta;
-    SkASSERT_RELEASE(SkTFitsIn<int>(testCount));
-    return SkToInt(testCount);
+    if (a.fSizeOfT != b.fSizeOfT || a.fSize != b.fSize) return false;
+    if (a.empty()) return true;
+    const size_t byteCount = a.size_bytes();
+    const bool equal = memcmp(a.fStorage, b.fStorage, byteCount) == 0;
+    return equal;
 }
 
 void SkTDStorage::moveTail(int to, int tailStart, int tailEnd) {
-    SkASSERT(0 <= to && to <= fSize);
-    SkASSERT(0 <= tailStart && tailStart <= tailEnd && tailEnd <= fSize);
-    if (to != tailStart && tailStart != tailEnd) {
-        this->copySrc(to, this->address(tailStart), tailEnd - tailStart);
-    }
-}
-
-void SkTDStorage::copySrc(int dstIndex, const void* src, int count) {
-    SkASSERT(count > 0);
-    memmove(this->address(dstIndex), src, this->bytes(count));
+    SkASSERT(to >= 0 && to <= fSize);
+    SkASSERT(tailStart >= 0 && tailStart <= tailEnd && tailEnd <= fSize);
+    const int count = tailEnd - tailStart;
+    SkASSERT(count <= fSize - to);
+    if (to == tailStart || count == 0) return;
+    const size_t byteCount = bytes(count);
+    memmove(address(to), address(tailStart), byteCount);
 }

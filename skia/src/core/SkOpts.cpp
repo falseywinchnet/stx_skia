@@ -25,21 +25,23 @@ namespace SkOpts {
     size_t raster_pipeline_lowp_stride  = SK_OPTS_NS::raster_pipeline_lowp_stride();
     size_t raster_pipeline_highp_stride = SK_OPTS_NS::raster_pipeline_highp_stride();
 
-#define M(st) (StageFn)SK_OPTS_NS::st,
+    // The kernel header's stage tables are in SkRasterPipelineOp order; each entry's typed stage
+    // is erased to StageFn here.
+#define M(st) reinterpret_cast<StageFn>(                                                          \
+        SK_OPTS_NS::kHighpStages[static_cast<size_t>(SkRasterPipelineOp::st)].stage),
     StageFn ops_highp[] = { SK_RASTER_PIPELINE_OPS_ALL(M) };
-    StageFn just_return_highp = (StageFn)SK_OPTS_NS::just_return;
+    StageFn just_return_highp = reinterpret_cast<StageFn>(SK_OPTS_NS::just_return);
     void (*start_pipeline_highp)(size_t, size_t, size_t, size_t, SkRasterPipelineStage*,
-                                 SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>,
-                                 uint8_t*) =
+                                 SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>) =
             SK_OPTS_NS::start_pipeline;
 #undef M
 
-#define M(st) (StageFn)SK_OPTS_NS::lowp::st,
+#define M(st) reinterpret_cast<StageFn>(                                                          \
+        SK_OPTS_NS::lowp::kLowpStages[static_cast<size_t>(SkRasterPipelineOp::st)].stage),
     StageFn ops_lowp[] = { SK_RASTER_PIPELINE_OPS_LOWP(M) };
-    StageFn just_return_lowp = (StageFn)SK_OPTS_NS::lowp::just_return;
+    StageFn just_return_lowp = reinterpret_cast<StageFn>(SK_OPTS_NS::lowp::just_return);
     void (*start_pipeline_lowp)(size_t, size_t, size_t, size_t, SkRasterPipelineStage*,
-                                SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>,
-                                uint8_t*) =
+                                SkSpan<SkRasterPipelineContexts::MemoryCtxPatch>) =
             SK_OPTS_NS::lowp::start_pipeline;
 #undef M
 
@@ -49,7 +51,7 @@ namespace SkOpts {
     void Init_lasx();
 
     static bool init() {
-    #if defined(SK_ENABLE_OPTIMIZE_SIZE)
+    #if defined(SK_ENABLE_OPTIMIZE_SIZE) || defined(STX_SKIA_BASELINE_SIMD)
         // All Init_foo functions are omitted when optimizing for size
     #elif defined(SK_CPU_X86)
         #if SK_CPU_X64_LEVEL < SK_CPU_X64_LEVEL_AVX2

@@ -10,7 +10,7 @@
 
 #include "include/core/SkCanvas.h"
 
-// If you would ordinarily want to inherit from Base (eg SkCanvas, SkNWayCanvas), instead
+// If you would ordinarily want to inherit from Base (eg SkCanvas), instead
 // inherit from SkCanvasVirtualEnforcer<Base>, which will make the build fail if you forget
 // to override one of SkCanvas' key virtual hooks.
 template <typename Base>
@@ -31,8 +31,6 @@ protected:
     void onDrawPath(const SkPath& path, const SkPaint& paint) override = 0;
     void onDrawRegion(const SkRegion& region, const SkPaint& paint) override = 0;
 
-    void onDrawTextBlob(const SkTextBlob* blob, SkScalar x, SkScalar y,
-                        const SkPaint& paint) override = 0;
 
     void onDrawPatch(const SkPoint cubics[12], const SkColor colors[4],
                      const SkPoint texCoords[4], SkBlendMode mode,
@@ -50,12 +48,7 @@ protected:
             SkCanvas::QuadAAFlags aaFlags, const SkColor4f& color, SkBlendMode mode) override = 0;
 #endif
 
-    void onDrawAnnotation(const SkRect& rect, const char key[], SkData* value) override = 0;
-    void onDrawShadowRec(const SkPath&, const SkDrawShadowRec&) override = 0;
 
-    void onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix) override = 0;
-    void onDrawPicture(const SkPicture* picture, const SkMatrix* matrix,
-                       const SkPaint* paint) override = 0;
 };
 
 #endif

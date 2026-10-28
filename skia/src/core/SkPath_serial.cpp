@@ -54,33 +54,44 @@ enum SerializationType {
 };
 
 static unsigned extract_version(uint32_t packed) {
-    return packed & kVersion_SerializationMask;
+    const unsigned version = packed & kVersion_SerializationMask;
+    return version;
 }
 
 static SkPathFillType extract_filltype(uint32_t packed) {
-    return static_cast<SkPathFillType>((packed >> kFillType_SerializationShift) & 0x3);
+    const SkPathFillType fillType =
+            static_cast<SkPathFillType>((packed >> kFillType_SerializationShift) & 0x3);
+    return fillType;
 }
 
 static SerializationType extract_serializationtype(uint32_t packed) {
-    return static_cast<SerializationType>((packed >> kType_SerializationShift) & 0xF);
+    const SerializationType type =
+            static_cast<SerializationType>((packed >> kType_SerializationShift) & 0xF);
+    return type;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Writes the rounded-rectangle form (header, rectangle and radii, start index) when the path
+// was built as an oval or rounded rectangle. Returns 0 otherwise. A null storage queries the
+// size; storage must be 4-byte aligned and hold that many bytes.
 size_t SkPath::writeToMemoryAsRRect(void* storage) const {
-    SkRRect rrect;
-    SkPathDirection firstDir;
-    unsigned start;
+    SkRRect rrect{};
+    SkPathDirection firstDir = SkPathDirection::kCW;
+    unsigned start = 0;
 
-    if (auto oinfo = this->getOvalInfo()) {
-        rrect.setOval(oinfo->fBounds);
-        firstDir = oinfo->fDirection;
+    const std::optional<SkPathOvalInfo> oinfo = getOvalInfo();
+    const std::optional<SkPathRRectInfo> rinfo = oinfo.has_value() ? std::nullopt
+                                                                    : getRRectInfo();
+    if (oinfo.has_value()) {
+        rrect.setOval(oinfo.value().fBounds);
+        firstDir = oinfo.value().fDirection;
         // Convert to rrect start indices.
-        start = oinfo->fStartIndex * 2;
-    } else if (auto rinfo = this->getRRectInfo()) {
-        rrect = rinfo->fRRect;
-        firstDir = rinfo->fDirection;
-        start = rinfo->fStartIndex;
+        start = oinfo.value().fStartIndex * 2;
+    } else if (rinfo.has_value()) {
+        rrect = rinfo.value().fRRect;
+        firstDir = rinfo.value().fDirection;
+        start = rinfo.value().fStartIndex;
     } else {
         return 0;
     }
@@ -91,10 +102,10 @@ size_t SkPath::writeToMemoryAsRRect(void* storage) const {
         return sizeNeeded;
     }
 
-    int32_t packed = (static_cast<int>(fFillType) << kFillType_SerializationShift) |
-                     ((int)firstDir << kDirection_SerializationShift) |
-                     (SerializationType::kRRect << kType_SerializationShift) |
-                     kCurrent_Version;
+    const int32_t packed = (static_cast<int>(fFillType) << kFillType_SerializationShift) |
+                           (static_cast<int>(firstDir) << kDirection_SerializationShift) |
+                           (SerializationType::kRRect << kType_SerializationShift) |
+                           kCurrent_Version;
 
     SkWBuffer buffer(storage);
     buffer.write32(packed);
@@ -105,26 +116,29 @@ size_t SkPath::writeToMemoryAsRRect(void* storage) const {
     return buffer.pos();
 }
 
+// Writes the header, the three counts, points, conic weights and forward verbs, padded to four
+// bytes. A null storage queries the size; 0 means the size is unrepresentable.
 size_t SkPath::writeToMemory(void* storage) const {
-    SkDEBUGCODE(this->validate();)
+    SkDEBUGCODE(validate();)
 
-    if (size_t bytes = this->writeToMemoryAsRRect(storage)) {
-        return bytes;
+    const size_t rrectBytes = writeToMemoryAsRRect(storage);
+    if (rrectBytes != 0) {
+        return rrectBytes;
     }
 
-    int32_t packed = (static_cast<int>(fFillType) << kFillType_SerializationShift) |
-                     (SerializationType::kGeneral << kType_SerializationShift) |
-                     kCurrent_Version;
+    const int32_t packed = (static_cast<int>(fFillType) << kFillType_SerializationShift) |
+                           (SerializationType::kGeneral << kType_SerializationShift) |
+                           kCurrent_Version;
 
-    SkSpan<const SkPoint> points = this->points();
-    SkSpan<const SkPathVerb> verbs = this->verbs();
-    SkSpan<const float> conics = this->conicWeights();
+    const SkSpan<const SkPoint> pointSpan = points();
+    const SkSpan<const SkPathVerb> verbSpan = verbs();
+    const SkSpan<const float> conics = conicWeights();
 
-    int32_t pts = SkToS32(points.size());
-    int32_t cnx = SkToS32(conics.size());
-    int32_t vbs = SkToS32(verbs.size());
+    const int32_t pts = SkToS32(pointSpan.size());
+    const int32_t cnx = SkToS32(conics.size());
+    const int32_t vbs = SkToS32(verbSpan.size());
 
-    SkSafeMath safe;
+    SkSafeMath safe{};
     size_t size = 4 * sizeof(int32_t);
     size = safe.add(size, safe.mul(pts, sizeof(SkPoint)));
     size = safe.add(size, safe.mul(cnx, sizeof(float)));
@@ -142,9 +156,9 @@ size_t SkPath::writeToMemory(void* storage) const {
     buffer.write32(pts);
     buffer.write32(cnx);
     buffer.write32(vbs);
-    buffer.write(points.data(), points.size_bytes());
+    buffer.write(pointSpan.data(), pointSpan.size_bytes());
     buffer.write(conics.data(), conics.size_bytes());
-    buffer.write(verbs.data(), verbs.size_bytes());
+    buffer.write(verbSpan.data(), verbSpan.size_bytes());
     buffer.padToAlign4();
 
     SkASSERT(buffer.pos() == size);
@@ -152,19 +166,20 @@ size_t SkPath::writeToMemory(void* storage) const {
 }
 
 sk_sp<SkData> SkPath::serialize() const {
-    size_t size = this->writeToMemory(nullptr);
+    const size_t size = writeToMemory(nullptr);
     sk_sp<SkData> data = SkData::MakeUninitialized(size);
-    this->writeToMemory(data->writable_data());
+    writeToMemory((*data).writable_data());
     return data;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // reading
 
-std::optional<SkPath> read_rrect_path(const void* storage, size_t length, size_t* bytesRead) {
+static std::optional<SkPath> read_rrect_path(const void* storage, size_t length,
+                                             size_t* bytesRead) {
     SkASSERT(bytesRead);
     SkRBuffer buffer(storage, length);
-    uint32_t packed;
+    uint32_t packed = 0;
     if (!buffer.readU32(&packed)) {
         *bytesRead = 0;
         return {};
@@ -172,15 +187,15 @@ std::optional<SkPath> read_rrect_path(const void* storage, size_t length, size_t
 
     SkASSERT(extract_serializationtype(packed) == SerializationType::kRRect);
 
-    uint8_t dir = (packed >> kDirection_SerializationShift) & 0x3;
-    SkPathFillType fillType = extract_filltype(packed);
+    const uint8_t dir = (packed >> kDirection_SerializationShift) & 0x3;
+    const SkPathFillType fillType = extract_filltype(packed);
 
-    SkPathDirection rrectDir;
+    SkPathDirection rrectDir = SkPathDirection::kCW;
     switch (dir) {
-        case (int)SkPathFirstDirection::kCW:
+        case static_cast<int>(SkPathFirstDirection::kCW):
             rrectDir = SkPathDirection::kCW;
             break;
-        case (int)SkPathFirstDirection::kCCW:
+        case static_cast<int>(SkPathFirstDirection::kCCW):
             rrectDir = SkPathDirection::kCCW;
             break;
         default:
@@ -188,13 +203,13 @@ std::optional<SkPath> read_rrect_path(const void* storage, size_t length, size_t
             return {};
     }
 
-    SkRRect rrect;
+    SkRRect rrect{};
     if (!SkRRectPriv::ReadFromBuffer(&buffer, &rrect)) {
         *bytesRead = 0;
         return {};
     }
 
-    int32_t start;
+    int32_t start = 0;
     if (!buffer.readS32(&start) || start != SkTPin(start, 0, 7)) {
         *bytesRead = 0;
         return {};
@@ -207,18 +222,36 @@ std::optional<SkPath> read_rrect_path(const void* storage, size_t length, size_t
     return path;
 }
 
+namespace {
+
+// The counts that follow the header of a general path.
+struct SerializedCounts {
+    uint32_t pts = 0;
+    uint32_t cnx = 0;
+    uint32_t vbs = 0;
+};
+
+}  // namespace
+
+// storage must be 4-byte aligned: points and weights are read in place. A misaligned or
+// truncated buffer, an unknown version or type, or invalid path data returns nullopt with
+// *bytesRead set to 0.
 std::optional<SkPath> SkPath::ReadFromMemory(const void* storage, size_t length, size_t* bytesRead) {
     size_t bytesStorage = 0;
     if (!bytesRead) {
         bytesRead = &bytesStorage;
     }
+    if (reinterpret_cast<uintptr_t>(storage) % alignof(SkPoint) != 0) {
+        *bytesRead = 0;
+        return {};
+    }
     SkRBuffer buffer(storage, length);
-    uint32_t packed;
+    uint32_t packed = 0;
     if (!buffer.readU32(&packed)) {
         *bytesRead = 0;
         return {};
     }
-    unsigned version = extract_version(packed);
+    const unsigned version = extract_version(packed);
 
     const bool verbsAreForward = (version == kVerbsAreStoredForward_Version);
     if (!verbsAreForward && version != kJustPublicData_Version) SK_UNLIKELY {
@@ -228,8 +261,10 @@ std::optional<SkPath> SkPath::ReadFromMemory(const void* storage, size_t length,
     }
 
     switch (extract_serializationtype(packed)) {
-        case SerializationType::kRRect:
-            return read_rrect_path(storage, length, bytesRead);
+        case SerializationType::kRRect: {
+            std::optional<SkPath> rrectPath = read_rrect_path(storage, length, bytesRead);
+            return rrectPath;
+        }
         case SerializationType::kGeneral:
             break;  // fall out
         default:
@@ -238,9 +273,7 @@ std::optional<SkPath> SkPath::ReadFromMemory(const void* storage, size_t length,
     }
 
     // To minimize the number of reads done a structure with the counts is used.
-    struct {
-      uint32_t pts, cnx, vbs;
-    } counts;
+    SerializedCounts counts{};
     if (!buffer.read(&counts, sizeof(counts))) {
         *bytesRead = 0;
         return {};
@@ -267,9 +300,10 @@ std::optional<SkPath> SkPath::ReadFromMemory(const void* storage, size_t length,
         return {};
     }
 
-    SkAutoMalloc reversedStorage;
+    // Older versions stored verbs backwards; reverse them into owned storage.
+    SkAutoMalloc reversedStorage{};
     if (!verbsAreForward) SK_UNLIKELY {
-        SkPathVerb* tmpVerbs = (SkPathVerb*)reversedStorage.reset(counts.vbs);
+        SkPathVerb* tmpVerbs = static_cast<SkPathVerb*>(reversedStorage.reset(counts.vbs));
         for (unsigned i = 0; i < counts.vbs; ++i) {
             tmpVerbs[i] = verbs[counts.vbs - i - 1];
         }
@@ -277,9 +311,10 @@ std::optional<SkPath> SkPath::ReadFromMemory(const void* storage, size_t length,
     }
 
     *bytesRead = buffer.pos();
-    return SkPath::Raw({points, counts.pts},
-                       {verbs, counts.vbs},
-                       {conics, counts.cnx},
-                       extract_filltype(packed),
-                       false);
+    const SkPath path = SkPath::Raw(SkSpan<const SkPoint>(points, counts.pts),
+                                    SkSpan<const SkPathVerb>(verbs, counts.vbs),
+                                    SkSpan<const SkScalar>(conics, counts.cnx),
+                                    extract_filltype(packed),
+                                    false);
+    return path;
 }

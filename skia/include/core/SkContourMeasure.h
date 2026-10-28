@@ -64,9 +64,10 @@ public:
     /** Measurement data for individual verbs.
      */
     struct VerbMeasure {
-        SkScalar              fDistance; // Cumulative distance along the current contour.
-        SkPathVerb            fVerb;     // Verb type.
-        SkSpan<const SkPoint> fPts;      // Verb points.
+        SkScalar              fDistance = 0;               // Cumulative distance along the
+                                                           // current contour.
+        SkPathVerb            fVerb = SkPathVerb::kMove;   // Verb type.
+        SkSpan<const SkPoint> fPts{};                      // Verb points; borrows the contour.
     };
 
 private:
@@ -75,9 +76,12 @@ private:
 public:
     /** Utility for iterating over the current contour verbs:
      *
-     *   for (const auto verb_measure : contour_measure) {
+     *   for (const SkContourMeasure::VerbMeasure verb_measure : contour_measure) {
      *     ...
      *   }
+     *
+     *  The iterator and the measures it yields borrow this contour's storage; the contour
+     *  must outlive them.
      */
     class ForwardVerbIterator final {
     public:
@@ -94,11 +98,13 @@ public:
         bool operator==(const ForwardVerbIterator& other) const {
             SkASSERT(fSegments.data() != other.fSegments.data() ||
                      fSegments.size() == other.fSegments.size());
-            return fSegments.data() == other.fSegments.data();
+            const bool same = fSegments.data() == other.fSegments.data();
+            return same;
         }
 
         bool operator!=(const ForwardVerbIterator& other) const {
-            return !((*this) == other);
+            const bool different = !(*this == other);
+            return different;
         }
 
     private:
@@ -114,7 +120,8 @@ public:
                 ++i;
             }
 
-            return segs.subspan(i - 1);
+            const SkSpan<const Segment> last = segs.subspan(i - 1);
+            return last;
         }
 
         // Remaining segments for forward iteration. The first segment in the span is
@@ -127,30 +134,23 @@ public:
     };
 
     ForwardVerbIterator begin() const {
-        return ForwardVerbIterator(fSegments, fPts);
+        const ForwardVerbIterator first(fSegments, fPts);
+        return first;
     }
     ForwardVerbIterator end() const {
-        return ForwardVerbIterator(SkSpan(fSegments.end(), 0), fPts);
+        const ForwardVerbIterator last(SkSpan<const Segment>(fSegments.end(), 0), fPts);
+        return last;
     }
 
 private:
     struct Segment {
-        SkScalar    fDistance;  // total distance up to this point
-        unsigned    fPtIndex; // index into the fPts array
-        unsigned    fTValue : 30;
-        unsigned    fType : 2;  // actually the enum SkSegType
+        SkScalar    fDistance = 0;  // total distance up to this point
+        unsigned    fPtIndex = 0;   // index into the fPts array
+        unsigned    fTValue : 30 = 0;
+        unsigned    fType : 2 = 0;  // actually the enum SkSegType
         // See SkPathMeasurePriv.h
 
         SkScalar getScalarT() const;
-
-        static const Segment* Next(const Segment* seg) {
-            unsigned ptIndex = seg->fPtIndex;
-            do {
-                ++seg;
-            } while (seg->fPtIndex == ptIndex);
-            return seg;
-        }
-
     };
 
     const SkTDArray<Segment>  fSegments;
@@ -161,9 +161,11 @@ private:
 
     SkContourMeasure(SkTDArray<Segment>&& segs, SkTDArray<SkPoint>&& pts,
                      SkScalar length, bool isClosed);
-    ~SkContourMeasure() override {}
+    ~SkContourMeasure() override = default;
 
-    const Segment* distanceToSegment(SkScalar distance, SkScalar* t) const;
+    // Returns the index of the segment containing distance (0 <= distance <= length()) and
+    // writes the parameter within that segment's verb to *t.
+    int distanceToSegment(SkScalar distance, SkScalar* t) const;
 
     friend class SkContourMeasureIter;
     friend class SkPathMeasurePriv;

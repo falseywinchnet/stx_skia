@@ -16,45 +16,10 @@
 
 struct SkRect;
 
-struct SK_API SkV2 {
-    float x, y;
-
-    bool operator==(SkV2 v) const { return x == v.x && y == v.y; }
-    bool operator!=(SkV2 v) const { return !(*this == v); }
-
-    static SkScalar   Dot(SkV2 a, SkV2 b) { return a.x * b.x + a.y * b.y; }
-    static SkScalar Cross(SkV2 a, SkV2 b) { return a.x * b.y - a.y * b.x; }
-    static SkV2 Normalize(SkV2 v) { return v * (1.0f / v.length()); }
-
-    SkV2 operator-() const { return {-x, -y}; }
-    SkV2 operator+(SkV2 v) const { return {x+v.x, y+v.y}; }
-    SkV2 operator-(SkV2 v) const { return {x-v.x, y-v.y}; }
-
-    SkV2 operator*(SkV2 v) const { return {x*v.x, y*v.y}; }
-    friend SkV2 operator*(SkV2 v, SkScalar s) { return {v.x*s, v.y*s}; }
-    friend SkV2 operator*(SkScalar s, SkV2 v) { return {v.x*s, v.y*s}; }
-    friend SkV2 operator/(SkV2 v, SkScalar s) { return {v.x/s, v.y/s}; }
-    friend SkV2 operator/(SkScalar s, SkV2 v) { return {s/v.x, s/v.y}; }
-
-    void operator+=(SkV2 v) { *this = *this + v; }
-    void operator-=(SkV2 v) { *this = *this - v; }
-    void operator*=(SkV2 v) { *this = *this * v; }
-    void operator*=(SkScalar s) { *this = *this * s; }
-    void operator/=(SkScalar s) { *this = *this / s; }
-
-    SkScalar lengthSquared() const { return Dot(*this, *this); }
-    SkScalar length() const { return SkScalarSqrt(this->lengthSquared()); }
-
-    SkScalar   dot(SkV2 v) const { return Dot(*this, v); }
-    SkScalar cross(SkV2 v) const { return Cross(*this, v); }
-    SkV2 normalize()       const { return Normalize(*this); }
-
-    const float* ptr() const { return &x; }
-    float* ptr() { return &x; }
-};
-
 struct SK_API SkV3 {
-    float x, y, z;
+    float x = 0;
+    float y = 0;
+    float z = 0;
 
     bool operator==(const SkV3& v) const {
         return x == v.x && y == v.y && z == v.z;
@@ -96,7 +61,10 @@ struct SK_API SkV3 {
 };
 
 struct SK_API SkV4 {
-    float x, y, z, w;
+    float x = 0;
+    float y = 0;
+    float z = 0;
+    float w = 0;
 
     bool operator==(const SkV4& v) const {
         return x == v.x && y == v.y && z == v.z && w == v.w;
@@ -129,13 +97,24 @@ struct SK_API SkV4 {
     const float* ptr() const { return &x; }
     float* ptr() { return &x; }
 
+    // Indices outside 0 to 3 stop the program in every build.
     float operator[](int i) const {
-        SkASSERT(i >= 0 && i < 4);
-        return this->ptr()[i];
+        SkASSERT_RELEASE(i >= 0 && i < 4);
+        switch (i) {
+            case 0: return x;
+            case 1: return y;
+            case 2: return z;
+            default: return w;
+        }
     }
     float& operator[](int i) {
-        SkASSERT(i >= 0 && i < 4);
-        return this->ptr()[i];
+        SkASSERT_RELEASE(i >= 0 && i < 4);
+        switch (i) {
+            case 0: return x;
+            case 1: return y;
+            case 2: return z;
+            default: return w;
+        }
     }
 };
 
@@ -152,31 +131,11 @@ public:
     SkM44(const SkM44& src) = default;
     SkM44& operator=(const SkM44& src) = default;
 
-    constexpr SkM44()
-        : fMat{1, 0, 0, 0,
-               0, 1, 0, 0,
-               0, 0, 1, 0,
-               0, 0, 0, 1}
-        {}
+    constexpr SkM44() = default;
 
     SkM44(const SkM44& a, const SkM44& b) {
-        this->setConcat(a, b);
+        setConcat(a, b);
     }
-
-    enum Uninitialized_Constructor {
-        kUninitialized_Constructor
-    };
-    explicit SkM44(Uninitialized_Constructor) {}
-
-    enum NaN_Constructor {
-        kNaN_Constructor
-    };
-    constexpr SkM44(NaN_Constructor)
-        : fMat{SK_ScalarNaN, SK_ScalarNaN, SK_ScalarNaN, SK_ScalarNaN,
-               SK_ScalarNaN, SK_ScalarNaN, SK_ScalarNaN, SK_ScalarNaN,
-               SK_ScalarNaN, SK_ScalarNaN, SK_ScalarNaN, SK_ScalarNaN,
-               SK_ScalarNaN, SK_ScalarNaN, SK_ScalarNaN, SK_ScalarNaN}
-    {}
 
     /**
      *  The constructor parameters are in row-major order.
@@ -192,29 +151,6 @@ public:
                m12, m13, m14, m15}
     {}
 
-    static SkM44 Rows(const SkV4& r0, const SkV4& r1, const SkV4& r2, const SkV4& r3) {
-        SkM44 m(kUninitialized_Constructor);
-        m.setRow(0, r0);
-        m.setRow(1, r1);
-        m.setRow(2, r2);
-        m.setRow(3, r3);
-        return m;
-    }
-    static SkM44 Cols(const SkV4& c0, const SkV4& c1, const SkV4& c2, const SkV4& c3) {
-        SkM44 m(kUninitialized_Constructor);
-        m.setCol(0, c0);
-        m.setCol(1, c1);
-        m.setCol(2, c2);
-        m.setCol(3, c3);
-        return m;
-    }
-
-    static SkM44 RowMajor(const SkScalar r[16]) {
-        return SkM44(r[ 0], r[ 1], r[ 2], r[ 3],
-                     r[ 4], r[ 5], r[ 6], r[ 7],
-                     r[ 8], r[ 9], r[10], r[11],
-                     r[12], r[13], r[14], r[15]);
-    }
     static SkM44 ColMajor(const SkScalar c[16]) {
         return SkM44(c[0], c[4], c[ 8], c[12],
                      c[1], c[5], c[ 9], c[13],
@@ -237,16 +173,10 @@ public:
     }
 
     static SkM44 Rotate(SkV3 axis, SkScalar radians) {
-        SkM44 m(kUninitialized_Constructor);
+        SkM44 m;
         m.setRotate(axis, radians);
         return m;
     }
-
-    // Scales and translates 'src' to fill 'dst' exactly.
-    static SkM44 RectToRect(const SkRect& src, const SkRect& dst);
-
-    static SkM44 LookAt(const SkV3& eye, const SkV3& center, const SkV3& up);
-    static SkM44 Perspective(float near, float far, float angle);
 
     bool operator==(const SkM44& other) const;
     bool operator!=(const SkM44& other) const {
@@ -256,38 +186,17 @@ public:
     void getColMajor(SkScalar v[]) const {
         memcpy(v, fMat, sizeof(fMat));
     }
-    void getRowMajor(SkScalar v[]) const;
 
+    // Rows and columns outside 0 to 3 stop the program in every build.
     SkScalar rc(int r, int c) const {
-        SkASSERT(r >= 0 && r <= 3);
-        SkASSERT(c >= 0 && c <= 3);
+        SkASSERT_RELEASE(r >= 0 && r <= 3);
+        SkASSERT_RELEASE(c >= 0 && c <= 3);
         return fMat[c*4 + r];
     }
     void setRC(int r, int c, SkScalar value) {
-        SkASSERT(r >= 0 && r <= 3);
-        SkASSERT(c >= 0 && c <= 3);
+        SkASSERT_RELEASE(r >= 0 && r <= 3);
+        SkASSERT_RELEASE(c >= 0 && c <= 3);
         fMat[c*4 + r] = value;
-    }
-
-    SkV4 row(int i) const {
-        SkASSERT(i >= 0 && i <= 3);
-        return {fMat[i + 0], fMat[i + 4], fMat[i + 8], fMat[i + 12]};
-    }
-    SkV4 col(int i) const {
-        SkASSERT(i >= 0 && i <= 3);
-        return {fMat[i*4 + 0], fMat[i*4 + 1], fMat[i*4 + 2], fMat[i*4 + 3]};
-    }
-
-    void setRow(int i, const SkV4& v) {
-        SkASSERT(i >= 0 && i <= 3);
-        fMat[i + 0]  = v.x;
-        fMat[i + 4]  = v.y;
-        fMat[i + 8]  = v.z;
-        fMat[i + 12] = v.w;
-    }
-    void setCol(int i, const SkV4& v) {
-        SkASSERT(i >= 0 && i <= 3);
-        memcpy(&fMat[i*4], v.ptr(), sizeof(v));
     }
 
     SkM44& setIdentity() {
@@ -330,15 +239,16 @@ public:
      *  This does not attempt to verify that axis.length() == 1.
      */
     SkM44& setRotateUnit(SkV3 axis, SkScalar radians) {
-        return this->setRotateUnitSinCos(axis, SkScalarSin(radians), SkScalarCos(radians));
+        return setRotateUnitSinCos(axis, SkScalarSin(radians), SkScalarCos(radians));
     }
 
     /**
      *  Set this matrix to rotate about the specified axis vector,
      *  by an angle specified in radians.
      *
-     *  Note: axis is not assumed to be unit-length, so it will be normalized internally.
-     *        If axis is already unit-length, call setRotateAboutUnitRadians() instead.
+     *  Note: axis is not assumed to be unit-length, so it will be normalized internally,
+     *        whatever its finite, nonzero length. A zero or non-finite axis sets the identity.
+     *        If axis is already unit-length, call setRotateUnit() instead.
      */
     SkM44& setRotate(SkV3 axis, SkScalar radians);
 
@@ -349,11 +259,11 @@ public:
     }
 
     SkM44& preConcat(const SkM44& m) {
-        return this->setConcat(*this, m);
+        return setConcat(*this, m);
     }
 
     SkM44& postConcat(const SkM44& m) {
-        return this->setConcat(m, *this);
+        return setConcat(m, *this);
     }
 
     /**
@@ -367,6 +277,10 @@ public:
      *  | E F G H | -> | E/X F/X G/X H/X |   for X != 0
      *  | I J K L |    | I/X J/X K/X L/X |
      *  | 0 0 0 X |    |  0   0   0   1  |
+     *
+     *  Each entry is scaled by 1/X in double precision and rounded once, as
+     *  SkMatrix::normalizePerspective() does. If X or any scaled entry is not finite, the matrix
+     *  is left unchanged.
      */
     void normalizePerspective();
 
@@ -379,22 +293,19 @@ public:
 
     /** If this is invertible, return that in inverse and return true. If it is
      *  not invertible, return false and leave the inverse parameter unchanged.
+     *  inverse may be null to test invertibility only.
      */
     [[nodiscard]] bool invert(SkM44* inverse) const;
-
-    [[nodiscard]] SkM44 transpose() const;
-
-    void dump() const;
 
     ////////////
 
     SkV4 map(float x, float y, float z, float w) const;
     SkV4 operator*(const SkV4& v) const {
-        return this->map(v.x, v.y, v.z, v.w);
+        return map(v.x, v.y, v.z, v.w);
     }
     SkV3 operator*(SkV3 v) const {
-        auto v4 = this->map(v.x, v.y, v.z, 0);
-        return {v4.x, v4.y, v4.z};
+        const SkV4 mapped = map(v.x, v.y, v.z, 0);
+        return {mapped.x, mapped.y, mapped.z};
     }
     ////////////////////// Converting to/from SkMatrix
 
@@ -434,7 +345,10 @@ private:
      *  2  6 10  14        0 0 1 trans_z
      *  3  7 11  15        0 0 0 1
      */
-    SkScalar fMat[16];
+    SkScalar fMat[16] = {1, 0, 0, 0,
+                         0, 1, 0, 0,
+                         0, 0, 1, 0,
+                         0, 0, 0, 1};
 
     friend class SkMatrixPriv;
 };

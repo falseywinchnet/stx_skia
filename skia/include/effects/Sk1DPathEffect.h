@@ -34,7 +34,6 @@ public:
     */
     static sk_sp<SkPathEffect> Make(const SkPath& path, SkScalar advance, SkScalar phase, Style);
 
-    static void RegisterFlattenables();
 };
 
 #endif

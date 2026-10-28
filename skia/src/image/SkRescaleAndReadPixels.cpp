@@ -25,6 +25,16 @@
 #include <memory>
 #include <utility>
 
+static SkSamplingOptions rescaling_to_sampling(SkImage::RescaleMode mode) {
+    SkSamplingOptions sampling;
+    if (mode == SkImage::RescaleMode::kRepeatedLinear) {
+        sampling = SkSamplingOptions(SkFilterMode::kLinear);
+    } else if (mode == SkImage::RescaleMode::kRepeatedCubic) {
+        sampling = SkSamplingOptions({1.0f/3, 1.0f/3});
+    }
+    return sampling;
+}
+
 void SkRescaleAndReadPixels(SkBitmap bmp,
                             const SkImageInfo& resultInfo,
                             const SkIRect& srcRect,
@@ -62,16 +72,7 @@ void SkRescaleAndReadPixels(SkBitmap bmp,
         }
     }
 
-    auto rescaling_to_sampling = [](SkImage::RescaleMode rescaleMode) {
-        SkSamplingOptions sampling;
-        if (rescaleMode == SkImage::RescaleMode::kRepeatedLinear) {
-            sampling = SkSamplingOptions(SkFilterMode::kLinear);
-        } else if (rescaleMode == SkImage::RescaleMode::kRepeatedCubic) {
-            sampling = SkSamplingOptions({1.0f/3, 1.0f/3});
-        }
-        return sampling;
-    };
-    SkSamplingOptions sampling = rescaling_to_sampling(rescaleMode);
+    const SkSamplingOptions sampling = rescaling_to_sampling(rescaleMode);
 
     sk_sp<SkSurface> tempSurf;
     sk_sp<SkImage> srcImage;
@@ -80,26 +81,39 @@ void SkRescaleAndReadPixels(SkBitmap bmp,
     SkCanvas::SrcRectConstraint constraint = SkCanvas::kStrict_SrcRectConstraint;
     // Assume we should ignore the rescale linear request if the surface has no color space since
     // it's unclear how we'd linearize from an unknown color space.
-    if (rescaleGamma == SkSurface::RescaleGamma::kLinear && bmp.info().colorSpace() &&
-        !bmp.info().colorSpace()->gammaIsLinear()) {
-        auto cs = bmp.info().colorSpace()->makeLinearGamma();
+    const SkImageInfo bitmapInfo = bmp.info();
+    SkColorSpace* colorSpace = bitmapInfo.colorSpace();
+    if (rescaleGamma == SkSurface::RescaleGamma::kLinear && colorSpace &&
+        !(*colorSpace).gammaIsLinear()) {
+        sk_sp<SkColorSpace> linearSpace = (*colorSpace).makeLinearGamma();
         // Promote to F16 color type to preserve precision.
-        auto ii = SkImageInfo::Make(srcW, srcH, kRGBA_F16_SkColorType, bmp.info().alphaType(),
-                                    std::move(cs));
-        auto linearSurf = SkSurfaces::Raster(ii);
+        const SkImageInfo linearInfo = SkImageInfo::Make(srcW, srcH, kRGBA_F16_SkColorType,
+                                                         bitmapInfo.alphaType(),
+                                                         std::move(linearSpace));
+        sk_sp<SkSurface> linearSurf = SkSurfaces::Raster(linearInfo);
         if (!linearSurf) {
             callback(context, nullptr);
             return;
         }
-        linearSurf->getCanvas()->drawImage(bmp.asImage().get(), -srcX, -srcY, sampling, &paint);
+        sk_sp<SkImage> bitmapImage = bmp.asImage();
+        if (!bitmapImage) {
+            callback(context, nullptr);
+            return;
+        }
+        SkCanvas* linearCanvas = (*linearSurf).getCanvas();
+        (*linearCanvas).drawImage(bitmapImage.get(), -srcX, -srcY, sampling, &paint);
         tempSurf = std::move(linearSurf);
-        srcImage = tempSurf->makeImageSnapshot();
+        srcImage = (*tempSurf).makeImageSnapshot();
         srcX = 0;
         srcY = 0;
         constraint = SkCanvas::kFast_SrcRectConstraint;
     } else {
         // MakeFromBitmap would trigger a copy if bmp is mutable.
         srcImage = SkImages::RasterFromPixmap(bmp.pixmap(), nullptr, nullptr);
+    }
+    if (!srcImage) {
+        callback(context, nullptr);
+        return;
     }
     while (stepsX || stepsY) {
         int nextW = resultInfo.width();
@@ -122,21 +136,23 @@ void SkRescaleAndReadPixels(SkBitmap bmp,
             }
             --stepsY;
         }
-        auto ii = srcImage->imageInfo().makeWH(nextW, nextH);
+        const SkImageInfo sourceInfo = (*srcImage).imageInfo();
+        SkImageInfo nextInfo = sourceInfo.makeWH(nextW, nextH);
         if (!stepsX && !stepsY) {
             // Might as well fold conversion to final info in the last step.
-            ii = resultInfo;
+            nextInfo = resultInfo;
         }
-        auto next = SkSurfaces::Raster(ii);
+        sk_sp<SkSurface> next = SkSurfaces::Raster(nextInfo);
         if (!next) {
             callback(context, nullptr);
             return;
         }
-        next->getCanvas()->drawImageRect(
+        SkCanvas* nextCanvas = (*next).getCanvas();
+        (*nextCanvas).drawImageRect(
                 srcImage.get(), SkRect::Make(SkIRect::MakeXYWH(srcX, srcY, srcW, srcH)),
                 SkRect::MakeIWH(nextW, nextH), sampling, &paint, constraint);
         tempSurf = std::move(next);
-        srcImage = tempSurf->makeImageSnapshot();
+        srcImage = (*tempSurf).makeImageSnapshot();
         srcX = srcY = 0;
         srcW = nextW;
         srcH = nextH;
@@ -146,7 +162,7 @@ void SkRescaleAndReadPixels(SkBitmap bmp,
     size_t rowBytes = resultInfo.minRowBytes();
     std::unique_ptr<char[]> data(new char[resultInfo.height() * rowBytes]);
     SkPixmap pm(resultInfo, data.get(), rowBytes);
-    if (srcImage->readPixels(nullptr, pm, srcX, srcY)) {
+    if ((*srcImage).readPixels(nullptr, pm, srcX, srcY)) {
         class Result : public SkImage::AsyncReadResult {
         public:
             Result(std::unique_ptr<const char[]> data, size_t rowBytes)

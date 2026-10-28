@@ -24,7 +24,8 @@ public:
 
     GradientType asGradient(GradientInfo* info, SkMatrix* localMatrix) const override;
 
-    const SkPoint& center() const { return fCenter; }
+    const SkPoint& center() const & { return fCenter; }
+    const SkPoint& center() const && = delete;
     SkScalar tBias() const { return fTBias; }
     SkScalar tScale() const { return fTScale; }
 
@@ -36,7 +37,6 @@ protected:
                               SkRasterPipeline* postPipeline) const override;
 
 private:
-    friend void ::SkRegisterSweepGradientShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkSweepGradient)
 
     const SkPoint fCenter;

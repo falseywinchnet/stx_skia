@@ -11,14 +11,12 @@
 #include "include/core/SkScalar.h"
 
 /**
- * Computes the inverse of `inMatrix`, passed in column-major order.
- * `inMatrix` and `outMatrix` are allowed to point to the same array of scalars in memory.
- * `outMatrix` is allowed to be null.
- * The return value is the determinant of the input matrix. If zero is returned, the matrix was
- * non-invertible, and `outMatrix` has been left in an indeterminate state.
+ * Computes the inverse of `inMatrix`, passed in column-major order, into `outMatrix`. The two
+ * may be the same array.
+ * Returns true if the matrix is invertible: its determinant, computed in double precision, is
+ * nonzero and every entry of the inverse is finite in float. Otherwise returns false and leaves
+ * `outMatrix` holding unspecified values.
  */
-SkScalar SkInvert2x2Matrix(const SkScalar inMatrix[4], SkScalar outMatrix[4]);
-SkScalar SkInvert3x3Matrix(const SkScalar inMatrix[9], SkScalar outMatrix[9]);
-SkScalar SkInvert4x4Matrix(const SkScalar inMatrix[16], SkScalar outMatrix[16]);
+[[nodiscard]] bool SkInvert4x4Matrix(const SkScalar (&inMatrix)[16], SkScalar (&outMatrix)[16]);
 
 #endif

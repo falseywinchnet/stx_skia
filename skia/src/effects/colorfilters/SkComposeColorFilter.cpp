@@ -22,16 +22,19 @@ SkComposeColorFilter::SkComposeColorFilter(sk_sp<SkColorFilter> outer, sk_sp<SkC
 }
 
 bool SkComposeColorFilter::onIsAlphaUnchanged() const {
-    // Can only claim alphaunchanged support if both our proxys do.
-    return fOuter->isAlphaUnchanged() && fInner->isAlphaUnchanged();
+    const bool unchanged = (*fOuter).isAlphaUnchanged() && (*fInner).isAlphaUnchanged();
+    return unchanged;
 }
 
 bool SkComposeColorFilter::appendStages(const SkStageRec& rec, bool shaderIsOpaque) const {
-    bool innerIsOpaque = shaderIsOpaque;
-    if (!fInner->isAlphaUnchanged()) {
-        innerIsOpaque = false;
+    const SkColorFilterBase& inner = *fInner;
+    const SkColorFilterBase& outer = *fOuter;
+    const bool innerIsOpaque = shaderIsOpaque && inner.isAlphaUnchanged();
+    if (!inner.appendStages(rec, shaderIsOpaque)) {
+        return false;
     }
-    return fInner->appendStages(rec, shaderIsOpaque) && fOuter->appendStages(rec, innerIsOpaque);
+    const bool appended = outer.appendStages(rec, innerIsOpaque);
+    return appended;
 }
 
 void SkComposeColorFilter::flatten(SkWriteBuffer& buffer) const {
@@ -42,15 +45,20 @@ void SkComposeColorFilter::flatten(SkWriteBuffer& buffer) const {
 sk_sp<SkFlattenable> SkComposeColorFilter::CreateProc(SkReadBuffer& buffer) {
     sk_sp<SkColorFilter> outer(buffer.readColorFilter());
     sk_sp<SkColorFilter> inner(buffer.readColorFilter());
-    return outer ? outer->makeComposed(std::move(inner)) : inner;
+    if (!outer) {
+        return inner;
+    }
+    sk_sp<SkFlattenable> composed = (*outer).makeComposed(std::move(inner));
+    return composed;
 }
 
 sk_sp<SkColorFilter> SkColorFilter::makeComposed(sk_sp<SkColorFilter> inner) const {
     if (!inner) {
-        return sk_ref_sp(this);
+        sk_sp<SkColorFilter> retained = sk_ref_sp(this);
+        return retained;
     }
 
-    return sk_sp<SkColorFilter>(new SkComposeColorFilter(sk_ref_sp(this), std::move(inner)));
+    sk_sp<SkColorFilter> outer = sk_ref_sp(this);
+    sk_sp<SkColorFilter> composed(new SkComposeColorFilter(std::move(outer), std::move(inner)));
+    return composed;
 }
-
-void SkRegisterComposeColorFilterFlattenable() { SK_REGISTER_FLATTENABLE(SkComposeColorFilter); }

@@ -34,17 +34,15 @@ public:
     SkBlendMode mode() const { return fMode; }
 
 protected:
-    SkBlendShader(SkReadBuffer&);
     void flatten(SkWriteBuffer&) const override;
     bool appendStages(const SkStageRec&, const SkShaders::MatrixRec&) const override;
 
 private:
-    friend void ::SkRegisterBlendShaderFlattenable();
     SK_FLATTENABLE_HOOKS(SkBlendShader)
 
-    sk_sp<SkShader> fDst;
-    sk_sp<SkShader> fSrc;
-    SkBlendMode fMode;
+    const sk_sp<SkShader> fDst;
+    const sk_sp<SkShader> fSrc;
+    const SkBlendMode fMode;
 };
 
 #endif

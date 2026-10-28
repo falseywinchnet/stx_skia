@@ -18,67 +18,76 @@ class SkDiscardableMemory;
 
 class SkCachedData : ::SkNoncopyable {
 public:
+    // Adopt a sk_malloc-compatible allocation, or an already locked discardable
+    // allocation. Initial state has one client reference and no cache reference.
+    // Only heap instances may use ref/unref; the final release deletes this object.
     SkCachedData(void* mallocData, size_t size);
     SkCachedData(size_t size, SkDiscardableMemory*);
     virtual ~SkCachedData();
 
+    // A client reference keeps the data address stable (possibly null after a
+    // failed discardable lock). Cache ownership alone grants no pixel access.
+    // Writable access additionally requires externally exclusive pixel ownership.
     size_t size() const { return fSize; }
     const void* data() const { return fData; }
 
     void* writable_data() { return fData; }
 
-    void ref() const { this->internalRef(false); }
-    void unref() const { this->internalUnref(false); }
+    void ref() const { internalRef(false); }
+    void unref() const { internalUnref(false); }
 
+    // Diagnostic access requires externally quiescent reference transitions.
     int testing_only_getRefCnt() const { return fRefCnt; }
     bool testing_only_isLocked() const { return fIsLocked; }
     bool testing_only_isInCache() const { return fInCache; }
 
     SkDiscardableMemory* diagnostic_only_getDiscardable() const {
-        return kDiscardableMemory_StorageType == fStorageType ? fStorage.fDM : nullptr;
+        SkDiscardableMemory* memory = fStorageType == StorageType::kDiscardableMemory ? fStorage.fDM : nullptr;
+        return memory;
     }
 
 protected:
-    // called when fData changes. could be nullptr.
-    virtual void onDataChange(void* oldData, void* newData) {}
+    // Runs under fMutex before publishing newData, which may be null. It must
+    // not reenter ref/unref/cache methods or throw; it updates borrowed views only.
+    virtual void onDataChange(void* oldData, void* newData) const {}
 
 private:
-    SkMutex fMutex;     // could use a pool of these...
+    mutable SkMutex fMutex{};
 
-    enum StorageType {
-        kDiscardableMemory_StorageType,
-        kMalloc_StorageType
+    enum class StorageType {
+        kDiscardableMemory,
+        kMalloc
     };
 
-    union {
-        SkDiscardableMemory*    fDM;
-        void*                   fMalloc;
-    } fStorage;
-    void*       fData;
-    size_t      fSize;
-    int         fRefCnt;    // low-bit means we're owned by the cache
-    StorageType fStorageType;
-    bool        fInCache;
-    bool        fIsLocked;
+    union Storage {
+        SkDiscardableMemory* fDM;
+        void* fMalloc;
+    };
+    const Storage fStorage;
+    mutable void* fData;
+    const size_t fSize;
+    mutable int fRefCnt;  // Includes one cache reference when fInCache is true.
+    const StorageType fStorageType;
+    mutable bool fInCache;
+    mutable bool fIsLocked;
 
     void internalRef(bool fromCache) const;
     void internalUnref(bool fromCache) const;
 
-    void inMutexRef(bool fromCache);
-    bool inMutexUnref(bool fromCache);  // returns true if we should delete "this"
-    void inMutexLock();
-    void inMutexUnlock();
+    void inMutexRef(bool fromCache) const;
+    bool inMutexUnref(bool fromCache) const;  // returns true if we should delete "this"
+    void inMutexLock() const;
+    void inMutexUnlock() const;
 
     // called whenever our fData might change (lock or unlock)
-    void setData(void* newData) {
+    void setData(void* newData) const {
         if (newData != fData) {
             // notify our subclasses of the change
-            this->onDataChange(fData, newData);
+            onDataChange(fData, newData);
             fData = newData;
         }
     }
 
-    class AutoMutexWritable;
 
 public:
 #ifdef SK_DEBUG
@@ -88,7 +97,7 @@ public:
 #endif
 
    /*
-     *  Attaching a data to to a SkResourceCache (only one at a time) enables the data to be
+     *  Attaching data to a SkResourceCache (only one at a time) enables the data to be
      *  unlocked when the cache is the only owner, thus freeing it to be purged (assuming the
      *  data is backed by a SkDiscardableMemory).
      *
@@ -103,13 +112,13 @@ public:
      *  Call when adding this instance to a SkResourceCache::Rec subclass
      *  (typically in the Rec's constructor).
      */
-    void attachToCacheAndRef() const { this->internalRef(true); }
+    void attachToCacheAndRef() const { internalRef(true); }
 
     /*
      *  Call when removing this instance from a SkResourceCache::Rec subclass
      *  (typically in the Rec's destructor).
      */
-    void detachFromCacheAndUnref() const { this->internalUnref(true); }
+    void detachFromCacheAndUnref() const { internalUnref(true); }
 };
 
 #endif

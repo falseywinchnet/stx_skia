@@ -21,6 +21,7 @@
 #include "src/core/SkWriteBuffer.h"
 #include "src/effects/colorfilters/SkColorFilterBase.h"
 
+#include <array>
 #include <cstdint>
 #include <utility>
 
@@ -35,72 +36,69 @@ SkColorSpaceXformColorFilter::SkColorSpaceXformColorFilter(sk_sp<SkColorSpace> s
                   kUnpremul_SkAlphaType) {}
 
 bool SkColorSpaceXformColorFilter::appendStages(const SkStageRec& rec, bool shaderIsOpaque) const {
+    SkRasterPipeline& pipeline = *rec.fPipeline;
     if (!shaderIsOpaque) {
-        rec.fPipeline->append(SkRasterPipelineOp::unpremul);
+        pipeline.append(SkRasterPipelineOp::unpremul);
     }
 
     fSteps.apply(rec.fPipeline);
 
     if (!shaderIsOpaque) {
-        rec.fPipeline->append(SkRasterPipelineOp::premul);
+        pipeline.append(SkRasterPipelineOp::premul);
     }
     return true;
 }
 
 void SkColorSpaceXformColorFilter::flatten(SkWriteBuffer& buffer) const {
-    buffer.writeDataAsByteArray(fSrc->serialize().get());
-    buffer.writeDataAsByteArray(fDst->serialize().get());
+    const sk_sp<SkData> source = (*fSrc).serialize();
+    buffer.writeDataAsByteArray(source.get());
+    const sk_sp<SkData> destination = (*fDst).serialize();
+    buffer.writeDataAsByteArray(destination.get());
 }
 
 sk_sp<SkFlattenable> SkColorSpaceXformColorFilter::LegacyGammaOnlyCreateProc(SkReadBuffer& buffer) {
-    uint32_t dir = buffer.read32();
+    const uint32_t dir = buffer.read32();
     if (!buffer.validate(dir <= 1)) {
         return nullptr;
     }
-    if (dir == 0) {
-        return SkColorFilters::LinearToSRGBGamma();
-    }
-    return SkColorFilters::SRGBToLinearGamma();
+    sk_sp<SkFlattenable> filter = dir == 0 ? SkColorFilters::LinearToSRGBGamma()
+                                          : SkColorFilters::SRGBToLinearGamma();
+    return filter;
 }
 
 sk_sp<SkFlattenable> SkColorSpaceXformColorFilter::CreateProc(SkReadBuffer& buffer) {
-    sk_sp<SkColorSpace> colorSpaces[2];
+    std::array<sk_sp<SkColorSpace>, 2> colorSpaces{};
     for (int i = 0; i < 2; ++i) {
-        auto data = buffer.readByteArrayAsData();
+        sk_sp<SkData> data = buffer.readByteArrayAsData();
         if (!buffer.validate(data != nullptr)) {
             return nullptr;
         }
-        colorSpaces[i] = SkColorSpace::Deserialize(data->data(), data->size());
+        colorSpaces[i] = SkColorSpace::Deserialize((*data).data(), (*data).size());
         if (!buffer.validate(colorSpaces[i] != nullptr)) {
             return nullptr;
         }
     }
-    return sk_sp<SkFlattenable>(
+    sk_sp<SkFlattenable> filter(
             new SkColorSpaceXformColorFilter(std::move(colorSpaces[0]), std::move(colorSpaces[1])));
+    return filter;
 }
 
 sk_sp<SkColorFilter> SkColorFilters::LinearToSRGBGamma() {
     static SkNoDestructor<SkColorSpaceXformColorFilter> gSingleton(SkColorSpace::MakeSRGBLinear(),
                                                                    SkColorSpace::MakeSRGB());
-    return sk_ref_sp(gSingleton.get());
+    sk_sp<SkColorFilter> filter = sk_ref_sp(gSingleton.get());
+    return filter;
 }
 
 sk_sp<SkColorFilter> SkColorFilters::SRGBToLinearGamma() {
     static SkNoDestructor<SkColorSpaceXformColorFilter> gSingleton(SkColorSpace::MakeSRGB(),
                                                                    SkColorSpace::MakeSRGBLinear());
-    return sk_ref_sp(gSingleton.get());
+    sk_sp<SkColorFilter> filter = sk_ref_sp(gSingleton.get());
+    return filter;
 }
 
 sk_sp<SkColorFilter> SkColorFilterPriv::MakeColorSpaceXform(sk_sp<SkColorSpace> src,
                                                             sk_sp<SkColorSpace> dst) {
-    return sk_make_sp<SkColorSpaceXformColorFilter>(std::move(src), std::move(dst));
-}
-
-void SkRegisterSkColorSpaceXformColorFilterFlattenable() {
-    SK_REGISTER_FLATTENABLE(SkColorSpaceXformColorFilter);
-    // Previous name
-    SkFlattenable::Register("ColorSpaceXformColorFilter", SkColorSpaceXformColorFilter::CreateProc);
-    // TODO(ccameron): Remove after grace period for SKPs to stop using old serialization.
-    SkFlattenable::Register("SkSRGBGammaColorFilter",
-                            SkColorSpaceXformColorFilter::LegacyGammaOnlyCreateProc);
+    sk_sp<SkColorFilter> filter = sk_make_sp<SkColorSpaceXformColorFilter>(std::move(src), std::move(dst));
+    return filter;
 }

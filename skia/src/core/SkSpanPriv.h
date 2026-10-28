@@ -26,7 +26,7 @@ public:
     }
 
     template <typename T> static void Copy(SkSpan<T> dst, SkSpan<const T> src) {
-        SkASSERT(dst.size() == src.size());
+        SkASSERT_RELEASE(dst.size() == src.size());
         sk_careful_memcpy(dst.data(), src.data(), src.size_bytes());
     }
 };

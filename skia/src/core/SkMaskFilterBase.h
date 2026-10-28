@@ -18,13 +18,13 @@
 #include "include/core/SkStrokeRec.h"
 #include "include/private/SkNoncopyable.h"
 #include "src/core/SkMask.h"
+#include "src/core/SkCachedData.h"
 
 #include <optional>
 #include <utility>
 
 class SkPaint;
 class SkBlitter;
-class SkImageFilter;
 class SkCachedData;
 class SkMatrix;
 class SkResourceCache;
@@ -48,7 +48,8 @@ public:
         If src.fImage == null, then do not allocate or create the dst image
         but do fill out the other fields in dstMask.
         If you do allocate a dst image, use SkMask::AllocImage()
-        If this returns false, dst mask is ignored.
+        Call with an empty dst descriptor. The caller adopts any returned pixel
+        allocation, including after failure; false means its content is unusable.
         @param  dst the result of the filter. If src.fImage == null, dst should not allocate its image
         @param src the original image to be filtered.
         @param matrix the CTM
@@ -94,22 +95,6 @@ public:
      */
     virtual bool asABlur(BlurRec*) const;
 
-    /**
-     * Return an SkImageFilter representation of this mask filter that SkCanvas can apply
-     * to an alpha-only image to produce an equivalent effect to running the mask filter directly.
-     *
-     * Additionally, return a boolean that indicates if the image filter applies shading properties.
-     * When restoring a layer, this affects whether to draw a rgba image or blend the coverage
-     * mask (A8 image).
-     *
-     * The paint parameter can be used to apply shading. Some mask filters (e.g. EmbossMaskFilter)
-     * may not produce correct results under these circumstances and different blend modes,
-     * given that the coverage mask will be blended in the mask filter as image filter impl in
-     * these cases.
-     */
-    virtual std::pair<sk_sp<SkImageFilter>, bool> asImageFilter(const SkMatrix& ctm,
-                                                                const SkPaint& paint) const;
-
     static SkFlattenable::Type GetFlattenableType() {
         return kSkMaskFilter_Type;
     }
@@ -128,16 +113,20 @@ protected:
     };
 
     class NinePatch final : ::SkNoncopyable {
+        // Adopt exactly one of a cache client reference or a raw mask allocation.
+        // Owners precede the descriptor they keep alive. Neither mode is a borrow.
+        sk_sp<SkCachedData> fCache;
+        SkAutoMaskFreeImage fPixels;
     public:
         NinePatch(const SkMask& mask, SkIRect outerRect, SkIPoint center, SkCachedData* cache)
-            : fMask(mask), fOuterRect(outerRect), fCenter(center), fCache(cache) {}
-        NinePatch(NinePatch&&) = delete;  // the transfer of fCache makes this not work
+            : fCache(cache), fPixels(cache == nullptr ? const_cast<uint8_t*>(mask.fImage) : nullptr),
+              fMask(mask), fOuterRect(outerRect), fCenter(center) {}
+        NinePatch(NinePatch&&) = delete;  // Stable owner/view lifetime within optional storage.
         ~NinePatch();
 
         SkMask      fMask;      // fBounds must have [0,0] in its top-left
         SkIRect     fOuterRect; // width/height must be >= fMask.fBounds'
         SkIPoint    fCenter;    // identifies center row/col for stretching
-        SkCachedData* fCache = nullptr;
     };
 
     /**
@@ -152,13 +141,10 @@ protected:
      *  FilterReturn::kFalse. If the normal filterMask() entry-point should be
      *  called (the default) return FilterReturn::kUnimplemented.
      *
-     *  By convention, the caller will take the center rol/col from the returned
-     *  mask as the slice it can replicate horizontally and vertically as we
-     *  stretch the mask to fit inside outerRect. It is an error for outerRect
-     *  to be smaller than the mask's bounds. This would imply that the width
-     *  and height of the mask should be odd. This is not required, just that
-     *  the caller will call mask.fBounds.centerX() and centerY() to find the
-     *  strips that will be replicated.
+     *  center identifies the row and column stretched across the destination
+     *  interior. Mask bounds start at zero, center lies inside them, and outerRect
+     *  is at least as wide and tall as the stored mask. The three horizontal and
+     *  vertical parts retain their original drawing order.
      */
     virtual FilterReturn filterRectsToNine(SkSpan<const SkRect>,
                                            const SkMatrix&,
@@ -179,8 +165,7 @@ private:
     /** Helper method that, given a raw path in device space, will rasterize it into a
      kA8_Format mask and then call filterMask(). If this returns true, the specified blitter
      will be called to render that mask. Returns false if filterMask() returned false.
-     This method is not exported to java.
-     */
+      */
     bool filterPath(const SkPathRaw& devRaw,
                     const SkMatrix& ctm,
                     const SkRasterClip&,
@@ -206,18 +191,20 @@ private:
 };
 
 inline SkMaskFilterBase* as_MFB(SkMaskFilter* mf) {
-    return static_cast<SkMaskFilterBase*>(mf);
+    SkMaskFilterBase* filter = static_cast<SkMaskFilterBase*>(mf);
+    return filter;
 }
 
 inline const SkMaskFilterBase* as_MFB(const SkMaskFilter* mf) {
-    return static_cast<const SkMaskFilterBase*>(mf);
+    const SkMaskFilterBase* filter = static_cast<const SkMaskFilterBase*>(mf);
+    return filter;
 }
 
 inline const SkMaskFilterBase* as_MFB(const sk_sp<SkMaskFilter>& mf) {
     return static_cast<SkMaskFilterBase*>(mf.get());
 }
 
-// For RegisterFlattenables access to the blur mask filter implementation
-extern void sk_register_blur_maskfilter_createproc();
+inline const SkMaskFilterBase* as_MFB(const sk_sp<SkMaskFilter>&&) = delete;
+
 
 #endif

@@ -36,21 +36,24 @@ sk_sp<SkShader> SkColorFilterShader::Make(sk_sp<SkShader> shader,
                                           sk_sp<SkColorFilter> filter) {
     if (!shader) {
         return nullptr;
-    } else if (!filter) {
-        return shader;
-    } else {
-        return sk_sp(new SkColorFilterShader(std::move(shader), alpha, std::move(filter)));
     }
+    if (!filter) {
+        return shader;
+    }
+    sk_sp<SkShader> result(new SkColorFilterShader(std::move(shader), alpha, std::move(filter)));
+    return result;
 }
 
 sk_sp<SkFlattenable> SkColorFilterShader::CreateProc(SkReadBuffer& buffer) {
-    auto shader = buffer.readShader();
-    auto filter = buffer.readColorFilter();
-    return Make(std::move(shader), 1.0f, std::move(filter));
+    sk_sp<SkShader> shader = buffer.readShader();
+    sk_sp<SkColorFilter> filter = buffer.readColorFilter();
+    sk_sp<SkFlattenable> result = Make(std::move(shader), 1.0f, std::move(filter));
+    return result;
 }
 
 bool SkColorFilterShader::isOpaque() const {
-    return fShader->isOpaque() && fAlpha == 1.0f && as_CFB(fFilter)->isAlphaUnchanged();
+    const bool opaque = (*fShader).isOpaque() && fAlpha == 1.0f && (*fFilter).isAlphaUnchanged();
+    return opaque;
 }
 
 void SkColorFilterShader::flatten(SkWriteBuffer& buffer) const {
@@ -61,13 +64,16 @@ void SkColorFilterShader::flatten(SkWriteBuffer& buffer) const {
 
 bool SkColorFilterShader::appendStages(const SkStageRec& rec,
                                        const SkShaders::MatrixRec& mRec) const {
-    if (!as_SB(fShader)->appendStages(rec, mRec)) {
+    const SkShaderBase& shader = *as_SB(fShader);
+    if (!shader.appendStages(rec, mRec)) {
         return false;
     }
     if (fAlpha != 1.0f) {
-        rec.fPipeline->append(SkRasterPipelineOp::scale_1_float, rec.fAlloc->make<float>(fAlpha));
+        const float* alpha = (*rec.fAlloc).make<float>(fAlpha);
+        (*rec.fPipeline).append(SkRasterPipelineOp::scale_1_float, alpha);
     }
-    if (!fFilter->appendStages(rec, fAlpha == 1.0f && fShader->isOpaque())) {
+    const bool inputIsOpaque = fAlpha == 1.0f && shader.isOpaque();
+    if (!(*fFilter).appendStages(rec, inputIsOpaque)) {
         return false;
     }
     return true;

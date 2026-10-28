@@ -105,7 +105,7 @@ public:
     const SkVerticesPriv priv() const;  // NOLINT(readability-const-return-type)
 
 private:
-    SkVertices() {}
+    SkVertices() = default;
 
     friend class SkVerticesPriv;
 
@@ -117,19 +117,19 @@ private:
 
     // we store this first, to pair with the refcnt in our base-class, so we don't have an
     // unnecessary pad between it and the (possibly 8-byte aligned) ptrs.
-    uint32_t fUniqueID;
+    uint32_t fUniqueID = 0;
 
     // these point inside our allocation, so none of these can be "freed"
-    SkPoint*     fPositions;        // [vertexCount]
-    uint16_t*    fIndices;          // [indexCount] or null
-    SkPoint*     fTexs;             // [vertexCount] or null
-    SkColor*     fColors;           // [vertexCount] or null
+    SkPoint*     fPositions = nullptr;  // [vertexCount]
+    uint16_t*    fIndices = nullptr;    // [indexCount] or null
+    SkPoint*     fTexs = nullptr;       // [vertexCount] or null
+    SkColor*     fColors = nullptr;     // [vertexCount] or null
 
-    SkRect  fBounds;    // computed to be the union of the fPositions[]
-    int     fVertexCount;
-    int     fIndexCount;
+    SkRect  fBounds = SkRect::MakeEmpty();  // computed to be the union of the fPositions[]
+    int     fVertexCount = 0;
+    int     fIndexCount = 0;
 
-    VertexMode fMode;
+    VertexMode fMode = kTriangles_VertexMode;
     // below here is where the actual array data is stored.
 };
 

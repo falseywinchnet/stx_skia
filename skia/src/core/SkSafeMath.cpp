@@ -9,12 +9,14 @@
 
 size_t SkSafeMath::Add(size_t x, size_t y) {
     SkSafeMath tmp;
-    size_t sum = tmp.add(x, y);
-    return tmp.ok() ? sum : SIZE_MAX;
+    const size_t sum = tmp.add(x, y);
+    if (!tmp.ok()) return SIZE_MAX;
+    return sum;
 }
 
 size_t SkSafeMath::Mul(size_t x, size_t y) {
     SkSafeMath tmp;
-    size_t prod = tmp.mul(x, y);
-    return tmp.ok() ? prod : SIZE_MAX;
+    const size_t prod = tmp.mul(x, y);
+    if (!tmp.ok()) return SIZE_MAX;
+    return prod;
 }

@@ -24,9 +24,13 @@ public:
     ~SkAutoPixmapStorage();
 
     SkAutoPixmapStorage(SkAutoPixmapStorage&& other);
+    SkAutoPixmapStorage(const SkAutoPixmapStorage&) = delete;
+    SkAutoPixmapStorage& operator=(const SkAutoPixmapStorage&) = delete;
 
     /**
-    * Leave the moved-from object in a free-but-valid state.
+    * Release the previous owned allocation and transfer the source's view and owner.
+    * Leave the source empty. Self-move leaves the object unchanged. A borrowed
+    * source view must not refer into this destination's current owned allocation.
     */
     SkAutoPixmapStorage& operator=(SkAutoPixmapStorage&& other);
 
@@ -35,9 +39,10 @@ public:
     *  return true and fill out the pixmap to point to that memory. The storage will be freed
     *  when this object is destroyed, or if another call to tryAlloc() or alloc() is made.
     *
-    *  On failure, return false and reset() the pixmap to empty.
+    *  On invalid dimensions/types, size overflow or allocation failure, return
+    *  false and reset the pixmap to empty. info may alias this owner's metadata.
     */
-    bool tryAlloc(const SkImageInfo&);
+    bool tryAlloc(const SkImageInfo& info);
 
     /**
     *  Allocate memory for the pixels needed to match the specified Info and fill out the pixmap
@@ -46,7 +51,7 @@ public:
     *
     *  If the memory cannot be allocated, calls SK_ABORT().
     */
-    void alloc(const SkImageInfo&);
+    void alloc(const SkImageInfo& info);
 
     /**
     * Gets the size and optionally the rowBytes that would be allocated by SkAutoPixmapStorage if
@@ -56,31 +61,34 @@ public:
 
     /**
     * Returns a void* of the allocated pixel memory and resets the pixmap. If the storage hasn't
-    * been allocated, the result is NULL. The caller is responsible for calling sk_free to free
+    * been allocated, the result is nullptr. The caller is responsible for calling sk_free to free
     * the returned memory.
     */
     [[nodiscard]] void* detachPixels();
 
     /**
     *  Returns an SkData object wrapping the allocated pixels memory, and resets the pixmap.
-    *  If the storage hasn't been allocated, the result is NULL.
+    *  If the storage hasn't been allocated, the result is nullptr.
     */
     [[nodiscard]] sk_sp<SkData> detachPixelsAsData();
 
-    // We wrap these so we can clear our internal storage
+    // Reset releases owned storage, then borrows the new pixels. The new view
+    // must not point into the allocation being released. Do not mutate this
+    // owner's view through a separate SkPixmap base alias.
 
     void reset() {
-        this->freeStorage();
-        this->INHERITED::reset();
+        freeStorage();
+        INHERITED::reset();
     }
     void reset(const SkImageInfo& info, const void* addr, size_t rb) {
-        this->freeStorage();
-        this->INHERITED::reset(info, addr, rb);
+        freeStorage();
+        INHERITED::reset(info, addr, rb);
     }
 
     [[nodiscard]] bool reset(const SkMask& mask) {
-        this->freeStorage();
-        return this->INHERITED::reset(mask);
+        freeStorage();
+        const bool accepted = INHERITED::reset(mask);
+        return accepted;
     }
 
 private:

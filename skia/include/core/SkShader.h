@@ -45,10 +45,13 @@ public:
      *  Iff this shader is backed by a single SkImage, return its ptr (the caller must ref this
      *  if they want to keep it longer than the lifetime of the shader). If not, return nullptr.
      */
-    SkImage* isAImage(SkMatrix* localMatrix, SkTileMode xy[2]) const;
+    SkImage* isAImage(SkMatrix* localMatrix, SkTileMode xy[2]) const &;
+    SkImage* isAImage(SkMatrix*, SkTileMode[2]) const && = delete;
 
     bool isAImage() const {
-        return this->isAImage(nullptr, (SkTileMode*)nullptr) != nullptr;
+        SkImage* image = isAImage(nullptr, nullptr);
+        const bool backedByImage = image != nullptr;
+        return backedByImage;
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -100,6 +103,7 @@ SK_API sk_sp<SkShader> Empty();
 SK_API sk_sp<SkShader> Color(SkColor);
 SK_API sk_sp<SkShader> Color(const SkColor4f&, sk_sp<SkColorSpace>);
 SK_API sk_sp<SkShader> Blend(SkBlendMode mode, sk_sp<SkShader> dst, sk_sp<SkShader> src);
+// Accepts standard blend-mode blenders only; a custom blender returns nullptr.
 SK_API sk_sp<SkShader> Blend(sk_sp<SkBlender>, sk_sp<SkShader> dst, sk_sp<SkShader> src);
 SK_API sk_sp<SkShader> CoordClamp(sk_sp<SkShader>, const SkRect& subset);
 

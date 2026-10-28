@@ -25,7 +25,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <tuple>
 
 class SkData;
 class SkRRect;
@@ -88,7 +87,8 @@ public:
                        unsigned startIndex = 0);
     static SkPath Rect(const SkRect& r, SkPathDirection direction = SkPathDirection::kDefault,
                        unsigned startIndex = 0) {
-        return Rect(r, SkPathFillType::kDefault, direction, startIndex);
+        const SkPath rect = Rect(r, SkPathFillType::kDefault, direction, startIndex);
+        return rect;
     }
     static SkPath Oval(const SkRect&, SkPathDirection = SkPathDirection::kDefault);
     static SkPath Oval(const SkRect&, SkPathDirection, unsigned startIndex);
@@ -104,7 +104,9 @@ public:
                           bool isVolatile = false);
 
     static SkPath Line(SkPoint a, SkPoint b) {
-        return Polygon({{a, b}}, false);
+        const SkPoint endpoints[2] = {a, b};
+        const SkPath line = Polygon(endpoints, false);
+        return line;
     }
 
     // Deprecated: use Raw()
@@ -113,8 +115,11 @@ public:
                        SkSpan<const SkScalar> conics,
                        SkPathFillType fillType,
                        bool isVolatile = false) {
-        return Raw(pts, {reinterpret_cast<const SkPathVerb*>(verbs.data()), verbs.size()},
-                   conics, fillType, isVolatile);
+        // SkPathVerb has uint8_t as its fixed underlying type; Raw validates every verb.
+        const SkSpan<const SkPathVerb> typedVerbs(reinterpret_cast<const SkPathVerb*>(verbs.data()),
+                                                  verbs.size());
+        const SkPath path = Raw(pts, typedVerbs, conics, fillType, isVolatile);
+        return path;
     }
 
     /** Constructs an empty SkPath: no verbs, no points, no conic weights.
@@ -152,7 +157,8 @@ public:
 
     /** Returns a copy of this path in the current state. */
     SkPath snapshot() const {
-        return *this;
+        const SkPath copy = *this;
+        return copy;
     }
 
     /** Constructs a copy of an existing path.
@@ -189,7 +195,8 @@ public:
         @return   true if SkPath pair are not equivalent
     */
     friend bool operator!=(const SkPath& a, const SkPath& b) {
-        return !(a == b);
+        const bool different = !(a == b);
+        return different;
     }
 
 // Note: These 3 interpolate() methods no long use any private access/info,
@@ -258,7 +265,7 @@ public:
 
         @return  current SkPathFillType setting
     */
-    SkPathFillType getFillType() const { return (SkPathFillType)fFillType; }
+    SkPathFillType getFillType() const { return fFillType; }
 
     /** Creates an SkPath with the same properties and data, and with SkPathFillType
         set to newFillType.
@@ -270,7 +277,10 @@ public:
 
         @return  true if FillType is kInverseWinding or kInverseEvenOdd
     */
-    bool isInverseFillType() const { return SkPathFillType_IsInverse(this->getFillType()); }
+    bool isInverseFillType() const {
+        const bool inverse = SkPathFillType_IsInverse(getFillType());
+        return inverse;
+    }
 
     /** Creates an SkPath with the same properties and data, and with SkPathFillType
         replaced with its inverse.  The inverse of SkPathFillType describes the area unmodified
@@ -343,7 +353,7 @@ public:
         @return  true if caller will alter SkPath after drawing
     */
     bool isVolatile() const {
-        return SkToBool(fIsVolatile);
+        return fIsVolatile;
     }
 
     /** Return a copy of SkPath with isVolatile indicating whether it will be altered
@@ -425,20 +435,29 @@ public:
     /*
      *  Return a read-only view into the path's points.
      */
-    SkSpan<const SkPoint> points() const;
+    SkSpan<const SkPoint> points() const &;
+    SkSpan<const SkPoint> points() const && = delete;
 
     /*
      *  Return a read-only view into the path's verbs.
      */
-    SkSpan<const SkPathVerb> verbs() const;
+    SkSpan<const SkPathVerb> verbs() const &;
+    SkSpan<const SkPathVerb> verbs() const && = delete;
 
     /*
      *  Return a read-only view into the path's conic-weights.
      */
-    SkSpan<const float> conicWeights() const;
+    SkSpan<const float> conicWeights() const &;
+    SkSpan<const float> conicWeights() const && = delete;
 
-    int countPoints() const { return SkToInt(this->points().size()); }
-    int countVerbs() const { return SkToInt(this->verbs().size()); }
+    int countPoints() const {
+        const int count = SkToInt(points().size());
+        return count;
+    }
+    int countVerbs() const {
+        const int count = SkToInt(verbs().size());
+        return count;
+    }
 
     /** Return the last point, or {}
 
@@ -478,16 +497,12 @@ public:
 
     // DEPRECATED
     bool getLastPt(SkPoint* lastPt) const {
-        if (auto lp = this->getLastPt()) {
-            if (lastPt) {
-                *lastPt = *lp;
-            }
-            return true;
-        }
+        const std::optional<SkPoint> last = getLastPt();
         if (lastPt) {
-            *lastPt = {0, 0};
+            *lastPt = last.value_or(SkPoint{0, 0});
         }
-        return false;
+        const bool found = last.has_value();
+        return found;
     }
 #endif
 
@@ -507,7 +522,8 @@ public:
 
         @return  bounds of the path's points
     */
-    const SkRect& getBounds() const;
+    const SkRect& getBounds() const &;
+    const SkRect& getBounds() const && = delete;
 
     /** Returns minimum and maximum axes values of the lines and curves in SkPath.
         Returns (0, 0, 0, 0) if SkPath contains no points.
@@ -616,11 +632,13 @@ public:
     std::optional<SkPath> tryMakeTransform(const SkMatrix& matrix) const;
 
     std::optional<SkPath> tryMakeOffset(float dx, float dy) const {
-        return this->tryMakeTransform(SkMatrix::Translate(dx, dy));
+        const std::optional<SkPath> moved = tryMakeTransform(SkMatrix::Translate(dx, dy));
+        return moved;
     }
 
     std::optional<SkPath> tryMakeScale(float sx, float sy) const {
-        return this->tryMakeTransform(SkMatrix::Scale(sx, sy));
+        const std::optional<SkPath> scaled = tryMakeTransform(SkMatrix::Scale(sx, sy));
+        return scaled;
     }
 
     /** Return a copy of SkPath with verb array, SkPoint array, and weight transformed
@@ -643,11 +661,13 @@ public:
         @param dy  offset added to SkPoint array y-axis coordinates
     */
     SkPath makeOffset(SkScalar dx, SkScalar dy) const {
-        return this->makeTransform(SkMatrix::Translate(dx, dy));
+        const SkPath moved = makeTransform(SkMatrix::Translate(dx, dy));
+        return moved;
     }
 
     SkPath makeScale(SkScalar sx, SkScalar sy) const {
-        return this->makeTransform(SkMatrix::Scale(sx, sy));
+        const SkPath scaled = makeTransform(SkMatrix::Scale(sx, sy));
+        return scaled;
     }
 
     /** \enum SkPath::SegmentMask
@@ -744,7 +764,8 @@ public:
     */
     SkPath& reset();
 
-    SkPathIter iter() const;
+    SkPathIter iter() const &;
+    SkPathIter iter() const && = delete;
 
     struct IterRec {
         SkPathVerb            fVerb;
@@ -786,6 +807,7 @@ public:
         example: https://fiddle.skia.org/c/@Path_Iter_const_SkPath
         */
         Iter(const SkPath& path, bool forceClose);
+        Iter(const SkPath&&, bool) = delete;
 
         /** Sets SkPath::Iter to return elements of verb array, SkPoint array, and conic weight in
             path. If forceClose is true, SkPath::Iter will add kLine_Verb and kClose_Verb after each
@@ -797,6 +819,7 @@ public:
         example: https://fiddle.skia.org/c/@Path_Iter_setPath
         */
         void setPath(const SkPath& path, bool forceClose);
+        void setPath(const SkPath&&, bool) = delete;
 
         /** Returns next SkPath::Verb in verb array, and advances SkPath::Iter.
             When verb array is exhausted, returns kDone_Verb.
@@ -819,7 +842,7 @@ public:
 
             @return  conic weight for conic SkPoint returned by next()
         */
-        SkScalar conicWeight() const { return *fConicWeights; }
+        SkScalar conicWeight() const { return fConicWeight; }
 
         /** Returns true if last kLine_Verb returned by next() was generated
             by kClose_Verb. When true, the end point returned by next() is
@@ -830,7 +853,7 @@ public:
 
             @return  true if last kLine_Verb was generated by kClose_Verb
         */
-        bool isCloseLine() const { return SkToBool(fCloseLine); }
+        bool isCloseLine() const { return fCloseLine; }
 
         /** Returns true if subsequent calls to next() return kClose_Verb before returning
             kMove_Verb. if true, contour SkPath::Iter is processing may end with kClose_Verb, or
@@ -843,16 +866,18 @@ public:
         bool isClosedContour() const;
 
     private:
-        const SkPoint*          fPts;
-        const SkPathVerb*       fVerbs;
-        const SkPathVerb*       fVerbStop;
-        const SkScalar*         fConicWeights;
-        SkPoint                 fMoveTo;
-        SkPoint                 fLastPt;
-        std::array<SkPoint, 4>  fStorage;
-        bool                    fForceClose;
-        bool                    fNeedClose;
-        bool                    fCloseLine;
+        // Borrowed from the iterated path, which must outlive the iterator.
+        const SkPoint*          fPts = nullptr;
+        const SkPathVerb*       fVerbs = nullptr;
+        const SkPathVerb*       fVerbStop = nullptr;
+        const SkScalar*         fConicWeights = nullptr;   // the next unconsumed weight
+        SkScalar                fConicWeight = 0;          // the most recent conic's weight
+        SkPoint                 fMoveTo = {0, 0};
+        SkPoint                 fLastPt = {0, 0};
+        std::array<SkPoint, 4>  fStorage = {};
+        bool                    fForceClose = false;
+        bool                    fNeedClose = false;
+        bool                    fCloseLine = false;
 
         SkPathVerb autoClose(SkPoint pts[2]);
     };
@@ -868,6 +893,15 @@ private:
 
         NOTE: This class will be moved into SkPathPriv once RangeIter is removed.
     */
+    // One verb with its points and conic weight. For every verb except kMove, fPoints starts
+    // at the previous segment's end point; fWeights addresses the conic weight for kConic.
+    // Both borrow the path's storage.
+    struct VerbRecord {
+        SkPathVerb      fVerb;
+        const SkPoint*  fPoints;
+        const SkScalar* fWeights;
+    };
+
     class RangeIter {
     public:
         RangeIter() = default;
@@ -876,13 +910,16 @@ private:
             SkDEBUGCODE(fInitialPoints = fPoints;)
         }
         bool operator!=(const RangeIter& that) const {
-            return fVerb != that.fVerb;
+            const bool different = fVerb != that.fVerb;
+            return different;
         }
         bool operator==(const RangeIter& that) const {
-            return fVerb == that.fVerb;
+            const bool same = fVerb == that.fVerb;
+            return same;
         }
         RangeIter& operator++() {
-            auto verb = *fVerb++;
+            const SkPathVerb verb = *fVerb;
+            ++fVerb;
             fPoints += pts_advance_after_verb(verb);
             if (verb == SkPathVerb::kConic) {
                 ++fWeights;
@@ -890,23 +927,25 @@ private:
             return *this;
         }
         RangeIter operator++(int) {
-            RangeIter copy = *this;
-            this->operator++();
+            const RangeIter copy = *this;
+            operator++();
             return copy;
         }
         SkPathVerb peekVerb() const {
             return *fVerb;
         }
-        std::tuple<SkPathVerb, const SkPoint*, const SkScalar*> operator*() const {
-            SkPathVerb verb = this->peekVerb();
+        VerbRecord operator*() const {
+            const SkPathVerb verb = peekVerb();
             // We provide the starting point for beziers by peeking backwards from the current
             // point, which works fine as long as there is always a kMove before any geometry.
             // (SkPath::injectMoveToIfNeeded should have guaranteed this to be the case.)
-            int backset = pts_backset_for_verb(verb);
+            const int backset = pts_backset_for_verb(verb);
             SkASSERT(fPoints + backset >= fInitialPoints);
-            return {verb, fPoints + backset, fWeights};
+            const VerbRecord record{verb, fPoints + backset, fWeights};
+            return record;
         }
     private:
+        // Path storage holds only the six verbs; an invalid verb advances by nothing.
         constexpr static int pts_advance_after_verb(SkPathVerb verb) {
             switch (verb) {
                 case SkPathVerb::kMove: return 1;
@@ -916,7 +955,7 @@ private:
                 case SkPathVerb::kCubic: return 3;
                 case SkPathVerb::kClose: return 0;
             }
-            SkUNREACHABLE;
+            return 0;
         }
         constexpr static int pts_backset_for_verb(SkPathVerb verb) {
             switch (verb) {
@@ -927,7 +966,7 @@ private:
                 case SkPathVerb::kCubic: return -1;
                 case SkPathVerb::kClose: return -1;
             }
-            SkUNREACHABLE;
+            return 0;
         }
         const SkPathVerb* fVerb = nullptr;
         const SkPoint* fPoints = nullptr;
@@ -954,6 +993,7 @@ public:
             @param path  SkPath to iterate
             @return      RawIter of path
         */
+        RawIter(const SkPath&&) = delete;
         RawIter(const SkPath& path) {
             setPath(path);
         }
@@ -964,6 +1004,7 @@ public:
             @param path  SkPath to iterate
         */
         void setPath(const SkPath&);
+        void setPath(const SkPath&&) = delete;
 
         /** Returns next SkPath::Verb in verb array, and advances RawIter.
             When verb array is exhausted, returns kDone_Verb.
@@ -981,7 +1022,11 @@ public:
             @return  next SkPath::Verb from verb array
         */
         Verb peek() const {
-            return (fIter != fEnd) ? static_cast<Verb>(std::get<0>(*fIter)) : kDone_Verb;
+            if (fIter == fEnd) {
+                return kDone_Verb;
+            }
+            const Verb verb = static_cast<Verb>((*fIter).fVerb);
+            return verb;
         }
 
         /** Returns conic weight if next() returned kConic_Verb.
@@ -1013,7 +1058,8 @@ public:
 
     // deprecated
     bool contains(SkScalar x, SkScalar y) const {
-        return this->contains({x, y});
+        const bool inside = contains(SkPoint{x, y});
+        return inside;
     }
 
     /** Writes text representation of SkPath to stream. If stream is nullptr, writes to
@@ -1027,8 +1073,8 @@ public:
     */
     void dump(SkWStream* stream, bool dumpAsHex) const;
 
-    void dump() const { this->dump(nullptr, false); }
-    void dumpHex() const { this->dump(nullptr, true); }
+    void dump() const { dump(nullptr, false); }
+    void dumpHex() const { dump(nullptr, true); }
 
     /** Writes SkPath to buffer, returning the number of bytes written.
         Pass nullptr to obtain the storage size.

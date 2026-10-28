@@ -12,82 +12,94 @@
 #include "src/core/SkFloatBits.h"
 #include "src/core/SkStringUtils.h"
 
-#include <functional>
 
-char const * const gFillTypeStrs[] = {
-    "Winding",
-    "EvenOdd",
-    "InverseWinding",
-    "InverseEvenOdd",
-};
+static const char* fill_type_name(SkPathFillType fillType) {
+    switch (fillType) {
+        case SkPathFillType::kWinding:        return "Winding";
+        case SkPathFillType::kEvenOdd:        return "EvenOdd";
+        case SkPathFillType::kInverseWinding: return "InverseWinding";
+        case SkPathFillType::kInverseEvenOdd: return "InverseEvenOdd";
+    }
+    // Fill types outside the enumeration are unsupported; name them rather than index past
+    // the table.
+    return "Unknown";
+}
 
 constexpr float kSentinelConicWeight = -12345;  // not a valid weight
+
+static void append_coordinate_list(SkString& str, SkSpan<const SkPoint> pts,
+                                   SkScalarAsStringType strType, bool decimal) {
+    for (size_t i = 0; i < pts.size(); ++i) {
+        const SkScalar coordinates[2] = {pts[i].fX, pts[i].fY};
+        for (int axis = 0; axis < 2; ++axis) {
+            if (decimal) {
+                SkAppendScalarDec(&str, coordinates[axis]);
+            } else {
+                SkAppendScalar(&str, coordinates[axis], strType);
+            }
+            const bool last = i + 1 == pts.size() && axis == 1;
+            if (!last) {
+                str.append(", ");
+            }
+        }
+    }
+}
 
 static void append_params(SkString* str, const char label[], SkSpan<const SkPoint> pts,
                           SkScalarAsStringType strType, bool useSemicolon,
                           SkScalar conicWeight = kSentinelConicWeight) {
-    str->append(label);
-    str->append("(");
+    SkString& text = *str;
+    text.append(label);
+    text.append("(");
 
-    const SkScalar* values = &pts[0].fX;
-    size_t count = pts.size() * 2;
-
-    for (size_t i = 0; i < count; ++i) {
-        SkAppendScalar(str, values[i], strType);
-        if (i < count - 1) {
-            str->append(", ");
-        }
-    }
+    append_coordinate_list(text, pts, strType, false);
     if (conicWeight != kSentinelConicWeight) {
-        str->append(", ");
-        SkAppendScalar(str, conicWeight, strType);
+        text.append(", ");
+        SkAppendScalar(&text, conicWeight, strType);
     }
-    str->append(useSemicolon ? ");" : ")");
+    text.append(useSemicolon ? ");" : ")");
     if (kHex_SkScalarAsStringType == strType) {
-        str->append("  // ");
-        for (size_t i = 0; i < count; ++i) {
-            SkAppendScalarDec(str, values[i]);
-            if (i < count - 1) {
-                str->append(", ");
-            }
-        }
+        text.append("  // ");
+        append_coordinate_list(text, pts, strType, true);
         if (conicWeight >= 0) {
-            str->append(", ");
-            SkAppendScalarDec(str, conicWeight);
+            text.append(", ");
+            SkAppendScalarDec(&text, conicWeight);
         }
     }
-    str->append("\n");
+    text.append("\n");
 }
 
+// Appends one builder command per verb. When flushToDebug is true, each command is written to
+// SkDebugf and the text is cleared afterward.
 static void dump_iter(SkPathIter iter, SkString* builder, const char cmdPrefix[],
-                      SkScalarAsStringType strType, bool useSemicolon,
-                      std::function<void()> postVerbProc) {
-    while (auto rec = iter.next()) {
+                      SkScalarAsStringType strType, bool useSemicolon, bool flushToDebug) {
+    for (std::optional<SkPathIter::Rec> rec = iter.next(); rec.has_value(); rec = iter.next()) {
         SkString cmd(cmdPrefix);
-        SkSpan<const SkPoint> pts;
+        SkSpan<const SkPoint> pts{};
         float cw = kSentinelConicWeight;
+        const SkPathIter::Rec& record = rec.value();
 
-        switch (rec->fVerb) {
+        switch (record.fVerb) {
             case SkPathVerb::kMove:
                 cmd.append(".moveTo");
-                pts = {&rec->fPoints[0], 1};
+                pts = record.fPoints.subspan(0, 1);
                 break;
             case SkPathVerb::kLine:
                 cmd.append(".lineTo");
-                pts = {&rec->fPoints[1], 1};
+                pts = record.fPoints.subspan(1, 1);
                 break;
             case SkPathVerb::kQuad:
                 cmd.append(".quadTo");
-                pts = {&rec->fPoints[1], 2};
+                pts = record.fPoints.subspan(1, 2);
                 break;
             case SkPathVerb::kConic:
                 cmd.append(".conicTo");
-                pts = {&rec->fPoints[1], 2};
-                cw = rec->conicWeight();
+                pts = record.fPoints.subspan(1, 2);
+                cw = record.conicWeight();
                 break;
             case SkPathVerb::kCubic:
                 cmd.append(".cubicTo");
-                pts = {&rec->fPoints[1], 3};
+                pts = record.fPoints.subspan(1, 3);
                 break;
             case SkPathVerb::kClose:
                 cmd.append(".close()");
@@ -95,48 +107,48 @@ static void dump_iter(SkPathIter iter, SkString* builder, const char cmdPrefix[]
                     cmd.append(";");
                 }
                 cmd.append("\n");
-                builder->append(cmd.c_str());
+                (*builder).append(cmd.c_str());
                 break;
         }
         // we don't do this for kClose
         if (pts.size()) {
             append_params(builder, cmd.c_str(), pts, strType, useSemicolon, cw);
         }
-        postVerbProc();
+        if (flushToDebug && (*builder).size()) {
+            SkDebugf("%s", (*builder).c_str());
+            (*builder).reset();
+        }
     }
 }
 
 void SkPath::dump(SkWStream* wStream, bool dumpAsHex) const {
-    SkScalarAsStringType asType = dumpAsHex ? kHex_SkScalarAsStringType : kDec_SkScalarAsStringType;
+    const SkScalarAsStringType asType = dumpAsHex ? kHex_SkScalarAsStringType
+                                                  : kDec_SkScalarAsStringType;
 
-    SkString builder;
-    builder.printf("path.setFillType(SkPathFillType::k%s);\n",
-            gFillTypeStrs[(int) this->getFillType()]);
+    SkString builder{};
+    builder.printf("path.setFillType(SkPathFillType::k%s);\n", fill_type_name(getFillType()));
 
-    dump_iter(this->iter(), &builder, "path", asType, true, [&]() {
-        if (!wStream && builder.size()) {
-            SkDebugf("%s", builder.c_str());
-            builder.reset();
-        }
-    });
+    // Without a stream, each command goes to SkDebugf as it is produced.
+    const bool flushToDebug = wStream == nullptr;
+    dump_iter(iter(), &builder, "path", asType, true, flushToDebug);
     if (wStream) {
-        wStream->writeText(builder.c_str());
+        (*wStream).writeText(builder.c_str());
     }
 }
 
 SkString SkPathBuilder::dumpToString(DumpFormat format) const {
-    SkScalarAsStringType asType = format == DumpFormat::kHex ? kHex_SkScalarAsStringType
-                                                             : kDec_SkScalarAsStringType;
+    const SkScalarAsStringType asType = format == DumpFormat::kHex ? kHex_SkScalarAsStringType
+                                                                   : kDec_SkScalarAsStringType;
 
-    SkString builder;
-    builder.printf("SkPathBuilder(SkPathFillType::k%s)\n",
-                   gFillTypeStrs[(int) this->fillType()]);
+    SkString builder{};
+    builder.printf("SkPathBuilder(SkPathFillType::k%s)\n", fill_type_name(fillType()));
 
-    dump_iter(this->iter(), &builder, "", asType, false, [](){});
+    dump_iter(iter(), &builder, "", asType, false, false);
 
     return builder;
 }
 
 void SkPathBuilder::dump(DumpFormat format) const {
-    SkDebugf("%s", dumpToString().c_str());
+    const SkString text = dumpToString(format);
+    SkDebugf("%s", text.c_str());
 }

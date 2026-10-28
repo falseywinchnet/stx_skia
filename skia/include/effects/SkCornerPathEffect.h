@@ -26,7 +26,6 @@ public:
     */
     static sk_sp<SkPathEffect> Make(SkScalar radius);
 
-    static void RegisterFlattenables();
 };
 
 #endif

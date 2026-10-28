@@ -14,8 +14,20 @@
 #include "include/core/SkScalar.h"
 #include "include/private/SkDebug.h"
 #include "src/core/SkRegionPriv.h"
+#include "src/shaders/SkLocalMatrixShader.h"
+
+#include <utility>
 
 class SkBlitter;
+
+// Clip operators convert to region operators by value.
+static_assert(static_cast<int>(SkClipOp::kDifference) == SkRegion::kDifference_Op);
+static_assert(static_cast<int>(SkClipOp::kIntersect) == SkRegion::kIntersect_Op);
+
+static SkRegion::Op to_region_op(SkClipOp op) {
+    const SkRegion::Op regionOp = static_cast<SkRegion::Op>(op);
+    return regionOp;
+}
 
 SkRasterClip::SkRasterClip(const SkRasterClip& that)
         : fIsBW(that.fIsBW)
@@ -23,7 +35,7 @@ SkRasterClip::SkRasterClip(const SkRasterClip& that)
         , fIsRect(that.fIsRect)
         , fShader(that.fShader)
 {
-    AUTO_RASTERCLIP_VALIDATE(that);
+    const SkAutoRasterClipValidate validateThat(that);
 
     if (fIsBW) {
         fBW = that.fBW;
@@ -31,45 +43,45 @@ SkRasterClip::SkRasterClip(const SkRasterClip& that)
         fAA = that.fAA;
     }
 
-    SkDEBUGCODE(this->validate();)
+    (*this).validate();
 }
 
 SkRasterClip& SkRasterClip::operator=(const SkRasterClip& that) {
-    AUTO_RASTERCLIP_VALIDATE(that);
+    const SkAutoRasterClipValidate validateThat(that);
 
+    // Copy the active representation and release the one this clip no longer uses.
     fIsBW = that.fIsBW;
     if (fIsBW) {
         fBW = that.fBW;
+        fAA.setEmpty();
     } else {
         fAA = that.fAA;
+        fBW.setEmpty();
     }
 
     fIsEmpty = that.isEmpty();
     fIsRect = that.isRect();
     fShader = that.fShader;
-    SkDEBUGCODE(this->validate();)
+    (*this).validate();
     return *this;
 }
 
 SkRasterClip::SkRasterClip(const SkRegion& rgn) : fBW(rgn) {
     fIsBW = true;
-    fIsEmpty = this->computeIsEmpty();  // bounds might be empty, so compute
+    fIsEmpty = (*this).computeIsEmpty();  // bounds might be empty, so compute
     fIsRect = !fIsEmpty;
-    SkDEBUGCODE(this->validate();)
+    (*this).validate();
 }
 
 SkRasterClip::SkRasterClip(const SkIRect& bounds) : fBW(bounds) {
     fIsBW = true;
-    fIsEmpty = this->computeIsEmpty();  // bounds might be empty, so compute
+    fIsEmpty = (*this).computeIsEmpty();  // bounds might be empty, so compute
     fIsRect = !fIsEmpty;
-    SkDEBUGCODE(this->validate();)
+    (*this).validate();
 }
 
 SkRasterClip::SkRasterClip() {
-    fIsBW = true;
-    fIsEmpty = true;
-    fIsRect = false;
-    SkDEBUGCODE(this->validate();)
+    (*this).validate();
 }
 
 SkRasterClip::SkRasterClip(const SkPath& path, const SkIRect& bounds, bool doAA) {
@@ -80,18 +92,19 @@ SkRasterClip::SkRasterClip(const SkPath& path, const SkIRect& bounds, bool doAA)
         fIsBW = true;
         fBW.setPath(path, SkRegion(bounds));
     }
-    fIsEmpty = this->computeIsEmpty();  // bounds might be empty, so compute
-    fIsRect = this->computeIsRect();
-    SkDEBUGCODE(this->validate();)
+    fIsEmpty = (*this).computeIsEmpty();  // bounds might be empty, so compute
+    fIsRect = (*this).computeIsRect();
+    (*this).validate();
 }
 
 SkRasterClip::~SkRasterClip() {
-    SkDEBUGCODE(this->validate();)
+    (*this).validate();
 }
 
 bool SkRasterClip::setEmpty() {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
+    fShader.reset();
     fIsBW = true;
     fBW.setEmpty();
     fAA.setEmpty();
@@ -101,8 +114,9 @@ bool SkRasterClip::setEmpty() {
 }
 
 bool SkRasterClip::setRect(const SkIRect& rect) {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
+    fShader.reset();
     fIsBW = true;
     fAA.setEmpty();
     fIsRect = fBW.setRect(rect);
@@ -113,27 +127,29 @@ bool SkRasterClip::setRect(const SkIRect& rect) {
 /////////////////////////////////////////////////////////////////////////////////////
 
 bool SkRasterClip::op(const SkIRect& rect, SkClipOp op) {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
     if (fIsBW) {
-        fBW.op(rect, (SkRegion::Op) op);
+        fBW.op(rect, to_region_op(op));
     } else {
         fAA.op(rect, op);
     }
-    return this->updateCacheAndReturnNonEmpty();
+    const bool nonEmpty = (*this).updateCacheAndReturnNonEmpty();
+    return nonEmpty;
 }
 
 bool SkRasterClip::op(const SkRegion& rgn, SkClipOp op) {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
     if (fIsBW) {
-        (void)fBW.op(rgn, (SkRegion::Op) op);
+        (void)fBW.op(rgn, to_region_op(op));
     } else {
         SkAAClip tmp;
         tmp.setRegion(rgn);
         (void)fAA.op(tmp, op);
     }
-    return this->updateCacheAndReturnNonEmpty();
+    const bool nonEmpty = (*this).updateCacheAndReturnNonEmpty();
+    return nonEmpty;
 }
 
 /**
@@ -142,94 +158,111 @@ bool SkRasterClip::op(const SkRegion& rgn, SkClipOp op) {
  *  from its nearest int by < half of that value (1/8 in this case).
  */
 static bool nearly_integral(SkScalar x) {
-    static const SkScalar domain = SK_Scalar1 / 4;
-    static const SkScalar halfDomain = domain / 2;
+    constexpr SkScalar domain = SK_Scalar1 / 4;
+    constexpr SkScalar halfDomain = domain / 2;
 
-    x += halfDomain;
-    return x - SkScalarFloorToScalar(x) < domain;
+    const SkScalar shifted = x + halfDomain;
+    const bool integral = shifted - SkScalarFloorToScalar(shifted) < domain;
+    return integral;
 }
 
 bool SkRasterClip::op(const SkRect& localRect, const SkMatrix& matrix, SkClipOp op, bool doAA) {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
     const bool isScaleTrans = matrix.isScaleTranslate();
     if (!isScaleTrans) {
-        return this->op(SkPath::Rect(localRect), matrix, op, doAA);
+        const bool nonEmpty = (*this).op(SkPath::Rect(localRect), matrix, op, doAA);
+        return nonEmpty;
     }
 
-    SkRect devRect = matrix.mapRect(localRect);
-    if (fIsBW && doAA) {
+    const SkRect devRect = matrix.mapRect(localRect);
+    bool useAA = doAA;
+    if (fIsBW && useAA) {
         // check that the rect really needs aa, or is it close enought to
         // integer boundaries that we can just treat it as a BW rect?
         if (nearly_integral(devRect.fLeft) && nearly_integral(devRect.fTop) &&
             nearly_integral(devRect.fRight) && nearly_integral(devRect.fBottom)) {
-            doAA = false;
+            useAA = false;
         }
     }
 
-    if (fIsBW && !doAA) {
-        (void)fBW.op(devRect.round(), (SkRegion::Op) op);
+    if (fIsBW && !useAA) {
+        (void)fBW.op(devRect.round(), to_region_op(op));
     } else {
         if (fIsBW) {
-            this->convertToAA();
+            (*this).convertToAA();
         }
-        (void)fAA.op(devRect, op, doAA);
+        (void)fAA.op(devRect, op, useAA);
     }
-    return this->updateCacheAndReturnNonEmpty();
+    const bool nonEmpty = (*this).updateCacheAndReturnNonEmpty();
+    return nonEmpty;
 }
 
 bool SkRasterClip::op(const SkRRect& rrect, const SkMatrix& matrix, SkClipOp op, bool doAA) {
-    return this->op(SkPath::RRect(rrect), matrix, op, doAA);
+    const bool nonEmpty = (*this).op(SkPath::RRect(rrect), matrix, op, doAA);
+    return nonEmpty;
 }
 
 bool SkRasterClip::op(const SkPath& path, const SkMatrix& matrix, SkClipOp op, bool doAA) {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
-    SkPath devPath = path.makeTransform(matrix);
+    const SkPath devPath = path.makeTransform(matrix);
 
     // Since op is either intersect or difference, the clip is always shrinking; that means we can
     // always use our current bounds as the limiting factor for region/aaclip operations.
-    if (this->isRect() && op == SkClipOp::kIntersect) {
+    if ((*this).isRect() && op == SkClipOp::kIntersect) {
         // However, in the relatively common case of intersecting a new path with a rectangular
         // clip, it's faster to convert the path into a region/aa-mask in place than evaluate the
         // actual intersection. See skbug.com/40043482
         if (doAA && fIsBW) {
-            this->convertToAA();
+            (*this).convertToAA();
         }
+        // Copy the bounds: setting the path replaces the representation they belong to.
+        const SkIRect bounds = (*this).getBounds();
         if (fIsBW) {
-            fBW.setPath(devPath, SkRegion(this->getBounds()));
+            fBW.setPath(devPath, SkRegion(bounds));
         } else {
-            fAA.setPath(devPath, this->getBounds(), doAA);
+            fAA.setPath(devPath, bounds, doAA);
         }
-        return this->updateCacheAndReturnNonEmpty();
-    } else {
-        return this->op(SkRasterClip(devPath, this->getBounds(), doAA), op);
+        const bool nonEmpty = (*this).updateCacheAndReturnNonEmpty();
+        return nonEmpty;
     }
+    const SkRasterClip pathClip(devPath, (*this).getBounds(), doAA);
+    const bool nonEmpty = (*this).op(pathClip, op);
+    return nonEmpty;
 }
 
 bool SkRasterClip::op(sk_sp<SkShader> sh) {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
-    if (!fShader) {
-        fShader = sh;
-    } else {
-        fShader = SkShaders::Blend(SkBlendMode::kSrcIn, sh, fShader);
+    // A clip can only shrink. A null shader restricts nothing; composing it with an earlier
+    // shader clip would yield null and erase that clip.
+    if (!sh) {
+        const bool nonEmpty = !(*this).isEmpty();
+        return nonEmpty;
     }
-    return !this->isEmpty();
+    if (!fShader) {
+        fShader = std::move(sh);
+    } else {
+        fShader = SkShaders::Blend(SkBlendMode::kSrcIn, std::move(sh), fShader);
+    }
+    const bool nonEmpty = !(*this).isEmpty();
+    return nonEmpty;
 }
 
 bool SkRasterClip::op(const SkRasterClip& clip, SkClipOp op) {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
     clip.validate();
 
-    if (this->isBW() && clip.isBW()) {
-        (void)fBW.op(clip.fBW, (SkRegion::Op) op);
+    if ((*this).isBW() && clip.isBW()) {
+        (void)fBW.op(clip.fBW, to_region_op(op));
     } else {
         SkAAClip tmp;
-        const SkAAClip* other;
+        // Borrows either tmp or the other clip's antialiased representation.
+        const SkAAClip* other = nullptr;
 
-        if (this->isBW()) {
-            this->convertToAA();
+        if ((*this).isBW()) {
+            (*this).convertToAA();
         }
         if (clip.isBW()) {
             tmp.setRegion(clip.bwRgn());
@@ -239,7 +272,8 @@ bool SkRasterClip::op(const SkRasterClip& clip, SkClipOp op) {
         }
         (void)fAA.op(*other, op);
     }
-    return this->updateCacheAndReturnNonEmpty();
+    const bool nonEmpty = (*this).updateCacheAndReturnNonEmpty();
+    return nonEmpty;
 }
 
 void SkRasterClip::translate(int dx, int dy, SkRasterClip* dst) const {
@@ -247,43 +281,60 @@ void SkRasterClip::translate(int dx, int dy, SkRasterClip* dst) const {
         return;
     }
 
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
-    if (this->isEmpty()) {
-        dst->setEmpty();
-        return;
-    }
     if (0 == (dx | dy)) {
         *dst = *this;
         return;
     }
 
-    dst->fIsBW = fIsBW;
-    if (fIsBW) {
-        fBW.translate(dx, dy, &dst->fBW);
-        dst->fAA.setEmpty();
-    } else {
-        fAA.translate(dx, dy, &dst->fAA);
-        dst->fBW.setEmpty();
+    if ((*this).isEmpty()) {
+        (*dst).setEmpty();
+        return;
     }
-    dst->updateCacheAndReturnNonEmpty();
+
+    const SkIRect sourceBounds = (*this).getBounds();
+    (*dst).fIsBW = fIsBW;
+    if (fIsBW) {
+        fBW.translate(dx, dy, &(*dst).fBW);
+        (*dst).fAA.setEmpty();
+    } else {
+        fAA.translate(dx, dy, &(*dst).fAA);
+        (*dst).fBW.setEmpty();
+    }
+    (*dst).updateCacheAndReturnNonEmpty();
+
+    // Geometry may clamp a requested offset near the coordinate limits. The
+    // shader must receive the offset that the clip actually applied.
+    const SkIRect destinationBounds = (*dst).getBounds();
+    const int appliedDx = destinationBounds.fLeft - sourceBounds.fLeft;
+    const int appliedDy = destinationBounds.fTop - sourceBounds.fTop;
+    if (fShader) {
+        const SkPoint offset = {-static_cast<float>(appliedDx),
+                                -static_cast<float>(appliedDy)};
+        sk_sp<SkShader> translated(new SkCTMShader(fShader, SkMatrix::I(), offset));
+        (*dst).fShader = std::move(translated);
+    } else {
+        (*dst).fShader.reset();
+    }
 }
 
 void SkRasterClip::convertToAA() {
-    AUTO_RASTERCLIP_VALIDATE(*this);
+    const SkAutoRasterClipValidate validateOnExit(*this);
 
     SkASSERT(fIsBW);
     fAA.setRegion(fBW);
     fIsBW = false;
+    // The region is no longer the active representation.
+    fBW.setEmpty();
 
     // since we are being explicitly asked to convert-to-aa, we pass false so we don't "optimize"
     // ourselves back to BW.
-    (void)this->updateCacheAndReturnNonEmpty(false);
+    (void)(*this).updateCacheAndReturnNonEmpty(false);
 }
 
 #ifdef SK_DEBUG
 void SkRasterClip::validate() const {
-    // can't ever assert that fBW is empty, since we may have called forceGetBW
     if (fIsBW) {
         SkASSERT(fAA.isEmpty());
     }
@@ -291,28 +342,25 @@ void SkRasterClip::validate() const {
     SkRegionPriv::Validate(fBW);
     fAA.validate();
 
-    SkASSERT(this->computeIsEmpty() == fIsEmpty);
-    SkASSERT(this->computeIsRect() == fIsRect);
+    SkASSERT((*this).computeIsEmpty() == fIsEmpty);
+    SkASSERT((*this).computeIsRect() == fIsRect);
 }
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
-SkAAClipBlitterWrapper::SkAAClipBlitterWrapper() {
-    SkDEBUGCODE(fClipRgn = nullptr;)
-    SkDEBUGCODE(fBlitter = nullptr;)
-}
+SkAAClipBlitterWrapper::SkAAClipBlitterWrapper() = default;
 
 SkAAClipBlitterWrapper::SkAAClipBlitterWrapper(const SkRasterClip& clip,
                                                SkBlitter* blitter) {
-    this->init(clip, blitter);
+    (*this).init(clip, blitter);
 }
 
 SkAAClipBlitterWrapper::SkAAClipBlitterWrapper(const SkAAClip* aaclip,
                                                SkBlitter* blitter) {
     SkASSERT(blitter);
     SkASSERT(aaclip);
-    fBWRgn.setRect(aaclip->getBounds());
+    fBWRgn.setRect((*aaclip).getBounds());
     fAABlitter.init(blitter, aaclip);
     // now our return values
     fClipRgn = &fBWRgn;

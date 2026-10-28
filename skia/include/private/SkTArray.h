@@ -25,7 +25,10 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <memory>
 #include <new>
+#include <optional>
+#include <type_traits>
 #include <utility>
 
 namespace skia_private {
@@ -37,6 +40,8 @@ namespace skia_private {
       - false: T will be moved via move-constructors.
 */
 template <typename T, bool MEM_MOVE = sk_is_trivially_relocatable_v<T>> class TArray {
+    static_assert(alignof(T) <= alignof(std::max_align_t),
+                  "TArray heap storage supports only fundamental alignment");
 public:
     using value_type = T;
 
@@ -48,63 +53,58 @@ public:
     /**
      * Creates an empty array that will preallocate space for reserveCount elements.
      */
-    explicit TArray(int reserveCount) : TArray() { this->reserve_exact(reserveCount); }
+    explicit TArray(int reserveCount) : TArray() { (*this).reserve_exact(reserveCount); }
 
     /**
      * Copies one array to another. The new array will be heap allocated.
      */
     TArray(const TArray& that) : TArray(that.fData, that.fSize) {}
 
-    TArray(TArray&& that) {
-        if (that.fOwnMemory) {
-            this->setData(that);
-            that.setData({});
-        } else {
-            this->initData(that.fSize);
-            that.move(fData);
-        }
-        this->changeSize(that.fSize);
-        that.changeSize(0);
-    }
+    TArray(TArray&& that) : TArray() { *this = std::move(that); }
 
     /**
      * Creates a TArray by copying contents of a standard C array. The new
      * array will be heap allocated. Be careful not to use this constructor
      * when you really want the (void*, int) version.
      */
-    TArray(const T* array, int count) {
-        this->initData(count);
-        this->copy(array);
+    // The source is a live, disjoint range; null is admitted only for zero count.
+    // Delegation establishes the empty owner before any element constructor runs.
+    // If copying throws, the standard algorithm destroys its partial range and
+    // this already-constructed owner releases any heap storage.
+    TArray(const T* array, int count) : TArray() {
+        SkASSERT_RELEASE(count >= 0 && count <= kMaxCapacity);
+        SkASSERT_RELEASE(count == 0 || array != nullptr);
+        reserve_exact(count);
+        copyConstruct(array, count);
     }
 
     /**
      * Creates a TArray by copying contents from an SkSpan. The new array will be heap allocated.
      */
-    TArray(SkSpan<const T> data) : TArray(data.data(), static_cast<int>(data.size())) {}
+    TArray(SkSpan<const T> data) : TArray(data.data(), CheckedCount(data.size())) {}
 
     /**
      * Creates a TArray by copying contents of an initializer list.
      */
-    TArray(std::initializer_list<T> data) : TArray(data.begin(), data.size()) {}
+    TArray(std::initializer_list<T> data) : TArray(data.begin(), CheckedCount(data.size())) {}
 
     TArray& operator=(const TArray& that) {
         if (this == &that) {
             return *this;
         }
-        this->clear();
-        this->checkRealloc(that.size(), kExactFit);
-        this->changeSize(that.fSize);
-        this->copy(that.fData);
+        clear();
+        if (that.fSize > capacity()) checkRealloc(that.fSize, kExactFit);
+        copyConstruct(that.fData, that.fSize);
         return *this;
     }
 
     TArray& operator=(TArray&& that) {
         if (this != &that) {
-            this->clear();
-            this->unpoison();
-            that.unpoison();
+            (*this).clear();
             if (that.fOwnMemory) {
                 // The storage is on the heap, so move the data pointer.
+                unpoison();
+                that.unpoison();
                 if (fOwnMemory) {
                     sk_free(fData);
                 }
@@ -117,12 +117,21 @@ public:
 
                 fOwnMemory = true;
 
-                this->changeSize(that.fSize);
+                (*this).changeSize(that.fSize);
             } else {
                 // The data is stored inline in that, so move it element-by-element.
-                this->checkRealloc(that.size(), kExactFit);
-                this->changeSize(that.fSize);
-                that.move(fData);
+                checkRealloc(that.size(), kExactFit);
+                UnpoisonedCapacity construction(*this);
+                if (that.fSize != 0) {
+                    if constexpr (MEM_MOVE) {
+                        sk_careful_memcpy(fData, that.fData, Bytes(that.fSize));
+                    } else {
+                        std::uninitialized_move_n(that.fData, that.fSize, fData);
+                    }
+                }
+                changeSize(that.fSize);
+                construction.release();
+                if constexpr (!MEM_MOVE) that.destroyAll();
             }
             that.changeSize(0);
         }
@@ -130,8 +139,8 @@ public:
     }
 
     ~TArray() {
-        this->destroyAll();
-        this->unpoison();
+        (*this).destroyAll();
+        (*this).unpoison();
         if (fOwnMemory) {
             sk_free(fData);
         }
@@ -140,24 +149,48 @@ public:
     /**
      * Resets to size() = n newly constructed T objects and resets any reserve count.
      */
-    void reset(int n) {
-        SkASSERT(n >= 0);
-        this->clear();
-        this->checkRealloc(n, kExactFit);
-        this->changeSize(n);
-        for (int i = 0; i < this->size(); ++i) {
-            new (fData + i) T;
-        }
+    // Construction failure leaves an empty owner retaining its current capacity.
+    // Default initialization intentionally leaves scalar values uninitialized.
+    void reset(int count) {
+        SkASSERT_RELEASE(count >= 0 && count <= kMaxCapacity);
+        clear();
+        checkRealloc(count, kExactFit);
+        UnpoisonedCapacity construction(*this);
+        if (count != 0) std::uninitialized_default_construct_n(fData, count);
+        changeSize(count);
+        construction.release();
     }
 
-    /**
-     * Resets to a copy of a C array and resets any reserve count.
-     */
-    void reset(SkSpan<const T> src) {
-        this->clear();
-        this->checkRealloc(src.size(), kExactFit);
-        this->changeSize(src.size());
-        this->copy(src.data());
+    // Replace from a disjoint source, or preserve a live subrange of this array
+    // before ending its elements. Nontrivial aliases need a temporary owner.
+    void reset(SkSpan<const T> source) {
+        const int count = CheckedCount(source.size());
+        const T* elements = source.data();
+        SkASSERT_RELEASE(count == 0 || elements != nullptr);
+        if (count != 0 && fSize != 0) {
+            const uintptr_t beginAddress = reinterpret_cast<uintptr_t>(fData);
+            const uintptr_t sourceAddress = reinterpret_cast<uintptr_t>(elements);
+            const size_t liveBytes = Bytes(fSize);
+            if (sourceAddress >= beginAddress && sourceAddress - beginAddress < liveBytes) {
+                const size_t byteOffset = sourceAddress - beginAddress;
+                SkASSERT_RELEASE(byteOffset % sizeof(T) == 0);
+                const size_t offset = byteOffset / sizeof(T);
+                SkASSERT_RELEASE(static_cast<size_t>(count) <= static_cast<size_t>(fSize) - offset);
+                if constexpr (std::is_trivially_copyable_v<T>) {
+                    // Copy while the source elements are still live and readable.
+                    const size_t bytes = Bytes(count);
+                    sk_careful_memmove(fData, elements, bytes);
+                    changeSize(count);
+                } else {
+                    TArray snapshot(elements, count);
+                    *this = snapshot;
+                }
+                return;
+            }
+        }
+        clear();
+        if (count > capacity()) checkRealloc(count, kExactFit);
+        copyConstruct(elements, count);
     }
 
     /**
@@ -166,9 +199,9 @@ public:
      * is called, or reserve() is called again.
      */
     void reserve(int n) {
-        SkASSERT(n >= 0);
-        if (n > this->size()) {
-            this->checkRealloc(n - this->size(), kGrowing);
+        SkASSERT_RELEASE(n >= 0 && n <= kMaxCapacity);
+        if (n > (*this).size()) {
+            (*this).checkRealloc(n - (*this).size(), kGrowing);
         }
     }
 
@@ -177,20 +210,22 @@ public:
      * as above apply.
      */
     void reserve_exact(int n) {
-        SkASSERT(n >= 0);
-        if (n > this->size()) {
-            this->checkRealloc(n - this->size(), kExactFit);
+        SkASSERT_RELEASE(n >= 0 && n <= kMaxCapacity);
+        if (n > (*this).size()) {
+            (*this).checkRealloc(n - (*this).size(), kExactFit);
         }
     }
 
     void removeShuffle(int n) {
-        SkASSERT(n < this->size());
-        int newCount = fSize - 1;
+        static_assert(MEM_MOVE || std::is_nothrow_move_constructible_v<T>,
+                      "removeShuffle requires a nonthrowing element relocation");
+        SkASSERT_RELEASE(n >= 0 && n < size());
+        const int newCount = fSize - 1;
         fData[n].~T();
         if (n != newCount) {
-            this->move(n, newCount);
+            (*this).move(n, newCount);
         }
-        this->changeSize(newCount);
+        (*this).changeSize(newCount);
     }
 
     // Is the array empty.
@@ -200,154 +235,202 @@ public:
      * Adds one new default-initialized T value and returns it by reference. Note that the reference
      * only remains valid until the next call that adds or removes elements.
      */
-    T& push_back() {
-        void* newT = this->push_back_raw(1);
-        return *new (newT) T;
+    T& push_back() & {
+        T* element = push_back_n(1);
+        return *element;
     }
+    T& push_back() && = delete;
 
     /**
      * Adds one new T value which is copy-constructed, returning it by reference. As always,
      * the reference only remains valid until the next call that adds or removes elements.
      */
-    T& push_back(const T& t) {
-        this->unpoison();
-        T* newT;
-        if (this->capacity() > fSize) SK_LIKELY {
+    T& push_back(const T& t) & {
+        UnpoisonedCapacity construction(*this);
+        T* newT = nullptr;
+        if ((*this).capacity() > fSize) SK_LIKELY {
             // Copy over the element directly.
             newT = new (fData + fSize) T(t);
         } else {
-            newT = this->growAndConstructAtEnd(t);
+            newT = (*this).growAndConstructAtEnd(t);
         }
 
-        this->changeSize(fSize + 1);
+        changeSize(fSize + 1);
+        construction.release();
         return *newT;
     }
+    T& push_back(const T&) && = delete;
 
     /**
      * Adds one new T value which is copy-constructed, returning it by reference.
      */
-    T& push_back(T&& t) {
-        this->unpoison();
-        T* newT;
-        if (this->capacity() > fSize) SK_LIKELY {
+    T& push_back(T&& t) & {
+        UnpoisonedCapacity construction(*this);
+        T* newT = nullptr;
+        if ((*this).capacity() > fSize) SK_LIKELY {
             // Move over the element directly.
             newT = new (fData + fSize) T(std::move(t));
         } else {
-            newT = this->growAndConstructAtEnd(std::move(t));
+            newT = (*this).growAndConstructAtEnd(std::move(t));
         }
 
-        this->changeSize(fSize + 1);
+        changeSize(fSize + 1);
+        construction.release();
         return *newT;
     }
+    T& push_back(T&&) && = delete;
 
     /**
      *  Constructs a new T at the back of this array, returning it by reference.
      */
-    template <typename... Args> T& emplace_back(Args&&... args) {
-        this->unpoison();
-        T* newT;
-        if (this->capacity() > fSize) SK_LIKELY {
+    template <typename... Args> T& emplace_back(Args&&... args) & {
+        UnpoisonedCapacity construction(*this);
+        T* newT = nullptr;
+        if ((*this).capacity() > fSize) SK_LIKELY {
             // Emplace the new element in directly.
             newT = new (fData + fSize) T(std::forward<Args>(args)...);
         } else {
-            newT = this->growAndConstructAtEnd(std::forward<Args>(args)...);
+            newT = (*this).growAndConstructAtEnd(std::forward<Args>(args)...);
         }
 
-        this->changeSize(fSize + 1);
+        changeSize(fSize + 1);
+        construction.release();
         return *newT;
     }
+    template <typename... Args> T& emplace_back(Args&&...) && = delete;
 
     /**
      * Allocates n more default-initialized T values, and returns the address of
      * the start of that new range. Note: this address is only valid until the
      * next API call made on the array that might add or remove elements.
      */
-    T* push_back_n(int n) {
-        SkASSERT(n >= 0);
-        T* newTs = TCast(this->push_back_raw(n));
-        for (int i = 0; i < n; ++i) {
-            new (&newTs[i]) T;
+    // Failure destroys only the new prefix; the original live count is unchanged.
+    // Capacity may have grown before element construction begins.
+    T* push_back_n(int count) & {
+        SkASSERT_RELEASE(count >= 0 && count <= kMaxCapacity - fSize);
+        if (count == 0) {
+            T* unchangedEnd = end();
+            return unchangedEnd;
         }
-        return newTs;
+        checkRealloc(count, kGrowing);
+        UnpoisonedCapacity construction(*this);
+        T* appended = fData + fSize;
+        std::uninitialized_default_construct_n(appended, count);
+        const int newSize = fSize + count;
+        changeSize(newSize);
+        construction.release();
+        return appended;
     }
+    T* push_back_n(int) && = delete;
 
     /**
      * Version of above that uses a copy constructor to initialize all n items
      * to the same T.
      */
-    T* push_back_n(int n, const T& t) {
-        SkASSERT(n >= 0);
-        T* newTs = TCast(this->push_back_raw(n));
-        for (int i = 0; i < n; ++i) {
-            new (&newTs[i]) T(t);
+    T* push_back_n(int n, const T& t) & {
+        SkASSERT_RELEASE(n >= 0 && n <= kMaxCapacity - fSize);
+        if (n == 0) return end();
+        std::optional<T> aliasValue{};
+        const T* source = &t;
+        if (capacity() - fSize < n && ownsLiveElement(source)) {
+            aliasValue.emplace(t);
+            source = &*aliasValue;
         }
-        return static_cast<T*>(newTs);
+        checkRealloc(n, kGrowing);
+        UnpoisonedCapacity construction(*this);
+        T* appended = fData + fSize;
+        std::uninitialized_fill_n(appended, n, *source);
+        changeSize(fSize + n);
+        construction.release();
+        return appended;
     }
+    T* push_back_n(int, const T&) && = delete;
 
     /**
      * Version of above that uses a copy constructor to initialize the n items
      * to separate T values.
      */
-    T* push_back_n(int n, const T t[]) {
-        SkASSERT(n >= 0);
-        this->checkRealloc(n, kGrowing);
-        T* end = this->end();
-        this->changeSize(fSize + n);
-        for (int i = 0; i < n; ++i) {
-            new (end + i) T(t[i]);
+    T* push_back_n(int n, const T t[]) & {
+        SkASSERT_RELEASE(n >= 0 && n <= kMaxCapacity - fSize);
+        if (n == 0) return end();
+        SkASSERT_RELEASE(t != nullptr);
+        std::optional<TArray> aliasValues{};
+        const T* source = t;
+        if (ownsLiveElement(source)) {
+            // A source among the live elements must end with them, whether or not the array
+            // grows: past them it would read the elements this call is constructing.
+            const size_t byteOffset = reinterpret_cast<uintptr_t>(source) -
+                                      reinterpret_cast<uintptr_t>(fData);
+            SkASSERT_RELEASE(byteOffset % sizeof(T) == 0);
+            const size_t offset = byteOffset / sizeof(T);
+            SkASSERT_RELEASE(static_cast<size_t>(n) <= static_cast<size_t>(fSize) - offset);
+            if (capacity() - fSize < n) {
+                // Growth frees the live elements, so copy them first.
+                aliasValues.emplace(source, n);
+                source = (*aliasValues).data();
+            }
         }
-        return end;
+        checkRealloc(n, kGrowing);
+        UnpoisonedCapacity construction(*this);
+        T* appended = fData + fSize;
+        std::uninitialized_copy_n(source, n, appended);
+        changeSize(fSize + n);
+        construction.release();
+        return appended;
     }
+    T* push_back_n(int, const T[]) && = delete;
 
     /**
      * Version of above that uses the move constructor to set n items.
      */
-    T* move_back_n(int n, T* t) {
-        SkASSERT(n >= 0);
-        this->checkRealloc(n, kGrowing);
-        T* end = this->end();
-        this->changeSize(fSize + n);
-        for (int i = 0; i < n; ++i) {
-            new (end + i) T(std::move(t[i]));
-        }
-        return end;
+    T* move_back_n(int n, T* t) & {
+        SkASSERT_RELEASE(n >= 0 && n <= kMaxCapacity - fSize);
+        if (n == 0) return end();
+        SkASSERT_RELEASE(t != nullptr && !ownsLiveElement(t));
+        checkRealloc(n, kGrowing);
+        UnpoisonedCapacity construction(*this);
+        T* appended = fData + fSize;
+        std::uninitialized_move_n(t, n, appended);
+        changeSize(fSize + n);
+        construction.release();
+        return appended;
     }
+    T* move_back_n(int, T*) && = delete;
 
     /**
      * Removes the last element. Not safe to call when size() == 0.
      */
     void pop_back() {
-        sk_collection_not_empty(this->empty());
+        sk_collection_not_empty((*this).empty());
         fData[fSize - 1].~T();
-        this->changeSize(fSize - 1);
+        (*this).changeSize(fSize - 1);
     }
 
     /**
      * Removes the last n elements. Not safe to call when size() < n.
      */
     void pop_back_n(int n) {
-        SkASSERT(n >= 0);
-        SkASSERT(this->size() >= n);
+        SkASSERT_RELEASE(n >= 0 && n <= size());
         int i = fSize;
         while (i-- > fSize - n) {
             (*this)[i].~T();
         }
-        this->changeSize(fSize - n);
+        (*this).changeSize(fSize - n);
     }
 
     /**
      * Pushes or pops from the back to resize. Pushes will be default initialized.
      */
     void resize_back(int newCount) {
-        SkASSERT(newCount >= 0);
-        if (newCount > this->size()) {
-            if (this->empty()) {
+        SkASSERT_RELEASE(newCount >= 0 && newCount <= kMaxCapacity);
+        if (newCount > (*this).size()) {
+            if ((*this).empty()) {
                 // When the container is completely empty, grow to exactly the requested size.
-                this->checkRealloc(newCount, kExactFit);
+                (*this).checkRealloc(newCount, kExactFit);
             }
-            this->push_back_n(newCount - fSize);
-        } else if (newCount < this->size()) {
-            this->pop_back_n(fSize - newCount);
+            (*this).push_back_n(newCount - fSize);
+        } else if (newCount < (*this).size()) {
+            (*this).pop_back_n(fSize - newCount);
         }
     }
 
@@ -363,9 +446,12 @@ public:
             swap(fSize, that.fSize);
 
             // Can't use swap because fCapacity is a bit field.
-            auto allocCount = fCapacity;
+            const uint32_t allocCount = fCapacity;
             fCapacity = that.fCapacity;
             that.fCapacity = allocCount;
+#ifdef SK_SANITIZE_ADDRESS
+            swap(fPoisoned, that.fPoisoned);
+#endif
         } else {
             // This could be more optimal...
             TArray copy(std::move(that));
@@ -382,127 +468,150 @@ public:
         if (that.empty() || &that == this) {
             return;
         }
-        void* dst = this->push_back_raw(that.size());
-        // After move() returns, the contents of `dst` will have either been in-place initialized
-        // using a the move constructor (per-item from `that`'s elements), or will have been
-        // mem-copied into when MEM_MOVE is true (now valid objects).
-        that.move(dst);
-        // All items in `that` have either been destroyed (when MEM_MOVE is false) or should be
-        // considered invalid (when MEM_MOVE is true). Reset fSize to 0 directly to skip any further
-        // per-item destruction.
+        const int oldSize = fSize;
+        const int movedCount = that.fSize;
+        checkRealloc(movedCount, kGrowing);
+        UnpoisonedCapacity construction(*this);
+        T* appended = fData + oldSize;
+        if constexpr (MEM_MOVE) {
+            sk_careful_memcpy(appended, that.fData, Bytes(movedCount));
+        } else {
+            std::uninitialized_move_n(that.fData, movedCount, appended);
+        }
+        changeSize(oldSize + movedCount);
+        construction.release();
+        if constexpr (!MEM_MOVE) that.destroyAll();
         that.changeSize(0);
     }
 
-    T* begin() {
+    T* begin() & {
         return fData;
     }
-    const T* begin() const {
+    const T* begin() const & {
         return fData;
     }
+    T* begin() && = delete;
+    const T* begin() const && = delete;
 
-    // It's safe to use fItemArray + fSize because if fItemArray is nullptr then adding 0 is
-    // valid and returns nullptr. See [expr.add] in the C++ standard.
-    T* end() {
+    T* end() & {
         if (fData == nullptr) {
             SkASSERT(fSize == 0);
+            return nullptr;
         }
         return fData + fSize;
     }
-    const T* end() const {
+    const T* end() const & {
         if (fData == nullptr) {
             SkASSERT(fSize == 0);
+            return nullptr;
         }
         return fData + fSize;
     }
-    T* data() { return fData; }
-    const T* data() const { return fData; }
+    T* end() && = delete;
+    const T* end() const && = delete;
+    T* data() & { return fData; }
+    const T* data() const & { return fData; }
+    T* data() && = delete;
+    const T* data() const && = delete;
     int size() const { return fSize; }
     size_t size_bytes() const { return Bytes(fSize); }
-    void resize(size_t count) { this->resize_back((int)count); }
+    void resize(size_t count) {
+        const int checkedCount = CheckedCount(count);
+        resize_back(checkedCount);
+    }
 
     void clear() {
-        this->destroyAll();
-        this->changeSize(0);
+        (*this).destroyAll();
+        (*this).changeSize(0);
     }
 
     void shrink_to_fit() {
         if (!fOwnMemory || fSize == fCapacity) {
             return;
         }
-        this->unpoison();
         if (fSize == 0) {
+            unpoison();
             sk_free(fData);
             fData = nullptr;
             fCapacity = 0;
         } else {
             SkSpan<std::byte> allocation = Allocate(fSize);
-            this->move(TCast(allocation.data()));
-            if (fOwnMemory) {
-                sk_free(fData);
-            }
-            // Poison is applied in `setDataFromBytes`.
-            this->setDataFromBytes(allocation);
+            installDataAndUpdateCapacity(allocation);
         }
     }
 
     /**
      * Get the i^th element.
      */
-    T& operator[] (int i) {
-        return fData[sk_collection_check_bounds(i, this->size())];
+    T& operator[] (int i) & {
+        return fData[sk_collection_check_bounds(i, (*this).size())];
     }
 
-    const T& operator[] (int i) const {
-        return fData[sk_collection_check_bounds(i, this->size())];
+    const T& operator[] (int i) const & {
+        return fData[sk_collection_check_bounds(i, (*this).size())];
     }
+    T& operator[](int) && = delete;
+    const T& operator[](int) const && = delete;
 
-    T& at(int i) { return (*this)[i]; }
-    const T& at(int i) const { return (*this)[i]; }
+    T& at(int i) & { return (*this)[i]; }
+    const T& at(int i) const & { return (*this)[i]; }
+    T& at(int) && = delete;
+    const T& at(int) const && = delete;
 
     /**
      * equivalent to operator[](0)
      */
-    T& front() {
-        sk_collection_not_empty(this->empty());
+    T& front() & {
+        sk_collection_not_empty((*this).empty());
         return fData[0];
     }
 
-    const T& front() const {
-        sk_collection_not_empty(this->empty());
+    const T& front() const & {
+        sk_collection_not_empty((*this).empty());
         return fData[0];
     }
+    T& front() && = delete;
+    const T& front() const && = delete;
 
     /**
      * equivalent to operator[](size() - 1)
      */
-    T& back() {
-        sk_collection_not_empty(this->empty());
+    T& back() & {
+        sk_collection_not_empty((*this).empty());
         return fData[fSize - 1];
     }
 
-    const T& back() const {
-        sk_collection_not_empty(this->empty());
+    const T& back() const & {
+        sk_collection_not_empty((*this).empty());
         return fData[fSize - 1];
     }
+    T& back() && = delete;
+    const T& back() const && = delete;
 
     /**
      * equivalent to operator[](size()-1-i)
      */
-    T& fromBack(int i) {
-        return (*this)[fSize - i - 1];
+    T& fromBack(int i) & {
+        SkASSERT_RELEASE(i >= 0 && i < fSize);
+        const int forwardIndex = fSize - 1 - i;
+        return fData[forwardIndex];
     }
 
-    const T& fromBack(int i) const {
-        return (*this)[fSize - i - 1];
+    const T& fromBack(int i) const & {
+        SkASSERT_RELEASE(i >= 0 && i < fSize);
+        const int forwardIndex = fSize - 1 - i;
+        return fData[forwardIndex];
     }
+    T& fromBack(int) && = delete;
+    const T& fromBack(int) const && = delete;
 
     bool operator==(const TArray<T, MEM_MOVE>& right) const {
-        int leftCount = this->size();
+        const int leftCount = (*this).size();
         if (leftCount != right.size()) {
             return false;
         }
         for (int index = 0; index < leftCount; ++index) {
-            if (fData[index] != right.fData[index]) {
+            if (!(fData[index] == right.fData[index])) {
                 return false;
             }
         }
@@ -518,39 +627,60 @@ public:
     }
 
 protected:
-    // Creates an empty array that will use the passed storage block until it is insufficiently
-    // large to hold the entire array.
+    // The storage base outlives this owner. Capacity is raw storage; no elements
+    // become live here. Growth transfers to a heap allocation when necessary.
     template <int InitialCapacity>
-    TArray(SkAlignedSTStorage<InitialCapacity, T>* storage, int size = 0) {
-        static_assert(InitialCapacity >= 0);
-        SkASSERT(size >= 0);
-        SkASSERT(storage->get() != nullptr);
-        if (size > InitialCapacity) {
-            this->initData(size);
-        } else {
-            this->setDataFromBytes({storage->data(), storage->size()});
-            this->changeSize(size);
-
-            // setDataFromBytes always sets fOwnMemory to true, but we are actually using static
-            // storage here, which shouldn't ever be freed.
-            fOwnMemory = false;
-        }
+    explicit TArray(SkAlignedSTStorage<InitialCapacity, T>* storage) : TArray() {
+        static_assert(InitialCapacity > 0);
+        SkASSERT_RELEASE(storage != nullptr);
+        SkSpan<std::byte> bytes{(*storage).data(), (*storage).size()};
+        setDataFromBytes(bytes);
+        fOwnMemory = false;
     }
 
-    // Copy a C array, using pre-allocated storage if preAllocCount >= count. Otherwise, storage
-    // will only be used when array shrinks to fit.
     template <int InitialCapacity>
-    TArray(const T* array, int size, SkAlignedSTStorage<InitialCapacity, T>* storage)
-            : TArray{storage, size} {
-        this->copy(array);
+    TArray(const T* array, int count, SkAlignedSTStorage<InitialCapacity, T>* storage)
+        : TArray(storage) {
+        SkASSERT_RELEASE(count >= 0 && count <= kMaxCapacity);
+        SkASSERT_RELEASE(count == 0 || array != nullptr);
+        reserve_exact(count);
+        copyConstruct(array, count);
     }
     template <int InitialCapacity>
     TArray(SkSpan<const T> data, SkAlignedSTStorage<InitialCapacity, T>* storage)
-            : TArray{storage, static_cast<int>(data.size())} {
-        this->copy(data.data());
-    }
+        : TArray(data.data(), CheckedCount(data.size()), storage) {}
 
 private:
+    // Restores the unused-capacity ASan boundary if element construction exits
+    // early. No per-element state or persistent array field is needed.
+    class UnpoisonedCapacity {
+    public:
+        explicit UnpoisonedCapacity(TArray& owner) : fOwner(owner) { fOwner.unpoison(); }
+        ~UnpoisonedCapacity() {
+            if (fActive) fOwner.poison();
+        }
+        void release() { fActive = false; }
+    private:
+        TArray& fOwner;
+        bool fActive = true;
+    };
+
+    struct FreeAllocation {
+        void operator()(std::byte* storage) const { sk_free(storage); }
+    };
+    struct DestroyNewElement {
+        void operator()(T* element) const { std::destroy_at(element); }
+    };
+
+    bool ownsLiveElement(const T* element) const {
+        if (fSize == 0) return false;
+        const uintptr_t beginAddress = reinterpret_cast<uintptr_t>(fData);
+        const uintptr_t elementAddress = reinterpret_cast<uintptr_t>(element);
+        const bool inside = elementAddress >= beginAddress &&
+                            elementAddress - beginAddress < Bytes(fSize);
+        return inside;
+    }
+
     // Growth factors for checkRealloc.
     static constexpr double kExactFit = 1.0;
     static constexpr double kGrowing = 1.5;
@@ -560,7 +690,7 @@ private:
 
     // Note for 32-bit machines kMaxCapacity will be <= SIZE_MAX. For 64-bit machines it will
     // just be INT_MAX if the sizeof(T) < 2^32.
-    static constexpr int kMaxCapacity = SkToInt(std::min(SIZE_MAX / sizeof(T), (size_t)INT_MAX));
+    static constexpr int kMaxCapacity = SkToInt(std::min(SIZE_MAX / sizeof(T), static_cast<size_t>(INT_MAX)));
 
     void setDataFromBytes(SkSpan<std::byte> allocation) {
         T* data = TCast(allocation.data());
@@ -568,25 +698,25 @@ private:
         // would seem like the SkContainerAllocator should handle the divide, but it would have
         // to a full divide instruction. If done here the size is known at compile, and usually
         // can be implemented by a right shift. The full divide takes ~50X longer than the shift.
-        size_t size = std::min(allocation.size() / sizeof(T), SkToSizeT(kMaxCapacity));
-        this->setData(SkSpan<T>(data, size));
+        const size_t size = std::min(allocation.size() / sizeof(T), SkToSizeT(kMaxCapacity));
+        (*this).setData(SkSpan<T>(data, size));
     }
 
     void setData(SkSpan<T> array) {
-        this->unpoison();
+        (*this).unpoison();
 
         fData = array.data();
         fCapacity = SkToU32(array.size());
         fOwnMemory = true;
 
-        this->poison();
+        (*this).poison();
     }
 
     void unpoison() {
 #ifdef SK_SANITIZE_ADDRESS
         if (fData && fPoisoned) {
             // SkDebugf("UNPOISONING %p : 0 -> %zu\n", fData, Bytes(fCapacity));
-            sk_asan_unpoison_memory_region(this->begin(), Bytes(fCapacity));
+            sk_asan_unpoison_memory_region((*this).begin(), Bytes(fCapacity));
             fPoisoned = false;
         }
 #endif
@@ -596,16 +726,16 @@ private:
 #ifdef SK_SANITIZE_ADDRESS
         if (fData && fCapacity > SkToUInt(fSize)) {
             // SkDebugf("  POISONING %p : %zu -> %zu\n", fData, Bytes(fSize), Bytes(fCapacity));
-            sk_asan_poison_memory_region(this->end(), Bytes(fCapacity - fSize));
+            sk_asan_poison_memory_region((*this).end(), Bytes(fCapacity - fSize));
             fPoisoned = true;
         }
 #endif
     }
 
     void changeSize(int n) {
-        this->unpoison();
+        (*this).unpoison();
         fSize = n;
-        this->poison();
+        (*this).poison();
     }
 
     // We disable Control-Flow Integrity sanitization (go/cfi) when casting item-array buffers.
@@ -617,7 +747,8 @@ private:
     // here, so disable CFI when doing these casts.
     SK_NO_SANITIZE_CFI
     static T* TCast(void* buffer) {
-        return (T*)buffer;
+        T* elements = static_cast<T*>(buffer);
+        return elements;
     }
 
     static size_t Bytes(int n) {
@@ -629,40 +760,47 @@ private:
         return SkContainerAllocator{sizeof(T), kMaxCapacity}.allocate(capacity, growthFactor);
     }
 
-    void initData(int count) {
-        this->setDataFromBytes(Allocate(count));
-        this->changeSize(count);
-    }
-
     void destroyAll() {
-        if (!this->empty()) {
-            T* cursor = this->begin();
-            T* const end = this->end();
+        if (!(*this).empty()) {
+            T* cursor = (*this).begin();
+            T* const end = (*this).end();
             do {
-                cursor->~T();
-                cursor++;
+                (*cursor).~T();
+                ++cursor;
             } while (cursor < end);
         }
     }
 
-    /** In the following move and copy methods, 'dst' is assumed to be uninitialized raw storage.
-     *  In the following move methods, 'src' is destroyed leaving behind uninitialized raw storage.
-     */
-    void copy(const T* src) {
+    // The caller has ended prior elements and reserved count slots. The standard
+    // algorithm cleans its constructed prefix if a copy throws; fSize stays zero.
+    // No count publication or destruction bookkeeping occurs per element here.
+    void copyConstruct(const T* source, int count) {
+        SkASSERT(fSize == 0 && count >= 0 && count <= capacity());
         if constexpr (std::is_trivially_copyable_v<T>) {
-            if (!this->empty() && src != nullptr) {
-                sk_careful_memcpy(fData, src, this->size_bytes());
+            // No constructor can throw or observe this count. Preserve the
+            // original store-before-copy fast path for trivial elements.
+            changeSize(count);
+            if (count != 0) {
+                const size_t bytes = Bytes(count);
+                sk_careful_memcpy(fData, source, bytes);
             }
         } else {
-            for (int i = 0; i < this->size(); ++i) {
-                new (fData + i) T(src[i]);
-            }
+            UnpoisonedCapacity construction(*this);
+            if (count != 0) std::uninitialized_copy_n(source, count, fData);
+            changeSize(count);
+            construction.release();
         }
+    }
+
+    static int CheckedCount(size_t count) {
+        SkASSERT_RELEASE(count <= static_cast<size_t>(kMaxCapacity));
+        const int result = static_cast<int>(count);
+        return result;
     }
 
     void move(int dst, int src) {
         if constexpr (MEM_MOVE) {
-            memcpy(static_cast<void*>(&fData[dst]),
+            std::memcpy(static_cast<void*>(&fData[dst]),
                    static_cast<const void*>(&fData[src]),
                    sizeof(T));
         } else {
@@ -671,32 +809,37 @@ private:
         }
     }
 
-    void move(void* dst) {
+    // A failed move leaves the source live and the standard algorithm destroys
+    // the constructed destination prefix. The source may contain moved-from
+    // values until the caller retries or clears it.
+    void relocateTo(T* destination) {
+        if (fSize == 0) return;
         if constexpr (MEM_MOVE) {
-            sk_careful_memcpy(dst, fData, Bytes(fSize));
+            sk_careful_memcpy(destination, fData, Bytes(fSize));
         } else {
-            for (int i = 0; i < this->size(); ++i) {
-                new (static_cast<char*>(dst) + Bytes(i)) T(std::move(fData[i]));
-                fData[i].~T();
-            }
+            std::uninitialized_move_n(fData, fSize, destination);
         }
     }
 
-    // Helper function that makes space for n objects, adjusts the count, but does not initialize
-    // the new objects.
-    void* push_back_raw(int n) {
-        this->checkRealloc(n, kGrowing);
-        void* ptr = fData + fSize;
-        this->changeSize(fSize + n);
-        return ptr;
+    // Only called after relocation succeeds. Bit-relocated source objects must
+    // not run their destructors; constructor-relocated source objects must.
+    void finishRelocation(SkSpan<std::byte> allocation) {
+        if constexpr (!MEM_MOVE) destroyAll();
+        unpoison();
+        if (fOwnMemory) sk_free(fData);
+        setDataFromBytes(allocation);
     }
 
     template <typename... Args>
     SK_ALWAYS_INLINE T* growAndConstructAtEnd(Args&&... args) {
-        SkSpan<std::byte> buffer = this->preallocateNewData(/*delta=*/1, kGrowing);
+        SkSpan<std::byte> buffer = preallocateNewData(/*delta=*/1, kGrowing);
+        std::unique_ptr<std::byte, FreeAllocation> allocationOwner(buffer.data());
         T* newT = new (TCast(buffer.data()) + fSize) T(std::forward<Args>(args)...);
-        this->installDataAndUpdateCapacity(buffer);
-
+        std::unique_ptr<T, DestroyNewElement> newElementOwner(newT);
+        relocateTo(TCast(buffer.data()));
+        finishRelocation(buffer);
+        newElementOwner.release();
+        allocationOwner.release();
         return newT;
     }
 
@@ -704,11 +847,9 @@ private:
         SkASSERT(delta >= 0);
         SkASSERT(fSize >= 0);
         SkASSERT(fCapacity >= 0);
-
-        // Check if there are enough remaining allocated elements to satisfy the request.
-        if (this->capacity() - fSize < delta) {
-            // Looks like we need to reallocate.
-            this->installDataAndUpdateCapacity(this->preallocateNewData(delta, growthFactor));
+        if (capacity() - fSize < delta) {
+            SkSpan<std::byte> allocation = preallocateNewData(delta, growthFactor);
+            installDataAndUpdateCapacity(allocation);
         }
     }
 
@@ -730,24 +871,23 @@ private:
     }
 
     void installDataAndUpdateCapacity(SkSpan<std::byte> allocation) {
-        this->move(TCast(allocation.data()));
-        if (fOwnMemory) {
-            sk_free(fData);
-        }
-        this->setDataFromBytes(allocation);
+        std::unique_ptr<std::byte, FreeAllocation> allocationOwner(allocation.data());
+        relocateTo(TCast(allocation.data()));
+        finishRelocation(allocation);
+        allocationOwner.release();
         SkASSERT(fData != nullptr);
     }
 
     T* fData{nullptr};
     int fSize{0};
-    uint32_t fOwnMemory : 1;
-    uint32_t fCapacity : 31;
+    uint32_t fOwnMemory : 1 = 1;
+    uint32_t fCapacity : 31 = 0;
 #ifdef SK_SANITIZE_ADDRESS
     bool fPoisoned = false;
 #endif
 };
 
-template <typename T, bool M> static inline void swap(TArray<T, M>& a, TArray<T, M>& b) {
+template <typename T, bool M> inline void swap(TArray<T, M>& a, TArray<T, M>& b) {
     a.swap(b);
 }
 
@@ -778,10 +918,10 @@ public:
         , TArray<T, MEM_MOVE>{data, this} {}
 
     STArray(std::initializer_list<T> data)
-        : STArray{data.begin(), SkToInt(data.size())} {}
+        : STArray{SkSpan<const T>(data.begin(), data.size())} {}
 
     explicit STArray(int reserveCount)
-        : STArray() { this->reserve_exact(reserveCount); }
+        : STArray() { (*this).reserve_exact(reserveCount); }
 
     STArray(const STArray& that)
         : STArray() { *this = that; }

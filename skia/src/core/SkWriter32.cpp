@@ -8,7 +8,7 @@
 #include "src/core/SkWriter32.h"
 
 #include "include/core/SkSamplingOptions.h"
-#include "include/private/SkTo.h"
+#include "src/core/SkSafeMath.h"
 #include "src/core/SkMatrixPriv.h"
 
 #include <algorithm>
@@ -16,65 +16,72 @@
 class SkMatrix;
 
 void SkWriter32::writeMatrix(const SkMatrix& matrix) {
-    size_t size = SkMatrixPriv::WriteToMemory(matrix, nullptr);
-    SkASSERT(SkAlign4(size) == size);
-    SkMatrixPriv::WriteToMemory(matrix, this->reserve(size));
+    const size_t bytes = SkMatrixPriv::WriteToMemory(matrix, nullptr);
+    void* destination = reserve(bytes);
+    SkMatrixPriv::WriteToMemory(matrix, destination);
 }
 
 void SkWriter32::writeSampling(const SkSamplingOptions& sampling) {
-    this->write32(sampling.maxAniso);
-    if (!sampling.isAniso()) {
-        this->writeBool(sampling.useCubic);
-        if (sampling.useCubic) {
-            this->writeScalar(sampling.cubic.B);
-            this->writeScalar(sampling.cubic.C);
-        } else {
-            this->write32((unsigned)sampling.filter);
-            this->write32((unsigned)sampling.mipmap);
-        }
+    write32(sampling.maxAniso);
+    if (sampling.isAniso()) return;
+    writeBool(sampling.useCubic);
+    if (sampling.useCubic) {
+        writeScalar(sampling.cubic.B);
+        writeScalar(sampling.cubic.C);
+        return;
     }
+    const int32_t filter = static_cast<int32_t>(sampling.filter);
+    const int32_t mipmap = static_cast<int32_t>(sampling.mipmap);
+    write32(filter);
+    write32(mipmap);
 }
 
-void SkWriter32::writeString(const char str[], size_t len) {
-    if (nullptr == str) {
-        str = "";
-        len = 0;
+void SkWriter32::writeString(const char* text, size_t length) {
+    if (text == nullptr) {
+        text = "";
+        length = 0;
     }
-    if ((long)len < 0) {
-        len = strlen(str);
-    }
-
-    // [ 4 byte len ] [ str ... ] [1 - 4 \0s]
-    uint32_t* ptr = this->reservePad(sizeof(uint32_t) + len + 1);
-    *ptr = SkToU32(len);
-    char* chars = (char*)(ptr + 1);
-    memcpy(chars, str, len);
-    chars[len] = '\0';
+    if (length == UnknownLength) length = std::strlen(text);
+    const size_t bytes = WriteStringSize(text, length);
+    uint8_t* storage = reinterpret_cast<uint8_t*>(reserve(bytes));
+    const uint32_t encodedLength = static_cast<uint32_t>(length);
+    std::memcpy(storage, &encodedLength, sizeof(encodedLength));
+    uint8_t* characters = storage + sizeof(encodedLength);
+    if (length != 0) std::memcpy(characters, text, length);
+    const size_t padding = bytes - sizeof(encodedLength) - length;
+    std::memset(characters + length, 0, padding);
 }
 
-size_t SkWriter32::WriteStringSize(const char* str, size_t len) {
-    if ((long)len < 0) {
-        SkASSERT(str);
-        len = strlen(str);
-    }
-    const size_t lenBytes = 4;    // we use 4 bytes to record the length
-    // add 1 since we also write a terminating 0
-    return SkAlign4(lenBytes + len + 1);
+size_t SkWriter32::WriteStringSize(const char* text, size_t length) {
+    if (text == nullptr) length = 0;
+    else if (length == UnknownLength) length = std::strlen(text);
+    SkASSERT_RELEASE(length <= std::numeric_limits<uint32_t>::max());
+    SkASSERT_RELEASE(length <= MaximumExtent - 8);
+    const size_t bytes = SkAlign4(sizeof(uint32_t) + length + 1);
+    return bytes;
 }
 
 void SkWriter32::growToAtLeast(size_t size) {
-    const bool wasExternal = (fExternal != nullptr) && (fData == fExternal);
-
-    fCapacity = 4096 + std::max(size, fCapacity + (fCapacity / 2));
-    fInternal.realloc(fCapacity);
-    fData = fInternal.get();
-
-    if (wasExternal) {
-        // we were external, so copy in the data
-        memcpy(fData, fExternal, fUsed);
-    }
+    const bool wasExternal = fExternal != nullptr && fData == fExternal;
+    SkSafeMath safe{};
+    const size_t geometric = safe.add(fCapacity, fCapacity / 2);
+    const size_t requested = std::max(size, geometric);
+    size_t capacity = safe.add(4096, requested);
+    // Preserve ordinary growth, but near the representable limit allocate only
+    // the requested extent rather than overflowing speculative spare capacity.
+    if (!safe.ok() || capacity > MaximumExtent) capacity = size;
+    fInternal.realloc(capacity);
+    uint8_t* replacement = fInternal.get();
+    if (wasExternal && fUsed != 0) std::memcpy(replacement, fExternal, fUsed);
+    fData = replacement;
+    fCapacity = capacity;
 }
 
 sk_sp<SkData> SkWriter32::snapshotAsData() const {
-    return SkData::MakeWithCopy(fData, fUsed);
+    if (fUsed == 0) {
+        sk_sp<SkData> empty = SkData::MakeEmpty();
+        return empty;
+    }
+    sk_sp<SkData> data = SkData::MakeWithCopy(fData, fUsed);
+    return data;
 }

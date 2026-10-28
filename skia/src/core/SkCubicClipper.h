@@ -23,15 +23,18 @@ struct SkPoint;
  */
 class SkCubicClipper {
 public:
-    SkCubicClipper();
+    SkCubicClipper() = default;
 
     void setClip(const SkIRect& clip);
 
+    // src and dst must not overlap.
     [[nodiscard]] bool clipCubic(const SkPoint src[4], SkPoint dst[4]);
 
+    // Bisects a cubic that is monotonic in Y for the t where it crosses y. Returns false when
+    // the end points do not straddle y; *t is written only on success.
     [[nodiscard]] static bool ChopMonoAtY(const SkPoint pts[4], SkScalar y, SkScalar* t);
 private:
-    SkRect      fClip;
+    SkRect      fClip = SkRect::MakeEmpty();
 };
 
 #endif  // SkCubicClipper_DEFINED

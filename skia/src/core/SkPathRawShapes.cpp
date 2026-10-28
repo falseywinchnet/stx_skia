@@ -11,9 +11,9 @@
 #include "include/private/SkAssert.h"
 #include "src/core/SkPathMakers.h"
 
-const SkPathFillType kDefFillType = SkPathFillType::kWinding;
+static constexpr SkPathFillType kDefFillType = SkPathFillType::kWinding;
 
-const SkPathVerb gRectVerbs[] = {
+static constexpr SkPathVerb gRectVerbs[] = {
     SkPathVerb::kMove,
     SkPathVerb::kLine,
     SkPathVerb::kLine,
@@ -21,19 +21,19 @@ const SkPathVerb gRectVerbs[] = {
     SkPathVerb::kClose
 };
 
-const uint8_t gRectSegMask = kLine_SkPathSegmentMask;
+static constexpr uint8_t gRectSegMask = kLine_SkPathSegmentMask;
 
 static void set_as_rect(SkPathRaw* raw, SkSpan<SkPoint> storage,
                         const SkRect& r, SkPathDirection dir, unsigned index) {
     SkASSERT(storage.size() >= 4);
 
-    raw->fPoints = { storage.data(), 4 };
-    raw->fVerbs = gRectVerbs;
-    raw->fConics = {};
-    raw->fBounds = r;
-    raw->fFillType = kDefFillType;
-    raw->fConvexity = SkPathDirection_ToConvexity(dir);
-    raw->fSegmentMask = gRectSegMask;
+    (*raw).fPoints = storage.first(4);
+    (*raw).fVerbs = gRectVerbs;
+    (*raw).fConics = {};
+    (*raw).fBounds = r;
+    (*raw).fFillType = kDefFillType;
+    (*raw).fConvexity = SkPathDirection_ToConvexity(dir);
+    (*raw).fSegmentMask = gRectSegMask;
 
     SkPath_RectPointIterator iter(r, dir, index);
 
@@ -45,7 +45,7 @@ static void set_as_rect(SkPathRaw* raw, SkSpan<SkPoint> storage,
 
 //////////////////
 
-const SkPathVerb gOvalVerbs[] = {
+static constexpr SkPathVerb gOvalVerbs[] = {
     SkPathVerb::kMove,
     SkPathVerb::kConic,
     SkPathVerb::kConic,
@@ -54,9 +54,9 @@ const SkPathVerb gOvalVerbs[] = {
     SkPathVerb::kClose
 };
 
-const uint8_t gOvalSegMask = kConic_SkPathSegmentMask;
+static constexpr uint8_t gOvalSegMask = kConic_SkPathSegmentMask;
 
-const float gFourQuarterCircleConics[] = {
+static constexpr float gFourQuarterCircleConics[] = {
     SK_ScalarRoot2Over2,
     SK_ScalarRoot2Over2,
     SK_ScalarRoot2Over2,
@@ -67,13 +67,13 @@ static void set_as_oval(SkPathRaw* raw, SkSpan<SkPoint> storage,
                         const SkRect& r, SkPathDirection dir, unsigned index) {
     SkASSERT(storage.size() >= 9);
 
-    raw->fPoints = { storage.data(), 9 };
-    raw->fVerbs = gOvalVerbs;
-    raw->fConics = gFourQuarterCircleConics;
-    raw->fBounds = r;
-    raw->fFillType = kDefFillType;
-    raw->fConvexity = SkPathDirection_ToConvexity(dir);
-    raw->fSegmentMask = gOvalSegMask;
+    (*raw).fPoints = storage.first(9);
+    (*raw).fVerbs = gOvalVerbs;
+    (*raw).fConics = gFourQuarterCircleConics;
+    (*raw).fBounds = r;
+    (*raw).fFillType = kDefFillType;
+    (*raw).fConvexity = SkPathDirection_ToConvexity(dir);
+    (*raw).fSegmentMask = gOvalSegMask;
 
     SkPath_OvalPointIterator ovalIter(r, dir, index);
     SkPath_RectPointIterator rectIter(r, dir, index + (dir == SkPathDirection::kCW ? 0 : 1));
@@ -87,7 +87,7 @@ static void set_as_oval(SkPathRaw* raw, SkSpan<SkPoint> storage,
 
 /////////////////////////////
 
-const SkPathVerb gRRectVerbs_LineStart[] = {
+static constexpr SkPathVerb gRRectVerbs_LineStart[] = {
     SkPathVerb::kMove,
     SkPathVerb::kLine, SkPathVerb::kConic,
     SkPathVerb::kLine, SkPathVerb::kConic,
@@ -96,7 +96,7 @@ const SkPathVerb gRRectVerbs_LineStart[] = {
     SkPathVerb::kClose
 };
 
-const SkPathVerb gRRectVerbs_ConicStart[] = {
+static constexpr SkPathVerb gRRectVerbs_ConicStart[] = {
     SkPathVerb::kMove,
     SkPathVerb::kConic, SkPathVerb::kLine,
     SkPathVerb::kConic, SkPathVerb::kLine,
@@ -105,7 +105,7 @@ const SkPathVerb gRRectVerbs_ConicStart[] = {
     SkPathVerb::kClose
 };
 
-const uint8_t gRRectSegMask = kLine_SkPathSegmentMask | kConic_SkPathSegmentMask;
+static constexpr uint8_t gRRectSegMask = kLine_SkPathSegmentMask | kConic_SkPathSegmentMask;
 
 static void set_as_rrect(SkPathRaw* raw, SkSpan<SkPoint> storage,
                          const SkRRect& rrect, SkPathDirection dir, unsigned index) {
@@ -117,17 +117,17 @@ static void set_as_rrect(SkPathRaw* raw, SkSpan<SkPoint> storage,
 
     SkASSERT(storage.size() >= npoints);
 
-    raw->fPoints = { storage.data(), npoints };
+    (*raw).fPoints = storage.first(npoints);
     if (startsWithConic) {
-        raw->fVerbs = gRRectVerbs_ConicStart;
+        (*raw).fVerbs = gRRectVerbs_ConicStart;
     } else {
-        raw->fVerbs = gRRectVerbs_LineStart;
+        (*raw).fVerbs = gRRectVerbs_LineStart;
     }
-    raw->fConics = gFourQuarterCircleConics;
-    raw->fBounds = bounds;
-    raw->fFillType = kDefFillType;
-    raw->fConvexity = SkPathDirection_ToConvexity(dir);
-    raw->fSegmentMask = gRRectSegMask;
+    (*raw).fConics = gFourQuarterCircleConics;
+    (*raw).fBounds = bounds;
+    (*raw).fFillType = kDefFillType;
+    (*raw).fConvexity = SkPathDirection_ToConvexity(dir);
+    (*raw).fSegmentMask = gRRectSegMask;
 
     SkPath_RRectPointIterator rrectIter(rrect, dir, index);
     // Corner iterator indices follow the collapsed radii model,
@@ -186,7 +186,7 @@ SkPathRawShapes::RRect::RRect(const SkRRect& rrect, SkPathDirection dir, unsigne
 
 /////////////////////////////
 
-const SkPathVerb gTriangle_Verbs[] = {
+static constexpr SkPathVerb gTriangle_Verbs[] = {
     SkPathVerb::kMove,
     SkPathVerb::kLine,
     SkPathVerb::kLine,
@@ -194,13 +194,17 @@ const SkPathVerb gTriangle_Verbs[] = {
 };
 
 static SkPathConvexity tri_to_convexity(SkSpan<const SkPoint> pts) {
-    SkVector u = pts[1] - pts[0],
-             v = pts[2] - pts[1];
-    float cross = u.fX * v.fY - u.fY * v.fX;
+    const SkVector u = pts[1] - pts[0];
+    const SkVector v = pts[2] - pts[1];
+    const float cross = u.fX * v.fY - u.fY * v.fX;
 
-    return cross > 0 ? SkPathConvexity::kConvex_CW
-                     : (cross < 0) ? SkPathConvexity::kConvex_CCW
-                                   : SkPathConvexity::kConvex_Degenerate;
+    if (cross > 0) {
+        return SkPathConvexity::kConvex_CW;
+    }
+    if (cross < 0) {
+        return SkPathConvexity::kConvex_CCW;
+    }
+    return SkPathConvexity::kConvex_Degenerate;
 }
 
 SkPathRawShapes::Triangle::Triangle(SkSpan<const SkPoint> threePoints, const SkRect& bounds)

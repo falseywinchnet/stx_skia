@@ -19,7 +19,7 @@
 
 class SkMatrix;
 
-SkPathMeasure::SkPathMeasure() {}
+SkPathMeasure::SkPathMeasure() = default;
 
 SkPathMeasure::SkPathMeasure(const SkPath& path, bool forceClosed, SkScalar resScale)
     : fIter(path, forceClosed, resScale)
@@ -27,37 +27,50 @@ SkPathMeasure::SkPathMeasure(const SkPath& path, bool forceClosed, SkScalar resS
     fContour = fIter.next();
 }
 
-SkPathMeasure::~SkPathMeasure() {}
+SkPathMeasure::~SkPathMeasure() = default;
 
 void SkPathMeasure::setPath(const SkPath* path, bool forceClosed) {
-    fIter.reset(path ? *path : SkPath(), forceClosed);
+    if (path) {
+        fIter.reset(*path, forceClosed);
+    } else {
+        fIter.reset(SkPath(), forceClosed);
+    }
     fContour = fIter.next();
 }
 
 SkScalar SkPathMeasure::getLength() {
-    return fContour ? fContour->length() : 0;
+    const SkScalar length = fContour ? (*fContour).length() : 0;
+    return length;
 }
 
 bool SkPathMeasure::getPosTan(SkScalar distance, SkPoint* position, SkVector* tangent) {
-    return fContour && fContour->getPosTan(distance, position, tangent);
+    const bool found = fContour && (*fContour).getPosTan(distance, position, tangent);
+    return found;
 }
 
 bool SkPathMeasure::getMatrix(SkScalar distance, SkMatrix* matrix, MatrixFlags flags) {
-    return fContour && fContour->getMatrix(distance, matrix, (SkContourMeasure::MatrixFlags)flags);
+    const bool found = fContour &&
+            (*fContour).getMatrix(distance, matrix,
+                                  static_cast<SkContourMeasure::MatrixFlags>(flags));
+    return found;
 }
 
 bool SkPathMeasure::getSegment(SkScalar startD, SkScalar stopD, SkPathBuilder* dst,
                                bool startWithMoveTo) {
-    return fContour && fContour->getSegment(startD, stopD, dst, startWithMoveTo);
+    const bool appended = fContour &&
+            (*fContour).getSegment(startD, stopD, dst, startWithMoveTo);
+    return appended;
 }
 
 bool SkPathMeasure::isClosed() {
-    return fContour && fContour->isClosed();
+    const bool closed = fContour && (*fContour).isClosed();
+    return closed;
 }
 
 bool SkPathMeasure::nextContour() {
     fContour = fIter.next();
-    return !!fContour;
+    const bool found = fContour != nullptr;
+    return found;
 }
 
 #ifdef SK_DEBUG
@@ -67,8 +80,10 @@ void SkPathMeasure::dump() {}
 /////
 
 size_t SkPathMeasurePriv::CountSegments(const SkPathMeasure& meas) {
-    if (auto cntr = meas.currentMeasure()) {
-        return cntr->fSegments.size();
+    const SkContourMeasure* contour = meas.currentMeasure();
+    if (contour) {
+        const size_t count = static_cast<size_t>((*contour).fSegments.size());
+        return count;
     }
     return 0;
 }

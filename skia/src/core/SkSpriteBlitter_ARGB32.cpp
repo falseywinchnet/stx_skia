@@ -36,25 +36,22 @@ public:
         fAlpha = alpha;
     }
 
+    // Each row's addresses come from the destination and the source.
     void blitRect(int x, int y, int width, int height) override {
         SkASSERT(width > 0 && height > 0);
-        uint32_t* SK_RESTRICT dst = fDst.writable_addr32(x, y);
-        const uint32_t* SK_RESTRICT src = fSource.addr32(x - fLeft, y - fTop);
-        size_t dstRB = fDst.rowBytes();
-        size_t srcRB = fSource.rowBytes();
-        SkBlitRow::Proc32 proc = fProc32;
-        U8CPU             alpha = fAlpha;
+        const SkBlitRow::Proc32 proc = fProc32;
+        const U8CPU alpha = fAlpha;
 
-        do {
+        for (int row = y; row < y + height; ++row) {
+            uint32_t* dst = fDst.writable_addr32(x, row);
+            const uint32_t* src = fSource.addr32(x - fLeft, row - fTop);
             proc(dst, src, width, alpha);
-            dst = (uint32_t* SK_RESTRICT)((char*)dst + dstRB);
-            src = (const uint32_t* SK_RESTRICT)((const char*)src + srcRB);
-        } while (--height != 0);
+        }
     }
 
 private:
-    SkBlitRow::Proc32   fProc32;
-    U8CPU               fAlpha;
+    SkBlitRow::Proc32   fProc32 = nullptr;
+    U8CPU               fAlpha = 0;
 
     using INHERITED = SkSpriteBlitter;
 };
@@ -73,7 +70,7 @@ SkSpriteBlitter* SkSpriteBlitter::ChooseL32(const SkPixmap& source, const SkPain
     }
     if (source.colorType() == kN32_SkColorType && paint.isSrcOver()) {
         // this can handle alpha, but not xfermode
-        return allocator->make<Sprite_D32_S32>(source, paint.getAlpha());
+        return (*allocator).make<Sprite_D32_S32>(source, paint.getAlpha());
     }
     return nullptr;
 }

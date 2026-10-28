@@ -17,7 +17,6 @@
 #include <cstddef>
 
 class SkColorSpace;
-class SkRuntimeEffect;
 enum class SkBlendMode;
 struct SkDeserialProcs;
 struct SkStageRec;
@@ -34,10 +33,11 @@ struct SkStageRec;
 
 class SkColorFilterBase : public SkColorFilter {
 public:
+    // The caller retains this filter and the arena through pipeline execution.
+    // Failure may leave partial stages; the caller must discard that pipeline.
     [[nodiscard]] virtual bool appendStages(const SkStageRec& rec, bool shaderIsOpaque) const = 0;
 
-    /** Returns the flags for this filter. Override in subclasses to return custom flags.
-    */
+    // Override only when every input preserves alpha.
     virtual bool onIsAlphaUnchanged() const { return false; }
 
     enum class Type {
@@ -52,11 +52,11 @@ public:
     virtual Type type() const = 0;
 
     bool affectsTransparentBlack() const {
-        return this->filterColor4f(SkColors::kTransparent, nullptr, nullptr) !=
-               SkColors::kTransparent;
+        const SkColor4f filtered = filterColor4f(SkColors::kTransparent, nullptr, nullptr);
+        const bool affected = filtered != SkColors::kTransparent;
+        return affected;
     }
 
-    virtual SkRuntimeEffect* asRuntimeEffect() const { return nullptr; }
 
     static SkFlattenable::Type GetFlattenableType() {
         return kSkColorFilter_Type;
@@ -68,9 +68,8 @@ public:
 
     static sk_sp<SkColorFilter> Deserialize(const void* data, size_t size,
                                           const SkDeserialProcs* procs = nullptr) {
-        return sk_sp<SkColorFilter>(static_cast<SkColorFilter*>(
-                                  SkFlattenable::Deserialize(
-                                  kSkColorFilter_Type, data, size, procs).release()));
+        sk_sp<SkColorFilter> filter = SkColorFilter::Deserialize(data, size, procs);
+        return filter;
     }
 
     virtual SkPMColor4f onFilterColor4f(const SkPMColor4f& color, SkColorSpace* dstCS) const;
@@ -88,26 +87,27 @@ private:
 };
 
 static inline SkColorFilterBase* as_CFB(SkColorFilter* filter) {
-    return static_cast<SkColorFilterBase*>(filter);
+    SkColorFilterBase* base = static_cast<SkColorFilterBase*>(filter);
+    return base;
 }
 
 static inline const SkColorFilterBase* as_CFB(const SkColorFilter* filter) {
-    return static_cast<const SkColorFilterBase*>(filter);
+    const SkColorFilterBase* base = static_cast<const SkColorFilterBase*>(filter);
+    return base;
 }
 
+// Borrowed base views remain valid only while the filter has a live owner.
 static inline const SkColorFilterBase* as_CFB(const sk_sp<SkColorFilter>& filter) {
-    return static_cast<SkColorFilterBase*>(filter.get());
+    const SkColorFilterBase* base = static_cast<const SkColorFilterBase*>(filter.get());
+    return base;
 }
+
+static inline const SkColorFilterBase* as_CFB(const sk_sp<SkColorFilter>&&) = delete;
 
 static inline sk_sp<SkColorFilterBase> as_CFB_sp(sk_sp<SkColorFilter> filter) {
-    return sk_sp<SkColorFilterBase>(static_cast<SkColorFilterBase*>(filter.release()));
+    sk_sp<SkColorFilterBase> base(static_cast<SkColorFilterBase*>(filter.release()));
+    return base;
 }
 
-void SkRegisterComposeColorFilterFlattenable();
-void SkRegisterMatrixColorFilterFlattenable();
-void SkRegisterModeColorFilterFlattenable();
-void SkRegisterSkColorSpaceXformColorFilterFlattenable();
-void SkRegisterTableColorFilterFlattenable();
-void SkRegisterWorkingFormatColorFilterFlattenable();
 
 #endif

@@ -10,37 +10,29 @@
 
 #include "include/core/SkVertices.h"
 
-#include "include/private/SkTo.h"
-
-class SkReadBuffer;
-class SkWriteBuffer;
-
-struct SkVertices_DeprecatedBone { float values[6]; };
 
 /** Class that adds methods to SkVertices that are only intended for use internal to Skia.
     This class is purely a privileged window into SkVertices. It should never have additional
     data members or virtual methods. */
 class SkVerticesPriv {
 public:
-    SkVertices::VertexMode mode() const { return fVertices->fMode; }
+    SkVertices::VertexMode mode() const { return (*fVertices).fMode; }
 
-    bool hasColors() const { return SkToBool(fVertices->fColors); }
-    bool hasTexCoords() const { return SkToBool(fVertices->fTexs); }
-    bool hasIndices() const { return SkToBool(fVertices->fIndices); }
+    bool hasColors() const { return (*fVertices).fColors != nullptr; }
+    bool hasTexCoords() const { return (*fVertices).fTexs != nullptr; }
+    bool hasIndices() const { return (*fVertices).fIndices != nullptr; }
 
-    int vertexCount() const { return fVertices->fVertexCount; }
-    int indexCount() const { return fVertices->fIndexCount; }
+    int vertexCount() const { return (*fVertices).fVertexCount; }
+    int indexCount() const { return (*fVertices).fIndexCount; }
 
-    const SkPoint* positions() const { return fVertices->fPositions; }
-    const SkPoint* texCoords() const { return fVertices->fTexs; }
-    const SkColor* colors() const { return fVertices->fColors; }
-    const uint16_t* indices() const { return fVertices->fIndices; }
+    const SkPoint* positions() const { return (*fVertices).fPositions; }
+    const SkPoint* texCoords() const { return (*fVertices).fTexs; }
+    const SkColor* colors() const { return (*fVertices).fColors; }
+    const uint16_t* indices() const { return (*fVertices).fIndices; }
 
     // Never called due to RVO in priv(), but must exist for MSVC 2017.
     SkVerticesPriv(const SkVerticesPriv&) = default;
 
-    void encode(SkWriteBuffer&) const;
-    static sk_sp<SkVertices> Decode(SkReadBuffer&);
 
 private:
     explicit SkVerticesPriv(SkVertices* vertices) : fVertices(vertices) {}
@@ -50,7 +42,8 @@ private:
     const SkVerticesPriv* operator&() const = delete;
     SkVerticesPriv* operator&() = delete;
 
-    SkVertices* fVertices;
+    // Borrowed; the window is valid only while the vertices it came from are alive.
+    SkVertices* fVertices = nullptr;
 
     friend class SkVertices; // to construct this type
 };

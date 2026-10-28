@@ -17,13 +17,11 @@
 #include "include/core/SkSpan.h"
 #include "src/core/SkCPURecorderImpl.h"
 #include "src/core/SkDevice.h"
-#include "src/core/SkGlyphRunPainter.h"
 #include "src/core/SkRasterClipStack.h"
 
 class SkBlender;
 class SkImage;
 class SkMatrix;
-class SkMesh;
 class SkMipmap;
 class SkPaint;
 class SkPath;
@@ -41,7 +39,6 @@ enum class SkClipOp;
 struct SkImageInfo;
 struct SkPoint;
 struct SkRSXform;
-namespace sktext { class GlyphRunList; }
 
 ///////////////////////////////////////////////////////////////////////////////
 class SkBitmapDevice final : public SkDevice {
@@ -83,8 +80,6 @@ public:
                        SkCanvas::SrcRectConstraint) override;
 
     void drawVertices(const SkVertices*, sk_sp<SkBlender>, const SkPaint&, bool) override;
-    // Implemented in src/sksl/SkBitmapDevice_mesh.cpp
-    void drawMesh(const SkMesh&, sk_sp<SkBlender>, const SkPaint&) override;
 
     void drawAtlas(SkSpan<const SkRSXform>, SkSpan<const SkRect>, SkSpan<const SkColor>,
                    sk_sp<SkBlender>, const SkPaint&) override;
@@ -110,11 +105,6 @@ public:
     void drawSpecial(SkSpecialImage*, const SkMatrix&, const SkSamplingOptions&,
                      const SkPaint&, SkCanvas::SrcRectConstraint) override;
 
-    void drawCoverageMask(const SkSpecialImage*, const SkMatrix&, const SkSamplingOptions&,
-                          const SkPaint&) override;
-
-    bool drawBlurredRRect(const SkRRect&, const SkPaint&, float) override;
-
     sk_sp<SkSpecialImage> snapSpecial(const SkIRect&, bool forceCopy = false) override;
 
     sk_sp<SkDevice> createDevice(const CreateInfo&, const SkPaint*) override;
@@ -139,7 +129,6 @@ private:
 
     void onClipShader(sk_sp<SkShader>) override;
 
-    void onDrawGlyphRunList(SkCanvas*, const sktext::GlyphRunList&, const SkPaint& paint) override;
 
     bool onReadPixels(const SkPixmap&, int x, int y) override;
     bool onWritePixels(const SkPixmap&, int, int) override;
@@ -157,7 +146,6 @@ private:
     skcpu::RecorderImpl* fRecorder = nullptr;
     SkBitmap fBitmap;
     SkRasterClipStack fRCStack;
-    skcpu::GlyphRunListPainter fGlyphPainter;
 };
 
 #endif // SkBitmapDevice_DEFINED

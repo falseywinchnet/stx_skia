@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2006 The Android Open Source Project
  *
@@ -6,52 +5,53 @@
  * found in the LICENSE file.
  */
 
-
 #ifndef SkDeque_DEFINED
 #define SkDeque_DEFINED
 
 #include "include/private/SkAPI.h"
-
 #include <cstddef>
 
-/*
- * The deque class works by blindly creating memory space of a specified element
- * size. It manages the memory as a doubly linked list of blocks each of which
- * can contain multiple elements. Pushes and pops add/remove blocks from the
- * beginning/end of the list as necessary while each block tracks the used
- * portion of its memory.
- * One behavior to be aware of is that the pops do not immediately remove an
- * empty block from the beginning/end of the list (Presumably so push/pop pairs
- * on the block boundaries don't cause thrashing). This can result in the first/
- * last element not residing in the first/last block.
- */
+// Raw, fixed-width element slots in linked blocks. The caller constructs and
+// destroys elements; this owner only allocates/releases blocks. Empty end blocks
+// are retained until a later pop crosses them, avoiding boundary push/pop churn.
+// Returned slots stay valid until their removal or destruction of the deque.
+// One execution context owns all mutation; iteration requires no intervening
+// mutation. No element alignment beyond pointer alignment is promised for heap
+// blocks; element size must preserve the alignment required by the caller.
 class SK_API SkDeque {
 public:
-    /**
-     * elemSize specifies the size of each individual element in the deque
-     * allocCount specifies how many elements are to be allocated as a block
-     */
     explicit SkDeque(size_t elemSize, int allocCount = 1);
+    // Borrow storage until destruction, even if its initial block is detached.
+    // A usable buffer must be pointer-aligned. Trailing partial slots are unused.
+    // An undersized buffer is ignored. Heap growth uses allocCount slots/block.
     SkDeque(size_t elemSize, void* storage, size_t storageSize, int allocCount = 1);
     ~SkDeque();
+    SkDeque(const SkDeque&) = delete;
+    SkDeque& operator=(const SkDeque&) = delete;
+    SkDeque(SkDeque&&) = delete;
+    SkDeque& operator=(SkDeque&&) = delete;
 
-    bool    empty() const { return 0 == fCount; }
-    int     count() const { return fCount; }
-    size_t  elemSize() const { return fElemSize; }
+    bool empty() const {
+        const bool result = fCount == 0;
+        return result;
+    }
+    int count() const { return fCount; }
+    size_t elemSize() const { return fElemSize; }
+    const void* front() const & { return fFront; }
+    const void* back() const & { return fBack; }
+    void* front() & { return fFront; }
+    void* back() & { return fBack; }
+    const void* front() const && = delete;
+    const void* back() const && = delete;
+    void* front() && = delete;
+    void* back() && = delete;
 
-    const void* front() const { return fFront; }
-    const void* back() const  { return fBack; }
-
-    void* front() { return fFront; }
-    void* back() { return fBack; }
-
-    /**
-     * push_front and push_back return a pointer to the memory space
-     * for the new element
-     */
-    void* push_front();
-    void* push_back();
-
+    // Reserve an uninitialized slot. Allocation failure terminates.
+    void* push_front() &;
+    void* push_back() &;
+    void* push_front() && = delete;
+    void* push_back() && = delete;
+    // Require a nonempty deque and an element already destroyed by the caller.
     void pop_front();
     void pop_back();
 
@@ -59,80 +59,50 @@ private:
     struct Block;
 
 public:
+    // Borrow the deque's blocks. Each call returns the current position before
+    // advancing in the requested direction. Exhaustion is sticky until reset.
+    // The const-deque constructor retains the original mutable-slot interface.
     class Iter {
     public:
-        enum IterStart {
-            kFront_IterStart,
-            kBack_IterStart,
-        };
-
-        /**
-         * Creates an uninitialized iterator. Must be reset()
-         */
+        enum IterStart { kFront_IterStart, kBack_IterStart };
         Iter();
-
-        Iter(const SkDeque& d, IterStart startLoc);
+        Iter(const SkDeque& deque, IterStart start);
+        Iter(const SkDeque&&, IterStart) = delete;
         void* next();
         void* prev();
-
-        void reset(const SkDeque& d, IterStart startLoc);
+        void reset(const SkDeque& deque, IterStart start);
+        void reset(const SkDeque&&, IterStart) = delete;
 
     private:
-        SkDeque::Block* fCurBlock;
-        char*           fPos;
-        size_t          fElemSize;
+        Block* fCurBlock = nullptr;
+        char* fPos = nullptr;
+        size_t fElemSize = 0;
     };
 
-    // Inherit privately from Iter to prevent access to reverse iteration
     class F2BIter : private Iter {
     public:
-        F2BIter() {}
-
-        /**
-         * Wrap Iter's 2 parameter ctor to force initialization to the
-         * beginning of the deque
-         */
-        F2BIter(const SkDeque& d) : INHERITED(d, kFront_IterStart) {}
-
+        F2BIter() = default;
+        explicit F2BIter(const SkDeque& deque) : Iter(deque, kFront_IterStart) {}
+        F2BIter(const SkDeque&&) = delete;
         using Iter::next;
-
-        /**
-         * Wrap Iter::reset to force initialization to the beginning of the
-         * deque
-         */
-        void reset(const SkDeque& d) {
-            this->INHERITED::reset(d, kFront_IterStart);
-        }
-
-    private:
-        using INHERITED = Iter;
+        void reset(const SkDeque& deque) { Iter::reset(deque, kFront_IterStart); }
+        void reset(const SkDeque&&) = delete;
     };
 
 private:
-    // allow unit test to call numBlocksAllocated
     friend class DequeUnitTestHelper;
+    void* fFront = nullptr;
+    void* fBack = nullptr;
+    Block* fFrontBlock = nullptr;
+    Block* fBackBlock = nullptr;
+    size_t fElemSize = 0;
+    void* fInitialStorage = nullptr;
+    int fCount = 0;
+    int fAllocCount = 0;
 
-    void*   fFront;
-    void*   fBack;
-
-    Block*  fFrontBlock;
-    Block*  fBackBlock;
-    size_t  fElemSize;
-    void*   fInitialStorage;
-    int     fCount;             // number of elements in the deque
-    int     fAllocCount;        // number of elements to allocate per block
-
-    Block*  allocateBlock(int allocCount);
-    void    freeBlock(Block* block);
-
-    /**
-     * This returns the number of chunk blocks allocated by the deque. It
-     * can be used to gauge the effectiveness of the selected allocCount.
-     */
-    int  numBlocksAllocated() const;
-
-    SkDeque(const SkDeque&) = delete;
-    SkDeque& operator=(const SkDeque&) = delete;
+    Block* allocateBlock(int allocCount);
+    void freeBlock(Block* block);
+    int numBlocksAllocated() const;
 };
 
 #endif
