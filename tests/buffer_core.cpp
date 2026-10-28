@@ -12,6 +12,10 @@
 // entries, and the free procedure's calls.
 //
 // Both builds must produce identical bytes (buffer-core.raw).
+//
+// The candidate alone checks that a read into a null destination skips, and that writing past a
+// sized buffer, null reader storage with a length, bad table indexes, zero element sizes and
+// overflowing table sizes stop the program; arguments beginning with "--" select a stop.
 
 #include "differential_corpus.h"
 
@@ -258,10 +262,68 @@ void table_cases(Output& output) {
     ++output.cases;
 }
 
+#ifndef STX_SKIA_REFERENCE
+// A read with a null destination skips the bytes, as documented, instead of copying to null.
+bool null_read_skips() {
+    alignas(16) std::array<uint8_t, 8> data{1, 2, 3, 4, 5, 6, 7, 8};
+    SkRBuffer reader(data.data(), data.size());
+    if (!reader.read(nullptr, 3) || reader.pos() != 3) return false;
+    uint8_t next = 0;
+    return reader.readU8(&next) && next == 4 && !reader.read(nullptr, 5) && !reader.isValid();
+}
+
+void ignore_free(void*) {}
+
+// Each mode violates one Release-checked precondition and must stop the program.
+int stop_mode(const char* mode) {
+    alignas(16) std::array<uint8_t, 16> storage{};
+    if (std::strcmp(mode, "--write-past-end") == 0) {
+        SkWBuffer writer(storage.data(), 6);
+        writer.write32(1);
+        writer.write32(2);
+    } else if (std::strcmp(mode, "--pad-past-end") == 0) {
+        SkWBuffer writer(storage.data(), 2);
+        writer.write8(1);
+        writer.padToAlign4();
+    } else if (std::strcmp(mode, "--reader-null-data") == 0) {
+        SkRBuffer reader(nullptr, 4);
+        uint32_t value = 0;
+        std::printf("%d\n", reader.readU32(&value) ? 1 : 0);
+    } else if (std::strcmp(mode, "--table-index") == 0) {
+        const sk_sp<SkDataTable> table = SkDataTable::MakeCopyArray(storage.data(), 4, 2);
+        std::printf("%zu\n", (*table).atSize(2));
+    } else if (std::strcmp(mode, "--table-zero-element") == 0) {
+        const sk_sp<SkDataTable> table = SkDataTable::MakeCopyArray(storage.data(), 0, 3);
+        std::printf("%d\n", (*table).count());
+    } else if (std::strcmp(mode, "--table-proc-zero-element") == 0) {
+        const sk_sp<SkDataTable> table =
+                SkDataTable::MakeArrayProc(storage.data(), 0, 3, ignore_free, nullptr);
+        std::printf("%d\n", (*table).count());
+    } else if (std::strcmp(mode, "--table-size-overflow") == 0) {
+        // The sizes wrap to 8 bytes in total; the copy would run far past the allocation.
+        const std::array<const void*, 2> pointers{storage.data(), storage.data()};
+        const std::array<size_t, 2> sizes{SIZE_MAX, 9};
+        const sk_sp<SkDataTable> table =
+                SkDataTable::MakeCopyArrays(pointers.data(), sizes.data(), 2);
+        std::printf("%d\n", (*table).count());
+    } else {
+        return 2;
+    }
+    return 0;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 2) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (argc == 2 && std::strncmp(argv[1], "--", 2) == 0) return stop_mode(argv[1]);
+    if (!null_read_skips()) {
+        std::puts("buffer core: a read into a null destination did not skip");
+        return 1;
+    }
+#endif
     Output output{};
     writer_cases(output);
     reader_cases(output);

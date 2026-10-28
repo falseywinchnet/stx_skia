@@ -539,6 +539,15 @@ if(BUILD_TESTING)
     add_executable(stx_skia_buffer_core_tests tests/buffer_core.cpp)
     target_link_libraries(stx_skia_buffer_core_tests PRIVATE stx_skia)
     add_test(NAME buffer_core_contract COMMAND stx_skia_buffer_core_tests)
+    if(NOT STX_SKIA_BASELINE)
+        # Each mode violates one Release-checked precondition and must stop the program.
+        foreach(mode IN ITEMS write-past-end pad-past-end reader-null-data table-index
+                              table-zero-element table-proc-zero-element table-size-overflow)
+            add_test(NAME buffer_core_stops_${mode}
+                     COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_buffer_core_tests>
+                             -DMODE=--${mode} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+        endforeach()
+    endif()
     add_executable(stx_skia_utf_core_tests tests/utf_core.cpp)
     target_link_libraries(stx_skia_utf_core_tests PRIVATE stx_skia)
     add_test(NAME utf_core_contract COMMAND stx_skia_utf_core_tests)

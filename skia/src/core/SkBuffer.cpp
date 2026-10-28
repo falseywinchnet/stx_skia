@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +28,9 @@ const void* SkRBuffer::skip(size_t size) {
 
 bool SkRBuffer::read(void* buffer, size_t size) {
     if (const void* src = (*this).skip(size)) {
-        sk_careful_memcpy(buffer, src, size);
+        if (buffer != nullptr) {
+            sk_careful_memcpy(buffer, src, size);
+        }
         return true;
     }
     return false;
@@ -48,30 +51,31 @@ bool SkRBuffer::skipToAlign4() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 void* SkWBuffer::skip(size_t size) {
-    void* result = fPos;
-    writeNoSizeCheck(nullptr, size);
-    return fData == nullptr ? nullptr : result;
+    const size_t start = fOffset;
+    (*this).writeBytes(nullptr, size);
+    return fData == nullptr ? nullptr : fData + start;
 }
 
-void SkWBuffer::writeNoSizeCheck(const void* buffer, size_t size) {
-    SkASSERT(fData == nullptr || fStop == nullptr || fPos + size <= fStop);
-    if (fData && buffer) {
-        sk_careful_memcpy(fPos, buffer, size);
+void SkWBuffer::writeBytes(const void* buffer, size_t size) {
+    if (fBounded) {
+        SkASSERT_RELEASE(size <= fCapacity - fOffset);
     }
-    fPos += size;
+    if (fData && buffer) {
+        sk_careful_memcpy(fData + fOffset, buffer, size);
+    }
+    fOffset += size;
 }
 
 size_t SkWBuffer::padToAlign4() {
     const size_t pos = (*this).pos();
     const size_t n = SkAlign4(pos) - pos;
 
-    if (n && fData) {
-        char* p = fPos;
-        char* stop = p + n;
-        do {
-            *p++ = 0;
-        } while (p < stop);
+    if (fBounded) {
+        SkASSERT_RELEASE(n <= fCapacity - fOffset);
     }
-    fPos += n;
+    if (n && fData) {
+        std::memset(fData + fOffset, 0, n);
+    }
+    fOffset += n;
     return n;
 }
