@@ -56,6 +56,10 @@ inline bool SkIsFinite(T x, Pack... values) {
 
 template <typename T, std::enable_if_t<std::is_floating_point_v<T>, bool> = true>
 inline bool SkIsFinite(const T array[], int count) {
+    // An empty array is finite; the intake code read its first element regardless.
+    if (count <= 0) {
+        return true;
+    }
     const T x = array[0];
     T prod = x - x;
     for (int i = 1; i < count; ++i) {
@@ -124,9 +128,11 @@ constexpr int64_t sk_float_saturate2int64(float x) {
 #define sk_float_ceil2int_no_saturate(x)    (static_cast<int>(std::ceil(x)))
 
 #define sk_double_round(x)          (std::floor((x) + 0.5))
-#define sk_double_floor2int(x)      (static_cast<int>(std::floor(x)))
-#define sk_double_round2int(x)      (static_cast<int>(std::round(x)))
-#define sk_double_ceil2int(x)       (static_cast<int>(std::ceil(x)))
+// These saturate like the float versions; the intake casts were undefined for NaN and for
+// values outside int.
+#define sk_double_floor2int(x)      sk_double_saturate2int(std::floor(x))
+#define sk_double_round2int(x)      sk_double_saturate2int(std::round(x))
+#define sk_double_ceil2int(x)       sk_double_saturate2int(std::ceil(x))
 
 // Cast double to float, ignoring any warning about too-large finite values being cast to float.
 // Clang thinks this is undefined, but it's actually implementation defined to return either

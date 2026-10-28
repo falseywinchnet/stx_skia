@@ -4,6 +4,11 @@
 // sk_double_nearly_zero, SkFloatUtils' SkFloatingPoint, and SkFloatInterpFunc. Inputs stay where
 // both builds are defined; out-of-range inputs to the unchecked conversions are left to the
 // candidate's own checks. Both builds must produce identical bytes (numeric-core.raw).
+//
+// The candidate alone checks those out-of-range inputs, where the intake helpers were undefined:
+// an empty array to SkIsFinite, division by zero in SkFixedDiv, NaN and huge values to the
+// double-to-int conversions and SkDoubleToFixed, and fixed-point rounding and averaging near
+// SK_FixedMax.
 
 #include "differential_corpus.h"
 
@@ -210,10 +215,40 @@ void interp_cases(Output& output) {
     ++output.cases;
 }
 
+#ifndef STX_SKIA_REFERENCE
+bool out_of_range_defined() {
+    const float* none = nullptr;
+    if (!SkIsFinite(none, 0)) return false;
+    if (SkFixedDiv(5, 0) != SK_MaxS32 || SkFixedDiv(-5, 0) != SK_MinS32) return false;
+    if (SkFixedDiv(0, 0) != 0) return false;
+    const double huge = 1e300;
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    if (sk_double_round2int(huge) != SK_MaxS32 || sk_double_floor2int(-huge) != SK_MinS32) {
+        return false;
+    }
+    if (sk_double_ceil2int(nan) != SK_MaxS32) return false;
+    if (SkDoubleToFixed(1e10) != INT32_MAX || SkDoubleToFixed(-1e10) != INT32_MIN) return false;
+    if (SkDoubleToFixed(-32768.0) != INT32_MIN || SkDoubleToFixed(nan) != SK_MaxS32) return false;
+    if (SkFixedRoundToInt(SK_FixedMax) != 32768 || SkFixedCeilToInt(SK_FixedMax) != 32768) {
+        return false;
+    }
+    if (SkFixedRoundToFixed(SK_FixedMax) != 0x7FFF0000) return false;
+    if (SkFixedCeilToFixed(SK_FixedMax - 3) != 0x7FFF0000) return false;
+    return SkFixedAve(SK_FixedMax, SK_FixedMax) == SK_FixedMax &&
+           SkFixedAve(SK_FixedMin, SK_FixedMin) == SK_FixedMin;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 2) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (!out_of_range_defined()) {
+        std::puts("numeric core: an out-of-range input gave the wrong result");
+        return 1;
+    }
+#endif
     Output output{};
     float_cases(output);
     fixed_cases(output);

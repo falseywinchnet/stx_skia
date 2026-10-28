@@ -13,6 +13,7 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 template <size_t size>
 class SkTypeWithSize {
@@ -89,13 +90,13 @@ public:
      *  to be also a NAN.  Therefore, don't expect this constructor to
      *  preserve the bits in x when x is a NAN.
      */
-    explicit SkFloatingPoint(const RawType& x) { fU.value = x; }
+    explicit SkFloatingPoint(const RawType& x) { std::memcpy(&fBits, &x, sizeof(fBits)); }
 
     /** Returns the exponent bits of this number. */
-    Bits exponent_bits() const { return kExponentBitMask & fU.bits; }
+    Bits exponent_bits() const { return kExponentBitMask & fBits; }
 
     /** Returns the fraction bits of this number. */
-    Bits fraction_bits() const { return kFractionBitMask & fU.bits; }
+    Bits fraction_bits() const { return kFractionBitMask & fBits; }
 
     /** Returns true iff this is NAN (not a number). */
     bool is_nan() const {
@@ -116,21 +117,11 @@ public:
         // Any comparison operation involving a NAN must return false.
         if (is_nan() || rhs.is_nan()) return false;
 
-        const Bits dist = DistanceBetweenSignAndMagnitudeNumbers(fU.bits,
-                                                                 rhs.fU.bits);
-        //SkDEBUGF("(%f, %f, %d) ", fU.value, rhs.fU.value, dist);
+        const Bits dist = DistanceBetweenSignAndMagnitudeNumbers(fBits, rhs.fBits);
         return dist <= kMaxUlps;
     }
 
 private:
-    /** The data type used to store the actual floating-point number. */
-    union FloatingPointUnion {
-        /** The raw floating-point number. */
-        RawType value;
-        /** The bits that represent the number. */
-        Bits bits;
-    };
-
     /**
      *  Converts an integer from the sign-and-magnitude representation to
      *  the biased representation. More precisely, let N be 2 to the
@@ -169,7 +160,9 @@ private:
         return (biased1 >= biased2) ? (biased1 - biased2) : (biased2 - biased1);
     }
 
-    FloatingPointUnion fU;
+    // The number's bits, copied in by the constructor. The intake code read them through a
+    // union after writing the float, which C++ leaves undefined.
+    Bits fBits = 0;
 };
 
 /** Interpolate along the function described by (keys[length], values[length])

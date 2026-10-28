@@ -54,7 +54,23 @@ using SkFixed = int32_t;
 #endif
 
 #define SkFixedToDouble(x)  ((x) * 1.52587890625e-5)
-#define SkDoubleToFixed(x)  ((SkFixed)((x) * SK_Fixed1))
+// Exact over the whole int32 range (INT32_MIN included, as in the intake cast), and saturating
+// beyond it, where the intake cast was undefined. NaN gives SK_MaxS32, as the saturating float
+// conversions do.
+inline SkFixed SkDoubleToFixedChecked(double x) {
+    const double scaled = x * SK_Fixed1;
+    if (scaled != scaled) {
+        return SK_MaxS32;
+    }
+    if (scaled >= 2147483647.0) {
+        return INT32_MAX;
+    }
+    if (scaled <= -2147483648.0) {
+        return INT32_MIN;
+    }
+    return static_cast<SkFixed>(scaled);
+}
+#define SkDoubleToFixed(x)  SkDoubleToFixedChecked(x)
 
 /** Converts an integer to a SkFixed, asserting that the result does not overflow
     a 32 bit signed integer
@@ -74,25 +90,39 @@ using SkFixed = int32_t;
     #define SkIntToFixed(n)     (SkFixed)((unsigned)(n) << 16)
 #endif
 
-#define SkFixedRoundToInt(x)    (((x) + SK_FixedHalf) >> 16)
-#define SkFixedCeilToInt(x)     (((x) + SK_Fixed1 - 1) >> 16)
+// Rounded in 64 bits: in 32, a value near SK_FixedMax overflowed before the shift.
+#define SkFixedRoundToInt(x)    (static_cast<int>((static_cast<int64_t>(x) + SK_FixedHalf) >> 16))
+#define SkFixedCeilToInt(x)     (static_cast<int>((static_cast<int64_t>(x) + SK_Fixed1 - 1) >> 16))
 #define SkFixedFloorToInt(x)    ((x) >> 16)
 
+// The largest whole number a SkFixed holds; rounding up past it saturates there.
+inline constexpr SkFixed SK_FixedMaxWhole = 0x7FFF0000;
+
+// Computed in 64 bits: in 32, the addition overflowed for values near SK_FixedMax.
 inline SkFixed SkFixedRoundToFixed(SkFixed x) {
-    return static_cast<SkFixed>(static_cast<uint32_t>(x + SK_FixedHalf) & 0xFFFF0000);
+    const int64_t rounded = (static_cast<int64_t>(x) + SK_FixedHalf) & ~int64_t{0xFFFF};
+    return static_cast<SkFixed>(rounded > SK_FixedMaxWhole ? SK_FixedMaxWhole : rounded);
 }
 inline SkFixed SkFixedCeilToFixed(SkFixed x) {
-    return static_cast<SkFixed>(static_cast<uint32_t>(x + SK_Fixed1 - 1) & 0xFFFF0000);
+    const int64_t rounded = (static_cast<int64_t>(x) + SK_Fixed1 - 1) & ~int64_t{0xFFFF};
+    return static_cast<SkFixed>(rounded > SK_FixedMaxWhole ? SK_FixedMaxWhole : rounded);
 }
 inline SkFixed SkFixedFloorToFixed(SkFixed x) {
     return static_cast<SkFixed>(static_cast<uint32_t>(x) & 0xFFFF0000);
 }
 
-#define SkFixedAve(a, b)    (((a) + (b)) >> 1)
+// Averaged in 64 bits, so that the sum of two large values does not overflow.
+#define SkFixedAve(a, b)    (static_cast<int>((static_cast<int64_t>(a) + (b)) >> 1))
 
-// The divide may exceed 32 bits. Clamp to a signed 32 bit result.
-#define SkFixedDiv(numer, denom) \
-    SkToS32(SkTPin<int64_t>((SkLeftShift((int64_t)(numer), 16) / (denom)), SK_MinS32, SK_MaxS32))
+// The divide may exceed 32 bits. Clamp to a signed 32 bit result. A zero denominator saturates
+// to the sign of the numerator (0/0 gives 0); the intake macro divided by it.
+constexpr SkFixed SkFixedDiv(int64_t numer, int64_t denom) {
+    const int64_t shifted = SkLeftShift(numer, 16);
+    if (denom == 0) {
+        return shifted > 0 ? SK_MaxS32 : (shifted < 0 ? SK_MinS32 : 0);
+    }
+    return SkToS32(SkTPin<int64_t>(shifted / denom, SK_MinS32, SK_MaxS32));
+}
 
 inline SkFixed SkFixedMul(SkFixed a, SkFixed b) {
     return static_cast<SkFixed>(static_cast<int64_t>(a) * b >> 16);
