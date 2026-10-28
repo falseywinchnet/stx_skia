@@ -59,7 +59,7 @@ also holds intake copies of the headers the candidate trimmed (`SkUtils.h`, `SkM
 ## Not removed: public API with no caller
 
 These have no caller in the library, the tests or GUI.Forms. They are public API, and the owner
-asked to keep general APIs whole, so they await the owner's decision:
+decided to keep them; they are converted with their units:
 - `SkDataTable` and `SkPoint3`;
 - `SkTiledImageUtils` and the Perlin-noise shaders (`MakeFractalNoise`, `MakeTurbulence`);
 - `SkMaskFilter::Deserialize` (effect deserialization is disabled);

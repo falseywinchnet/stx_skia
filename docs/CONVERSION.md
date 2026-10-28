@@ -1647,29 +1647,47 @@ port. `SkImageAndroid.h` loses its GPU and undefined declarations, so no compile
 includes a GPU header. Public API without callers awaits the owner. See
 ../results/2026-10-27/DEAD_CODE_REMOVAL.md.
 
+## Support leftovers: UTF, buffers, template and numeric helpers
+
+Each with a corpus, a respelling and fixes, APIs whole. Fixed:
+- **UTF:** UTF-8 decoding now rejects overlong forms, surrogates and values past U+10FFFF, and
+  UTF-32 only accepts scalar values.
+- **Buffers:** sized buffer writes stop at the end, a null-destination read skips, and data
+  tables check indexes and refuse overflowing or zero element sizes.
+- **`SkZip`:** its conversion constraint, which never applied, now holds, and its bounds are
+  checked.
+- **Other templates:** `SkTPin` returns by value, `SkAbs32` saturates, and the lazy holders stop
+  on empty access.
+- **Numeric:** the out-of-range fixed-point and double-to-int conversions and the zero divisor
+  saturate instead of being undefined.
+
+See ../results/2026-10-27/SUPPORT_LEFTOVERS.md.
+
 ## Still required
 
-Refreshed 2026-10-27 after the dead-code removal. The whole-library AST inventory counts 276
-excluded constructs in 35 files, almost all `->` member arrows. The counts show spelling work
+Refreshed 2026-10-27 after the support leftovers. The whole-library AST inventory counts 249
+excluded constructs in 32 files, almost all `->` member arrows. The remaining work is handed to
+the GUI.Forms sibling sessions; see HANDOFF.md. The counts show spelling work
 only. They omit code this arm64 configuration does not compile, and zero findings is not
 conversion evidence. Each unit also fixes defects, as before.
 
 - **Remaining tree cleanup.** Public headers that nothing compiled includes and no consumer
   uses. The unbuilt upstream test, GM, benchmark and tool trees under `skia/` are kept as
   preserved sources.
-- **Memory, containers and support code.** `SkZip`, `SkBuffer`, `SkRandom`, the
-  spinlock, data tables, time, CPU detection, tracing and assertion helpers, and the OS file
-  ports. Also the compatibility remnants:
-  `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing return, and the `SkSpan`
-  traits.
+- **Memory, containers and support code.** `SkRandom`, `SkChecksum`, time, CPU detection,
+  debug and assertion helpers (`SkAssert.h`, `SkDebug`, `SkLog`), the OS file ports, and the
+  base headers (`SkTypes.h`, `SkFeatures.h`, `SkMacros.h`, `SkAttributes.h`). Also the
+  compatibility remnants: `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing
+  return, and the `SkSpan` traits.
 - **Shaders and colour (about 180).** skcms (`Transform_inl.h`, `skcms_public.h`),
   `SkColorSpace`, `SkColor`, `SkBlendMode`, and the triangle-colour and Perlin-noise shaders.
   GUI.Forms does not call the Perlin-noise shader.
 - **Raster pipeline and pixel kernels.** Row blending, mask blitting and swizzles
   (`SkBlitRow_opts.h`, `SkBlitMask_opts.h`, `SkSwizzler_opts.inc`, `Sk4px.h`, `SkVx.h`). The
-  bitmap-sampling procedures were unreachable and are removed. Imported optimized code stays the baseline. GUI.Forms' wasm build
-  (SSE4.1 emulated over SIMD128) and the planned Android NDK build (NEON) need these paths to
-  keep compiling. New SIMD work follows the 128-bit portable policy and needs measurements.
+  bitmap-sampling procedures were unreachable and are removed. Imported optimized code stays
+  the baseline. GUI.Forms' wasm build (SSE4.1 emulated over SIMD128) and the planned Android NDK
+  build (NEON) need these paths to keep compiling. New SIMD work follows the 128-bit portable
+  policy and needs measurements.
 - **Canvas-adjacent state.** `SkRSXform`, `SkPoint3`, `SkMatrix22` and lattice iteration.
 - **Deferred defects.**
   - The process-wide CPU recorder and context singletons are never released.
