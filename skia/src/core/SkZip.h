@@ -63,9 +63,10 @@ public:
     using CanConvertToConst = typename std::integral_constant<bool,
                     std::is_convertible<U*, T*>::value && sizeof(U) == sizeof(T)>::type;
 
-    // Allow SkZip<const T> to be constructed from SkZip<T>.
+    // Allow SkZip<const T> to be constructed from SkZip<T>. The intake code wrote enable_if
+    // without ::type, which is always a valid type, so the size check never constrained this.
     template<typename... Us,
-            typename = std::enable_if<std::conjunction<CanConvertToConst<Us, Ts>...>::value>>
+            typename = std::enable_if_t<std::conjunction<CanConvertToConst<Us, Ts>...>::value>>
     constexpr SkZip(const SkZip<Us...>& that) : fPointers(that.data()), fSize(that.size()) {}
 
     constexpr ReturnTuple operator[](size_t i) const { return (*this).index(i);}
@@ -80,30 +81,30 @@ public:
         return SkSpan(std::get<I>(fPointers), fSize);
     }
     constexpr std::tuple<Ts*...> data() const { return fPointers; }
+    // Lengths and offsets are checked as SkSpan checks them: a bad one stops the program.
     constexpr SkZip first(size_t n) const {
-        SkASSERT(n <= (*this).size());
-        if (n == 0) { return SkZip(); }
-        return SkZip(n, fPointers);
+        const size_t length = sk_collection_check_length(n, fSize);
+        if (length == 0) { return SkZip(); }
+        return SkZip(length, fPointers);
     }
     constexpr SkZip last(size_t n) const {
-        SkASSERT(n <= (*this).size());
-        if (n == 0) { return SkZip(); }
-        return SkZip(n, (*this).pointersAt(fSize - n));
+        const size_t length = sk_collection_check_length(n, fSize);
+        if (length == 0) { return SkZip(); }
+        return SkZip(length, (*this).pointersAt(fSize - length));
     }
     constexpr SkZip subspan(size_t offset, size_t count) const {
-        SkASSERT(offset < (*this).size());
-        SkASSERT(count <= (*this).size() - offset);
-        if (count == 0) { return SkZip(); }
-        return SkZip(count, pointersAt(offset));
+        const size_t start = sk_collection_check_length(offset, fSize);
+        const size_t length = sk_collection_check_length(count, fSize - start);
+        if (length == 0) { return SkZip(); }
+        return SkZip(length, pointersAt(start));
     }
 
 private:
     constexpr SkZip(size_t n, const std::tuple<Ts*...>& pointers) : fPointers(pointers), fSize(n) {}
 
     constexpr ReturnTuple index(size_t i) const {
-        SkASSERT((*this).size() > 0);
-        SkASSERT(i < (*this).size());
-        return indexDetail(i, std::make_index_sequence<sizeof...(Ts)>());
+        const size_t checked = sk_collection_check_bounds(i, fSize);
+        return indexDetail(checked, std::make_index_sequence<sizeof...(Ts)>());
     }
 
     template<std::size_t... Is>
@@ -112,9 +113,8 @@ private:
     }
 
     std::tuple<Ts*...> pointersAt(size_t i) const {
-        SkASSERT((*this).size() > 0);
-        SkASSERT(i < (*this).size());
-        return pointersAtDetail(i, std::make_index_sequence<sizeof...(Ts)>());
+        const size_t checked = sk_collection_check_bounds(i, fSize);
+        return pointersAtDetail(checked, std::make_index_sequence<sizeof...(Ts)>());
     }
 
     template<std::size_t... Is>
@@ -189,19 +189,17 @@ public:
         // Pick the first collection that has a size, and use that for the size.
         size_t size = PickOneSize<DecayPointerT<Ts>...>::Size(std::forward<Ts>(ts)...);
 
-#ifdef SK_DEBUG
-        // Check that all sizes are the same.
+        // Check that all sizes are the same; a shorter collection would be read past its end.
         size_t minSize = SIZE_MAX;
         size_t maxSize = 0;
-        size_t sizes[sizeof...(Ts)] = {Span<Ts>::Size(std::forward<Ts>(ts))...};
-        for (size_t s : sizes) {
+        const size_t sizes[sizeof...(Ts)] = {Span<Ts>::Size(std::forward<Ts>(ts))...};
+        for (const size_t s : sizes) {
             if (s != SIZE_MAX) {
                 minSize = std::min(minSize, s);
                 maxSize = std::max(maxSize, s);
             }
         }
-        SkASSERT(minSize == maxSize);
-#endif
+        SkASSERT_RELEASE(minSize == maxSize);
 
         return SkZip<ValueType<Ts>...>(size, Span<Ts>::Data(std::forward<Ts>(ts))...);
         // NOLINTEND

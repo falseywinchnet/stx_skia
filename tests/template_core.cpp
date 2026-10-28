@@ -2,6 +2,10 @@
 // SkTCopyOnFirstWrite, SkEnumBitMask, SkTPin, SkTFitsIn, SkTo, the saturating 32-bit helpers,
 // SkAbs32, SkSpanPriv and SkCount. Each is exercised over its boundary values and records every
 // result. Both builds must produce identical bytes (template-core.raw).
+//
+// The candidate alone checks what the intake helpers got wrong: SkZip converting between element
+// types of different sizes, SkAbs32 of the most negative value, and an empty SkZip subspan at the
+// end. Arguments beginning with "--" select a Release-check stop.
 
 #include "differential_corpus.h"
 
@@ -20,6 +24,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <string>
 #include <tuple>
@@ -326,10 +331,69 @@ void span_cases(Output& output) {
     ++output.cases;
 }
 
+#ifndef STX_SKIA_REFERENCE
+struct Base {
+    int32_t value = 0;
+};
+struct Derived : Base {
+    int32_t extra = 0;
+};
+// A zip over Derived must not become a zip over Base, which would index with Base's stride.
+static_assert(!std::is_constructible_v<SkZip<const Base, int32_t>, const SkZip<Derived, int32_t>&>);
+static_assert(std::is_constructible_v<SkZip<const int32_t, const int16_t>,
+                                      const SkZip<int32_t, int16_t>&>);
+
+bool corrected_helpers() {
+    if (SkAbs32(std::numeric_limits<int32_t>::min()) != std::numeric_limits<int32_t>::max()) {
+        return false;
+    }
+    std::array<int32_t, 3> left{1, 2, 3};
+    std::array<int16_t, 3> right{4, 5, 6};
+    const SkZip<int32_t, int16_t> zip(3, left.data(), right.data());
+    return zip.subspan(3, 0).empty() && zip.last(0).empty();
+}
+
+// Each mode violates one Release-checked precondition and must stop the program.
+int stop_mode(const char* mode) {
+    std::array<int32_t, 3> left{1, 2, 3};
+    std::array<int16_t, 3> right{4, 5, 6};
+    const SkZip<int32_t, int16_t> zip(3, left.data(), right.data());
+    if (std::strcmp(mode, "--zip-index") == 0) {
+        std::printf("%d\n", std::get<0>(zip[3]));
+    } else if (std::strcmp(mode, "--zip-subspan") == 0) {
+        std::printf("%zu\n", zip.subspan(2, 2).size());
+    } else if (std::strcmp(mode, "--zip-first") == 0) {
+        std::printf("%zu\n", zip.first(4).size());
+    } else if (std::strcmp(mode, "--zip-unequal") == 0) {
+        std::vector<int16_t> longer{1, 2, 3, 4};
+        std::printf("%zu\n", SkMakeZip(left, longer).size());
+    } else if (std::strcmp(mode, "--lazy-empty") == 0) {
+        SkTLazy<int> lazy{};
+        std::printf("%d\n", *lazy);
+    } else if (std::strcmp(mode, "--cow-null") == 0) {
+        SkTCopyOnFirstWrite<int> cow{};
+        *cow.writable() = 1;
+    } else if (std::strcmp(mode, "--span-copy-unequal") == 0) {
+        std::array<int32_t, 2> small{};
+        SkSpanPriv::Copy(SkSpan<int32_t>(small.data(), 2), SkSpan<const int32_t>(left.data(), 3));
+    } else {
+        return 2;
+    }
+    return 0;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 2) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (argc == 2 && std::strncmp(argv[1], "--", 2) == 0) return stop_mode(argv[1]);
+    if (!corrected_helpers()) {
+        std::puts("template core: a corrected helper misbehaved");
+        return 1;
+    }
+#endif
     Output output{};
     zip_cases(output);
     lazy_cases(output);

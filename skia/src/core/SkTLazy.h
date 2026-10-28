@@ -89,23 +89,23 @@ public:
      * knows that the object has been initialized.
      */
     T* get() {
-        SkASSERT(fValue.has_value());
-        return &fValue.value();
+        SkASSERT_RELEASE(fValue.has_value());
+        return &*fValue;
     }
     const T* get() const {
-        SkASSERT(fValue.has_value());
-        return &fValue.value();
+        SkASSERT_RELEASE(fValue.has_value());
+        return &*fValue;
     }
 
     T* operator->() { return (*this).get(); }
     const T* operator->() const { return (*this).get(); }
 
     T& operator*() {
-        SkASSERT(fValue.has_value());
+        SkASSERT_RELEASE(fValue.has_value());
         return *fValue;
     }
     const T& operator*() const {
-        SkASSERT(fValue.has_value());
+        SkASSERT_RELEASE(fValue.has_value());
         return *fValue;
     }
 
@@ -188,7 +188,7 @@ public:
      * Returns a writable T*. The first time this is called the initial object is cloned.
      */
     T* writable() {
-        SkASSERT(fObj);
+        SkASSERT_RELEASE(fObj != nullptr);
         if (!fLazy.has_value()) {
             fLazy = *fObj;
             fObj = &fLazy.value();
@@ -206,7 +206,10 @@ public:
 
     operator const T*() const { return fObj; }
 
-    const T& operator *() const { return *fObj; }
+    const T& operator *() const {
+        SkASSERT_RELEASE(fObj != nullptr);
+        return *fObj;
+    }
 
 private:
     const T*         fObj = nullptr;

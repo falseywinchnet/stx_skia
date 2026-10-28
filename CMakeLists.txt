@@ -539,6 +539,15 @@ if(BUILD_TESTING)
     add_executable(stx_skia_template_core_tests tests/template_core.cpp)
     target_link_libraries(stx_skia_template_core_tests PRIVATE stx_skia)
     add_test(NAME template_core_contract COMMAND stx_skia_template_core_tests)
+    if(NOT STX_SKIA_BASELINE)
+        # Each mode violates one Release-checked precondition and must stop the program.
+        foreach(mode IN ITEMS zip-index zip-subspan zip-first zip-unequal lazy-empty cow-null
+                              span-copy-unequal)
+            add_test(NAME template_core_stops_${mode}
+                     COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_template_core_tests>
+                             -DMODE=--${mode} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+        endforeach()
+    endif()
     add_executable(stx_skia_buffer_core_tests tests/buffer_core.cpp)
     target_link_libraries(stx_skia_buffer_core_tests PRIVATE stx_skia)
     add_test(NAME buffer_core_contract COMMAND stx_skia_buffer_core_tests)

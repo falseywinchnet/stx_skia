@@ -35,11 +35,17 @@ constexpr int32_t Sk32_can_overflow_sub(int32_t a, int32_t b) {
 }
 
 /**
- * This is a 'safe' abs for 32-bit integers that asserts when undefined behavior would occur.
- * SkTAbs (in SkTemplates.h) is a general purpose absolute-value function.
+ * This is a 'safe' abs for 32-bit integers. SkTAbs (in SkTemplates.h) is a general purpose
+ * absolute-value function.
  */
+// The most negative int32_t has no positive counterpart; its magnitude saturates to SK_MaxS32.
+// (The intake code negated it, which is undefined and in practice left it negative, so a
+// huge magnitude compared as tiny.) The scan converters call this on saturated differences,
+// which can be exactly that value.
 inline int32_t SkAbs32(int32_t value) {
-    SkASSERT(value != SK_NaN32);  // The most negative int32_t can't be negated.
+    if (value == SK_NaN32) {
+        return SK_MaxS32;
+    }
     if (value < 0) {
         value = -value;
     }
