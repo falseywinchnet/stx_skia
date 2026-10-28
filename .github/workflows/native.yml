@@ -52,6 +52,7 @@ jobs:
           cmake -E compare_files build/baseline/utf-core.raw build/candidate/utf-core.raw
           cmake -E compare_files build/baseline/buffer-core.raw build/candidate/buffer-core.raw
           cmake -E compare_files build/baseline/template-core.raw build/candidate/template-core.raw
+          cmake -E compare_files build/baseline/numeric-core.raw build/candidate/numeric-core.raw
           cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
@@ -124,6 +125,7 @@ jobs:
           cmake -E compare_files build/baseline/utf-core.raw build/candidate/utf-core.raw
           cmake -E compare_files build/baseline/buffer-core.raw build/candidate/buffer-core.raw
           cmake -E compare_files build/baseline/template-core.raw build/candidate/template-core.raw
+          cmake -E compare_files build/baseline/numeric-core.raw build/candidate/numeric-core.raw
           cmake -E compare_files build/baseline/raster-pipeline.raw build/candidate/raster-pipeline.raw
           cmake -E compare_files build/baseline/image-subsets.raw build/candidate/image-subsets.raw
           cmake -E compare_files build/baseline/image-sampling.raw build/candidate/image-sampling.raw
