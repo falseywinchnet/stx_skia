@@ -8,6 +8,9 @@
 // but not Unicode: overlong UTF-8, UTF-8 and UTF-32 encodings of surrogates, values past U+10FFFF,
 // and lone surrogates given to the encoders. The intake code accepts these; the corpus keeps them
 // apart so that a stricter build can differ there and only there.
+//
+// The candidate alone checks that it rejects all of that input, and that it refuses a null UTF-32
+// pointer with a length and a negative conversion capacity.
 
 #include "differential_corpus.h"
 
@@ -245,10 +248,73 @@ void strict_cases(Output& output) {
     for (const SkUnichar value : {0xD800, 0xDBFF, 0xDC00, 0xDFFF}) record_encoders(output, value);
 }
 
+#ifndef STX_SKIA_REFERENCE
+bool rejects_utf8(const std::vector<uint8_t>& bytes) {
+    const char* text = reinterpret_cast<const char*>(bytes.data());
+    const char* cursor = text;
+    const char* end = text + bytes.size();
+    bool decodedInvalid = false;
+    while (cursor < end) {
+        if (SkUTF::NextUTF8(&cursor, end) < 0) decodedInvalid = true;
+    }
+    return SkUTF::CountUTF8(text, bytes.size()) == -1 && decodedInvalid &&
+           SkUTF::UTF8ToUTF16(nullptr, 0, text, bytes.size()) == -1;
+}
+
+// Overlong forms, encoded surrogates and values past U+10FFFF are rejected by every decoder;
+// lone surrogates are rejected by the encoders; and the boundary values on either side are kept.
+bool strict_unicode() {
+    const std::vector<std::vector<uint8_t>> rejected{
+            {0xE0, 0x80, 0x80}, {0xE0, 0x9F, 0xBF}, {0xF0, 0x80, 0x80, 0x80},
+            {0xF0, 0x8F, 0xBF, 0xBF}, {0xED, 0xA0, 0x80}, {0xED, 0xBF, 0xBF},
+            {0xF4, 0x90, 0x80, 0x80}, {0xF4, 0xBF, 0xBF, 0xBF}};
+    for (const std::vector<uint8_t>& bytes : rejected) {
+        if (!rejects_utf8(bytes)) return false;
+    }
+    // The nearest accepted neighbours: U+0800, U+10000, U+D7FF, U+E000 and U+10FFFF.
+    const std::vector<std::vector<uint8_t>> accepted{
+            {0xE0, 0xA0, 0x80}, {0xF0, 0x90, 0x80, 0x80}, {0xED, 0x9F, 0xBF},
+            {0xEE, 0x80, 0x80}, {0xF4, 0x8F, 0xBF, 0xBF}};
+    for (const std::vector<uint8_t>& bytes : accepted) {
+        const char* text = reinterpret_cast<const char*>(bytes.data());
+        if (SkUTF::CountUTF8(text, bytes.size()) != 1) return false;
+    }
+    for (const int32_t value : {0xD800, 0xDFFF, 0x110000, 0xFFFFFF}) {
+        const int32_t* cursor = &value;
+        if (SkUTF::CountUTF32(&value, 4) != -1) return false;
+        if (SkUTF::NextUTF32(&cursor, &value + 1) != -1) return false;
+    }
+    for (const SkUnichar value : {0xD800, 0xDBFF, 0xDC00, 0xDFFF}) {
+        if (SkUTF::ToUTF8(value) != 0 || SkUTF::ToUTF16(value) != 0) return false;
+    }
+    return SkUTF::ToUTF8(0xD7FF) == 3 && SkUTF::ToUTF16(0xE000) == 1;
+}
+
+bool refuses_bad_arguments() {
+    if (SkUTF::CountUTF32(nullptr, 4) != -1) return false;
+    const char text[] = "abc";
+    std::array<uint16_t, 4> units{};
+    if (SkUTF::UTF8ToUTF16(units.data(), -1, text, 3) != -1) return false;
+    const std::array<uint16_t, 3> source{0x61, 0x62, 0x63};
+    std::array<char, 4> bytes{};
+    return SkUTF::UTF16ToUTF8(bytes.data(), -2, source.data(), 3) == -1;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 1 || argc > 3) return 2;
+#ifndef STX_SKIA_REFERENCE
+    if (!strict_unicode()) {
+        std::puts("utf core: text that is not Unicode was accepted");
+        return 1;
+    }
+    if (!refuses_bad_arguments()) {
+        std::puts("utf core: a null source or negative capacity was not refused");
+        return 1;
+    }
+#endif
     Output output{};
     valid_cases(output);
     malformed_cases(output);
