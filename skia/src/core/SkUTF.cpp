@@ -5,17 +5,20 @@
 
 #include "include/private/SkTFitsIn.h"
 
-static constexpr inline int32_t left_shift(int32_t value, int32_t shift) {
-    return (int32_t) ((uint32_t) value << shift);
+#include <cstddef>
+#include <cstdint>
+
+static constexpr int32_t left_shift(int32_t value, int32_t shift) {
+    return static_cast<int32_t>(static_cast<uint32_t>(value) << shift);
 }
 
-template <typename T> static constexpr bool is_align2(T x) { return 0 == (x & 1); }
+template <typename T> static constexpr bool is_align2(T x) { return (x & 1) == 0; }
 
-template <typename T> static constexpr bool is_align4(T x) { return 0 == (x & 3); }
+template <typename T> static constexpr bool is_align4(T x) { return (x & 3) == 0; }
 
-static constexpr inline bool utf16_is_high_surrogate(uint16_t c) { return (c & 0xFC00) == 0xD800; }
+static constexpr bool utf16_is_high_surrogate(uint16_t c) { return (c & 0xFC00) == 0xD800; }
 
-static constexpr inline bool utf16_is_low_surrogate(uint16_t c) { return (c & 0xFC00) == 0xDC00; }
+static constexpr bool utf16_is_low_surrogate(uint16_t c) { return (c & 0xFC00) == 0xDC00; }
 
 /** @returns   -1  iff invalid UTF8 byte,
                 0  iff UTF8 continuation byte,
@@ -33,7 +36,7 @@ static int utf8_byte_type(uint8_t c) {
     } else if (c >= 0xF5 || (c & 0xFE) == 0xC0) { // "octet values c0, c1, f5 to ff never appear"
         return -1;
     } else {
-        int value = (((0xe5 << 24) >> ((unsigned)c >> 4 << 1)) & 3) + 1;
+        const int value = (((0xe5 << 24) >> (static_cast<unsigned>(c) >> 4 << 1)) & 3) + 1;
         // assert(value >= 2 && value <=4);
         return value;
     }
@@ -51,13 +54,13 @@ int SkUTF::CountUTF8(const char* utf8, size_t byteLength) {
     int count = 0;
     const char* stop = utf8 + byteLength;
     while (utf8 < stop) {
-        int type = utf8_byte_type(*(const uint8_t*)utf8);
+        int type = utf8_byte_type(*reinterpret_cast<const uint8_t*>(utf8));
         if (!utf8_type_is_valid_leading_byte(type) || utf8 + type > stop) {
             return -1;  // Sequence extends beyond end.
         }
-        while(type-- > 1) {
+        while (type-- > 1) {
             ++utf8;
-            if (!utf8_byte_is_continuation(*(const uint8_t*)utf8)) {
+            if (!utf8_byte_is_continuation(*reinterpret_cast<const uint8_t*>(utf8))) {
                 return -1;
             }
         }
@@ -71,7 +74,7 @@ int SkUTF::CountUTF16(const uint16_t* utf16, size_t byteLength) {
     if (!utf16 || !is_align2(intptr_t(utf16)) || !is_align2(byteLength)) {
         return -1;
     }
-    const uint16_t* src = (const uint16_t*)utf16;
+    const uint16_t* src = utf16;
     const uint16_t* stop = src + (byteLength >> 1);
     int count = 0;
     while (src < stop) {
@@ -98,7 +101,7 @@ int SkUTF::CountUTF32(const int32_t* utf32, size_t byteLength) {
         return -1;
     }
     const uint32_t kInvalidUnicharMask = 0xFF000000;    // unichar fits in 24 bits
-    const uint32_t* ptr = (const uint32_t*)utf32;
+    const uint32_t* ptr = reinterpret_cast<const uint32_t*>(utf32);
     const uint32_t* stop = ptr + (byteLength >> 2);
     while (ptr < stop) {
         if (*ptr & kInvalidUnicharMask) {
@@ -106,7 +109,7 @@ int SkUTF::CountUTF32(const int32_t* utf32, size_t byteLength) {
         }
         ptr += 1;
     }
-    return (int)(byteLength >> 2);
+    return static_cast<int>(byteLength >> 2);
 }
 
 template <typename T>
@@ -119,26 +122,27 @@ SkUnichar SkUTF::NextUTF8(const char** ptr, const char* end) {
     if (!ptr || !end ) {
         return -1;
     }
-    const uint8_t*  p = (const uint8_t*)*ptr;
-    if (!p || p >= (const uint8_t*)end) {
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(*ptr);
+    const uint8_t* stop = reinterpret_cast<const uint8_t*>(end);
+    if (!p || p >= stop) {
         return next_fail(ptr, end);
     }
-    int             c = *p;
-    int             hic = c << 24;
+    int c = *p;
+    int hic = c << 24;
 
     if (!utf8_type_is_valid_leading_byte(utf8_byte_type(c))) {
         return next_fail(ptr, end);
     }
     if (hic < 0) {
-        uint32_t mask = (uint32_t)~0x3F;
+        uint32_t mask = static_cast<uint32_t>(~0x3F);
         hic = left_shift(hic, 1);
         do {
             ++p;
-            if (p >= (const uint8_t*)end) {
+            if (p >= stop) {
                 return next_fail(ptr, end);
             }
             // check before reading off end of array.
-            uint8_t nextByte = *p;
+            const uint8_t nextByte = *p;
             if (!utf8_byte_is_continuation(nextByte)) {
                 return next_fail(ptr, end);
             }
@@ -147,12 +151,12 @@ SkUnichar SkUTF::NextUTF8(const char** ptr, const char* end) {
         } while ((hic = left_shift(hic, 1)) < 0);
         c &= ~mask;
     }
-    *ptr = (const char*)p + 1;
+    *ptr = reinterpret_cast<const char*>(p) + 1;
     return c;
 }
 
 SkUnichar SkUTF::NextUTF8WithReplacement(const char** ptr, const char* end) {
-    SkUnichar val = SkUTF::NextUTF8(ptr, end);
+    const SkUnichar val = SkUTF::NextUTF8(ptr, end);
     return val < 0 ? 0xFFFD : val;
 }
 
@@ -164,7 +168,7 @@ SkUnichar SkUTF::NextUTF16(const uint16_t** ptr, const uint16_t* end) {
     if (!src || src + 1 > end || !is_align2(intptr_t(src))) {
         return next_fail(ptr, end);
     }
-    uint16_t c = *src++;
+    const uint16_t c = *src++;
     SkUnichar result = c;
     if (utf16_is_low_surrogate(c)) {
         return next_fail(ptr, end);  // srcPtr should never point at low surrogate.
@@ -173,7 +177,7 @@ SkUnichar SkUTF::NextUTF16(const uint16_t** ptr, const uint16_t* end) {
         if (src + 1 > end) {
             return next_fail(ptr, end);  // Truncated string.
         }
-        uint16_t low = *src++;
+        const uint16_t low = *src++;
         if (!utf16_is_low_surrogate(low)) {
             return next_fail(ptr, end);
         }
@@ -188,7 +192,7 @@ SkUnichar SkUTF::NextUTF16(const uint16_t** ptr, const uint16_t* end) {
         unicode = (high << 10) - (0xD800 << 10) + low - 0xDC00 + 0x10000
         unicode = (high << 10) + low - ((0xD800 << 10) + 0xDC00 - 0x10000)
         */
-        result = (result << 10) + (SkUnichar)low - ((0xD800 << 10) + 0xDC00 - 0x10000);
+        result = (result << 10) + static_cast<SkUnichar>(low) - ((0xD800 << 10) + 0xDC00 - 0x10000);
     }
     *ptr = src;
     return result;
@@ -202,7 +206,7 @@ SkUnichar SkUTF::NextUTF32(const int32_t** ptr, const int32_t* end) {
     if (!s || s + 1 > end || !is_align4(intptr_t(s))) {
         return next_fail(ptr, end);
     }
-    int32_t value = *s;
+    const int32_t value = *s;
     const uint32_t kInvalidUnicharMask = 0xFF000000;    // unichar fits in 24 bits
     if (value & kInvalidUnicharMask) {
         return next_fail(ptr, end);
@@ -212,20 +216,20 @@ SkUnichar SkUTF::NextUTF32(const int32_t** ptr, const int32_t* end) {
 }
 
 size_t SkUTF::ToUTF8(SkUnichar uni, char utf8[SkUTF::kMaxBytesInUTF8Sequence]) {
-    if ((uint32_t)uni > 0x10FFFF) {
+    if (static_cast<uint32_t>(uni) > 0x10FFFF) {
         return 0;
     }
     if (uni <= 127) {
         if (utf8) {
-            *utf8 = (char)uni;
+            *utf8 = static_cast<char>(uni);
         }
         return 1;
     }
-    char    tmp[4];
-    char*   p = tmp;
-    size_t  count = 1;
+    char tmp[4] = {};
+    char* p = tmp;
+    size_t count = 1;
     while (uni > 0x7F >> count) {
-        *p++ = (char)(0x80 | (uni & 0x3F));
+        *p++ = static_cast<char>(0x80 | (uni & 0x3F));
         uni >>= 6;
         count += 1;
     }
@@ -235,22 +239,22 @@ size_t SkUTF::ToUTF8(SkUnichar uni, char utf8[SkUTF::kMaxBytesInUTF8Sequence]) {
         while (p < tmp + count - 1) {
             *--utf8 = *p++;
         }
-        *--utf8 = (char)(~(0xFF >> count) | uni);
+        *--utf8 = static_cast<char>(~(0xFF >> count) | uni);
     }
     return count;
 }
 
 size_t SkUTF::ToUTF16(SkUnichar uni, uint16_t utf16[2]) {
-    if ((uint32_t)uni > 0x10FFFF) {
+    if (static_cast<uint32_t>(uni) > 0x10FFFF) {
         return 0;
     }
-    int extra = (uni > 0xFFFF);
+    const int extra = (uni > 0xFFFF) ? 1 : 0;
     if (utf16) {
         if (extra) {
-            utf16[0] = (uint16_t)((0xD800 - 64) + (uni >> 10));
-            utf16[1] = (uint16_t)(0xDC00 | (uni & 0x3FF));
+            utf16[0] = static_cast<uint16_t>((0xD800 - 64) + (uni >> 10));
+            utf16[1] = static_cast<uint16_t>(0xDC00 | (uni & 0x3FF));
         } else {
-            utf16[0] = (uint16_t)uni;
+            utf16[0] = static_cast<uint16_t>(uni);
         }
     }
     return 1 + extra;
@@ -265,12 +269,12 @@ int SkUTF::UTF8ToUTF16(uint16_t dst[], int dstCapacity, const char src[], size_t
     uint16_t* endDst = dst + dstCapacity;
     const char* endSrc = src + srcByteLength;
     while (src < endSrc) {
-        SkUnichar uni = NextUTF8(&src, endSrc);
+        const SkUnichar uni = NextUTF8(&src, endSrc);
         if (uni < 0) {
             return -1;
         }
 
-        uint16_t utf16[2];
+        uint16_t utf16[2] = {};
         size_t count = ToUTF16(uni, utf16);
         if (count == 0) {
             return -1;
@@ -297,12 +301,12 @@ int SkUTF::UTF16ToUTF8(char dst[], int dstCapacity, const uint16_t src[], size_t
     const char* endDst = dst + dstCapacity;
     const uint16_t* endSrc = src + srcLength;
     while (src < endSrc) {
-        SkUnichar uni = NextUTF16(&src, endSrc);
+        const SkUnichar uni = NextUTF16(&src, endSrc);
         if (uni < 0) {
             return -1;
         }
 
-        char utf8[SkUTF::kMaxBytesInUTF8Sequence];
+        char utf8[SkUTF::kMaxBytesInUTF8Sequence] = {};
         size_t count = ToUTF8(uni, utf8);
         if (count == 0) {
             return -1;
