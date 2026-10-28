@@ -54,6 +54,7 @@ else
     "build/$profile/stx_skia_arena_core_tests" "build/$profile/arena-core.raw" "build/$profile/arena-core-layout.raw"
     "build/$profile/stx_skia_utf_core_tests" "build/$profile/utf-core.raw" "build/$profile/utf-core-strict.raw"
     "build/$profile/stx_skia_buffer_core_tests" "build/$profile/buffer-core.raw"
+    "build/$profile/stx_skia_template_core_tests" "build/$profile/template-core.raw"
     "build/$profile/stx_skia_raster_pipeline_corpus_tests" "build/$profile/raster-pipeline.raw"
     "build/$profile/stx_skia_image_subset_tests" "build/$profile/image-subsets.raw"
     "build/$profile/stx_skia_image_sampling_tests" "build/$profile/image-sampling.raw" "build/$profile/image-sampling-corrected.raw"
