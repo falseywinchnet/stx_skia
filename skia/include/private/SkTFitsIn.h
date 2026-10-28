@@ -16,12 +16,12 @@
  */
 template <typename T, class Enable = void>
 struct sk_strip_enum {
-    typedef T type;
+    using type = T;
 };
 
 template <typename T>
-struct sk_strip_enum<T, typename std::enable_if<std::is_enum<T>::value>::type> {
-    typedef typename std::underlying_type<T>::type type;
+struct sk_strip_enum<T, std::enable_if_t<std::is_enum_v<T>>> {
+    using type = std::underlying_type_t<T>;
 };
 
 
@@ -66,10 +66,9 @@ struct sk_strip_enum<T, typename std::enable_if<std::is_enum<T>::value>::type> {
  */
 
 template <typename D, typename S>
-static constexpr inline
-typename std::enable_if<(std::is_integral<S>::value || std::is_enum<S>::value) &&
-                        (std::is_integral<D>::value || std::is_enum<D>::value), bool>::type
-/*bool*/ SkTFitsIn(S src) {
+constexpr std::enable_if_t<(std::is_integral_v<S> || std::is_enum_v<S>) &&
+                           (std::is_integral_v<D> || std::is_enum_v<D>), bool>
+SkTFitsIn(S src) {
     // Ensure that is_signed and is_unsigned are passed the arithmetic underlyng types of enums.
     using Sa = typename sk_strip_enum<S>::type;
     using Da = typename sk_strip_enum<D>::type;

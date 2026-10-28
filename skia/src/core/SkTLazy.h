@@ -52,7 +52,7 @@ public:
      */
     template <typename... Args> T* init(Args&&... args) {
         fValue.emplace(std::forward<Args>(args)...);
-        return this->get();
+        return (*this).get();
     }
 
     /**
@@ -63,12 +63,12 @@ public:
      */
     T* set(const T& src) {
         fValue = src;
-        return this->get();
+        return (*this).get();
     }
 
     T* set(T&& src) {
         fValue = std::move(src);
-        return this->get();
+        return (*this).get();
     }
 
     /**
@@ -97,8 +97,8 @@ public:
         return &fValue.value();
     }
 
-    T* operator->() { return this->get(); }
-    const T* operator->() const { return this->get(); }
+    T* operator->() { return (*this).get(); }
+    const T* operator->() const { return (*this).get(); }
 
     T& operator*() {
         SkASSERT(fValue.has_value());
@@ -113,8 +113,8 @@ public:
      * Like above but doesn't assert if object isn't initialized (in which case
      * nullptr is returned).
      */
-    const T* getMaybeNull() const { return fValue.has_value() ? this->get() : nullptr; }
-          T* getMaybeNull()       { return fValue.has_value() ? this->get() : nullptr; }
+    const T* getMaybeNull() const { return fValue.has_value() ? (*this).get() : nullptr; }
+          T* getMaybeNull()       { return fValue.has_value() ? (*this).get() : nullptr; }
 
 private:
     std::optional<T> fValue;
@@ -209,7 +209,7 @@ public:
     const T& operator *() const { return *fObj; }
 
 private:
-    const T*         fObj;
+    const T*         fObj = nullptr;
     std::optional<T> fLazy;
 };
 

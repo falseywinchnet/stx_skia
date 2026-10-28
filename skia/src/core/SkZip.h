@@ -68,30 +68,31 @@ public:
             typename = std::enable_if<std::conjunction<CanConvertToConst<Us, Ts>...>::value>>
     constexpr SkZip(const SkZip<Us...>& that) : fPointers(that.data()), fSize(that.size()) {}
 
-    constexpr ReturnTuple operator[](size_t i) const { return this->index(i);}
+    constexpr ReturnTuple operator[](size_t i) const { return (*this).index(i);}
     constexpr size_t size() const { return fSize; }
-    constexpr bool empty() const { return this->size() == 0; }
-    constexpr ReturnTuple front() const { return this->index(0); }
-    constexpr ReturnTuple back() const { return this->index(this->size() - 1); }
+    constexpr bool empty() const { return (*this).size() == 0; }
+    constexpr ReturnTuple front() const { return (*this).index(0); }
+    constexpr ReturnTuple back() const { return (*this).index((*this).size() - 1); }
     constexpr Iterator begin() const { return Iterator(this, 0); }
-    constexpr Iterator end() const { return Iterator(this, this->size()); }
-    template<size_t I> constexpr auto get() const {
+    constexpr Iterator end() const { return Iterator(this, (*this).size()); }
+    template<size_t I>
+    constexpr SkSpan<std::tuple_element_t<I, std::tuple<Ts...>>> get() const {
         return SkSpan(std::get<I>(fPointers), fSize);
     }
     constexpr std::tuple<Ts*...> data() const { return fPointers; }
     constexpr SkZip first(size_t n) const {
-        SkASSERT(n <= this->size());
+        SkASSERT(n <= (*this).size());
         if (n == 0) { return SkZip(); }
         return SkZip(n, fPointers);
     }
     constexpr SkZip last(size_t n) const {
-        SkASSERT(n <= this->size());
+        SkASSERT(n <= (*this).size());
         if (n == 0) { return SkZip(); }
-        return SkZip(n, this->pointersAt(fSize - n));
+        return SkZip(n, (*this).pointersAt(fSize - n));
     }
     constexpr SkZip subspan(size_t offset, size_t count) const {
-        SkASSERT(offset < this->size());
-        SkASSERT(count <= this->size() - offset);
+        SkASSERT(offset < (*this).size());
+        SkASSERT(count <= (*this).size() - offset);
         if (count == 0) { return SkZip(); }
         return SkZip(count, pointersAt(offset));
     }
@@ -100,8 +101,8 @@ private:
     constexpr SkZip(size_t n, const std::tuple<Ts*...>& pointers) : fPointers(pointers), fSize(n) {}
 
     constexpr ReturnTuple index(size_t i) const {
-        SkASSERT(this->size() > 0);
-        SkASSERT(i < this->size());
+        SkASSERT((*this).size() > 0);
+        SkASSERT(i < (*this).size());
         return indexDetail(i, std::make_index_sequence<sizeof...(Ts)>());
     }
 
@@ -111,8 +112,8 @@ private:
     }
 
     std::tuple<Ts*...> pointersAt(size_t i) const {
-        SkASSERT(this->size() > 0);
-        SkASSERT(i < this->size());
+        SkASSERT((*this).size() > 0);
+        SkASSERT(i < (*this).size());
         return pointersAtDetail(i, std::make_index_sequence<sizeof...(Ts)>());
     }
 
@@ -127,8 +128,8 @@ private:
 
 class SkMakeZipDetail {
     template<typename T> struct DecayPointer{
-        using U = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
-        using type = typename std::conditional<std::is_pointer<U>::value, U, T>::type;
+        using U = std::remove_cv_t<std::remove_reference_t<T>>;
+        using type = std::conditional_t<std::is_pointer_v<U>, U, T>;
     };
     template<typename T> using DecayPointerT = typename DecayPointer<T>::type;
 
@@ -152,12 +153,18 @@ class SkMakeZipDetail {
     };
     // Only accept l-value references to collections.
     template<typename C> struct ContiguousMemory<C&> {
-        using value_type = typename std::remove_pointer<decltype(std::declval<C>().data())>::type;
+        // decltype is kept: a container's data() may be overloaded on const, so neither a member
+        // pointer nor C::value_type names the element type it returns.
+        using value_type = std::remove_pointer_t<decltype(std::declval<C>().data())>;
         static constexpr value_type* Data(C& c) { return c.data(); }
         static constexpr size_t Size(C& c) { return c.size(); }
     };
     template<typename C> using Span = ContiguousMemory<DecayPointerT<C>>;
+public:
+    // Public so that SkMakeZip can name its result type.
     template<typename C> using ValueType = typename Span<C>::value_type;
+
+private:
 
     template<typename C, typename... Ts> struct PickOneSize {};
     template <typename T, typename... Ts> struct PickOneSize<T*, Ts...> {
@@ -177,7 +184,7 @@ class SkMakeZipDetail {
 
 public:
     template<typename... Ts>
-    static constexpr auto MakeZip(Ts&& ... ts) {
+    static constexpr SkZip<ValueType<Ts>...> MakeZip(Ts&& ... ts) {
         // NOLINTBEGIN
         // Pick the first collection that has a size, and use that for the size.
         size_t size = PickOneSize<DecayPointerT<Ts>...>::Size(std::forward<Ts>(ts)...);
@@ -205,7 +212,7 @@ template<typename... Ts>
 SkZip(size_t size, Ts*... ts) -> SkZip<Ts...>;
 
 template<typename... Ts>
-inline constexpr auto SkMakeZip(Ts&& ... ts) {
+inline constexpr SkZip<SkMakeZipDetail::ValueType<Ts>...> SkMakeZip(Ts&& ... ts) {
     return SkMakeZipDetail::MakeZip(std::forward<Ts>(ts)...);
 }
 #endif //SkZip_DEFINED

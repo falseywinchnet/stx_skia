@@ -16,7 +16,7 @@
     If x is NaN, SkTPin() returns lo but std::clamp() returns NaN.
 */
 template <typename T>
-static constexpr const T& SkTPin(const T& x, const T& lo, const T& hi) {
+constexpr const T& SkTPin(const T& x, const T& lo, const T& hi) {
     return std::max(lo, std::min(x, hi));
 }
 
