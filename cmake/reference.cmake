@@ -299,7 +299,8 @@ endforeach()
 
 # Strings and the OS file ports before the string prune. The port is the POSIX or the
 # Windows file, whichever this platform compiles.
-foreach(unit IN ITEMS src/core/SkString.cpp src/core/SkStringUtils.cpp src/core/SkUTF.cpp)
+foreach(unit IN ITEMS src/core/SkString.cpp src/core/SkStringUtils.cpp src/core/SkUTF.cpp
+                      src/core/SkBuffer.cpp src/core/SkDataTable.cpp)
     list(REMOVE_ITEM stx_sources skia/${unit})
     list(APPEND stx_sources baseline/skia/${unit})
 endforeach()
