@@ -306,8 +306,12 @@ void saturating_cases(Output& output) {
         if (a != std::numeric_limits<int32_t>::min()) append(output, SkAbs32(a));
         ++output.cases;
     }
-    for (const int64_t x : {std::numeric_limits<int64_t>::min(), -2147483649LL, -2147483648LL,
-                            0LL, 2147483647LL, 2147483648LL, std::numeric_limits<int64_t>::max()}) {
+    // A typed array: int64_t is long on Linux and long long on macOS, so a braced list mixing
+    // numeric_limits with LL literals has no single element type there.
+    const std::array<int64_t, 7> wide{std::numeric_limits<int64_t>::min(), -2147483649LL,
+                                      -2147483648LL, 0, 2147483647LL, 2147483648LL,
+                                      std::numeric_limits<int64_t>::max()};
+    for (const int64_t x : wide) {
         append(output, Sk64_pin_to_s32(x));
     }
     ++output.cases;
