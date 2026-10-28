@@ -223,9 +223,9 @@ void append_cases(Output& output) {
         text.append(SkString(piece.c_str()));
         record(output, text);
     }
-    // Code points of one to four UTF-8 bytes, a lone surrogate, and a value past the last code
-    // point.
-    const std::array<SkUnichar, 13> points{0x41, 0x7F, 0x80, 0xE9, 0x7FF, 0x800, 0xD800, 0x20AC,
+    // Code points of one to four UTF-8 bytes, and a value past the last code point. Lone
+    // surrogates are covered by utf_core.cpp's strict artifact, since encoding them is invalid.
+    const std::array<SkUnichar, 12> points{0x41, 0x7F, 0x80, 0xE9, 0x7FF, 0x800, 0x20AC,
                                            0xFFFF, 0x10000, 0x1F600, 0x10FFFF, 0x110000};
     for (const SkUnichar point : points) {
         SkString unichar("u");
